@@ -106,7 +106,7 @@ Incrocio tra: calore Ghibli × graphic novel italiana × UI Pokémon GO outdoor-
 ### 5 Elementi creature
 | Elemento | Ispirazione | Forte contro | Debole contro |
 |---|---|---|---|
-| 🔥 Fiamma | Miti vulcanici italiani | Terra, Bosco | Adriatico |
+| 🔥 Fiamma | Miti vulcanici italiani | Bosco | Adriatico, Terra |
 | 🌊 Adriatico | Spiriti del mare Adriatico | Fiamma, Terra | Bosco |
 | 🌿 Bosco | Fauna appenninica | Adriatico | Fiamma |
 | ⛰️ Terra | Colline marchigiane | Fiamma | Adriatico |
@@ -120,7 +120,8 @@ Incrocio tra: calore Ghibli × graphic novel italiana × UI Pokémon GO outdoor-
 
 ### Tabelle Core (permanenti)
 ```sql
-users              -- Supabase Auth: id, email, nickname, avatar_url
+users              -- Supabase Auth: id, email, nickname, avatar_url,
+                   --   is_admin(boolean, default false), gdpr_consent_at(timestamptz), gdpr_consent_minor(boolean)
 creatures          -- id, name, description, element, rarity, hp, atk, def,
                    --   min_level, image_url, sprite_url, lottie_url, spawn_weight, evolution_of
 items              -- id, name, type(rete/esca/uovo/battaglia), effect_value, description, shop_price
@@ -142,7 +143,11 @@ hall_of_fame       -- id, user_id, session_id, rank, score, creatures_caught, se
 player_creatures   -- id, user_id, creature_id, session_id, duplicates_count, evolved, caught_at
 player_inventory   -- id, user_id, session_id, item_id, quantity
 encounters         -- id, user_id, creature_id, session_id, status(active/caught/fled/fought),
-                   --   trigger(gps/timer), wild_creature_hp, started_at, resolved_at
+                   --   trigger(gps/timer), wild_creature_hp, player_creature_id(uuid FK creatures, locked at start),
+                   --   started_at, resolved_at
+                   -- NOTA: player_creature_id viene letto da player_sessions.selected_creature_id al momento
+                   --   di POST /api/game/encounter/start e salvato immutabile — non cambia tra i turni.
+                   --   Questo previene il cambio di creatura mid-fight come exploit.
 duels              -- id, challenger_id, opponent_id, session_id, status, winner_id,
                    --   challenger_creature_id, opponent_creature_id,
                    --   room_code(4char, no ambiguous chars: no 0/O/I/1), started_at, ended_at
@@ -207,6 +212,7 @@ notifications      -- id, session_id, title, body, sent_at, sent_by_admin_id
 | `POST /api/game/duel/connect` | Crea/join lobby duello via room code |
 | `POST /api/game/duel/action` | Invia azione duello (attacco, oggetto, resa) |
 | `POST /api/game/qr/scan` | Valida QR code, applica effetti |
+| `POST /api/game/shop/buy` | Acquisto oggetto — deduce oro e aggiunge item a player_inventory (atomico server-side) |
 | `POST /api/auth/join` | Valida codice invito, associa utente a sessione |
 | `GET /api/admin/dashboard` | Statistiche live sessione |
 | `POST /api/admin/notify` | Broadcast notifica a tutti i giocatori |
@@ -249,7 +255,7 @@ notifications      -- id, session_id, title, body, sent_at, sent_by_admin_id
 
 ### Combattimento in Incontro Selvaggio (azione COMBATTI)
 Il giocatore può scegliere di combattere la creatura selvatica **prima** di tentare la cattura. Logica:
-- Il giocatore usa la `selected_creature_id` dalla propria `player_sessions`
+- Il giocatore usa la `player_creature_id` dell'`encounters` — copiata da `selected_creature_id` al momento di `encounter/start` e immutabile per tutta la durata dell'incontro (anti-exploit)
 - Ogni turno: danno = ATK creatura giocatore × dado(0.8–1.2). La creatura selvatica attacca per prima se Rara+
 - Ridurre l'HP della creatura selvatica a ≤ 30% → bonus cattura +20% sul prossimo tentativo con Rete
 - Ridurre HP a 0 → la creatura fugge (non catturabile). Il giocatore deve gestire il danno
