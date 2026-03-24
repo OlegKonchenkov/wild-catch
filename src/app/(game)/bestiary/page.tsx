@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
@@ -12,7 +12,7 @@ export default function BestiaryPage() {
   const [selectedCreature, setSelectedCreature] = useState<Creature | null>(null)
   const [selectedPlayerCreature, setSelectedPlayerCreature] = useState<PlayerCreature | null>(null)
   const [message, setMessage] = useState('')
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
@@ -69,13 +69,11 @@ export default function BestiaryPage() {
       // Refresh player creatures
       const user = (await supabase.auth.getUser()).data.user
       if (!user) return
-      const sessionIdRefresh = localStorage.getItem('current_session_id')
-      if (!sessionIdRefresh) return
       const { data: refreshed } = await supabase
         .from('player_creatures')
         .select('*, creatures(*)')
         .eq('user_id', user.id)
-        .eq('session_id', sessionIdRefresh)
+        .eq('session_id', sessionId)
       if (refreshed) setPlayerCreatures(refreshed as unknown as PlayerCreature[])
     } else {
       setMessage(data.error)

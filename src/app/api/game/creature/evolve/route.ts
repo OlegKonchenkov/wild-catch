@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     .from('player_creatures')
     .update({ evolved: true, creature_id: evolvedForm.id })
     .eq('id', playerCreatureId)
+    .eq('user_id', user.id)
 
   return NextResponse.json({
     evolved: true,
