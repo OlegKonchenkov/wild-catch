@@ -143,7 +143,7 @@ hall_of_fame       -- id, user_id, session_id, rank, score, creatures_caught, se
 player_creatures   -- id, user_id, creature_id, session_id, duplicates_count, evolved, caught_at
 player_inventory   -- id, user_id, session_id, item_id, quantity
 encounters         -- id, user_id, creature_id, session_id, status(active/caught/fled/fought),
-                   --   trigger(gps/timer), wild_creature_hp, player_creature_id(uuid FK creatures, locked at start),
+                   --   trigger(gps/timer), wild_creature_hp, player_creature_id(uuid FK player_creatures, locked at start),
                    --   started_at, resolved_at
                    -- NOTA: player_creature_id viene letto da player_sessions.selected_creature_id al momento
                    --   di POST /api/game/encounter/start e salvato immutabile — non cambia tra i turni.
