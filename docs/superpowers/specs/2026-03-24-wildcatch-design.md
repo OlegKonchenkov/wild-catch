@@ -45,11 +45,11 @@ WildCatch è una PWA mobile-first per eventi outdoor dal vivo. I giocatori esplo
 | Vercel | Hosting + CI/CD da GitHub (piano Hobby, gratuito) |
 | Resend | Magic link email fallback |
 | next-pwa | Service Worker, installabilità, offline partial |
-| OpenAI gpt-image-1.5 | Generazione artwork creature (high quality, ~€3–8 totale) |
+| OpenAI gpt-image-1 | Generazione artwork creature (high quality, ~€8 totale — vedi Sezione 4) |
 | Leaflet + OpenStreetMap | Mappa area evento (gratuito, no Google Maps) |
 | Supabase pg_cron | Chiusura automatica sessione (gratis, nessun Vercel cron) |
 
-**Costo mensile MVP: €0** (immagini AI ~€3–8 una tantum)
+**Costo mensile MVP: €0** (immagini AI ~€8 una tantum — vedi breakdown Sezione 4)
 
 ---
 
@@ -60,8 +60,18 @@ Incrocio tra: calore Ghibli × graphic novel italiana × UI Pokémon GO outdoor-
 
 ### Creature — Standard qualità Pokémon
 - **Artwork:** Illustrazione digitale HD, bold outline 2–3px, cel-shading caldo, luce ambiente estiva italiana
-- **Dimensioni:** 512×512px thumbnail, 1024×1024px artwork principale, 1536×1024px per schermata incontro
-- **Modello generazione:** OpenAI gpt-image-1 **high quality** ($0.167/img) per i 30 artwork principali — qualità massima equivalente Pokémon. Budget stimato: ~€5 per il set completo
+- **Modello generazione:** OpenAI `gpt-image-1` (modello ufficiale, API ID esatto: `gpt-image-1`) — usato ovunque nel progetto
+- **Budget immagini — breakdown completo:**
+
+| Tipo immagine | Dimensione | Qualità API | Prezzo | Quantità | Subtotale |
+|---|---|---|---|---|---|
+| Artwork principale | 1024×1024px | high | $0.167 | 30 | ~$5.01 |
+| Thumbnail / Bestiario | 1024×1024px | medium | $0.042 | 30 | ~$1.26 |
+| Schermata incontro | 1536×1024px | high | $0.250 | 30 | ~$7.50 |
+| Immagini UI / sfondi | 1024×1024px | medium | $0.042 | 10 | ~$0.42 |
+| **Totale stimato** | | | | **100 img** | **~$14.20 (~€13)** |
+
+*Prima generazione: usa Google AI Studio (gratuito, 500 img/giorno) per iterare prompt e stile. Poi run finale a pagamento con OpenAI per qualità massima.*
 - **Animazioni creature** (Framer Motion + Lottie):
   - **Idle loop:** leggero respiro/fluttuazione continua (2–3s loop)
   - **Attacco:** animazione forward + particle effect elemento (fuoco, acqua, foglie, ecc.)
@@ -100,9 +110,9 @@ Incrocio tra: calore Ghibli × graphic novel italiana × UI Pokémon GO outdoor-
 | 🌊 Adriatico | Spiriti del mare Adriatico | Fiamma, Terra | Bosco |
 | 🌿 Bosco | Fauna appenninica | Adriatico | Fiamma |
 | ⛰️ Terra | Colline marchigiane | Fiamma | Adriatico |
-| 🎵 Armonia | Rossini / UNESCO City of Music | +15% danno base | Nessuna |
+| 🎵 Armonia | Rossini / UNESCO City of Music | +15% danno base (tutti) | Terra, Fiamma |
 
-*Il sistema elementi è opzionale — disattivabile dall'admin per eventi più semplici.*
+*Nota Armonia: elemento leggendario, assegnato solo a creature Epico/Leggendario. Il +15% base compensa la debolezza doppia. Il sistema elementi è opzionale — disattivabile dall'admin per eventi più semplici.*
 
 ---
 
@@ -123,7 +133,7 @@ sessions           -- id, name, status(draft/ready/active/ended), area_bounds(JS
                    --   narrative_config(JSON): {story_title, intro_text, villain_name, chapters[]}
 session_invites    -- id, session_id, code(8char univoco), used_by_user_id, used_at, is_active
 player_sessions    -- id, user_id, session_id, level, exp, gold, role(player/boss/villain),
-                   --   last_position(POINT), score_final, joined_at
+                   --   last_position(POINT), score_final, selected_creature_id, joined_at
 hall_of_fame       -- id, user_id, session_id, rank, score, creatures_caught, season_label, awarded_at
 ```
 
@@ -131,10 +141,11 @@ hall_of_fame       -- id, user_id, session_id, rank, score, creatures_caught, se
 ```sql
 player_creatures   -- id, user_id, creature_id, session_id, duplicates_count, evolved, caught_at
 player_inventory   -- id, user_id, session_id, item_id, quantity
-encounters         -- id, user_id, creature_id, session_id, status(active/caught/fled),
-                   --   trigger(gps/timer), started_at, resolved_at
+encounters         -- id, user_id, creature_id, session_id, status(active/caught/fled/fought),
+                   --   trigger(gps/timer), wild_creature_hp, started_at, resolved_at
 duels              -- id, challenger_id, opponent_id, session_id, status, winner_id,
-                   --   room_code(4char), started_at, ended_at
+                   --   challenger_creature_id, opponent_creature_id,
+                   --   room_code(4char, no ambiguous chars: no 0/O/I/1), started_at, ended_at
 ```
 
 ### Tabelle Missioni & QR
@@ -143,7 +154,13 @@ missions           -- id, session_id, chapter_order, title, description, type,
                    --   target, target_count, reward_gold, reward_exp, reward_item_id, is_required
 player_missions    -- id, user_id, mission_id, progress, completed_at
 qr_codes           -- id, session_id, type(uovo/indizio/oggetto/boss/evento),
-                   --   payload(JSON), uses_remaining, label, created_at
+                   --   payload(JSON, schema per tipo — vedi sotto), uses_remaining, label, created_at
+-- Payload schema per tipo QR:
+-- uovo:    { egg_rarity: "comune"|"non_comune"|"raro"|"epico"|"leggendario", creature_pool: [uuid,...] }
+-- indizio: { chapter_order: number, text: string, image_url?: string }
+-- oggetto: { item_id: uuid, quantity: number }
+-- boss:    { creature_id: uuid, level_override: number, reward_item_id?: uuid }
+-- evento:  { event_type: "team_rocket"|"capo_palestra"|"bonus_exp", effect: object }
 notifications      -- id, session_id, title, body, sent_at, sent_by_admin_id
 ```
 
@@ -183,7 +200,10 @@ notifications      -- id, session_id, title, body, sent_at, sent_by_admin_id
 |---|---|
 | `POST /api/game/position` | Aggiorna GPS, valuta trigger incontro, controlla scadenza sessione |
 | `POST /api/game/encounter/start` | Genera incontro — RNG creatura server-side |
-| `POST /api/game/encounter/catch` | RNG cattura server-side, aggiorna inventario |
+| `POST /api/game/encounter/catch` | RNG cattura server-side, aggiorna inventario, valuta evoluzione |
+| `POST /api/game/encounter/fight` | Esegue 1 turno combattimento selvaggio, aggiorna wild_creature_hp |
+| `POST /api/game/creature/evolve` | Trigger manuale evoluzione dal Bestiario (duplicates_count ≥ 3) |
+| `PUT /api/game/creature/select` | Imposta selected_creature_id in player_sessions |
 | `POST /api/game/duel/connect` | Crea/join lobby duello via room code |
 | `POST /api/game/duel/action` | Invia azione duello (attacco, oggetto, resa) |
 | `POST /api/game/qr/scan` | Valida QR code, applica effetti |
@@ -221,11 +241,29 @@ notifications      -- id, session_id, title, body, sent_at, sent_by_admin_id
 - Max 1 incontro attivo per giocatore
 
 ### Cattura (RNG server-side)
-- 1 solo tentativo per incontro
+- 1 solo tentativo con Rete per incontro — se fallisce la creatura fugge
 - Probabilità base per rarità (vedi tabella sopra)
-- Ogni tipo di Rete aggiunge bonus additivo
+- Ogni tipo di Rete aggiunge bonus additivo alla probabilità
 - RNG eseguito esclusivamente server-side — client non vede mai la soglia
 - Anti-cheat: rate limit 1 req/5s per utente, validità GPS (max 60km/h)
+
+### Combattimento in Incontro Selvaggio (azione COMBATTI)
+Il giocatore può scegliere di combattere la creatura selvatica **prima** di tentare la cattura. Logica:
+- Il giocatore usa la `selected_creature_id` dalla propria `player_sessions`
+- Ogni turno: danno = ATK creatura giocatore × dado(0.8–1.2). La creatura selvatica attacca per prima se Rara+
+- Ridurre l'HP della creatura selvatica a ≤ 30% → bonus cattura +20% sul prossimo tentativo con Rete
+- Ridurre HP a 0 → la creatura fugge (non catturabile). Il giocatore deve gestire il danno
+- Max 5 turni di combattimento per incontro, poi la creatura fugge automaticamente
+- Stato `encounters.wild_creature_hp` traccia l'HP rimanente lato server
+- Il giocatore non perde la propria creatura (HP si resettano dopo l'incontro)
+- API: `POST /api/game/encounter/fight` — esegue 1 turno, restituisce HP aggiornati + animazione
+
+### Evoluzione
+- Trigger: automatico al momento della cattura quando `duplicates_count` raggiunge 3
+- Flusso: `POST /api/game/encounter/catch` controlla `duplicates_count` → se = 3 → avvia evoluzione
+- API dedicata: `POST /api/game/creature/evolve` per trigger manuale dal Bestiario
+- L'evoluzione aggiorna `player_creatures.evolved = true`, sostituisce `creature_id` con la forma evoluta
+- La creatura evolta ha statistiche potenziate definite nel campo `creatures.evolution_of`
 
 ### Duelli
 - Connessione via codice stanza 4 caratteri o QR condiviso
@@ -328,19 +366,33 @@ notifications      -- id, session_id, title, body, sent_at, sent_by_admin_id
 ---
 
 ## 10. Accesso Offline (Service Worker)
-Cache locale: inventario, Bestiario, missioni correnti, ultimo stato mappa
-Sync automatico al ripristino connessione
-Incontri e catture richiedono connessione (RNG server-side)
+Cache locale (read-only): inventario, Bestiario, missioni correnti, ultimo stato mappa e tile OpenStreetMap del bounding box sessione (pre-cached all'avvio sessione).
+
+**Strategia sync: server-wins.** Le operazioni che consumano risorse (cattura, uso Rete, acquisto shop) richiedono obbligatoriamente connessione attiva — il client non può eseguirle offline. Questo elimina ogni possibile conflitto di inventario: offline il giocatore può solo leggere il proprio stato, non modificarlo. Al ripristino connessione il client ricarica lo stato dal server (nessun merge necessario).
 
 ---
 
 ## 11. Sicurezza
+
+### Autenticazione Admin
+- Campo `users.is_admin (boolean)` in Supabase — assegnato manualmente via Supabase Dashboard da chi gestisce il progetto
+- Autenticazione: Google OAuth identica ai giocatori, ma RLS Supabase verifica `is_admin = true` su ogni richiesta alle route `/admin/*`
+- Middleware Next.js blocca tutte le route `/admin` se `is_admin` non è presente nella sessione JWT
+- Per eventi ad alto rischio (futuro): aggiungere TOTP via Supabase MFA (supportato nativamente)
+
+### GDPR-K — Minori sotto i 14 anni
+- Onboarding: checkbox "Ho 14 anni o più, oppure ho il consenso di un genitore/tutore"
+- Campo `users.gdpr_consent_at (timestamp)` + `users.gdpr_consent_minor (boolean)` salvati al momento del consenso
+- Per eventi supervisionati (bambini presenti con genitori): il consenso parentale si considera implicito nella presenza fisica all'evento a pagamento. La checkbox è documentazione digitale di questo consenso
+- Dati raccolti per minori: solo nickname, avatar Google (opzionale), progressi di gioco. Nessun dato di localizzazione nominale esposto (GPS aggregato solo per admin, non per nickname)
+- Admin può esportare o cancellare i dati di un utente specifico dalla schermata Giocatori
+
+### Altre misure
 - RNG cattura e incontri: server-side only
 - Anti-cheat GPS: velocità max 60km/h, spike ignorati
 - Rate limiting: max 1 req/5s per utente su API gioco
 - Row Level Security (RLS) su tutte le tabelle Supabase
-- Admin con ruolo separato, autenticazione più robusta
-- Codici invito monouso validati server-side
+- Codici invito monouso validati server-side. Admin può revocare singolo codice da `/admin/invites`
 
 ---
 
@@ -376,4 +428,4 @@ Incontri e catture richiedono connessione (RNG server-side)
 | Function timeout 10s (Vercel free) | Tutte le operazioni di gioco < 500ms, nessun problema |
 
 **Costo mensile stimato: €0**
-**Costo immagini creature (una tantum): ~€5–8** (30 artwork high quality + thumbnail + UI)
+**Costo immagini creature (una tantum): ~€13** (100 immagini totali — vedi breakdown Sezione 4)
