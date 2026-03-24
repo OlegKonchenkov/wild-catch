@@ -45,11 +45,11 @@ WildCatch è una PWA mobile-first per eventi outdoor dal vivo. I giocatori esplo
 | Vercel | Hosting + CI/CD da GitHub (piano Hobby, gratuito) |
 | Resend | Magic link email fallback |
 | next-pwa | Service Worker, installabilità, offline partial |
-| OpenAI gpt-image-1 | Generazione artwork creature (high quality, ~€8 totale — vedi Sezione 4) |
+| OpenAI gpt-image-1 | Generazione artwork creature (high quality, ~€13 totale — vedi Sezione 4) |
 | Leaflet + OpenStreetMap | Mappa area evento (gratuito, no Google Maps) |
 | Supabase pg_cron | Chiusura automatica sessione (gratis, nessun Vercel cron) |
 
-**Costo mensile MVP: €0** (immagini AI ~€8 una tantum — vedi breakdown Sezione 4)
+**Costo mensile MVP: €0** (immagini AI ~€13 una tantum — vedi breakdown Sezione 4)
 
 ---
 
@@ -263,7 +263,9 @@ Il giocatore può scegliere di combattere la creatura selvatica **prima** di ten
 - Flusso: `POST /api/game/encounter/catch` controlla `duplicates_count` → se = 3 → avvia evoluzione
 - API dedicata: `POST /api/game/creature/evolve` per trigger manuale dal Bestiario
 - L'evoluzione aggiorna `player_creatures.evolved = true`, sostituisce `creature_id` con la forma evoluta
-- La creatura evolta ha statistiche potenziate definite nel campo `creatures.evolution_of`
+- La forma evoluta è una **riga separata** nella tabella `creatures` con statistiche proprie (HP, ATK, DEF, nuovo artwork). Il campo `creatures.evolution_of` è una **foreign key** che punta all'UUID della forma base, permettendo di risalire alla catena evolutiva
+- Il pannello admin `/admin/creatures` supporta la creazione di forme evolute: si crea una nuova creatura, si seleziona la forma base nel campo "Evoluzione di" — il sistema la collegherà automaticamente alla forma base tramite `evolution_of`
+- Esempio: "Fiammare" (base, id=AAA) → "Fiammare+" (evoluta, id=BBB, `evolution_of=AAA`). Al momento dell'evoluzione il giocatore ha `player_creatures.creature_id=BBB`
 
 ### Duelli
 - Connessione via codice stanza 4 caratteri o QR condiviso
