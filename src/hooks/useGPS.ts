@@ -13,7 +13,10 @@ export function useGPS(onPosition?: (pos: GPSPosition) => void) {
   const [error, setError] = useState<string | null>(null)
   const watchIdRef = useRef<number | null>(null)
   const onPositionRef = useRef(onPosition)
-  onPositionRef.current = onPosition
+
+  useEffect(() => {
+    onPositionRef.current = onPosition
+  }, [onPosition])
 
   useEffect(() => {
     if (!navigator.geolocation) {
