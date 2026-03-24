@@ -1,0 +1,102 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { calculateFightDamage } from '@/lib/game/rng'
+import { getElementMultiplier } from '@/lib/game/elements'
+import type { Element } from '@/lib/types'
+
+const RARE_TIERS = ['raro', 'epico', 'leggendario']
+
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+
+  const body = await request.json().catch(() => ({}))
+  const { encounterId } = body
+
+  if (!encounterId) return NextResponse.json({ error: 'encounterId mancante' }, { status: 400 })
+
+  // Get encounter with creature data
+  const { data: encounter } = await supabase
+    .from('encounters')
+    .select('*, creatures(*)')
+    .eq('id', encounterId)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .single()
+
+  if (!encounter) return NextResponse.json({ error: 'Incontro non trovato' }, { status: 404 })
+
+  const wildCreature = (encounter as any).creatures
+
+  if (!encounter.player_creature_id) {
+    return NextResponse.json({
+      error: 'Nessuna creatura selezionata. Seleziona una creatura dal Bestiario prima di combattere.'
+    }, { status: 400 })
+  }
+
+  const { data: playerCreature } = await supabase
+    .from('player_creatures')
+    .select('*, creatures(*)')
+    .eq('id', encounter.player_creature_id)
+    .single()
+
+  if (!playerCreature) return NextResponse.json({ error: 'Creatura giocatore non trovata' }, { status: 404 })
+
+  const playerCr = (playerCreature as any).creatures
+  const isRarePlus = RARE_TIERS.includes(wildCreature.rarity)
+
+  let wildHpRemaining = encounter.wild_creature_hp
+  let playerTookDamage = false
+  let playerDamage = 0
+  let wildDamage = 0
+
+  // Rara+ attacks first
+  if (isRarePlus) {
+    wildDamage = calculateFightDamage(wildCreature.atk)
+    playerTookDamage = true
+  }
+
+  // Player attacks with element multiplier
+  const elementMult = getElementMultiplier(
+    playerCr.element as Element,
+    wildCreature.element as Element
+  )
+  playerDamage = Math.round(calculateFightDamage(playerCr.atk) * elementMult)
+  wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
+
+  // Non-rare attacks after player
+  if (!isRarePlus && wildHpRemaining > 0) {
+    wildDamage = calculateFightDamage(wildCreature.atk)
+    playerTookDamage = true
+  }
+
+  // Determine outcome
+  let fightResult: 'ongoing' | 'fled' | 'catchable' = 'ongoing'
+
+  if (wildHpRemaining === 0) {
+    fightResult = 'fled'  // HP 0 = flees
+  } else if (wildHpRemaining <= wildCreature.hp * 0.3) {
+    fightResult = 'catchable'  // ≤30% HP = +20% catch bonus
+  }
+
+  await supabase
+    .from('encounters')
+    .update({
+      wild_creature_hp: wildHpRemaining,
+      status: fightResult === 'fled' ? 'fought' : 'active',
+      resolved_at: fightResult === 'fled' ? new Date().toISOString() : null,
+    })
+    .eq('id', encounterId)
+
+  return NextResponse.json({
+    wildHpRemaining,
+    wildHpMax: wildCreature.hp,
+    playerDamage,
+    wildDamage,
+    playerTookDamage,
+    elementMultiplier: elementMult,
+    fightResult,
+    catchBonus: fightResult === 'catchable' ? 0.20 : 0,
+  })
+}

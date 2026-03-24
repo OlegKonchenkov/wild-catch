@@ -1,0 +1,87 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { selectCreatureForEncounter } from '@/lib/game/rng'
+
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+
+  const body = await request.json().catch(() => ({}))
+  const { sessionId, trigger = 'gps' } = body
+
+  if (!sessionId) return NextResponse.json({ error: 'sessionId mancante' }, { status: 400 })
+
+  // Get player session
+  const { data: playerSession } = await supabase
+    .from('player_sessions')
+    .select('id, level, selected_creature_id')
+    .eq('user_id', user.id)
+    .eq('session_id', sessionId)
+    .single()
+
+  if (!playerSession) return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
+
+  // Check no active encounter already
+  const { data: existing } = await supabase
+    .from('encounters')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('session_id', sessionId)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (existing) return NextResponse.json({ error: 'Incontro già in corso', encounterId: existing.id })
+
+  // Get creatures for selection
+  const { data: creatures } = await supabase
+    .from('creatures')
+    .select('id, spawn_weight, rarity, min_level, hp, element')
+
+  if (!creatures?.length) return NextResponse.json({ error: 'Nessuna creatura disponibile' }, { status: 500 })
+
+  // RNG creature selection — server-side only
+  const selected = selectCreatureForEncounter(creatures, playerSession.level)
+  if (!selected) return NextResponse.json({ error: 'Nessuna creatura idonea' }, { status: 500 })
+
+  // Get full creature data
+  const { data: creature } = await supabase
+    .from('creatures')
+    .select('*')
+    .eq('id', selected.id)
+    .single()
+
+  if (!creature) return NextResponse.json({ error: 'Errore dati creatura' }, { status: 500 })
+
+  // Create encounter — lock player_creature_id at start (anti-cheat)
+  const { data: encounter, error: encError } = await supabase
+    .from('encounters')
+    .insert({
+      user_id: user.id,
+      creature_id: creature.id,
+      session_id: sessionId,
+      status: 'active',
+      trigger,
+      wild_creature_hp: creature.hp,
+      player_creature_id: playerSession.selected_creature_id,
+    })
+    .select()
+    .single()
+
+  if (encError) return NextResponse.json({ error: 'Errore creazione incontro' }, { status: 500 })
+
+  return NextResponse.json({
+    encounterId: encounter.id,
+    creature: {
+      id: creature.id,
+      name: creature.name,
+      element: creature.element,
+      rarity: creature.rarity,
+      hp: creature.hp,
+      image_url: creature.image_url,
+      sprite_url: creature.sprite_url,
+      lottie_url: creature.lottie_url,
+    },
+    wildHp: creature.hp,
+  })
+}
