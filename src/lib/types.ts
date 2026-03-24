@@ -61,7 +61,7 @@ export interface PlayerSession {
   exp: number
   gold: number
   role: PlayerRole
-  last_position: { x: number; y: number } | null
+  last_position: { lat: number; lng: number } | null
   score_final: number | null
   selected_creature_id: string | null
   joined_at: string
@@ -159,13 +159,25 @@ export interface HallOfFame {
   awarded_at: string
 }
 
+export interface PlayerMission {
+  id: string
+  user_id: string
+  mission_id: string
+  progress: number
+  completed_at: string | null
+  mission?: Mission
+}
+
 // Element type chart: attacker element -> multiplier for defender
+// Forte (1.5x): Fiamma→Bosco, Adriatico→Fiamma/Terra, Bosco→Adriatico, Terra→Fiamma
+// Debole (0.5x): inverse of forte relationships
+// Armonia: legendary, +15% flat (handled separately); weak to Terra and Fiamma (1.5x incoming)
 export const ELEMENT_MULTIPLIERS: Record<Element, Partial<Record<Element, number>>> = {
-  fiamma: { bosco: 1.5, adriatico: 0.5, terra: 0.5 },
+  fiamma: { bosco: 1.5, armonia: 1.5 },
   adriatico: { fiamma: 1.5, terra: 1.5, bosco: 0.5 },
   bosco: { adriatico: 1.5, fiamma: 0.5 },
-  terra: { fiamma: 1.5, adriatico: 0.5 },
-  armonia: {},  // +15% base damage against all handled separately
+  terra: { fiamma: 1.5, adriatico: 0.5, armonia: 1.5 },
+  armonia: {},  // +15% flat bonus against all; defensive weaknesses encoded in attacker rows above
 }
 
 export const RARITY_CATCH_RATES: Record<Rarity, number> = {
