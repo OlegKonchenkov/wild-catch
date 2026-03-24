@@ -19,7 +19,7 @@ WildCatch è una PWA mobile-first per eventi outdoor dal vivo. I giocatori esplo
 | Decisione | Scelta |
 |---|---|
 | Lingua app | Italiano |
-| Pubblico | Bambini 8–14 + famiglie + ragazzi fino a 22 anni |
+| Pubblico | Bambini 8–14 + famiglie + ragazzi + adulti fino a 50 anni |
 | Location | Area limitata definita dall'admin (bounding box), evento iniziale Pesaro |
 | Creature MVP | 30 creature, 5 elementi |
 | Accesso | Invite-only (QR o codice) — pagamento gestito esternamente |
