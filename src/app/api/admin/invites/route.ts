@@ -92,7 +92,7 @@ export async function PATCH(request: Request) {
   const admin = createAdminClient()
   const { error } = await admin
     .from('session_invites')
-    .update({ used_by_user_id: null, is_active: true })
+    .update({ used_by_user_id: null, used_at: null, is_active: true })
     .eq('id', inviteId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ reset: true })
