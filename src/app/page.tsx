@@ -13,6 +13,23 @@ function JoinFlow() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  // On mount: if already authenticated and has a session → restore and redirect
+  useEffect(() => {
+    if (searchParams.get('resume') === '1' || searchParams.get('error')) return
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      // User is authenticated — check if they already joined a session
+      fetch('/api/auth/restore').then(async r => {
+        const d = await r.json()
+        if (d.sessionId) {
+          localStorage.setItem('current_session_id', d.sessionId)
+          router.replace('/game/map')
+        }
+        // else: authenticated but no active session → show invite form normally
+      })
+    })
+  }, [supabase, router, searchParams])
+
   // After OAuth redirect back here with ?resume=1
   useEffect(() => {
     if (searchParams.get('resume') !== '1') return

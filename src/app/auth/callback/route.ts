@@ -10,9 +10,30 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      // If a specific next URL was requested (e.g. /admin-login?resume=1), use it
+      // Admin login with explicit redirect target
       if (next) return NextResponse.redirect(`${origin}${next}`)
-      // Default: back to join page to consume pending_code from sessionStorage
+
+      // Check if user already has an active player session (re-login or new device)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: existing } = await supabase
+          .from('player_sessions')
+          .select('session_id, sessions!inner(status)')
+          .eq('user_id', user.id)
+          .in('sessions.status', ['active', 'ready'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (existing?.session_id) {
+          // Returning player — skip join form, restore sessionId on the client
+          return NextResponse.redirect(
+            `${origin}/game/map?restored=${existing.session_id}`
+          )
+        }
+      }
+
+      // New player — back to join page to consume pending_code from sessionStorage
       return NextResponse.redirect(`${origin}/?resume=1`)
     }
   }

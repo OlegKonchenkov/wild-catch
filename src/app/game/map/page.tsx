@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { useGPS } from '@/hooks/useGPS'
@@ -11,7 +11,7 @@ const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false }
 
 const ENCOUNTER_COOLDOWN_MS = 30000  // 30s between encounters
 
-export default function MapPage() {
+function MapPageInner() {
   const [session, setSession] = useState<Session | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [inBounds, setInBounds] = useState(true)
@@ -20,9 +20,17 @@ export default function MapPage() {
   const lastEncounterRef = useRef(0)
   const sessionIdRef = useRef<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
+    // ?restored=<sessionId> comes from auth callback after re-login on a new device
+    const restored = searchParams.get('restored')
+    if (restored) {
+      localStorage.setItem('current_session_id', restored)
+      router.replace('/game/map')
+      return
+    }
     const sid = localStorage.getItem('current_session_id')
     if (!sid) { router.push('/'); return }
     setSessionId(sid)
@@ -170,5 +178,13 @@ export default function MapPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function MapPage() {
+  return (
+    <Suspense fallback={<div className="h-full bg-[#0F1F2E]" />}>
+      <MapPageInner />
+    </Suspense>
   )
 }
