@@ -1,7 +1,7 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function JoinPage() {
   const [code, setCode] = useState('')
@@ -10,6 +10,28 @@ export default function JoinPage() {
   const [loading, setLoading] = useState(false)
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // After OAuth redirect, consume pending_code from sessionStorage
+  useEffect(() => {
+    if (searchParams.get('resume') !== '1') return
+    const pending = sessionStorage.getItem('pending_code')
+    if (!pending) { router.replace('/game/map'); return }
+    sessionStorage.removeItem('pending_code')
+    setLoading(true)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { setLoading(false); return }
+      fetch('/api/auth/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: pending }),
+      }).then(async res => {
+        const data = await res.json()
+        if (!res.ok) { setError(data.error); setLoading(false) }
+        else router.replace('/game/map')
+      })
+    })
+  }, [searchParams, supabase, router])
 
   async function handleGoogleSignIn() {
     setLoading(true)

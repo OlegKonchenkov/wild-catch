@@ -10,7 +10,10 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      // Redirect back to /join so it can consume pending_code from sessionStorage
+      // If no pending code, join page auto-redirects to /game/map
+      const destination = next === '/game/map' ? '/join?resume=1' : next
+      return NextResponse.redirect(`${origin}${destination}`)
     }
   }
 
