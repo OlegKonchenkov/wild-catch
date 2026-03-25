@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
 
@@ -43,7 +43,7 @@ const EMPTY_FORM = {
   hp: 50, atk: 10, def: 5, evolution_of: '',
 }
 
-type ImageMode = 'preview' | 'url' | 'ai'
+type ImageMode = 'preview' | 'url' | 'upload' | 'ai'
 
 export default function CreaturesPage() {
   const [creatures, setCreatures] = useState<Creature[]>([])
@@ -65,6 +65,7 @@ export default function CreaturesPage() {
   const [aiQuality, setAiQuality] = useState<'low' | 'medium' | 'high'>('medium')
   const [artworkLoading, setArtworkLoading] = useState(false)
   const [artworkError, setArtworkError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [filter, setFilter] = useState<ElementType | 'all'>('all')
   const [search, setSearch] = useState('')
@@ -145,6 +146,27 @@ export default function CreaturesPage() {
       })
       const d = await res.json()
       if (!res.ok) { setArtworkError(d.error ?? 'Errore artwork') }
+      else { setImageMode('preview'); await loadCreatures() }
+    } catch { setArtworkError('Errore di rete') }
+    finally { setArtworkLoading(false) }
+  }
+
+  async function handleFileUpload(file: File) {
+    const targetId = panel === 'new' ? null : panel as string
+    if (!targetId) { setArtworkError('Salva prima la creatura, poi carica l\'artwork'); return }
+    setArtworkLoading(true); setArtworkError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const uploadRes = await fetch('/api/admin/upload', { method: 'POST', body: fd })
+      const uploadData = await uploadRes.json()
+      if (!uploadRes.ok) { setArtworkError(uploadData.error ?? 'Errore upload'); return }
+      const artRes = await fetch(`/api/admin/creatures/${targetId}/artwork`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: uploadData.url }),
+      })
+      const artData = await artRes.json()
+      if (!artRes.ok) { setArtworkError(artData.error ?? 'Errore salvataggio artwork') }
       else { setImageMode('preview'); await loadCreatures() }
     } catch { setArtworkError('Errore di rete') }
     finally { setArtworkLoading(false) }
@@ -286,13 +308,18 @@ export default function CreaturesPage() {
 
                     {/* Image mode tabs */}
                     <div className="flex gap-1 mb-3 bg-white/5 p-1 rounded-lg">
-                      {(['preview', 'url', 'ai'] as ImageMode[]).map(m => (
-                        <button key={m} onClick={() => setImageMode(m)}
+                      {(['preview', 'url', 'upload', 'ai'] as ImageMode[]).map(m => (
+                        <button key={m} onClick={() => { setImageMode(m); setArtworkError(null) }}
                           className={`flex-1 text-xs py-1.5 rounded-md font-semibold transition-all ${imageMode === m ? 'bg-[#3A9DBC] text-white' : 'text-white/40 hover:text-white'}`}>
-                          {m === 'preview' ? '👁 Anteprima' : m === 'url' ? '🔗 URL' : '✨ AI'}
+                          {m === 'preview' ? '👁' : m === 'url' ? '🔗' : m === 'upload' ? '📁' : '✨'}
                         </button>
                       ))}
                     </div>
+
+                    {/* Hidden file input */}
+                    <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                      className="hidden"
+                      onChange={e => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]) }} />
 
                     {imageMode === 'url' && (
                       <div className="space-y-2">
@@ -302,6 +329,29 @@ export default function CreaturesPage() {
                           className="w-full bg-white/10 text-white text-xs font-bold py-2 rounded-lg disabled:opacity-40 hover:bg-white/20 transition-colors">
                           Imposta URL
                         </button>
+                      </div>
+                    )}
+
+                    {imageMode === 'upload' && (
+                      <div
+                        onClick={() => !artworkLoading && fileInputRef.current?.click()}
+                        className="w-full border-2 border-dashed border-white/20 rounded-lg p-4 text-center cursor-pointer hover:border-[#3A9DBC]/50 hover:bg-white/5 transition-colors"
+                      >
+                        {artworkLoading ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-6 h-6 border-2 border-[#3A9DBC] border-t-transparent rounded-full spin-slow" />
+                            <p className="text-xs text-white/50">Caricamento...</p>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1 py-1">
+                            <span className="text-2xl">📁</span>
+                            <p className="text-xs text-white/50 font-medium">Clicca per selezionare</p>
+                            <p className="text-xs text-white/25">PNG, JPG, WEBP, GIF, SVG — max 5 MB</p>
+                          </div>
+                        )}
+                        {panel === 'new' && (
+                          <p className="text-xs text-amber-400/70 mt-1">Salva prima la creatura</p>
+                        )}
                       </div>
                     )}
 

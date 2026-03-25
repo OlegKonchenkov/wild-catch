@@ -1,114 +1,138 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { ImageInput } from '@/components/admin/ImageInput'
 import type { QRCodeType } from '@/lib/types'
 
-/* ── Per-type field definitions ─────────────────────────── */
-type FieldDef = {
-  key: string
-  label: string
-  hint: string
-  type: 'text' | 'number' | 'textarea' | 'select'
-  options?: { value: string; label: string }[]
-  defaultValue: string | number
-  optional?: boolean
-}
+/* ── Searchable select ───────────────────────── */
+function SearchSelect({
+  options, value, onChange, placeholder,
+}: {
+  options: { value: string; label: string; sub?: string }[]
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+}) {
+  const [open, setOpen]   = useState(false)
+  const [q, setQ]         = useState('')
+  const ref               = useRef<HTMLDivElement>(null)
+  const selected          = options.find(o => o.value === value)
+  const filtered          = q.trim()
+    ? options.filter(o => o.label.toLowerCase().includes(q.toLowerCase()) || (o.sub ?? '').toLowerCase().includes(q.toLowerCase()))
+    : options
 
-const TYPE_INFO: Record<QRCodeType, { label: string; icon: string; description: string; fields: FieldDef[] }> = {
-  oggetto: {
-    label: 'Oggetto', icon: '🎁',
-    description: 'Il giocatore ottiene un oggetto dallo zaino quando scansiona questo QR.',
-    fields: [
-      { key: 'item_id',  label: 'ID Oggetto (UUID)',  hint: 'Copia l\'ID dall\'elenco oggetti nel database', type: 'text', defaultValue: '' },
-      { key: 'quantity', label: 'Quantità',            hint: 'Quanti oggetti riceve il giocatore', type: 'number', defaultValue: 1 },
-    ],
-  },
-  indizio: {
-    label: 'Indizio', icon: '🔍',
-    description: 'Il giocatore riceve un testo/immagine che lo guida verso il prossimo obiettivo.',
-    fields: [
-      { key: 'chapter_order', label: 'Capitolo di riferimento', hint: 'A quale capitolo/missione appartiene questo indizio (numero)', type: 'number', defaultValue: 1 },
-      { key: 'text',          label: 'Testo dell\'indizio',      hint: 'Il messaggio narrativo mostrato al giocatore', type: 'textarea', defaultValue: '' },
-      { key: 'image_url',     label: 'URL immagine (opzionale)', hint: 'Link a un\'immagine da mostrare insieme al testo', type: 'text', defaultValue: '', optional: true },
-    ],
-  },
-  uovo: {
-    label: 'Uovo creatura', icon: '🥚',
-    description: 'Il giocatore ottiene un uovo che si schiude in una creatura casuale del pool selezionato.',
-    fields: [
-      {
-        key: 'egg_rarity', label: 'Rarità dell\'uovo', hint: 'Determina la rarità delle creature ottenibili',
-        type: 'select', defaultValue: 'comune',
-        options: [
-          { value: 'comune',    label: '⚪ Comune' },
-          { value: 'raro',      label: '🔵 Raro' },
-          { value: 'epico',     label: '🟣 Epico' },
-          { value: 'leggendario', label: '🟡 Leggendario' },
-        ],
-      },
-    ],
-  },
-  boss: {
-    label: 'Boss', icon: '💀',
-    description: 'Il giocatore affronta un boss — creatura speciale con livello elevato.',
-    fields: [
-      { key: 'creature_id',    label: 'ID Creatura boss (UUID)', hint: 'UUID della creatura che farà da boss (dalla sezione Creature)', type: 'text', defaultValue: '' },
-      { key: 'level_override', label: 'Livello del boss',        hint: 'Livello con cui la creatura appare come boss (default: 10)', type: 'number', defaultValue: 10 },
-    ],
-  },
-  evento: {
-    label: 'Evento speciale', icon: '⚡',
-    description: 'Attiva un bonus temporaneo per il giocatore che scansiona.',
-    fields: [
-      {
-        key: 'event_type', label: 'Tipo di bonus', hint: 'Quale effetto si attiva',
-        type: 'select', defaultValue: 'bonus_exp',
-        options: [
-          { value: 'bonus_exp',         label: '✨ Moltiplicatore EXP' },
-          { value: 'spawn_rate_boost',  label: '🐾 Aumento spawn creature' },
-          { value: 'double_gold',       label: '🪙 Oro raddoppiato' },
-        ],
-      },
-      { key: 'multiplier',        label: 'Moltiplicatore',      hint: 'es. 2 = doppio, 3 = triplo', type: 'number', defaultValue: 2 },
-      { key: 'duration_minutes',  label: 'Durata (minuti)',      hint: 'Per quanti minuti rimane attivo il bonus', type: 'number', defaultValue: 10 },
-    ],
-  },
-}
-
-function buildDefaultFields(t: QRCodeType): Record<string, string | number> {
-  const obj: Record<string, string | number> = {}
-  TYPE_INFO[t].fields.forEach(f => { obj[f.key] = f.defaultValue })
-  return obj
-}
-
-function buildPayload(t: QRCodeType, fields: Record<string, string | number>): any {
-  if (t === 'uovo') return { egg_rarity: fields.egg_rarity, creature_pool: [] }
-  if (t === 'evento') return { event_type: fields.event_type, effect: { multiplier: Number(fields.multiplier), duration_minutes: Number(fields.duration_minutes) } }
-  const out: any = {}
-  TYPE_INFO[t].fields.forEach(f => {
-    if (fields[f.key] !== '' || !f.optional) {
-      out[f.key] = f.type === 'number' ? Number(fields[f.key]) : fields[f.key]
+  useEffect(() => {
+    function close(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setQ('') }
     }
-  })
-  return out
+    if (open) document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => { setOpen(v => !v); setQ('') }}
+        className="w-full flex items-center justify-between bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-left">
+        {selected
+          ? <span className="text-white">{selected.label}<span className="text-white/40 ml-2 text-xs">{selected.sub}</span></span>
+          : <span className="text-white/30">{placeholder}</span>
+        }
+        <span className="text-white/40 ml-2">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-[#0d1e2e] border border-white/20 rounded-xl shadow-2xl overflow-hidden">
+          <div className="p-2 border-b border-white/10">
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)}
+              placeholder="Cerca..."
+              className="w-full bg-white/10 text-white text-sm border border-white/20 rounded-lg px-3 py-1.5 outline-none" />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.length === 0
+              ? <p className="px-4 py-3 text-white/30 text-sm">Nessun risultato</p>
+              : filtered.map(o => (
+                  <button key={o.value} type="button"
+                    onClick={() => { onChange(o.value); setOpen(false); setQ('') }}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 flex items-center justify-between ${value === o.value ? 'bg-[#3A9DBC]/10 text-[#3A9DBC]' : 'text-white'}`}>
+                    <span>{o.label}</span>
+                    {o.sub && <span className="text-xs text-white/40 ml-2">{o.sub}</span>}
+                  </button>
+                ))
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
+/* ── Per-type field definitions ─────────────── */
+const TYPE_INFO: Record<QRCodeType, { label: string; icon: string; description: string }> = {
+  oggetto: { label: 'Oggetto',        icon: '🎁', description: 'Il giocatore ottiene un oggetto dallo zaino.' },
+  indizio: { label: 'Indizio',        icon: '🔍', description: 'Il giocatore riceve un testo/immagine narrativo.' },
+  uovo:    { label: 'Uovo creatura',  icon: '🥚', description: 'Il giocatore ottiene un uovo da schiudere.' },
+  boss:    { label: 'Boss',           icon: '💀', description: 'Il giocatore affronta una creatura boss.' },
+  evento:  { label: 'Evento speciale',icon: '⚡',  description: 'Attiva un bonus temporaneo per il giocatore.' },
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-white/60 mb-1">{label}</label>
+      {hint && <p className="text-xs text-white/30 mb-1.5 leading-relaxed">{hint}</p>}
+      {children}
+    </div>
+  )
+}
+const cls = 'w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm'
+
+/* ── Default payload fields per type ─────────── */
+type Fields = Record<string, string | number>
+
+function defaultFields(t: QRCodeType): Fields {
+  switch (t) {
+    case 'oggetto': return { item_id: '', quantity: 1 }
+    case 'indizio': return { chapter_order: 1, text: '', image_url: '' }
+    case 'uovo':    return { egg_rarity: 'comune' }
+    case 'boss':    return { creature_id: '', level_override: 10 }
+    case 'evento':  return { event_type: 'bonus_exp', multiplier: 2, duration_minutes: 10 }
+  }
+}
+
+function buildPayload(t: QRCodeType, f: Fields): any {
+  switch (t) {
+    case 'oggetto': return { item_id: f.item_id, quantity: Number(f.quantity) }
+    case 'indizio': return { chapter_order: Number(f.chapter_order), text: f.text, image_url: f.image_url || null }
+    case 'uovo':    return { egg_rarity: f.egg_rarity, creature_pool: [] }
+    case 'boss':    return { creature_id: f.creature_id, level_override: Number(f.level_override) }
+    case 'evento':  return { event_type: f.event_type, effect: { multiplier: Number(f.multiplier), duration_minutes: Number(f.duration_minutes) } }
+  }
+}
+
+/* ── Page ────────────────────────────────────── */
 export default function QRCodesPage() {
-  const [sessions, setSessions]       = useState<any[]>([])
-  const [selectedId, setSelectedId]   = useState('')
-  const [qrCodes, setQrCodes]         = useState<any[]>([])
-  const [type, setType]               = useState<QRCodeType>('oggetto')
-  const [label, setLabel]             = useState('')
-  const [fields, setFields]           = useState<Record<string, string | number>>(buildDefaultFields('oggetto'))
+  const [sessions, setSessions]         = useState<any[]>([])
+  const [selectedId, setSelectedId]     = useState('')
+  const [qrCodes, setQrCodes]           = useState<any[]>([])
+
+  // Reference data for selects
+  const [creatures, setCreatures]       = useState<any[]>([])
+  const [items, setItems]               = useState<any[]>([])
+
+  const [type, setType]                 = useState<QRCodeType>('oggetto')
+  const [label, setLabel]               = useState('')
+  const [fields, setFields]             = useState<Fields>(defaultFields('oggetto'))
   const [usesRemaining, setUsesRemaining] = useState<number | null>(null)
-  const [creating, setCreating]       = useState(false)
-  const [error, setError]             = useState('')
+  const [creating, setCreating]         = useState(false)
+  const [error, setError]               = useState('')
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     supabase.from('sessions').select('id, name').then(({ data }) => {
       if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) }
     })
+    // Load creatures and items for selects
+    fetch('/api/admin/creatures').then(r => r.json()).then(d => setCreatures(d.creatures ?? []))
+    fetch('/api/admin/items').then(r => r.json()).then(d => setItems(d.items ?? []))
   }, [supabase])
 
   useEffect(() => {
@@ -118,9 +142,7 @@ export default function QRCodesPage() {
   }, [selectedId])
 
   function handleTypeChange(t: QRCodeType) {
-    setType(t)
-    setFields(buildDefaultFields(t))
-    setError('')
+    setType(t); setFields(defaultFields(t)); setError('')
   }
 
   function setField(key: string, val: string | number) {
@@ -129,19 +151,17 @@ export default function QRCodesPage() {
 
   async function createQR() {
     setError('')
-    const payload = buildPayload(type, fields)
     setCreating(true)
     const res = await fetch('/api/admin/qrcodes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: selectedId, type, payload, usesRemaining, label }),
+      body: JSON.stringify({ sessionId: selectedId, type, payload: buildPayload(type, fields), usesRemaining, label }),
     })
     const data = await res.json()
     setCreating(false)
     if (res.ok) {
       setQrCodes(prev => [data.qrCode, ...prev])
-      setLabel('')
-      setFields(buildDefaultFields(type))
+      setLabel(''); setFields(defaultFields(type))
     } else {
       setError(data.error ?? 'Errore nella creazione')
     }
@@ -156,6 +176,10 @@ export default function QRCodesPage() {
     link.href = canvas.toDataURL()
     link.click()
   }
+
+  // Build select options
+  const creatureOptions = creatures.map(c => ({ value: c.id, label: c.name, sub: `${c.rarity} · ${c.element}` }))
+  const itemOptions     = items.map(i => ({ value: i.id, label: i.name, sub: i.type }))
 
   const info = TYPE_INFO[type]
 
@@ -177,81 +201,119 @@ export default function QRCodesPage() {
         <h2 className="font-bold text-white">Crea nuovo QR Code</h2>
 
         {/* Type selector */}
-        <div>
-          <label className="block text-xs font-semibold text-white/60 mb-2">Tipo di QR Code</label>
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+        <Field label="Tipo di QR Code">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-1">
             {(Object.keys(TYPE_INFO) as QRCodeType[]).map(t => (
-              <button
-                key={t}
-                onClick={() => handleTypeChange(t)}
+              <button key={t} onClick={() => handleTypeChange(t)}
                 className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border text-xs font-semibold transition-colors ${
-                  type === t
-                    ? 'bg-[#3A9DBC]/20 border-[#3A9DBC] text-[#3A9DBC]'
-                    : 'bg-white/5 border-white/10 text-white/50 hover:border-white/30'
-                }`}
-              >
+                  type === t ? 'bg-[#3A9DBC]/20 border-[#3A9DBC] text-[#3A9DBC]' : 'bg-white/5 border-white/10 text-white/50 hover:border-white/30'
+                }`}>
                 <span className="text-xl">{TYPE_INFO[t].icon}</span>
                 {TYPE_INFO[t].label}
               </button>
             ))}
           </div>
           <p className="text-xs text-white/35 mt-2 italic">{info.description}</p>
-        </div>
+        </Field>
 
         {/* Label */}
-        <div>
-          <label className="block text-xs font-semibold text-white/60 mb-1">Etichetta QR (identificativo visivo)</label>
-          <p className="text-xs text-white/30 mb-1.5">Nome descrittivo per riconoscere questo QR nell'elenco (es. "Stazione A", "Indizio bosco")</p>
+        <Field label="Etichetta QR" hint="Nome visivo per riconoscere questo QR nell'elenco (es. 'Stazione A')">
           <input value={label} onChange={e => setLabel(e.target.value)}
-            placeholder="es. Stazione A"
-            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm" />
-        </div>
+            placeholder="es. Stazione A" className={cls} />
+        </Field>
 
         {/* Dynamic fields per type */}
         <div className="space-y-3 border-t border-white/10 pt-4">
           <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">Contenuto del QR</p>
-          {info.fields.map(f => (
-            <div key={f.key}>
-              <label className="block text-xs font-semibold text-white/60 mb-1">
-                {f.label}{f.optional && <span className="text-white/30 ml-1">(opzionale)</span>}
-              </label>
-              <p className="text-xs text-white/30 mb-1.5">{f.hint}</p>
-              {f.type === 'select' ? (
-                <select
-                  value={String(fields[f.key] ?? f.defaultValue)}
-                  onChange={e => setField(f.key, e.target.value)}
-                  className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm"
-                >
-                  {f.options!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+
+          {type === 'oggetto' && (
+            <>
+              <Field label="Oggetto da consegnare" hint="Seleziona l'oggetto che il giocatore riceverà scansionando questo QR">
+                <SearchSelect
+                  options={itemOptions}
+                  value={String(fields.item_id)}
+                  onChange={v => setField('item_id', v)}
+                  placeholder="Seleziona oggetto..."
+                />
+              </Field>
+              <Field label="Quantità" hint="Quanti oggetti riceve il giocatore">
+                <input type="number" value={fields.quantity} min={1} onChange={e => setField('quantity', +e.target.value)} className={cls} />
+              </Field>
+            </>
+          )}
+
+          {type === 'indizio' && (
+            <>
+              <Field label="Capitolo di riferimento" hint="A quale missione/capitolo appartiene questo indizio">
+                <input type="number" value={fields.chapter_order} min={1} onChange={e => setField('chapter_order', +e.target.value)} className={cls} />
+              </Field>
+              <Field label="Testo dell'indizio" hint="Il messaggio narrativo mostrato al giocatore">
+                <textarea value={String(fields.text)} onChange={e => setField('text', e.target.value)}
+                  rows={3} className={cls + ' resize-none'} placeholder="es. Il segreto si nasconde tra le rovine al tramonto..." />
+              </Field>
+              <ImageInput
+                label="Immagine (opzionale)"
+                hint="Immagine mostrata insieme al testo dell'indizio"
+                value={String(fields.image_url)}
+                onChange={v => setField('image_url', v)}
+                optional
+              />
+            </>
+          )}
+
+          {type === 'uovo' && (
+            <Field label="Rarità dell'uovo" hint="Determina la rarità delle creature ottenibili dall'uovo">
+              <select value={String(fields.egg_rarity)} onChange={e => setField('egg_rarity', e.target.value)} className={cls}>
+                <option value="comune">⚪ Comune</option>
+                <option value="raro">🔵 Raro</option>
+                <option value="epico">🟣 Epico</option>
+                <option value="leggendario">🟡 Leggendario</option>
+              </select>
+            </Field>
+          )}
+
+          {type === 'boss' && (
+            <>
+              <Field label="Creatura boss" hint="Seleziona la creatura che apparirà come boss da scansionare">
+                <SearchSelect
+                  options={creatureOptions}
+                  value={String(fields.creature_id)}
+                  onChange={v => setField('creature_id', v)}
+                  placeholder="Seleziona creatura..."
+                />
+              </Field>
+              <Field label="Livello del boss" hint="Livello con cui la creatura appare come boss (più alto = più difficile)">
+                <input type="number" value={fields.level_override} min={1} onChange={e => setField('level_override', +e.target.value)} className={cls} />
+              </Field>
+            </>
+          )}
+
+          {type === 'evento' && (
+            <>
+              <Field label="Tipo di bonus" hint="Quale effetto si attiva quando il giocatore scansiona">
+                <select value={String(fields.event_type)} onChange={e => setField('event_type', e.target.value)} className={cls}>
+                  <option value="bonus_exp">✨ Moltiplicatore EXP</option>
+                  <option value="spawn_rate_boost">🐾 Aumento spawn creature</option>
+                  <option value="double_gold">🪙 Oro raddoppiato</option>
                 </select>
-              ) : f.type === 'textarea' ? (
-                <textarea
-                  value={String(fields[f.key] ?? '')}
-                  onChange={e => setField(f.key, e.target.value)}
-                  rows={3}
-                  className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm resize-none"
-                />
-              ) : (
-                <input
-                  type={f.type}
-                  value={fields[f.key] ?? f.defaultValue}
-                  onChange={e => setField(f.key, f.type === 'number' ? +e.target.value : e.target.value)}
-                  className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm"
-                />
-              )}
-            </div>
-          ))}
+              </Field>
+              <Field label="Moltiplicatore" hint="es. 2 = doppio effetto, 3 = triplo">
+                <input type="number" value={fields.multiplier} min={1} step={0.5} onChange={e => setField('multiplier', +e.target.value)} className={cls} />
+              </Field>
+              <Field label="Durata (minuti)" hint="Per quanti minuti rimane attivo il bonus">
+                <input type="number" value={fields.duration_minutes} min={1} onChange={e => setField('duration_minutes', +e.target.value)} className={cls} />
+              </Field>
+            </>
+          )}
         </div>
 
         {/* Uses remaining */}
-        <div>
-          <label className="block text-xs font-semibold text-white/60 mb-1">Numero di utilizzi massimi</label>
-          <p className="text-xs text-white/30 mb-1.5">Lascia vuoto per utilizzi illimitati. Utile per QR esclusivi (es. 1 solo uso).</p>
-          <input type="number" placeholder="∞ illimitati"
+        <Field label="Utilizzi massimi" hint="Lascia vuoto per utilizzi illimitati. Utile per QR esclusivi (es. 1 solo uso).">
+          <input type="number" placeholder="∞ illimitati" min={1}
             value={usesRemaining ?? ''}
             onChange={e => setUsesRemaining(e.target.value ? +e.target.value : null)}
             className="w-40 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm" />
-        </div>
+        </Field>
 
         {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {error}</p>}
 
@@ -263,23 +325,17 @@ export default function QRCodesPage() {
 
       {/* QR list */}
       <div className="space-y-2">
-        {qrCodes.length === 0 && (
-          <p className="text-white/30 text-sm">Nessun QR code creato per questa sessione.</p>
-        )}
+        {qrCodes.length === 0 && <p className="text-white/30 text-sm">Nessun QR code per questa sessione.</p>}
         {qrCodes.map(qr => (
           <div key={qr.id} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-3">
             <span className="text-2xl">{TYPE_INFO[qr.type as QRCodeType]?.icon ?? '📷'}</span>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-bold">{qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || qr.type}</p>
               <p className="text-xs text-white/40 font-mono truncate">{qr.id}</p>
-              <p className="text-xs text-white/40">
-                {qr.uses_remaining === null ? '∞ usi illimitati' : `${qr.uses_remaining} usi rimanenti`}
-              </p>
+              <p className="text-xs text-white/40">{qr.uses_remaining === null ? '∞ usi illimitati' : `${qr.uses_remaining} usi rimanenti`}</p>
             </div>
             <button onClick={() => downloadQR(qr.id, qr.label)}
-              className="bg-[#3A9DBC] text-white px-3 py-1.5 rounded-lg text-sm shrink-0">
-              ⬇ PNG
-            </button>
+              className="bg-[#3A9DBC] text-white px-3 py-1.5 rounded-lg text-sm shrink-0">⬇ PNG</button>
           </div>
         ))}
       </div>
