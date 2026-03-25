@@ -43,12 +43,22 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         })
     })
 
-    // Session end time
+    // Session end time — prefer end_at, fall back to start_at + duration_minutes
     supabase.from('sessions')
-      .select('end_at')
+      .select('end_at, start_at, duration_minutes')
       .eq('id', sessionId)
       .single()
-      .then(({ data }) => { if (data?.end_at) setEndAt(data.end_at) })
+      .then(({ data }) => {
+        if (!data) return
+        if (data.end_at) {
+          setEndAt(data.end_at)
+        } else if (data.start_at && data.duration_minutes) {
+          const computed = new Date(
+            new Date(data.start_at).getTime() + data.duration_minutes * 60 * 1000
+          ).toISOString()
+          setEndAt(computed)
+        }
+      })
   }, [supabase])
 
   const timer = useSessionTimer({

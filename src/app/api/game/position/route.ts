@@ -80,11 +80,12 @@ export async function POST(request: Request) {
   let triggerEncounter = false
   if (inBounds && session.status === 'active') {
     const distanceMoved = prevPos ? haversineDistance(prevPos, currentPos) : 0
-    const highAccuracy = (accuracy ?? 100) < 50
+    // Accept most mobile GPS (50-150m accuracy); only reject very noisy signals
+    const usableAccuracy = (accuracy ?? 200) < 150
 
-    if (highAccuracy && distanceMoved >= 20) {
-      // 15% chance per 20m of movement
-      triggerEncounter = Math.random() < 0.15
+    if (usableAccuracy && distanceMoved >= 10) {
+      // 25% chance per 10m of movement
+      triggerEncounter = Math.random() < 0.25
     }
     // GPS fallback: timer-based trigger handled client-side (60-180s random)
   }

@@ -128,14 +128,14 @@ function MapPageInner() {
 
       {/* GPS error */}
       {gpsError && (
-        <div className="absolute top-2 left-2 right-2 bg-yellow-900/90 text-yellow-200 text-sm px-3 py-2 rounded-lg z-10">
+        <div className="absolute top-2 left-2 right-2 bg-yellow-900/90 text-yellow-200 text-sm px-3 py-2 rounded-lg z-[900]">
           ⚠️ {gpsError}
         </div>
       )}
 
       {/* Out of bounds */}
       {!inBounds && (
-        <div className="absolute top-2 left-2 right-2 bg-red-900/90 text-red-200 text-sm px-3 py-2 rounded-lg z-10 text-center">
+        <div className="absolute top-2 left-2 right-2 bg-red-900/90 text-red-200 text-sm px-3 py-2 rounded-lg z-[900] text-center">
           🚫 Sei fuori dall'area di gioco — torna nella zona indicata!
         </div>
       )}
@@ -143,14 +143,14 @@ function MapPageInner() {
       {/* QR scan button */}
       <button
         onClick={() => router.push('/game/missions?qr=1')}
-        className="absolute bottom-4 right-4 bg-[#3A9DBC] text-white rounded-full w-14 h-14 flex items-center justify-center text-2xl shadow-lg z-10"
+        className="absolute bottom-4 right-4 bg-[#3A9DBC] text-white rounded-full w-14 h-14 flex items-center justify-center text-2xl shadow-lg z-[900]"
       >
         📷
       </button>
 
       {/* Encounter popup */}
       {showEncounterPopup && pendingEncounter && (
-        <div className="absolute inset-x-4 bottom-16 bg-[#0F1F2E] border border-[#3A9DBC] rounded-2xl p-4 z-20 shadow-xl">
+        <div className="absolute inset-x-4 bottom-16 bg-[#0F1F2E] border border-[#3A9DBC] rounded-2xl p-4 z-[1000] shadow-xl">
           <div className="flex items-center gap-3">
             <div className="text-4xl">🐾</div>
             <div>
