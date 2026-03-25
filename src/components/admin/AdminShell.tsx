@@ -9,6 +9,7 @@ const NAV = [
   { href: '/admin/sessions',    label: '🎮 Sessioni'   },
   { href: '/admin/creatures',   label: '🐾 Creature'   },
   { href: '/admin/missions',    label: '🎯 Missioni'   },
+  { href: '/admin/items',       label: '🎒 Oggetti'    },
   { href: '/admin/qrcodes',     label: '📷 QR Codes'   },
   { href: '/admin/invites',     label: '🎟️ Inviti'     },
   { href: '/admin/players',     label: '👥 Giocatori'  },
