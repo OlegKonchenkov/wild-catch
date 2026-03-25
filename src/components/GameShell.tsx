@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/game/backpack', icon: '🎒', label: 'Zaino'     },
   { href: '/game/profile',  icon: '👤', label: 'Profilo'   },
   { href: '/game/guide',    icon: '❓', label: 'Guida'     },
+  { href: '/home',          icon: '🏠', label: 'Home'      },
 ]
 
 export default function GameShell({ children }: { children: React.ReactNode }) {

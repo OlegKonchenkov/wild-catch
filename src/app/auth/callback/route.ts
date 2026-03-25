@@ -33,8 +33,8 @@ export async function GET(request: Request) {
         }
       }
 
-      // New player — back to join page to consume pending_code from sessionStorage
-      return NextResponse.redirect(`${origin}/?resume=1`)
+      // New player or no active session — go to lobby
+      return NextResponse.redirect(`${origin}/home`)
     }
   }
 

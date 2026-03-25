@@ -32,7 +32,7 @@ function MapPageInner() {
       return
     }
     const sid = localStorage.getItem('current_session_id')
-    if (!sid) { router.push('/'); return }
+    if (!sid) { router.push('/home'); return }
     setSessionId(sid)
     sessionIdRef.current = sid
 
