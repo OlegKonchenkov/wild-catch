@@ -11,7 +11,8 @@ interface Props {
   size?: number
 }
 
-const ANIM_VARIANTS: Record<AnimState, object> = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ANIM_VARIANTS: Record<AnimState, any> = {
   idle: {
     y: [0, -8, 0],
     transition: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
