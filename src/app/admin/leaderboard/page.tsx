@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 
 interface LeaderboardEntry {
   user_id: string
-  nickname: string | null
+  nickname: string
   level: number
   exp: number
   gold: number
@@ -12,10 +12,10 @@ interface LeaderboardEntry {
 }
 
 export default function AdminLeaderboard() {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([])
+  const [entries, setEntries]   = useState<LeaderboardEntry[]>([])
   const [sessions, setSessions] = useState<any[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading]   = useState(false)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -26,32 +26,50 @@ export default function AdminLeaderboard() {
   useEffect(() => {
     if (!selectedId) return
     setLoading(true)
-    supabase
-      .from('player_sessions')
-      .select('user_id, level, exp, gold, profiles(nickname)')
-      .eq('session_id', selectedId)
-      .order('exp', { ascending: false })
-      .then(async ({ data }) => {
-        if (!data) { setLoading(false); return }
-        // Count caught creatures per player
-        const counts = await Promise.all(data.map(async (p) => {
-          const { count } = await supabase
-            .from('player_creatures')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', p.user_id)
-            .eq('session_id', selectedId)
-          return { ...p, caught_count: count ?? 0 }
-        }))
-        setEntries(counts.map(p => ({
-          user_id: p.user_id,
-          nickname: (p.profiles as any)?.nickname ?? 'Anonimo',
-          level: p.level,
-          exp: p.exp,
-          gold: p.gold,
-          caught_count: p.caught_count,
-        })))
-        setLoading(false)
-      })
+
+    async function load() {
+      // Step 1: player_sessions ordered by exp
+      const { data: players } = await supabase
+        .from('player_sessions')
+        .select('user_id, level, exp, gold')
+        .eq('session_id', selectedId!)
+        .order('exp', { ascending: false })
+
+      if (!players || players.length === 0) { setEntries([]); setLoading(false); return }
+
+      const userIds = players.map(p => p.user_id)
+
+      // Step 2: nicknames (separate query — no FK join ambiguity)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, nickname')
+        .in('user_id', userIds)
+
+      const nickMap: Record<string, string> = {}
+      for (const p of profiles ?? []) nickMap[p.user_id] = p.nickname ?? 'Anonimo'
+
+      // Step 3: caught creatures count per player
+      const counts = await Promise.all(players.map(async p => {
+        const { count } = await supabase
+          .from('player_creatures')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', p.user_id)
+          .eq('session_id', selectedId!)
+        return { ...p, caught_count: count ?? 0 }
+      }))
+
+      setEntries(counts.map(p => ({
+        user_id: p.user_id,
+        nickname: nickMap[p.user_id] ?? 'Anonimo',
+        level: p.level,
+        exp: p.exp,
+        gold: p.gold,
+        caught_count: p.caught_count,
+      })))
+      setLoading(false)
+    }
+
+    load()
   }, [selectedId, supabase])
 
   const medals = ['🥇', '🥈', '🥉']
@@ -72,7 +90,9 @@ export default function AdminLeaderboard() {
       </div>
 
       {loading ? (
-        <p className="text-white/40 text-sm">Caricamento...</p>
+        <div className="space-y-2">
+          {[1,2,3].map(i => <div key={i} className="bg-white/5 rounded-xl h-16 animate-pulse" />)}
+        </div>
       ) : entries.length === 0 ? (
         <p className="text-white/40 text-sm">Nessun giocatore in questa sessione.</p>
       ) : (
@@ -80,12 +100,12 @@ export default function AdminLeaderboard() {
           {entries.map((e, i) => (
             <div key={e.user_id}
               className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
-              <span className="text-xl w-8 text-center">{medals[i] ?? `#${i + 1}`}</span>
-              <div className="flex-1">
-                <p className="font-bold text-white">{e.nickname}</p>
-                <p className="text-xs text-white/40">Lv {e.level} · {e.exp} EXP · {e.caught_count} catture</p>
+              <span className="text-xl w-8 text-center shrink-0">{medals[i] ?? `#${i + 1}`}</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-white truncate">{e.nickname}</p>
+                <p className="text-xs text-white/40">Lv {e.level} · {e.exp} EXP · {e.caught_count} 🐾</p>
               </div>
-              <span className="text-[#F7C841] font-bold text-sm">🪙 {e.gold}</span>
+              <span className="text-[#F7C841] font-bold text-sm shrink-0">🪙 {e.gold}</span>
             </div>
           ))}
         </div>

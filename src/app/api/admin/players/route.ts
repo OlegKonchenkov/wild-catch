@@ -24,16 +24,26 @@ export async function GET(request: Request) {
 
   const { data: playerSessions, error } = await admin
     .from('player_sessions')
-    .select('user_id, level, exp, score, gold, created_at')
+    .select('user_id, level, exp, score_final, gold, joined_at')
     .eq('session_id', sessionId)
-    .order('score', { ascending: false })
+    .order('exp', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Fetch only the users we need by querying each user_id
-  const userIds = (playerSessions ?? []).map((ps: { user_id: string }) => ps.user_id)
-  const emailMap = new Map<string, string>()
+  const userIds = (playerSessions ?? []).map((ps: any) => ps.user_id)
 
+  // Fetch nicknames from profiles
+  const nicknameMap = new Map<string, string>()
+  if (userIds.length > 0) {
+    const { data: profiles } = await admin
+      .from('profiles')
+      .select('user_id, nickname')
+      .in('user_id', userIds)
+    for (const p of profiles ?? []) nicknameMap.set(p.user_id, p.nickname ?? '')
+  }
+
+  // Fetch emails from auth.users
+  const emailMap = new Map<string, string>()
   if (userIds.length > 0) {
     const { data: usersData, error: usersError } = await admin.auth.admin.listUsers({ perPage: 1000 })
     if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 })
@@ -43,14 +53,15 @@ export async function GET(request: Request) {
     }
   }
 
-  const players = (playerSessions ?? []).map((ps: { user_id: string; level: number; exp: number; score: number; gold: number; created_at: string }) => ({
+  const players = (playerSessions ?? []).map((ps: any) => ({
     userId: ps.user_id,
+    nickname: nicknameMap.get(ps.user_id) || 'Anonimo',
     email: emailMap.get(ps.user_id) ?? '',
     level: ps.level,
     exp: ps.exp,
-    score: ps.score,
+    score: ps.score_final,
     gold: ps.gold,
-    joinedAt: ps.created_at,
+    joinedAt: ps.joined_at,
   }))
 
   return NextResponse.json({ players })

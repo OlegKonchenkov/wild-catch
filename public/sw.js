@@ -45,6 +45,9 @@ self.addEventListener('fetch', event => {
   // Only handle GET — Cache API does not support PUT/POST/DELETE requests
   if (event.request.method !== 'GET') return
 
+  // Only handle http/https — skip chrome-extension://, data:, etc.
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return
+
   // API: always network, never cache
   if (url.pathname.startsWith('/api/')) return
 
