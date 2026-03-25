@@ -1,9 +1,9 @@
 'use client'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function JoinPage() {
+function JoinForm() {
   const [code, setCode] = useState('')
   const [gdprAccepted, setGdprAccepted] = useState(false)
   const [error, setError] = useState('')
@@ -130,5 +130,13 @@ export default function JoinPage() {
         Continua con Google
       </button>
     </main>
+  )
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense>
+      <JoinForm />
+    </Suspense>
   )
 }
