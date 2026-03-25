@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-async function requireAdmin(supabase: any) {
+async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non autenticato', status: 401 }
-  const { data: isAdmin } = await supabase.rpc('is_admin')
+  const { data: isAdmin, error: rpcError } = await supabase.rpc('is_admin')
+  if (rpcError) return { error: 'Errore verifica ruolo', status: 500 }
   if (!isAdmin) return { error: 'Non autorizzato', status: 403 }
   return { user }
 }

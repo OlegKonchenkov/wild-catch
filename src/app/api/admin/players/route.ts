@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-async function requireAdmin(supabase: any) {
+async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non autenticato', status: 401 }
-  const { data: isAdmin } = await supabase.rpc('is_admin')
+  const { data: isAdmin, error: rpcError } = await supabase.rpc('is_admin')
+  if (rpcError) return { error: 'Errore verifica ruolo', status: 500 }
   if (!isAdmin) return { error: 'Non autorizzato', status: 403 }
   return { user }
 }
@@ -29,10 +30,20 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const { data: { users } } = await admin.auth.admin.listUsers()
-  const emailMap = new Map(users.map((u: any) => [u.id, u.email ?? '']))
+  // Fetch only the users we need by querying each user_id
+  const userIds = (playerSessions ?? []).map((ps: { user_id: string }) => ps.user_id)
+  const emailMap = new Map<string, string>()
 
-  const players = (playerSessions ?? []).map((ps: any) => ({
+  if (userIds.length > 0) {
+    const { data: usersData, error: usersError } = await admin.auth.admin.listUsers({ perPage: 1000 })
+    if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 })
+    const relevantIds = new Set(userIds)
+    for (const u of usersData.users) {
+      if (relevantIds.has(u.id)) emailMap.set(u.id, u.email ?? '')
+    }
+  }
+
+  const players = (playerSessions ?? []).map((ps: { user_id: string; level: number; exp: number; score: number; gold: number; created_at: string }) => ({
     userId: ps.user_id,
     email: emailMap.get(ps.user_id) ?? '',
     level: ps.level,

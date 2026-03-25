@@ -37,7 +37,8 @@ export default function PlayersPage() {
     async function fetchPlayers() {
       setLoadingPlayers(true)
       try {
-        const res = await fetch(`/api/admin/players?sessionId=${selectedId}`)
+        const res = await fetch(`/api/admin/players?sessionId=${encodeURIComponent(selectedId)}`)
+        if (!res.ok) return
         const data = await res.json()
         if (!cancelled) setPlayers(data.players ?? [])
       } finally {
@@ -67,6 +68,7 @@ export default function PlayersPage() {
         setFeedback({ type: 'success', text: 'Notifica inviata con successo!' })
         setNotifyTitle('')
         setNotifyMessage('')
+        setTimeout(() => setFeedback(null), 5000)
       } else {
         const data = await res.json()
         setFeedback({ type: 'error', text: data.error ?? 'Errore durante l\'invio' })
