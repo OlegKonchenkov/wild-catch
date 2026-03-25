@@ -64,7 +64,7 @@ export async function POST(
       n: 1,
       size: '1024x1024',
       quality,
-      output_format: 'url',
+      output_format: 'png',
     }),
   })
 
@@ -77,38 +77,33 @@ export async function POST(
   }
 
   const openaiData = await openaiRes.json()
-  const generatedUrl: string | undefined = openaiData?.data?.[0]?.url
+  const b64: string | undefined = openaiData?.data?.[0]?.b64_json
 
-  if (!generatedUrl) {
+  if (!b64) {
     return NextResponse.json({ error: 'Nessuna immagine generata' }, { status: 502 })
   }
 
-  // Download the image and upload to Supabase Storage for permanence
-  let finalUrl = generatedUrl
+  // Upload base64 image to Supabase Storage
+  let finalUrl = ''
   try {
-    const imgRes = await fetch(generatedUrl)
-    if (imgRes.ok) {
-      const buffer = await imgRes.arrayBuffer()
-      const storagePath = `creatures/${id}.png`
-      const storageBucket = 'creature-artwork'
+    const buffer = Buffer.from(b64, 'base64')
+    const storagePath = `creatures/${id}.png`
+    const storageBucket = 'creature-artwork'
 
-      // Ensure bucket exists (ignore error if already exists)
-      await admin.storage.createBucket(storageBucket, { public: true }).catch(() => {})
+    await admin.storage.createBucket(storageBucket, { public: true }).catch(() => {})
 
-      const { error: uploadError } = await admin.storage
-        .from(storageBucket)
-        .upload(storagePath, buffer, {
-          contentType: 'image/png',
-          upsert: true,
-        })
+    const { error: uploadError } = await admin.storage
+      .from(storageBucket)
+      .upload(storagePath, buffer, { contentType: 'image/png', upsert: true })
 
-      if (!uploadError) {
-        const { data: urlData } = admin.storage.from(storageBucket).getPublicUrl(storagePath)
-        finalUrl = urlData.publicUrl
-      }
+    if (!uploadError) {
+      const { data: urlData } = admin.storage.from(storageBucket).getPublicUrl(storagePath)
+      finalUrl = urlData.publicUrl
+    } else {
+      return NextResponse.json({ error: 'Errore upload storage: ' + uploadError.message }, { status: 500 })
     }
-  } catch {
-    // Storage upload failed — fall back to OpenAI URL (temporary but functional)
+  } catch (e: any) {
+    return NextResponse.json({ error: 'Errore upload: ' + e.message }, { status: 500 })
   }
 
   // Save URL to DB
