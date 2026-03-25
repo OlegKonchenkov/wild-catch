@@ -68,6 +68,7 @@ function HomeLobby() {
   const [showSettings, setShowSettings] = useState(false)
   const [editNick, setEditNick]   = useState('')
   const [savingNick, setSavingNick] = useState(false)
+  const [editingNickInline, setEditingNickInline] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting]   = useState(false)
   const [settingMsg, setSettingMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -262,7 +263,7 @@ function HomeLobby() {
           <span style={{ fontFamily: "'Cinzel', serif", fontSize: 18, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.04em' }}>🌿 WildCatch</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
-              onClick={() => { setShowSettings(v => !v); setSettingMsg(null) }}
+              onClick={() => { setShowSettings(v => !v); setSettingMsg(null); setEditingNickInline(false) }}
               style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(58,188,168,0.4)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(58,188,168,0.15)', color: '#3ABCA8', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
               title="Profilo"
             >
@@ -280,6 +281,54 @@ function HomeLobby() {
             {user?.email}
           </div>
         </div>
+
+        {/* ── Inline nickname ── */}
+        {!needsNickname && !showSettings && (
+          <div style={{ padding: '10px 20px 0' }}>
+            {!editingNickInline ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(58,188,168,0.08)', border: '1px solid rgba(58,188,168,0.18)', borderRadius: 20, padding: '5px 12px 5px 10px' }}>
+                <span style={{ fontSize: 13 }}>🎮</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '0.01em' }}>{nickname}</span>
+                <button
+                  onClick={() => { setEditingNickInline(true); setEditNick(nickname ?? ''); setSettingMsg(null) }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 12, padding: '0 0 0 4px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                  title="Modifica nickname"
+                >
+                  ✏️
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="input"
+                    value={editNick}
+                    onChange={e => setEditNick(e.target.value)}
+                    maxLength={24}
+                    autoFocus
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="btn btn-teal"
+                    style={{ width: 'auto', paddingLeft: 14, paddingRight: 14, flexShrink: 0 }}
+                    disabled={editNick.trim().length < 2 || savingNick}
+                    onClick={async () => { await handleUpdateNick(); setEditingNickInline(false) }}
+                  >
+                    {savingNick ? <span className="spinner" /> : 'Salva'}
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    style={{ width: 'auto', paddingLeft: 12, paddingRight: 12, flexShrink: 0 }}
+                    onClick={() => { setEditingNickInline(false); setEditNick(nickname ?? '') }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                {settingMsg && <div className={`msg ${settingMsg.ok ? 'ok' : 'err'}`}>{settingMsg.ok ? '✓' : '⚠'} {settingMsg.text}</div>}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Stats ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: '20px 20px 0' }}>
