@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -37,7 +37,7 @@ export async function middleware(request: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/', request.url))
     }
-    // Admin check deferred to admin layout (middleware can't query Supabase tables)
+    // Admin check deferred to admin layout (proxy can't query Supabase tables)
     // The admin layout/page itself will verify is_admin via server component
   }
 
