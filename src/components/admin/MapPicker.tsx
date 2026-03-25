@@ -8,6 +8,14 @@ interface Props {
   initialBounds?: Bounds | null
 }
 
+function isValidBounds(b: Bounds | null | undefined): b is Bounds {
+  return !!b &&
+    typeof b.north === 'number' && isFinite(b.north) &&
+    typeof b.south === 'number' && isFinite(b.south) &&
+    typeof b.east  === 'number' && isFinite(b.east)  &&
+    typeof b.west  === 'number' && isFinite(b.west)
+}
+
 export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
   const containerRef      = useRef<HTMLDivElement>(null)
   const mapRef            = useRef<any>(null)
@@ -16,8 +24,10 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
   const drawModeRef       = useRef(false)
   const onChangeRef       = useRef(onBoundsChange)
 
+  const validInitial = isValidBounds(initialBounds) ? initialBounds : null
+
   const [drawMode, setDrawMode]     = useState(false)
-  const [hasBounds, setHasBounds]   = useState(!!initialBounds)
+  const [hasBounds, setHasBounds]   = useState(isValidBounds(initialBounds))
   const [searchQuery, setSearchQuery] = useState('')
   const [searching, setSearching]   = useState(false)
   const [tooSmall, setTooSmall]     = useState(false)
@@ -42,11 +52,11 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
 
       LRef.current = L
 
-      const center: [number, number] = initialBounds
-        ? [(initialBounds.north + initialBounds.south) / 2, (initialBounds.east + initialBounds.west) / 2]
+      const center: [number, number] = validInitial
+        ? [(validInitial.north + validInitial.south) / 2, (validInitial.east + validInitial.west) / 2]
         : [43.91, 12.91]
 
-      const map = L.map(containerRef.current!, { center, zoom: initialBounds ? 14 : 12, zoomControl: true })
+      const map = L.map(containerRef.current!, { center, zoom: validInitial ? 14 : 12, zoomControl: true })
       mapRef.current = map
 
       // Force Leaflet to recalculate container size after render
@@ -57,11 +67,11 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
         maxZoom: 19,
       }).addTo(map)
 
-      // Draw existing bounds
-      if (initialBounds) {
+      // Draw existing bounds (only if valid)
+      if (validInitial) {
         const b = L.latLngBounds(
-          [initialBounds.south, initialBounds.west],
-          [initialBounds.north, initialBounds.east]
+          [validInitial.south, validInitial.west],
+          [validInitial.north, validInitial.east]
         )
         rectRef.current = L.rectangle(b, { color: '#3A9DBC', weight: 2, fillOpacity: 0.15 }).addTo(map)
         map.fitBounds(b, { padding: [30, 30] })
