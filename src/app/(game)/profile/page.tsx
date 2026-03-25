@@ -26,7 +26,7 @@ export default function ProfilePage() {
       if (!user) return
 
       // Profile
-      supabase.from('player_sessions').select('*, auth.users(nickname, avatar_url)')
+      supabase.from('player_sessions').select('*, profiles(nickname, avatar_url)')
         .eq('user_id', user.id).eq('session_id', sessionId).single()
         .then(({ data }) => { if (data) setProfile(data) })
 

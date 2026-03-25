@@ -2,13 +2,6 @@
 -- Core tables (permanent, survive session resets)
 -- ============================================================
 
--- Extend Supabase auth.users with app-specific fields
-ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS nickname TEXT;
-ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
-ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
-ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS gdpr_consent_at TIMESTAMPTZ;
-ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS gdpr_consent_minor BOOLEAN DEFAULT FALSE;
-
 -- Creature catalogue
 CREATE TABLE creatures (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

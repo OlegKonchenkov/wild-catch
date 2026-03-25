@@ -14,10 +14,10 @@ ALTER TABLE player_missions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qr_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
--- Helper: check if current user is admin
+-- Helper: check if current user is admin (reads from JWT app_metadata set via Supabase admin API)
 CREATE OR REPLACE FUNCTION is_admin()
 RETURNS BOOLEAN LANGUAGE SQL SECURITY DEFINER AS $$
-  SELECT COALESCE(is_admin, FALSE) FROM auth.users WHERE id = auth.uid()
+  SELECT COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, FALSE)
 $$;
 
 -- Helper: check if user is in an active session
