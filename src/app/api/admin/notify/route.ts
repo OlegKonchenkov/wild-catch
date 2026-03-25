@@ -16,13 +16,15 @@ export async function POST(request: Request) {
   const auth = await requireAdmin(supabase)
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
-  const { sessionId, title, message } = await request.json()
-  if (!sessionId || !title || !message) {
-    return NextResponse.json({ error: 'sessionId, title e message sono richiesti' }, { status: 400 })
+  const { sessionId, userId, title, message } = await request.json()
+  if (!title || !message || (!sessionId && !userId)) {
+    return NextResponse.json({ error: 'title, message e almeno sessionId o userId sono richiesti' }, { status: 400 })
   }
 
   const admin = createAdminClient()
-  const channel = admin.channel(`session:${sessionId}`)
+  // If userId is provided, send to that specific player's channel; otherwise broadcast to whole session
+  const channelName = userId ? `user:${userId}` : `session:${sessionId}`
+  const channel = admin.channel(channelName)
   await new Promise<void>(resolve => channel.subscribe(() => resolve()))
   await channel.send({
     type: 'broadcast',

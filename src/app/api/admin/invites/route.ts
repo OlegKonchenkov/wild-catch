@@ -79,3 +79,21 @@ export async function DELETE(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ revoked: true })
 }
+
+// PATCH /api/admin/invites — reset a used invite code (make it available again)
+export async function PATCH(request: Request) {
+  const supabase = await createClient()
+  const auth = await requireAdmin(supabase)
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
+  const { inviteId } = await request.json()
+  if (!inviteId) return NextResponse.json({ error: 'inviteId richiesto' }, { status: 400 })
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from('session_invites')
+    .update({ used_by_user_id: null, is_active: true })
+    .eq('id', inviteId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ reset: true })
+}

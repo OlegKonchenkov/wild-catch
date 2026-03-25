@@ -24,3 +24,13 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Fix select dropdown on dark backgrounds — options inherit browser default white bg */
+select {
+  background-color: #0d1e2e;
+  color: #fff;
+}
+select option {
+  background-color: #0d1e2e;
+  color: #fff;
+}
