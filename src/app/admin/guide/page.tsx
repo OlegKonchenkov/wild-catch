@@ -1,3 +1,5 @@
+'use client'
+
 const tocItems = [
   { id: 'overview',       label: 'Panoramica' },
   { id: 'sessions',       label: 'Sessioni' },
