@@ -24,6 +24,9 @@ export default function GameMap({ session, playerPosition, onEncounterTrigger, s
       if (mapRef.current || !mapContainerRef.current) return
 
       const bounds = session.area_bounds
+      // Area not configured yet — skip map init (fallback UI shown in JSX)
+      if (!bounds || bounds.north == null || isNaN(bounds.north)) return
+
       const center: [number, number] = [
         (bounds.north + bounds.south) / 2,
         (bounds.east + bounds.west) / 2,
@@ -79,6 +82,15 @@ export default function GameMap({ session, playerPosition, onEncounterTrigger, s
       }
     })
   }, [playerPosition])
+
+  if (!session.area_bounds) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-[#0F1F2E]">
+        <span className="text-4xl opacity-30">🗺️</span>
+        <p className="text-white/30 text-sm text-center px-6">Area di gioco non ancora configurata dall'organizzatore</p>
+      </div>
+    )
+  }
 
   return <div ref={mapContainerRef} className="w-full h-full" />
 }
