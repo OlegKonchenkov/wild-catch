@@ -3,14 +3,20 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 const VALID_RARITIES = ['comune', 'non_comune', 'raro', 'epico', 'leggendario'] as const
-const VALID_ELEMENTS = ['acqua', 'terra', 'aria', 'fuoco', 'elettro', 'natura', 'neutro'] as const
+const VALID_ELEMENTS = ['fiamma', 'adriatico', 'bosco', 'terra', 'armonia'] as const
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non autenticato', status: 401 }
-  const { data: isAdmin } = await supabase.rpc('is_admin')
+  const { data: isAdmin, error: rpcError } = await supabase.rpc('is_admin')
+  if (rpcError) return { error: 'Errore verifica ruolo', status: 500 }
   if (!isAdmin) return { error: 'Non autorizzato', status: 403 }
   return { user }
+}
+
+function validateInt(value: unknown, min = 1): number | null {
+  const n = Number(value)
+  return Number.isInteger(n) && n >= min ? n : null
 }
 
 export async function GET() {
@@ -30,7 +36,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const body = await request.json()
-  const { name, description, rarity, element, base_hp, base_attack, base_defense, evolution_of } = body
+  const { name, description, rarity, element, hp, atk, def: defVal, evolution_of } = body
 
   if (!name || typeof name !== 'string' || name.trim() === '') {
     return NextResponse.json({ error: 'Il nome è obbligatorio' }, { status: 400 })
@@ -38,19 +44,26 @@ export async function POST(request: Request) {
   if (!VALID_RARITIES.includes(rarity)) {
     return NextResponse.json({ error: `Rarità non valida. Valori consentiti: ${VALID_RARITIES.join(', ')}` }, { status: 400 })
   }
-  if (element !== undefined && !VALID_ELEMENTS.includes(element)) {
+  if (!VALID_ELEMENTS.includes(element)) {
     return NextResponse.json({ error: `Elemento non valido. Valori consentiti: ${VALID_ELEMENTS.join(', ')}` }, { status: 400 })
+  }
+
+  const hpVal = hp !== undefined ? validateInt(hp) : 50
+  const atkVal = atk !== undefined ? validateInt(atk) : 10
+  const defParsed = defVal !== undefined ? validateInt(defVal, 0) : 5
+  if (hpVal === null || atkVal === null || defParsed === null) {
+    return NextResponse.json({ error: 'hp, atk e def devono essere numeri interi positivi' }, { status: 400 })
   }
 
   const admin = createAdminClient()
   const { data, error } = await admin.from('creatures').insert({
     name: name.trim(),
-    description: description ?? null,
+    description: description ?? '',
     rarity,
-    element: element ?? 'neutro',
-    base_hp: base_hp ?? 50,
-    base_attack: base_attack ?? 10,
-    base_defense: base_defense ?? 5,
+    element,
+    hp: hpVal,
+    atk: atkVal,
+    def: defParsed,
     evolution_of: evolution_of ?? null,
   }).select().single()
 

@@ -3,14 +3,20 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 const VALID_RARITIES = ['comune', 'non_comune', 'raro', 'epico', 'leggendario'] as const
-const VALID_ELEMENTS = ['acqua', 'terra', 'aria', 'fuoco', 'elettro', 'natura', 'neutro'] as const
+const VALID_ELEMENTS = ['fiamma', 'adriatico', 'bosco', 'terra', 'armonia'] as const
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non autenticato', status: 401 }
-  const { data: isAdmin } = await supabase.rpc('is_admin')
+  const { data: isAdmin, error: rpcError } = await supabase.rpc('is_admin')
+  if (rpcError) return { error: 'Errore verifica ruolo', status: 500 }
   if (!isAdmin) return { error: 'Non autorizzato', status: 403 }
   return { user }
+}
+
+function validateInt(value: unknown, min = 1): number | null {
+  const n = Number(value)
+  return Number.isInteger(n) && n >= min ? n : null
 }
 
 export async function PATCH(
@@ -23,7 +29,7 @@ export async function PATCH(
 
   const { id } = await params
   const body = await request.json()
-  const { name, description, rarity, element, base_hp, base_attack, base_defense, evolution_of } = body
+  const { name, description, rarity, element, hp, atk, def: defVal, evolution_of } = body
 
   if (name !== undefined && (typeof name !== 'string' || name.trim() === '')) {
     return NextResponse.json({ error: 'Il nome non può essere vuoto' }, { status: 400 })
@@ -40,9 +46,15 @@ export async function PATCH(
   if (description !== undefined) updates.description = description
   if (rarity !== undefined) updates.rarity = rarity
   if (element !== undefined) updates.element = element
-  if (base_hp !== undefined) updates.base_hp = base_hp
-  if (base_attack !== undefined) updates.base_attack = base_attack
-  if (base_defense !== undefined) updates.base_defense = base_defense
+  if (hp !== undefined) {
+    const v = validateInt(hp); if (v === null) return NextResponse.json({ error: 'hp deve essere un intero positivo' }, { status: 400 }); updates.hp = v
+  }
+  if (atk !== undefined) {
+    const v = validateInt(atk); if (v === null) return NextResponse.json({ error: 'atk deve essere un intero positivo' }, { status: 400 }); updates.atk = v
+  }
+  if (defVal !== undefined) {
+    const v = validateInt(defVal, 0); if (v === null) return NextResponse.json({ error: 'def deve essere un intero >= 0' }, { status: 400 }); updates.def = v
+  }
   if (evolution_of !== undefined) updates.evolution_of = evolution_of
 
   const admin = createAdminClient()
