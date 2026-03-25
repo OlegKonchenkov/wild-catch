@@ -26,7 +26,7 @@ export default function ProfilePage() {
       if (!user) return
 
       // Profile
-      supabase.from('player_sessions').select('*, profiles(nickname, avatar_url)')
+      supabase.from('player_sessions').select('*, profiles!player_sessions_user_id_fkey(nickname, avatar_url)')
         .eq('user_id', user.id).eq('session_id', sessionId).single()
         .then(({ data }) => { if (data) setProfile(data) })
 
@@ -40,7 +40,7 @@ export default function ProfilePage() {
     function fetchLeaderboard() {
       supabase
         .from('player_sessions')
-        .select('score_final, level, exp, user_id')
+        .select('exp, user_id, profiles!player_sessions_user_id_fkey(nickname)')
         .eq('session_id', sessionId)
         .order('exp', { ascending: false })
         .limit(20)
@@ -48,9 +48,9 @@ export default function ProfilePage() {
           if (data) {
             setLeaderboard(data.map((p: any, i: number) => ({
               rank: i + 1,
-              nickname: p.user_id.slice(0, 8),  // simplified; join with users for nickname
+              nickname: (p.profiles as any)?.nickname ?? 'Anonimo',
               score: p.exp,
-              creatures_caught: 0,  // join with player_creatures count
+              creatures_caught: 0,
             })))
           }
         })
@@ -78,7 +78,7 @@ export default function ProfilePage() {
               👤
             </div>
             <div>
-              <p className="font-bold text-white">Giocatore</p>
+              <p className="font-bold text-white">{(profile as any)?.profiles?.nickname ?? 'Anonimo'}</p>
               <p className="text-sm text-[#3A9DBC]">Livello {profile.level}</p>
             </div>
           </div>

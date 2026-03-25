@@ -11,21 +11,66 @@ interface SessionHistory {
   sessions: { name: string; status: string; start_at: string | null } | null
 }
 
+/* ─── tiny helpers ─────────────────────────────── */
+function Stat({ val, label, icon }: { val: number | string; label: string; icon: string }) {
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '14px 12px', textAlign: 'center' }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 2 }}>{val}</div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{icon} {label}</div>
+    </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ padding: '24px 20px 0' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', marginBottom: 12 }}>{title}</div>
+      {children}
+    </div>
+  )
+}
+
+function Card({ children, accent }: { children: React.ReactNode; accent?: string }) {
+  return (
+    <div style={{
+      background: accent ? `linear-gradient(135deg, ${accent}12, transparent)` : 'rgba(255,255,255,0.04)',
+      border: `1px solid ${accent ? accent + '33' : 'rgba(255,255,255,0.08)'}`,
+      borderRadius: 16, overflow: 'hidden',
+    }}>{children}</div>
+  )
+}
+
+/* ─── main ─────────────────────────────────────── */
 function HomeLobby() {
-  const supabase  = useMemo(() => createClient(), [])
-  const router    = useRouter()
+  const supabase = useMemo(() => createClient(), [])
+  const router   = useRouter()
   const searchParams = useSearchParams()
 
-  const [user, setUser]         = useState<User | null>(null)
-  const [activeSession, setActiveSession] = useState<string | null>(null)
-  const [history, setHistory]   = useState<SessionHistory[]>([])
+  const [user, setUser]           = useState<User | null>(null)
+  const [nickname, setNickname]   = useState<string | null>(null)
+  const [activeSession, setActiveSession] = useState<{ id: string; name: string } | null>(null)
+  const [history, setHistory]     = useState<SessionHistory[]>([])
   const [totalCreatures, setTotalCreatures] = useState(0)
-  const [code, setCode]         = useState(searchParams.get('code') ?? '')
-  const [gdpr, setGdpr]         = useState(false)
-  const [showJoin, setShowJoin] = useState(false)
-  const [joining, setJoining]   = useState(false)
+
+  // Invite code form
+  const [code, setCode]           = useState(searchParams.get('code') ?? '')
+  const [gdpr, setGdpr]           = useState(false)
+  const [showJoin, setShowJoin]   = useState(!!searchParams.get('code'))
+  const [joining, setJoining]     = useState(false)
   const [joinError, setJoinError] = useState('')
-  const [joinSuccess, setJoinSuccess] = useState('')
+
+  // Nickname prompt
+  const [nickInput, setNickInput] = useState('')
+  const [nickSaving, setNickSaving] = useState(false)
+  const [nickError, setNickError]   = useState('')
+
+  // Settings panel
+  const [showSettings, setShowSettings] = useState(false)
+  const [editNick, setEditNick]   = useState('')
+  const [savingNick, setSavingNick] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting]   = useState(false)
+  const [settingMsg, setSettingMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -36,12 +81,22 @@ function HomeLobby() {
   }, [supabase, router])
 
   async function loadData(userId: string) {
+    // Profile (nickname)
+    const profileRes = await fetch('/api/profile')
+    if (profileRes.ok) {
+      const p = await profileRes.json()
+      setNickname(p.nickname)
+      setEditNick(p.nickname ?? '')
+    }
+
     // Active session
     const restoreRes = await fetch('/api/auth/restore')
     const { sessionId } = await restoreRes.json()
     if (sessionId) {
       localStorage.setItem('current_session_id', sessionId)
-      setActiveSession(sessionId)
+      // Get session name
+      const { data: s } = await supabase.from('sessions').select('name').eq('id', sessionId).single()
+      setActiveSession({ id: sessionId, name: s?.name ?? 'Evento' })
     }
 
     // Session history
@@ -53,7 +108,7 @@ function HomeLobby() {
       .limit(10)
     if (ps) setHistory(ps as unknown as SessionHistory[])
 
-    // Total creatures across all sessions
+    // Total creatures
     const { count } = await supabase
       .from('player_creatures')
       .select('*', { count: 'exact', head: true })
@@ -61,24 +116,54 @@ function HomeLobby() {
     setTotalCreatures(count ?? 0)
   }
 
+  async function saveNickname(nick: string) {
+    setNickSaving(true); setNickError('')
+    const res = await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: nick }),
+    })
+    const d = await res.json()
+    if (!res.ok) { setNickError(d.error ?? 'Errore'); setNickSaving(false); return false }
+    setNickname(nick); setNickSaving(false); return true
+  }
+
   async function handleJoin() {
     if (!code || code.length < 4 || !gdpr || joining) return
-    setJoining(true)
-    setJoinError('')
+    // Require nickname before joining
+    if (!nickname) { setJoinError('Imposta prima il tuo nickname (vedi sopra)'); return }
+    setJoining(true); setJoinError('')
     const res = await fetch('/api/auth/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: code.trim().toUpperCase() }),
     })
     const data = await res.json()
-    if (!res.ok) {
-      setJoinError(data.error ?? 'Codice non valido')
-      setJoining(false)
-      return
-    }
+    if (!res.ok) { setJoinError(data.error ?? 'Codice non valido'); setJoining(false); return }
     localStorage.setItem('current_session_id', data.sessionId)
-    setJoinSuccess('Accesso all\'evento riuscito! Caricamento...')
-    setTimeout(() => router.push('/game/map'), 800)
+    router.push('/game/map')
+  }
+
+  async function handleUpdateNick() {
+    setSavingNick(true); setSettingMsg(null)
+    const res = await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: editNick }),
+    })
+    const d = await res.json()
+    if (!res.ok) { setSettingMsg({ ok: false, text: d.error ?? 'Errore' }) }
+    else { setNickname(editNick); setSettingMsg({ ok: true, text: 'Nickname aggiornato!' }) }
+    setSavingNick(false)
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteConfirm !== 'ELIMINA') return
+    setDeleting(true)
+    localStorage.removeItem('current_session_id')
+    await fetch('/api/profile', { method: 'DELETE' })
+    await supabase.auth.signOut()
+    router.replace('/')
   }
 
   async function handleSignOut() {
@@ -87,12 +172,13 @@ function HomeLobby() {
     router.replace('/')
   }
 
-  const avatar = user?.user_metadata?.avatar_url
-  const name   = user?.user_metadata?.full_name ?? user?.email ?? 'Giocatore'
-  const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
-
+  const googleName  = user?.user_metadata?.full_name ?? user?.email ?? 'Giocatore'
+  const displayName = nickname ?? googleName.split(' ')[0]
+  const avatarUrl   = user?.user_metadata?.avatar_url
+  const initials    = displayName.slice(0, 2).toUpperCase()
   const sessionsPlayed = history.length
-  const totalExp = history.reduce((s, ps) => s + (ps.exp ?? 0), 0)
+  const totalExp       = history.reduce((s, ps) => s + (ps.exp ?? 0), 0)
+  const needsNickname  = nickname === null || nickname === ''
 
   return (
     <>
@@ -100,325 +186,311 @@ function HomeLobby() {
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #0A1520; font-family: 'DM Sans', sans-serif; min-height: 100svh; }
-        .home-root {
-          min-height: 100svh;
-          background: linear-gradient(160deg, #0D1E2E 0%, #0A1520 60%);
-          padding: 0 0 40px;
-          max-width: 480px; margin: 0 auto;
-        }
-        /* Header */
-        .top-bar {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 16px 20px 12px;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-        }
-        .logo {
-          font-family: 'Cinzel', serif;
-          font-size: 18px; font-weight: 700;
-          color: #3ABCA8; letter-spacing: 0.04em;
-        }
-        .avatar-wrap { display: flex; align-items: center; gap: 10px; }
-        .avatar {
-          width: 36px; height: 36px; border-radius: 50%;
-          border: 2px solid rgba(58,188,168,0.4);
-          overflow: hidden; flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center;
-          background: rgba(58,188,168,0.15); color: #3ABCA8;
-          font-weight: 700; font-size: 13px;
-        }
-        .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .sign-out-btn {
-          font-size: 11px; color: rgba(255,255,255,0.3);
-          background: none; border: none; cursor: pointer;
-          transition: color 0.2s; padding: 4px;
-        }
-        .sign-out-btn:hover { color: rgba(255,255,255,0.6); }
-
-        /* Welcome */
-        .welcome {
-          padding: 24px 20px 0;
-        }
-        .welcome-name {
-          font-size: 22px; font-weight: 700; color: #fff;
-          margin-bottom: 2px;
-        }
-        .welcome-sub { font-size: 13px; color: rgba(255,255,255,0.35); }
-
-        /* Stats row */
-        .stats-row {
-          display: grid; grid-template-columns: repeat(3, 1fr);
-          gap: 10px; padding: 20px 20px 0;
-        }
-        .stat-card {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 14px; padding: 14px 12px; text-align: center;
-        }
-        .stat-val {
-          font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 2px;
-        }
-        .stat-label {
-          font-size: 10px; color: rgba(255,255,255,0.35);
-          text-transform: uppercase; letter-spacing: 0.06em;
-        }
-
-        /* Section */
-        .section { padding: 24px 20px 0; }
-        .section-title {
-          font-size: 11px; font-weight: 700;
-          text-transform: uppercase; letter-spacing: 0.1em;
-          color: rgba(255,255,255,0.3); margin-bottom: 12px;
-        }
-
-        /* Active event banner */
-        .active-banner {
-          background: linear-gradient(135deg, rgba(58,188,168,0.12), rgba(58,188,168,0.06));
-          border: 1px solid rgba(58,188,168,0.3);
-          border-radius: 16px; padding: 16px 18px;
-          display: flex; align-items: center; justify-content: space-between; gap: 12px;
-        }
-        .active-label { font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 2px; }
-        .active-title { font-size: 15px; font-weight: 700; color: #fff; }
-        .resume-btn {
-          background: #3ABCA8; color: #fff; border: none; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
-          padding: 10px 16px; border-radius: 10px; white-space: nowrap;
-          transition: opacity 0.2s, transform 0.15s;
-          box-shadow: 0 2px 12px rgba(58,188,168,0.3);
-        }
-        .resume-btn:hover { opacity: 0.9; transform: translateY(-1px); }
-
-        /* Join event */
-        .join-card {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 16px; overflow: hidden;
-        }
-        .join-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 16px 18px; cursor: pointer;
-        }
-        .join-header-left { display: flex; align-items: center; gap: 12px; }
-        .join-icon {
-          width: 38px; height: 38px; border-radius: 10px;
-          background: rgba(247,200,65,0.12); border: 1px solid rgba(247,200,65,0.25);
-          display: flex; align-items: center; justify-content: center; font-size: 18px;
-        }
-        .join-title { font-size: 15px; font-weight: 600; color: #fff; }
-        .join-sub { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 1px; }
-        .chevron {
-          color: rgba(255,255,255,0.3); font-size: 18px;
-          transition: transform 0.2s;
-        }
-        .chevron.open { transform: rotate(180deg); }
-        .join-body { padding: 0 18px 18px; border-top: 1px solid rgba(255,255,255,0.06); }
-        .code-input {
-          width: 100%; margin-top: 14px;
-          background: rgba(255,255,255,0.06);
-          border: 1.5px solid rgba(255,255,255,0.1);
-          border-radius: 12px; padding: 13px 16px;
-          text-align: center; font-size: 20px; font-weight: 700;
-          letter-spacing: 0.25em; color: #fff; text-transform: uppercase;
-          font-family: 'DM Sans', monospace; outline: none;
+        .hr { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 0; }
+        .input {
+          width: 100%;
+          background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.1);
+          border-radius: 12px; padding: 12px 14px;
+          font-family: 'DM Sans', sans-serif; font-size: 16px; color: #fff; outline: none;
           transition: border-color 0.2s;
         }
-        .code-input::placeholder { font-size: 13px; letter-spacing: 0.05em; font-weight: 400; color: rgba(255,255,255,0.2); }
-        .code-input:focus { border-color: #F7C841; }
-        .gdpr-wrap {
-          display: flex; align-items: flex-start; gap: 10px;
-          margin-top: 12px; cursor: pointer;
+        .input::placeholder { color: rgba(255,255,255,0.2); font-size: 14px; }
+        .input:focus { border-color: #3ABCA8; }
+        .input.code-style {
+          text-align: center; font-size: 20px; font-weight: 700;
+          letter-spacing: 0.2em; text-transform: uppercase;
         }
-        .gdpr-check {
+        .input.code-style:focus { border-color: #F7C841; }
+        .btn {
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          font-family: 'DM Sans', sans-serif; font-weight: 700; letter-spacing: 0.04em;
+          border: none; border-radius: 12px; cursor: pointer; width: 100%;
+          transition: opacity 0.2s, transform 0.15s;
+          padding: 13px 16px; font-size: 14px;
+        }
+        .btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+        .btn-teal { background: #3ABCA8; color: #fff; box-shadow: 0 3px 14px rgba(58,188,168,0.3); }
+        .btn-gold { background: linear-gradient(135deg, #F7C841, #E0B020); color: #0F1F2E; box-shadow: 0 3px 14px rgba(247,200,65,0.3); }
+        .btn-red  { background: rgba(232,93,47,0.15); color: #E85D2F; border: 1px solid rgba(232,93,47,0.3); box-shadow: none; }
+        .btn-ghost { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5); box-shadow: none; border: 1px solid rgba(255,255,255,0.08); }
+        .msg { border-radius: 8px; padding: 9px 12px; font-size: 12.5px; margin-top: 8px; }
+        .msg.err { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+        .msg.ok  { background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: #6ee7b7; }
+        .gdpr-wrap { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; cursor: pointer; }
+        .gdpr-box {
           width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px;
           border: 1.5px solid rgba(255,255,255,0.2); border-radius: 5px;
           display: flex; align-items: center; justify-content: center;
           transition: all 0.2s; background: transparent;
         }
-        .gdpr-check.on { background: #3ABCA8; border-color: #3ABCA8; }
-        .gdpr-text { font-size: 11.5px; color: rgba(255,255,255,0.45); line-height: 1.5; }
-        .join-btn {
-          width: 100%; margin-top: 14px;
-          background: linear-gradient(135deg, #F7C841, #E0B020);
-          color: #0F1F2E; font-family: 'DM Sans', sans-serif;
-          font-size: 14px; font-weight: 800; letter-spacing: 0.05em;
-          padding: 14px; border-radius: 12px; border: none;
-          cursor: pointer; transition: opacity 0.2s, transform 0.15s;
-          box-shadow: 0 3px 16px rgba(247,200,65,0.3);
+        .gdpr-box.on { background: #3ABCA8; border-color: #3ABCA8; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+          width: 14px; height: 14px; display: inline-block;
+          border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+          border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle;
         }
-        .join-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
-        .join-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
-        .msg { margin-top: 10px; font-size: 12.5px; border-radius: 8px; padding: 9px 12px; }
-        .msg.err { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
-        .msg.ok  { background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: #6ee7b7; }
-
-        /* History */
-        .history-list { display: flex; flex-direction: column; gap: 8px; }
-        .history-item {
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 12px; padding: 12px 14px;
+        .spinner.dark { border: 2px solid rgba(15,31,46,0.3); border-top-color: #0F1F2E; }
+        .accordion-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 16px 18px; cursor: pointer;
+        }
+        .accordion-body { padding: 0 18px 18px; border-top: 1px solid rgba(255,255,255,0.06); }
+        .chevron { color: rgba(255,255,255,0.3); transition: transform 0.2s; font-style: normal; }
+        .chevron.open { transform: rotate(180deg); }
+        .hi-item {
           display: flex; align-items: center; gap: 12px;
+          background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
         }
         .hi-icon {
           width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
           background: rgba(58,157,188,0.1); border: 1px solid rgba(58,157,188,0.2);
           display: flex; align-items: center; justify-content: center; font-size: 16px;
         }
-        .hi-name { font-size: 14px; font-weight: 600; color: #fff; }
-        .hi-meta { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px; }
-        .hi-exp {
-          margin-left: auto; font-size: 13px; font-weight: 700;
-          color: #F7C841; white-space: nowrap;
-        }
-        .empty { font-size: 13px; color: rgba(255,255,255,0.25); text-align: center; padding: 20px 0; }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .spinner {
-          width: 14px; height: 14px; display: inline-block;
-          border: 2px solid rgba(15,31,46,0.4); border-top-color: #0F1F2E;
-          border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle;
+        .danger-zone {
+          background: rgba(232,93,47,0.06); border: 1px solid rgba(232,93,47,0.2);
+          border-radius: 12px; padding: 16px;
         }
       `}</style>
 
-      <div className="home-root">
-        {/* Top bar */}
-        <div className="top-bar">
-          <span className="logo">🌿 WildCatch</span>
-          <div className="avatar-wrap">
-            <div className="avatar">
-              {avatar ? <img src={avatar} alt={name} /> : initials}
-            </div>
-            <button className="sign-out-btn" onClick={handleSignOut} title="Esci">
-              Esci
+      <div style={{ minHeight: '100svh', background: 'linear-gradient(160deg, #0D1E2E 0%, #0A1520 60%)', maxWidth: 480, margin: '0 auto', paddingBottom: 48 }}>
+
+        {/* ── Top bar ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <span style={{ fontFamily: "'Cinzel', serif", fontSize: 18, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.04em' }}>🌿 WildCatch</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={() => { setShowSettings(v => !v); setSettingMsg(null) }}
+              style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(58,188,168,0.4)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(58,188,168,0.15)', color: '#3ABCA8', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+              title="Profilo"
+            >
+              {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
             </button>
           </div>
         </div>
 
-        {/* Welcome */}
-        <div className="welcome">
-          <div className="welcome-name">Ciao, {name.split(' ')[0]} 👋</div>
-          <div className="welcome-sub">Il tuo profilo WildCatch</div>
-        </div>
-
-        {/* Stats */}
-        <div className="stats-row">
-          {[
-            { val: totalCreatures, label: 'Creature', icon: '🐾' },
-            { val: sessionsPlayed, label: 'Sessioni',  icon: '🎮' },
-            { val: totalExp,       label: 'EXP tot',  icon: '⚡' },
-          ].map(({ val, label, icon }) => (
-            <div key={label} className="stat-card">
-              <div className="stat-val">{val}</div>
-              <div className="stat-label">{icon} {label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Active session */}
-        {activeSession && (
-          <div className="section">
-            <div className="section-title">Evento in corso</div>
-            <div className="active-banner">
-              <div>
-                <div className="active-label">Sessione attiva</div>
-                <div className="active-title">
-                  {history.find(h => h.session_id === activeSession)?.sessions?.name ?? 'Evento'}
-                </div>
-              </div>
-              <button
-                className="resume-btn"
-                onClick={() => router.push('/game/map')}
-              >
-                ▶ Continua
-              </button>
-            </div>
+        {/* ── Welcome ── */}
+        <div style={{ padding: '24px 20px 0' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
+            Ciao, {displayName} 👋
           </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>
+            {user?.email}
+          </div>
+        </div>
+
+        {/* ── Stats ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: '20px 20px 0' }}>
+          <Stat val={totalCreatures} label="Creature" icon="🐾" />
+          <Stat val={sessionsPlayed} label="Sessioni"  icon="🎮" />
+          <Stat val={totalExp}       label="EXP tot"   icon="⚡" />
+        </div>
+
+        {/* ── Nickname prompt (one-time) ── */}
+        {needsNickname && !showSettings && (
+          <Section title="🎯 Imposta il tuo nickname">
+            <Card accent="#F7C841">
+              <div style={{ padding: '16px 18px' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 4 }}>Come vuoi essere chiamato?</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>Verrà mostrato nelle classifiche e nelle statistiche</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="input"
+                    placeholder="es. WildHunter99"
+                    value={nickInput}
+                    onChange={e => setNickInput(e.target.value)}
+                    maxLength={24}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="btn btn-gold"
+                    style={{ width: 'auto', paddingLeft: 20, paddingRight: 20 }}
+                    disabled={nickInput.trim().length < 2 || nickSaving}
+                    onClick={async () => { const ok = await saveNickname(nickInput.trim()); if (ok) setNickInput('') }}
+                  >
+                    {nickSaving ? <span className="spinner dark" /> : 'Salva'}
+                  </button>
+                </div>
+                {nickError && <div className="msg err">⚠ {nickError}</div>}
+              </div>
+            </Card>
+          </Section>
         )}
 
-        {/* Join event */}
-        <div className="section">
-          <div className="section-title">Partecipa a un evento</div>
-          <div className="join-card">
-            <div className="join-header" onClick={() => setShowJoin(v => !v)}>
-              <div className="join-header-left">
-                <div className="join-icon">🎟️</div>
-                <div>
-                  <div className="join-title">Inserisci codice invito</div>
-                  <div className="join-sub">Ricevuto dall'organizzatore dell'evento</div>
+        {/* ── Settings panel ── */}
+        {showSettings && (
+          <Section title="Impostazioni profilo">
+            <Card>
+              {/* Nickname */}
+              <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>NICKNAME</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input className="input" placeholder="Inserisci nickname" value={editNick} onChange={e => setEditNick(e.target.value)} maxLength={24} style={{ flex: 1 }} />
+                  <button
+                    className="btn btn-teal"
+                    style={{ width: 'auto', paddingLeft: 18, paddingRight: 18 }}
+                    disabled={editNick.trim().length < 2 || savingNick}
+                    onClick={handleUpdateNick}
+                  >
+                    {savingNick ? <span className="spinner" /> : 'Salva'}
+                  </button>
+                </div>
+                {settingMsg && <div className={`msg ${settingMsg.ok ? 'ok' : 'err'}`}>{settingMsg.ok ? '✓' : '⚠'} {settingMsg.text}</div>}
+              </div>
+
+              {/* Account info */}
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>ACCOUNT</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>📧 {user?.email}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>
+                  Registrato il {user?.created_at ? new Date(user.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}
                 </div>
               </div>
-              <span className={`chevron ${showJoin ? 'open' : ''}`}>⌄</span>
+
+              {/* Sign out */}
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <button className="btn btn-ghost" onClick={handleSignOut}>
+                  🚪 Disconnetti
+                </button>
+              </div>
+
+              {/* Delete account */}
+              <div style={{ padding: '16px 18px' }}>
+                <div className="danger-zone">
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#E85D2F', marginBottom: 4 }}>⚠ Elimina account</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 12, lineHeight: 1.5 }}>
+                    Tutti i tuoi dati verranno eliminati permanentemente. Questa azione è irreversibile.
+                    Scrivi <strong style={{ color: '#E85D2F' }}>ELIMINA</strong> per confermare.
+                  </div>
+                  <input
+                    className="input"
+                    placeholder='Scrivi "ELIMINA" per confermare'
+                    value={deleteConfirm}
+                    onChange={e => setDeleteConfirm(e.target.value)}
+                    style={{ marginBottom: 10 }}
+                  />
+                  <button
+                    className="btn btn-red"
+                    disabled={deleteConfirm !== 'ELIMINA' || deleting}
+                    onClick={handleDeleteAccount}
+                  >
+                    {deleting ? <><span className="spinner" /> Eliminazione...</> : '🗑 Elimina account definitivamente'}
+                  </button>
+                </div>
+              </div>
+            </Card>
+          </Section>
+        )}
+
+        {/* ── Active session ── */}
+        {activeSession && (
+          <Section title="Evento in corso">
+            <Card accent="#3ABCA8">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '16px 18px' }}>
+                <div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Sessione attiva</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{activeSession.name}</div>
+                </div>
+                <button
+                  onClick={() => router.push('/game/map')}
+                  style={{ background: '#3ABCA8', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, padding: '10px 16px', borderRadius: 10, whiteSpace: 'nowrap', boxShadow: '0 2px 12px rgba(58,188,168,0.3)', transition: 'opacity 0.2s' }}
+                >
+                  ▶ Continua
+                </button>
+              </div>
+            </Card>
+          </Section>
+        )}
+
+        {/* ── Join event ── */}
+        <Section title="Partecipa a un evento">
+          <Card>
+            <div className="accordion-header" onClick={() => setShowJoin(v => !v)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(247,200,65,0.12)', border: '1px solid rgba(247,200,65,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎟️</div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>Inserisci codice invito</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Ricevuto dall'organizzatore dell'evento</div>
+                </div>
+              </div>
+              <em className={`chevron ${showJoin ? 'open' : ''}`}>⌄</em>
             </div>
 
             {showJoin && (
-              <div className="join-body">
+              <div className="accordion-body">
                 <input
-                  className="code-input"
+                  className="input code-style"
                   type="text"
                   placeholder="es. WILD2024"
                   value={code}
                   onChange={e => setCode(e.target.value.toUpperCase())}
                   maxLength={8}
                   autoCapitalize="characters"
+                  style={{ marginTop: 14 }}
                 />
 
                 <label className="gdpr-wrap" onClick={() => setGdpr(v => !v)}>
-                  <div className={`gdpr-check ${gdpr ? 'on' : ''}`}>
-                    {gdpr && (
-                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                        <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
+                  <div className={`gdpr-box ${gdpr ? 'on' : ''}`}>
+                    {gdpr && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                   </div>
-                  <span className="gdpr-text">
+                  <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
                     Accetto il trattamento dei dati personali ai sensi del GDPR (art. 6) per partecipare all'evento
                   </span>
                 </label>
 
+                {needsNickname && (
+                  <div className="msg err" style={{ marginTop: 12 }}>
+                    ⚠ Imposta prima il tuo nickname (vedi sezione sopra)
+                  </div>
+                )}
+
                 <button
-                  className="join-btn"
-                  disabled={!code || code.length < 4 || !gdpr || joining}
+                  className="btn btn-gold"
+                  style={{ marginTop: 14 }}
+                  disabled={!code || code.length < 4 || !gdpr || joining || needsNickname}
                   onClick={handleJoin}
                 >
-                  {joining ? <><span className="spinner" /> Accesso...</> : '🎮 PARTECIPA ALL\'EVENTO'}
+                  {joining ? <><span className="spinner dark" /> Accesso...</> : '🎮 PARTECIPA ALL\'EVENTO'}
                 </button>
 
-                {joinError   && <div className="msg err">⚠ {joinError}</div>}
-                {joinSuccess && <div className="msg ok">✓ {joinSuccess}</div>}
+                {joinError && <div className="msg err">⚠ {joinError}</div>}
               </div>
             )}
-          </div>
-        </div>
+          </Card>
+        </Section>
 
-        {/* Session history */}
-        <div className="section">
-          <div className="section-title">Storico sessioni</div>
-          <div className="history-list">
-            {history.length === 0 ? (
-              <div className="empty">Nessuna sessione ancora.<br />Partecipa al tuo primo evento!</div>
-            ) : (
-              history.map(ps => (
-                <div key={ps.session_id} className="history-item">
+        {/* ── Session history ── */}
+        <Section title="Storico sessioni">
+          {history.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: '20px 0' }}>
+              Nessuna sessione ancora.<br />Partecipa al tuo primo evento!
+            </div>
+          ) : (
+            <div>
+              {history.map(ps => (
+                <div key={ps.session_id} className="hi-item">
                   <div className="hi-icon">🎮</div>
-                  <div>
-                    <div className="hi-name">{ps.sessions?.name ?? 'Sessione'}</div>
-                    <div className="hi-meta">
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{ps.sessions?.name ?? 'Sessione'}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
                       {ps.sessions?.start_at
                         ? new Date(ps.sessions.start_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
                         : new Date(ps.joined_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
                       }
                       {' · '}
-                      <span style={{ textTransform: 'capitalize' }}>
+                      <span style={{ color: ps.sessions?.status === 'active' ? '#34D399' : 'rgba(255,255,255,0.25)' }}>
                         {ps.sessions?.status === 'ended' ? 'Terminata' : ps.sessions?.status === 'active' ? 'In corso' : ps.sessions?.status ?? '—'}
                       </span>
                     </div>
                   </div>
-                  <div className="hi-exp">⚡ {ps.exp ?? 0}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#F7C841', whiteSpace: 'nowrap' }}>⚡ {ps.exp ?? 0}</div>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+              ))}
+            </div>
+          )}
+        </Section>
       </div>
     </>
   )
