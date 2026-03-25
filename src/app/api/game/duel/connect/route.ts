@@ -44,10 +44,12 @@ export async function POST(request: Request) {
         started_at: new Date().toISOString(),
       })
       .eq('id', duel.id)
+      .is('opponent_id', null)
       .select()
       .single()
 
-    return NextResponse.json({ duelId: updated!.id, role: 'opponent', roomCode: duel.room_code })
+    if (!updated) return NextResponse.json({ error: 'Stanza già occupata' }, { status: 409 })
+    return NextResponse.json({ duelId: updated.id, role: 'opponent', roomCode: duel.room_code })
   } else {
     // Create new duel — retry on room code collision
     let code = generateRoomCode()

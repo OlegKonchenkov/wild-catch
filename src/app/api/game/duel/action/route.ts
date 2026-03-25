@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const winnerId = isChallenger ? duel.opponent_id : duel.challenger_id
     await supabase.from('duels').update({ status: 'ended', winner_id: winnerId, ended_at: new Date().toISOString() }).eq('id', duelId)
     await awardDuelResults(supabase, duel.session_id, winnerId!, user.id)
-    return NextResponse.json({ ended: true, winner: 'opponent' })
+    return NextResponse.json({ ended: true, winnerId })
   }
 
   // Get creature stats from the FK-joined data
@@ -47,7 +47,9 @@ export async function POST(request: Request) {
   const damage = Math.round(calculateFightDamage(attackerCr.atk) * mult)
 
   // Broadcast action via Supabase Realtime to both players
-  await supabase.channel(`duel:${duelId}`).send({
+  const channel = supabase.channel(`duel:${duelId}`)
+  await new Promise<void>(resolve => channel.subscribe(() => resolve()))
+  await channel.send({
     type: 'broadcast',
     event: 'duel_action',
     payload: {
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
       elementMultiplier: mult,
     },
   })
+  await supabase.removeChannel(channel)
 
   return NextResponse.json({ damage, elementMultiplier: mult, action })
 }

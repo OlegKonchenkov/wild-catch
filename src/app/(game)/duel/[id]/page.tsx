@@ -19,29 +19,39 @@ export default function DuelPage() {
   const [result, setResult] = useState<'won' | 'lost' | null>(null)
   const [animState, setAnimState] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [userId, setUserId] = useState<string | null>(null)
+  const [myRole, setMyRole] = useState<'challenger' | 'opponent' | null>(null)
   const realtimeUpdatedRef = useRef(false)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
+    // Fetch duel data and determine player role together
     supabase
       .from('duels')
       .select('*, challenger_creature:player_creatures!challenger_creature_id(*, creatures(*)), opponent_creature:player_creatures!opponent_creature_id(*, creatures(*))')
       .eq('id', id)
       .single()
-      .then(({ data }) => {
-        if (data) {
-          setDuel(data)
-          const ch = (data as any).challenger_creature?.creatures
-          const op = (data as any).opponent_creature?.creatures
-          if (ch) { setMyHp(ch.hp); setMyHpMax(ch.hp) }
-          if (op) { setOpponentHp(op.hp); setOpponentHpMax(op.hp) }
-          if (!realtimeUpdatedRef.current) setWaiting(data.status === 'waiting')
-        }
-      })
+      .then(async ({ data }) => {
+        if (!data) return
+        setDuel(data)
+        if (!realtimeUpdatedRef.current) setWaiting(data.status === 'waiting')
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id)
-    })
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        setUserId(user.id)
+
+        const role = data.challenger_id === user.id ? 'challenger' : 'opponent'
+        setMyRole(role)
+
+        const myCrData = role === 'challenger'
+          ? (data as any).challenger_creature?.creatures
+          : (data as any).opponent_creature?.creatures
+        const oppCrData = role === 'challenger'
+          ? (data as any).opponent_creature?.creatures
+          : (data as any).challenger_creature?.creatures
+
+        if (myCrData) { setMyHp(myCrData.hp); setMyHpMax(myCrData.hp) }
+        if (oppCrData) { setOpponentHp(oppCrData.hp); setOpponentHpMax(oppCrData.hp) }
+      })
 
     // Subscribe to duel actions
     const channel = supabase
@@ -78,8 +88,6 @@ export default function DuelPage() {
   }, [id, supabase])
 
   async function handleAttack() {
-    setAnimState('attack')
-    setTimeout(() => setAnimState('idle'), 400)
     await fetch('/api/game/duel/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -95,8 +103,12 @@ export default function DuelPage() {
     })
   }
 
-  const myCr = duel?.challenger_creature?.creatures
-  const oppCr = duel?.opponent_creature?.creatures
+  const myCr = myRole === 'opponent'
+    ? duel?.opponent_creature?.creatures
+    : duel?.challenger_creature?.creatures
+  const oppCr = myRole === 'opponent'
+    ? duel?.challenger_creature?.creatures
+    : duel?.opponent_creature?.creatures
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-[#0F1F2E] via-[#1A1A2E] to-[#0F1F2E] p-4">
