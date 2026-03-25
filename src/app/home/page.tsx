@@ -82,39 +82,49 @@ function HomeLobby() {
   }, [supabase, router])
 
   async function loadData(userId: string) {
-    // Profile (nickname)
-    const profileRes = await fetch('/api/profile')
-    if (profileRes.ok) {
-      const p = await profileRes.json()
-      setNickname(p.nickname)
-      setEditNick(p.nickname ?? '')
+    // Phase 1 — profile + restore in parallel (both independent)
+    const [profileRes, restoreRes] = await Promise.all([
+      fetch('/api/profile'),
+      fetch('/api/auth/restore'),
+    ])
+
+    const [profile, restore] = await Promise.all([
+      profileRes.ok ? profileRes.json() : Promise.resolve({}),
+      restoreRes.json(),
+    ])
+
+    if (profile.nickname !== undefined) {
+      setNickname(profile.nickname)
+      setEditNick(profile.nickname ?? '')
     }
 
-    // Active session
-    const restoreRes = await fetch('/api/auth/restore')
-    const { sessionId } = await restoreRes.json()
-    if (sessionId) {
-      localStorage.setItem('current_session_id', sessionId)
-      // Get session name
-      const { data: s } = await supabase.from('sessions').select('name').eq('id', sessionId).single()
-      setActiveSession({ id: sessionId, name: s?.name ?? 'Evento' })
-    }
+    const { sessionId } = restore as { sessionId: string | null }
+    if (sessionId) localStorage.setItem('current_session_id', sessionId)
 
-    // Session history
-    const { data: ps } = await supabase
-      .from('player_sessions')
-      .select('session_id, exp, joined_at, sessions(name, status, start_at)')
-      .eq('user_id', userId)
-      .order('joined_at', { ascending: false })
-      .limit(10)
-    if (ps) setHistory(ps as unknown as SessionHistory[])
+    // Phase 2 — session name + history + creature count all in parallel
+    await Promise.all([
+      // Session name (only if we have a sessionId)
+      sessionId
+        ? supabase.from('sessions').select('name').eq('id', sessionId).single()
+            .then(({ data: s }) => setActiveSession({ id: sessionId, name: s?.name ?? 'Evento' }))
+        : Promise.resolve(),
 
-    // Total creatures
-    const { count } = await supabase
-      .from('player_creatures')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-    setTotalCreatures(count ?? 0)
+      // Session history
+      supabase
+        .from('player_sessions')
+        .select('session_id, exp, joined_at, sessions(name, status, start_at)')
+        .eq('user_id', userId)
+        .order('joined_at', { ascending: false })
+        .limit(10)
+        .then(({ data: ps }) => { if (ps) setHistory(ps as unknown as SessionHistory[]) }),
+
+      // Total creatures
+      supabase
+        .from('player_creatures')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .then(({ count }) => setTotalCreatures(count ?? 0)),
+    ])
   }
 
   async function saveNickname(nick: string) {
