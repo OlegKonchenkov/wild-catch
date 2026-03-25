@@ -1,0 +1,95 @@
+'use client'
+import { useState, useEffect, useMemo } from 'react'
+import { createClient } from '@/lib/supabase/client'
+
+interface LeaderboardEntry {
+  user_id: string
+  nickname: string | null
+  level: number
+  exp: number
+  gold: number
+  caught_count: number
+}
+
+export default function AdminLeaderboard() {
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([])
+  const [sessions, setSessions] = useState<any[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const supabase = useMemo(() => createClient(), [])
+
+  useEffect(() => {
+    supabase.from('sessions').select('id, name, status').order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) } })
+  }, [supabase])
+
+  useEffect(() => {
+    if (!selectedId) return
+    setLoading(true)
+    supabase
+      .from('player_sessions')
+      .select('user_id, level, exp, gold, profiles(nickname)')
+      .eq('session_id', selectedId)
+      .order('exp', { ascending: false })
+      .then(async ({ data }) => {
+        if (!data) { setLoading(false); return }
+        // Count caught creatures per player
+        const counts = await Promise.all(data.map(async (p) => {
+          const { count } = await supabase
+            .from('player_creatures')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', p.user_id)
+            .eq('session_id', selectedId)
+          return { ...p, caught_count: count ?? 0 }
+        }))
+        setEntries(counts.map(p => ({
+          user_id: p.user_id,
+          nickname: (p.profiles as any)?.nickname ?? 'Anonimo',
+          level: p.level,
+          exp: p.exp,
+          gold: p.gold,
+          caught_count: p.caught_count,
+        })))
+        setLoading(false)
+      })
+  }, [selectedId, supabase])
+
+  const medals = ['🥇', '🥈', '🥉']
+
+  return (
+    <div className="max-w-2xl">
+      <h1 className="text-2xl font-bold mb-4">🏆 Classifica</h1>
+
+      <div className="mb-4">
+        <select
+          value={selectedId ?? ''} onChange={e => setSelectedId(e.target.value)}
+          className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 w-full"
+        >
+          {sessions.map(s => (
+            <option key={s.id} value={s.id}>{s.name} ({s.status})</option>
+          ))}
+        </select>
+      </div>
+
+      {loading ? (
+        <p className="text-white/40 text-sm">Caricamento...</p>
+      ) : entries.length === 0 ? (
+        <p className="text-white/40 text-sm">Nessun giocatore in questa sessione.</p>
+      ) : (
+        <div className="space-y-2">
+          {entries.map((e, i) => (
+            <div key={e.user_id}
+              className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+              <span className="text-xl w-8 text-center">{medals[i] ?? `#${i + 1}`}</span>
+              <div className="flex-1">
+                <p className="font-bold text-white">{e.nickname}</p>
+                <p className="text-xs text-white/40">Lv {e.level} · {e.exp} EXP · {e.caught_count} catture</p>
+              </div>
+              <span className="text-[#F7C841] font-bold text-sm">🪙 {e.gold}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
