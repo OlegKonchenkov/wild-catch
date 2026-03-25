@@ -94,8 +94,8 @@ export default function BestiaryPage() {
   return (
     <div className="h-full overflow-y-auto">
       <style>{`
-        .silhouette { filter: brightness(0) contrast(1); }
-        .silhouette-soft { filter: brightness(0.08) saturate(0) blur(1px); }
+        .silhouette { filter: brightness(0.15) saturate(0) blur(0.5px) contrast(0.8); }
+        .silhouette-soft { filter: brightness(0.12) saturate(0) blur(2px) contrast(0.7); }
         @keyframes shimmer {
           0%   { background-position: -200% center; }
           100% { background-position:  200% center; }
@@ -176,12 +176,19 @@ export default function BestiaryPage() {
                 {/* Image area */}
                 <div className="relative aspect-square overflow-hidden flex items-center justify-center p-1">
                   {creature.image_url ? (
-                    <Image
-                      src={creature.image_url}
-                      alt={caught ? creature.name : '???'}
-                      width={80} height={80}
-                      className={`w-full h-full object-contain transition-all ${caught ? '' : 'silhouette'}`}
-                    />
+                    <>
+                      <Image
+                        src={creature.image_url}
+                        alt={caught ? creature.name : '???'}
+                        width={80} height={80}
+                        className={`w-full h-full object-contain transition-all ${caught ? '' : 'silhouette'}`}
+                      />
+                      {!caught && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-[#0A1520]/40 rounded-lg">
+                          <span className="text-white/30 text-lg font-black">?</span>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className={`text-3xl ${caught ? '' : 'opacity-10'}`}>
                       {caught ? ELEMENT_EMOJI[creature.element] : '?'}
@@ -248,8 +255,13 @@ export default function BestiaryPage() {
                 <div className="flex justify-center mb-4">
                   <div className="relative w-36 h-36">
                     {creature.image_url ? (
-                      <Image src={creature.image_url} alt={caught ? creature.name : '???'}
-                        fill className={`object-contain ${caught ? '' : 'silhouette-soft'}`} sizes="144px" />
+                      <>
+                        <Image src={creature.image_url} alt={caught ? creature.name : '???'}
+                          fill className={`object-contain ${caught ? '' : 'silhouette-soft'}`} sizes="144px" />
+                        {!caught && (
+                          <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#0F1F2E]/30 via-[#0F1F2E]/20 to-[#0F1F2E]/50" />
+                        )}
+                      </>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-6xl opacity-20">
                         {caught ? ELEMENT_EMOJI[creature.element] : '?'}

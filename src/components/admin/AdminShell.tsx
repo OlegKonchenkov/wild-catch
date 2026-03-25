@@ -11,6 +11,7 @@ const NAV = [
   { href: '/admin/invites',     label: '🎟️ Inviti'     },
   { href: '/admin/players',     label: '👥 Giocatori'  },
   { href: '/admin/leaderboard', label: '🏆 Classifica' },
+  { href: '/admin/guide',       label: '📘 Guida Admin' },
 ]
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
