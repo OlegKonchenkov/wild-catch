@@ -36,13 +36,16 @@ export async function POST(request: Request) {
   if (ps.gold < totalCost) return NextResponse.json({ error: 'Oro insufficiente' }, { status: 402 })
 
   // Atomic: deduct gold + add item
-  const { error: goldError } = await supabase
+  const { data: goldUpdateResult, error: goldError } = await supabase
     .from('player_sessions')
     .update({ gold: ps.gold - totalCost })
     .eq('id', ps.id)
     .eq('gold', ps.gold)  // optimistic lock
+    .select('id')
 
-  if (goldError) return NextResponse.json({ error: 'Errore transazione' }, { status: 500 })
+  if (goldError || !goldUpdateResult || goldUpdateResult.length === 0) {
+    return NextResponse.json({ error: 'Errore transazione (riprova)' }, { status: 409 })
+  }
 
   // Add item to inventory (upsert)
   const { data: existing } = await supabase
@@ -54,13 +57,15 @@ export async function POST(request: Request) {
     .single()
 
   if (existing) {
-    await supabase.from('player_inventory')
+    const { error: invError } = await supabase.from('player_inventory')
       .update({ quantity: existing.quantity + quantity })
       .eq('id', existing.id)
+    if (invError) return NextResponse.json({ error: 'Errore aggiunta oggetto' }, { status: 500 })
   } else {
-    await supabase.from('player_inventory').insert({
+    const { error: invError } = await supabase.from('player_inventory').insert({
       user_id: user.id, session_id: sessionId, item_id: itemId, quantity,
     })
+    if (invError) return NextResponse.json({ error: 'Errore aggiunta oggetto' }, { status: 500 })
   }
 
   return NextResponse.json({
