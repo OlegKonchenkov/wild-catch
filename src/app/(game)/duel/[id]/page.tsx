@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion } from 'framer-motion'
@@ -18,6 +18,8 @@ export default function DuelPage() {
   const [waiting, setWaiting] = useState(true)
   const [result, setResult] = useState<'won' | 'lost' | null>(null)
   const [animState, setAnimState] = useState<'idle' | 'attack' | 'damage'>('idle')
+  const [userId, setUserId] = useState<string | null>(null)
+  const realtimeUpdatedRef = useRef(false)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -33,19 +35,31 @@ export default function DuelPage() {
           const op = (data as any).opponent_creature?.creatures
           if (ch) { setMyHp(ch.hp); setMyHpMax(ch.hp) }
           if (op) { setOpponentHp(op.hp); setOpponentHpMax(op.hp) }
-          setWaiting(data.status === 'waiting')
+          if (!realtimeUpdatedRef.current) setWaiting(data.status === 'waiting')
         }
       })
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id)
+    })
 
     // Subscribe to duel actions
     const channel = supabase
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
-        const { damage } = payload
-
-        setAnimState('damage')
+        const { actorId, damage } = payload
+        // If I am the attacker, opponent takes damage; if I am defender, I take damage
+        setUserId(currentId => {
+          if (actorId === currentId) {
+            setOpponentHp(prev => Math.max(0, prev - damage))
+            setAnimState('attack')
+          } else {
+            setMyHp(prev => Math.max(0, prev - damage))
+            setAnimState('damage')
+          }
+          return currentId
+        })
         setTimeout(() => setAnimState('idle'), 400)
-        setMyHp(prev => Math.max(0, prev - damage))
         setLog(prev => [`💥 Danno: ${damage}`, ...prev.slice(0, 4)])
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${id}` },
@@ -55,6 +69,7 @@ export default function DuelPage() {
               setResult(updated.winner_id === user?.id ? 'won' : 'lost')
             })
           }
+          realtimeUpdatedRef.current = true
           setWaiting(updated.status === 'waiting')
         })
       .subscribe()
