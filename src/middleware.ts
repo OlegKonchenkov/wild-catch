@@ -23,8 +23,12 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Protect /game/* routes — must be authenticated
-  if (request.nextUrl.pathname.startsWith('/game') && !user) {
+  // Protect /game/* and /onboarding routes — must be authenticated
+  if (
+    (request.nextUrl.pathname.startsWith('/game') ||
+      request.nextUrl.pathname.startsWith('/onboarding')) &&
+    !user
+  ) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -41,5 +45,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/game/:path*', '/admin/:path*', '/auth/:path*'],
+  matcher: ['/game/:path*', '/admin/:path*', '/auth/:path*', '/onboarding/:path*', '/onboarding'],
 }
