@@ -1,133 +1,165 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-interface LeaderboardEntry {
-  rank: number
+interface Profile {
+  exp: number
+  gold: number
+  level: number
   nickname: string
-  score: number
+  avatar_url: string | null
   creatures_caught: number
 }
 
-export default function ProfilePage() {
-  const [profile, setProfile] = useState<any>(null)
+interface LeaderboardEntry {
+  rank: number
+  user_id: string
+  nickname: string
+  score: number
+  isMe: boolean
+}
+
+const MEDAL: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
+
+function ProfileContent() {
+  const [profile, setProfile]       = useState<Profile | null>(null)
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [hallOfFame, setHallOfFame] = useState<any[]>([])
+  const [loadingProfile, setLoadingProfile] = useState(true)
+  const [loadingBoard, setLoadingBoard]     = useState(true)
+  const [error, setError]           = useState<string | null>(null)
   const searchParams = useSearchParams()
   const sessionEnded = searchParams.get('ended') === '1'
-  const supabase = useMemo(() => createClient(), [])
+
+  const sessionId = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null
+
+  const fetchProfile = useCallback(async () => {
+    if (!sessionId) return
+    setLoadingProfile(true)
+    const res = await fetch(`/api/game/profile?sessionId=${sessionId}`)
+    if (res.ok) setProfile(await res.json())
+    else setError('Impossibile caricare il profilo')
+    setLoadingProfile(false)
+  }, [sessionId])
+
+  const fetchLeaderboard = useCallback(async () => {
+    if (!sessionId) return
+    setLoadingBoard(true)
+    const res = await fetch(`/api/game/leaderboard?sessionId=${sessionId}`)
+    if (res.ok) {
+      const d = await res.json()
+      setLeaderboard(d.leaderboard ?? [])
+    }
+    setLoadingBoard(false)
+  }, [sessionId])
 
   useEffect(() => {
-    const sessionId = localStorage.getItem('current_session_id')
-    if (!sessionId) return
-
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-
-      // Profile
-      supabase.from('player_sessions').select('*, profiles!player_sessions_user_id_fkey(nickname, avatar_url)')
-        .eq('user_id', user.id).eq('session_id', sessionId).single()
-        .then(({ data }) => { if (data) setProfile(data) })
-
-      // Hall of fame
-      supabase.from('hall_of_fame').select('*')
-        .eq('user_id', user.id).order('awarded_at', { ascending: false }).limit(5)
-        .then(({ data }) => { if (data) setHallOfFame(data) })
-    })
-
-    // Leaderboard — polling every 30s
-    function fetchLeaderboard() {
-      supabase
-        .from('player_sessions')
-        .select('exp, user_id, profiles!player_sessions_user_id_fkey(nickname)')
-        .eq('session_id', sessionId)
-        .order('exp', { ascending: false })
-        .limit(20)
-        .then(({ data }) => {
-          if (data) {
-            setLeaderboard(data.map((p: any, i: number) => ({
-              rank: i + 1,
-              nickname: (p.profiles as any)?.nickname ?? 'Anonimo',
-              score: p.exp,
-              creatures_caught: 0,
-            })))
-          }
-        })
-    }
-
+    fetchProfile()
     fetchLeaderboard()
     const interval = setInterval(fetchLeaderboard, 30000)
     return () => clearInterval(interval)
-  }, [supabase])
+  }, [fetchProfile, fetchLeaderboard])
+
+  const myEntry = leaderboard.find(e => e.isMe)
 
   return (
-    <div className="h-full overflow-y-auto p-4">
+    <div className="h-full overflow-y-auto p-4 pb-6">
       {sessionEnded && (
-        <div className="bg-[#7B4DB8]/20 border border-[#7B4DB8] rounded-xl p-4 mb-4 text-center">
+        <div className="bg-[#7B4DB8]/20 border border-[#7B4DB8]/50 rounded-2xl p-4 mb-4 text-center">
           <p className="text-2xl font-bold text-white">🏆 Evento Terminato!</p>
-          <p className="text-white/70 text-sm mt-1">La classifica finale è stata generata</p>
+          <p className="text-white/60 text-sm mt-1">La classifica finale è stata generata</p>
         </div>
+      )}
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-red-400 text-sm mb-4">{error}</div>
       )}
 
       {/* Profile card */}
-      {profile && (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-[#3A9DBC] flex items-center justify-center text-xl">
-              👤
+      {loadingProfile ? (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-4 animate-pulse h-28" />
+      ) : profile ? (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-12 h-12 rounded-full bg-[#3A9DBC]/20 border border-[#3A9DBC]/30 flex items-center justify-center text-xl shrink-0">
+              {profile.avatar_url
+                /* eslint-disable-next-line @next/next/no-img-element */
+                ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover rounded-full" />
+                : '👤'}
             </div>
             <div>
-              <p className="font-bold text-white">{(profile as any)?.profiles?.nickname ?? 'Anonimo'}</p>
+              <p className="font-bold text-white text-base">{profile.nickname}</p>
               <p className="text-sm text-[#3A9DBC]">Livello {profile.level}</p>
             </div>
+            {myEntry && (
+              <div className="ml-auto text-right">
+                <p className="text-xl font-extrabold">{MEDAL[myEntry.rank] ?? `#${myEntry.rank}`}</p>
+                <p className="text-xs text-white/40">in classifica</p>
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-3 gap-2 mt-3 text-center">
-            <div><p className="text-[#F7C841] font-bold">{profile.exp}</p><p className="text-xs text-white/50">EXP</p></div>
-            <div><p className="text-[#D4A96A] font-bold">{profile.gold}</p><p className="text-xs text-white/50">Oro</p></div>
-            <div><p className="text-white font-bold">{profile.level}</p><p className="text-xs text-white/50">Livello</p></div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-black/20 rounded-xl py-2">
+              <p className="text-[#F7C841] font-extrabold text-lg">{profile.exp}</p>
+              <p className="text-xs text-white/40">EXP</p>
+            </div>
+            <div className="bg-black/20 rounded-xl py-2">
+              <p className="text-[#D4A96A] font-extrabold text-lg">{profile.gold}</p>
+              <p className="text-xs text-white/40">Oro</p>
+            </div>
+            <div className="bg-black/20 rounded-xl py-2">
+              <p className="text-white font-extrabold text-lg">{profile.creatures_caught}</p>
+              <p className="text-xs text-white/40">🐾 Creature</p>
+            </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Live leaderboard */}
-      <h2 className="text-lg font-bold text-white mb-3">Classifica Live</h2>
-      <div className="space-y-2 mb-6">
-        {leaderboard.map(entry => (
-          <div key={entry.rank} className="flex items-center gap-3 bg-white/5 rounded-xl p-3">
-            <span className={`font-bold text-lg w-8 text-center ${
-              entry.rank === 1 ? 'text-[#F7C841]' :
-              entry.rank === 2 ? 'text-gray-300' :
-              entry.rank === 3 ? 'text-[#D4A96A]' : 'text-white/40'
-            }`}>
-              {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
-            </span>
-            <span className="flex-1 text-white text-sm">{entry.nickname}</span>
-            <span className="text-[#F7C841] font-bold text-sm">{entry.score} pt</span>
-          </div>
-        ))}
-        {leaderboard.length === 0 && (
-          <p className="text-center text-white/30 py-4">Caricamento classifica...</p>
-        )}
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-base font-extrabold text-white">🏆 Classifica Live</h2>
+        <button onClick={fetchLeaderboard} className="text-xs text-[#3A9DBC] hover:text-white transition-colors">↻ Aggiorna</button>
       </div>
 
-      {/* Hall of Fame */}
-      {hallOfFame.length > 0 && (
-        <>
-          <h2 className="text-lg font-bold text-[#F7C841] mb-3">🏆 Hall of Fame</h2>
-          <div className="space-y-2">
-            {hallOfFame.map(hof => (
-              <div key={hof.id} className="bg-[#F7C841]/10 border border-[#F7C841]/30 rounded-xl p-3">
-                <div className="flex justify-between">
-                  <span className="text-white font-bold">{hof.season_label}</span>
-                  <span className="text-[#F7C841]">#{hof.rank}</span>
-                </div>
-                <p className="text-sm text-white/60">{hof.score} punti · {hof.creatures_caught} creature</p>
-              </div>
-            ))}
-          </div>
-        </>
+      {loadingBoard ? (
+        <div className="space-y-2">
+          {[1,2,3].map(i => <div key={i} className="bg-white/5 rounded-xl h-12 animate-pulse" />)}
+        </div>
+      ) : leaderboard.length === 0 ? (
+        <p className="text-center text-white/30 py-8 text-sm">Nessun giocatore ancora</p>
+      ) : (
+        <div className="space-y-1.5">
+          {leaderboard.map(entry => (
+            <div
+              key={entry.user_id}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all ${
+                entry.isMe
+                  ? 'bg-[#3A9DBC]/15 border border-[#3A9DBC]/40'
+                  : 'bg-white/4 border border-white/8'
+              }`}
+            >
+              <span className={`font-extrabold text-base w-8 text-center shrink-0 ${
+                entry.rank === 1 ? 'text-[#F7C841]' :
+                entry.rank === 2 ? 'text-gray-300' :
+                entry.rank === 3 ? 'text-[#D4A96A]' : 'text-white/30 text-sm'
+              }`}>
+                {MEDAL[entry.rank] ?? `#${entry.rank}`}
+              </span>
+              <span className={`flex-1 text-sm font-semibold truncate ${entry.isMe ? 'text-[#3A9DBC]' : 'text-white'}`}>
+                {entry.nickname}{entry.isMe && ' (tu)'}
+              </span>
+              <span className="text-[#F7C841] font-bold text-sm shrink-0">{entry.score} pt</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
+  )
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-white/30 text-sm">Caricamento...</div>}>
+      <ProfileContent />
+    </Suspense>
   )
 }
