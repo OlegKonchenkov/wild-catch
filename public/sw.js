@@ -42,6 +42,9 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url)
 
+  // Only handle GET — Cache API does not support PUT/POST/DELETE requests
+  if (event.request.method !== 'GET') return
+
   // API: always network, never cache
   if (url.pathname.startsWith('/api/')) return
 
@@ -68,9 +71,11 @@ self.addEventListener('fetch', event => {
         const cached = await cache.match(event.request)
         const networkFetch = fetch(event.request).then(async res => {
           if (res.ok) {
+            // Clone immediately before any async gap
+            const clone = res.clone()
             const keys = await cache.keys()
             if (keys.length >= MAX_IMG_CACHE) await cache.delete(keys[0])
-            cache.put(event.request, res.clone())
+            cache.put(event.request, clone)
           }
           return res
         }).catch(() => null)
@@ -86,7 +91,9 @@ self.addEventListener('fetch', event => {
     fetch(event.request)
       .then(res => {
         if (res.ok) {
-          caches.open(STATIC_CACHE).then(c => c.put(event.request, res.clone()))
+          // Clone synchronously before returning res (body consumed by browser)
+          const clone = res.clone()
+          caches.open(STATIC_CACHE).then(c => c.put(event.request, clone))
         }
         return res
       })
