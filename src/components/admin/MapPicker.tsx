@@ -36,7 +36,7 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
     if (!containerRef.current) return
     let cleanupFn = () => {}
 
-    Promise.all([import('leaflet'), import('leaflet/dist/leaflet.css')]).then(([L]) => {
+    import('leaflet').then(L => {
       // Avoid double-init on React StrictMode
       if (mapRef.current) return
 
@@ -48,6 +48,9 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
 
       const map = L.map(containerRef.current!, { center, zoom: initialBounds ? 14 : 12, zoomControl: true })
       mapRef.current = map
+
+      // Force Leaflet to recalculate container size after render
+      setTimeout(() => map.invalidateSize(), 100)
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a>',
