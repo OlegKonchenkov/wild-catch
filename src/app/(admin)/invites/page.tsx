@@ -63,7 +63,7 @@ export default function InvitesPage() {
         <p className="text-white/50 text-sm mb-3">Genera nuovi codici</p>
         <div className="flex gap-2">
           <input type="number" value={quantity} onChange={e => setQuantity(+e.target.value)}
-            min={1} max={200}
+            min={1} max={500}
             className="w-24 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2" />
           <button onClick={generateCodes} disabled={loading || !selectedId}
             className="flex-1 bg-[#3A9DBC] text-white font-bold py-2 rounded-lg disabled:opacity-50">
