@@ -12,6 +12,7 @@ export default function AdminDashboard() {
   const [sessions, setSessions] = useState<any[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [notifText, setNotifText] = useState('')
   const supabase = useMemo(() => createClient(), [])
 
@@ -24,7 +25,9 @@ export default function AdminDashboard() {
     if (!selectedId) return
     const fetchStats = () => {
       fetch(`/api/admin/dashboard?sessionId=${selectedId}`)
-        .then(r => r.json()).then(setStats)
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(data => { setStats(data); setError(null) })
+        .catch(e => setError(`Errore caricamento stats (${e})`))
     }
     fetchStats()
     const i = setInterval(fetchStats, 10000)
@@ -54,6 +57,9 @@ export default function AdminDashboard() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-4">Dashboard Admin</h1>
+      {error && (
+        <p className="text-red-400 text-sm mb-4 bg-red-400/10 rounded-lg p-2">{error}</p>
+      )}
 
       {/* Session selector */}
       <div className="mb-4">

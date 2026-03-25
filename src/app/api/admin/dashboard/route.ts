@@ -13,14 +13,15 @@ export async function GET(request: Request) {
   const sessionId = searchParams.get('sessionId')
   if (!sessionId) return NextResponse.json({ error: 'sessionId richiesto' }, { status: 400 })
 
-  const [players, encounters, duels, session] = await Promise.all([
-    supabase.from('player_sessions').select('id', { count: 'exact' }).eq('session_id', sessionId),
-    supabase.from('encounters').select('id, status', { count: 'exact' }).eq('session_id', sessionId),
+  const [players, encounters, caught, duels, session] = await Promise.all([
+    supabase.from('player_sessions').select('id', { count: 'exact', head: true }).eq('session_id', sessionId),
+    supabase.from('encounters').select('id', { count: 'exact', head: true }).eq('session_id', sessionId),
+    supabase.from('encounters').select('id', { count: 'exact', head: true }).eq('session_id', sessionId).eq('status', 'caught'),
     supabase.from('duels').select('id, status', { count: 'exact' }).eq('session_id', sessionId),
     supabase.from('sessions').select('status, end_at, name').eq('id', sessionId).single(),
   ])
 
-  const caughtCount = encounters.data?.filter(e => e.status === 'caught').length ?? 0
+  const caughtCount = caught.count ?? 0
 
   return NextResponse.json({
     sessionName: session.data?.name,
