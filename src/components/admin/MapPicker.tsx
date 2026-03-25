@@ -36,7 +36,7 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
     if (!containerRef.current) return
     let cleanupFn = () => {}
 
-    import('leaflet').then(L => {
+    Promise.all([import('leaflet'), import('leaflet/dist/leaflet.css')]).then(([L]) => {
       // Avoid double-init on React StrictMode
       if (mapRef.current) return
 
