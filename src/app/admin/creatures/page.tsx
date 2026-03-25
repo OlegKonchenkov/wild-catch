@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Image from 'next/image'
 
 type Rarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario'
 type ElementType = 'fiamma' | 'adriatico' | 'bosco' | 'terra' | 'armonia'
@@ -16,23 +17,25 @@ interface Creature {
   def: number
   evolution_of: string | null
   image_url: string
-  created_at: string
 }
 
 const RARITIES: Rarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario']
 const ELEMENTS: ElementType[] = ['fiamma', 'adriatico', 'bosco', 'terra', 'armonia']
 
-const RARITY_LABELS: Record<Rarity, string> = {
-  comune: 'Comune', non_comune: 'Non Comune', raro: 'Raro', epico: 'Epico', leggendario: 'Leggendario',
+const RARITY_META: Record<Rarity, { label: string; color: string; glow: string }> = {
+  comune:      { label: 'Comune',      color: '#9CA3AF', glow: 'rgba(156,163,175,0.25)' },
+  non_comune:  { label: 'Non Comune',  color: '#34D399', glow: 'rgba(52,211,153,0.25)' },
+  raro:        { label: 'Raro',        color: '#38BDF8', glow: 'rgba(56,189,248,0.25)' },
+  epico:       { label: 'Epico',       color: '#C084FC', glow: 'rgba(192,132,252,0.25)' },
+  leggendario: { label: 'Leggendario', color: '#FBBF24', glow: 'rgba(251,191,36,0.35)' },
 }
 
-const RARITY_COLORS: Record<Rarity, string> = {
-  comune: 'text-white/50', non_comune: 'text-green-400', raro: 'text-[#3A9DBC]',
-  epico: 'text-purple-400', leggendario: 'text-yellow-400',
-}
-
-const ELEMENT_LABELS: Record<ElementType, string> = {
-  fiamma: 'Fiamma', adriatico: 'Adriatico', bosco: 'Bosco', terra: 'Terra', armonia: 'Armonia',
+const ELEMENT_META: Record<ElementType, { label: string; emoji: string; bg: string }> = {
+  fiamma:    { label: 'Fiamma',    emoji: '🔥', bg: 'rgba(239,68,68,0.15)' },
+  adriatico: { label: 'Adriatico', emoji: '🌊', bg: 'rgba(56,189,248,0.15)' },
+  bosco:     { label: 'Bosco',     emoji: '🌿', bg: 'rgba(52,211,153,0.15)' },
+  terra:     { label: 'Terra',     emoji: '🪨', bg: 'rgba(180,140,90,0.15)' },
+  armonia:   { label: 'Armonia',   emoji: '✨', bg: 'rgba(192,132,252,0.15)' },
 }
 
 const EMPTY_FORM = {
@@ -40,251 +43,377 @@ const EMPTY_FORM = {
   hp: 50, atk: 10, def: 5, evolution_of: '',
 }
 
+type ImageMode = 'preview' | 'url' | 'ai'
+
 export default function CreaturesPage() {
   const [creatures, setCreatures] = useState<Creature[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
-  const [showNewForm, setShowNewForm] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  // Panel state
+  const [panel, setPanel] = useState<'none' | 'new' | string>('none') // 'none' | 'new' | creature.id
   const [formData, setFormData] = useState({ ...EMPTY_FORM })
   const [formError, setFormError] = useState<string | null>(null)
   const [formLoading, setFormLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [artworkCreatureName, setArtworkCreatureName] = useState('')
 
-  useEffect(() => {
-    loadCreatures()
-  }, [supabase])
+  // Image state
+  const [imageMode, setImageMode] = useState<ImageMode>('preview')
+  const [manualUrl, setManualUrl] = useState('')
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiQuality, setAiQuality] = useState<'low' | 'medium' | 'high'>('medium')
+  const [artworkLoading, setArtworkLoading] = useState(false)
+  const [artworkError, setArtworkError] = useState<string | null>(null)
 
-  async function loadCreatures() {
-    setLoading(true)
-    setError(null)
+  const [filter, setFilter] = useState<ElementType | 'all'>('all')
+  const [search, setSearch] = useState('')
+
+  const loadCreatures = useCallback(async () => {
+    setLoading(true); setError(null)
     try {
       const res = await fetch('/api/admin/creatures')
       const d = await res.json()
-      if (!res.ok) { setError(d.error ?? 'Errore nel caricamento'); return }
+      if (!res.ok) { setError(d.error ?? 'Errore caricamento'); return }
       setCreatures(d.creatures ?? [])
-    } catch {
-      setError('Errore di rete')
-    } finally {
-      setLoading(false)
-    }
+    } catch { setError('Errore di rete') }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { loadCreatures() }, [loadCreatures])
+
+  function openNew() {
+    setPanel('new'); setFormData({ ...EMPTY_FORM }); setFormError(null)
+    setImageMode('preview'); setManualUrl(''); setAiPrompt(''); setArtworkError(null)
   }
 
-  function startNew() {
-    setEditingId(null); setFormData({ ...EMPTY_FORM }); setFormError(null); setShowNewForm(true)
-  }
-
-  function startEdit(c: Creature) {
-    setShowNewForm(false); setEditingId(c.id)
+  function openEdit(c: Creature) {
+    setPanel(c.id)
     setFormData({ name: c.name, description: c.description, rarity: c.rarity, element: c.element,
       hp: c.hp, atk: c.atk, def: c.def, evolution_of: c.evolution_of ?? '' })
-    setFormError(null)
+    setFormError(null); setImageMode('preview')
+    setManualUrl(c.image_url ?? ''); setAiPrompt(c.description ?? ''); setArtworkError(null)
   }
 
-  function cancelForm() {
-    setShowNewForm(false); setEditingId(null); setFormData({ ...EMPTY_FORM }); setFormError(null)
+  function closePanel() {
+    setPanel('none'); setFormError(null); setArtworkError(null)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setFormLoading(true); setFormError(null)
+    const isEdit = panel !== 'new'
     const payload = {
       name: formData.name, description: formData.description, rarity: formData.rarity,
       element: formData.element, hp: Number(formData.hp), atk: Number(formData.atk),
       def: Number(formData.def), evolution_of: formData.evolution_of || null,
     }
-    const url = editingId ? `/api/admin/creatures/${editingId}` : '/api/admin/creatures'
     try {
-      const res = await fetch(url, {
-        method: editingId ? 'PATCH' : 'POST',
+      const res = await fetch(isEdit ? `/api/admin/creatures/${panel}` : '/api/admin/creatures', {
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       const d = await res.json()
-      if (!res.ok) { setFormError(d.error ?? 'Errore durante il salvataggio') }
-      else { cancelForm(); await loadCreatures() }
-    } catch {
-      setFormError('Errore di rete')
-    } finally {
-      setFormLoading(false)
-    }
+      if (!res.ok) { setFormError(d.error ?? 'Errore salvataggio') }
+      else { closePanel(); await loadCreatures() }
+    } catch { setFormError('Errore di rete') }
+    finally { setFormLoading(false) }
   }
 
   async function handleDelete(c: Creature) {
-    if (!window.confirm(`Eliminare la creatura "${c.name}"? Questa azione è irreversibile.`)) return
+    if (!confirm(`Eliminare "${c.name}"? Irreversibile.`)) return
     setDeletingId(c.id)
     try {
       const res = await fetch(`/api/admin/creatures/${c.id}`, { method: 'DELETE' })
       if (!res.ok) { const d = await res.json(); setError(d.error ?? 'Errore eliminazione') }
-      else await loadCreatures()
-    } catch {
-      setError('Errore di rete')
-    } finally {
-      setDeletingId(null)
-    }
+      else { if (panel === c.id) closePanel(); await loadCreatures() }
+    } catch { setError('Errore di rete') }
+    finally { setDeletingId(null) }
   }
 
-  function renderForm(isEdit: boolean) {
-    return (
-      <form onSubmit={handleSubmit} className="border border-white/20 rounded-2xl p-6 space-y-4 mb-6">
-        <h2 className="font-bold text-lg">{isEdit ? 'Modifica Creatura' : 'Nuova Creatura'}</h2>
-        {formError && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-red-400 text-sm">{formError}</div>
-        )}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <label className="text-sm text-white/50 block mb-1">Nome *</label>
-            <input type="text" value={formData.name} required
-              onChange={e => setFormData(f => ({ ...f, name: e.target.value }))}
-              className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2" />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-sm text-white/50 block mb-1">Descrizione</label>
-            <textarea value={formData.description} rows={3}
-              onChange={e => setFormData(f => ({ ...f, description: e.target.value }))}
-              className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 resize-none" />
-          </div>
-          <div>
-            <label className="text-sm text-white/50 block mb-1">Rarità *</label>
-            <select value={formData.rarity} onChange={e => setFormData(f => ({ ...f, rarity: e.target.value as Rarity }))}
-              className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2">
-              {RARITIES.map(r => <option key={r} value={r}>{RARITY_LABELS[r]}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm text-white/50 block mb-1">Elemento *</label>
-            <select value={formData.element} onChange={e => setFormData(f => ({ ...f, element: e.target.value as ElementType }))}
-              className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2">
-              {ELEMENTS.map(el => <option key={el} value={el}>{ELEMENT_LABELS[el]}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm text-white/50 block mb-1">HP</label>
-            <input type="number" value={formData.hp} min={1}
-              onChange={e => setFormData(f => ({ ...f, hp: +e.target.value }))}
-              className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2" />
-          </div>
-          <div>
-            <label className="text-sm text-white/50 block mb-1">Attacco</label>
-            <input type="number" value={formData.atk} min={1}
-              onChange={e => setFormData(f => ({ ...f, atk: +e.target.value }))}
-              className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2" />
-          </div>
-          <div>
-            <label className="text-sm text-white/50 block mb-1">Difesa</label>
-            <input type="number" value={formData.def} min={0}
-              onChange={e => setFormData(f => ({ ...f, def: +e.target.value }))}
-              className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2" />
-          </div>
-          <div>
-            <label className="text-sm text-white/50 block mb-1">Evoluzione di (opzionale)</label>
-            <select value={formData.evolution_of} onChange={e => setFormData(f => ({ ...f, evolution_of: e.target.value }))}
-              className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2">
-              <option value="">— Nessuna —</option>
-              {creatures.filter(c => !isEdit || c.id !== editingId).map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="flex gap-2 pt-2">
-          <button type="button" onClick={cancelForm}
-            className="flex-1 bg-white/10 text-white font-bold py-3 rounded-xl">Annulla</button>
-          <button type="submit" disabled={formLoading}
-            className="flex-1 bg-[#3A9DBC] text-white font-bold py-3 rounded-xl disabled:opacity-50">
-            {formLoading ? 'Salvataggio...' : isEdit ? 'Salva Modifiche' : 'Crea Creatura'}
-          </button>
-        </div>
-      </form>
-    )
+  async function handleArtwork() {
+    const targetId = panel === 'new' ? null : panel as string
+    if (!targetId) { setArtworkError('Salva prima la creatura, poi genera l\'artwork'); return }
+    setArtworkLoading(true); setArtworkError(null)
+    try {
+      const body = imageMode === 'url'
+        ? { imageUrl: manualUrl }
+        : { prompt: aiPrompt || formData.description || formData.name, quality: aiQuality }
+      const res = await fetch(`/api/admin/creatures/${targetId}/artwork`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      const d = await res.json()
+      if (!res.ok) { setArtworkError(d.error ?? 'Errore artwork') }
+      else { setImageMode('preview'); await loadCreatures() }
+    } catch { setArtworkError('Errore di rete') }
+    finally { setArtworkLoading(false) }
   }
+
+  const editingCreature = panel !== 'none' && panel !== 'new'
+    ? creatures.find(c => c.id === panel) ?? null : null
+
+  const filtered = creatures.filter(c => {
+    if (filter !== 'all' && c.element !== filter) return false
+    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
 
   return (
-    <div className="max-w-4xl">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Catalogo Creature</h1>
-        {!showNewForm && editingId === null && (
-          <button onClick={startNew} className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-xl">
-            + Nuova Creatura
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+        .creatures-root { font-family: 'Exo 2', sans-serif; }
+        .stat-mono { font-family: 'JetBrains Mono', monospace; }
+        .card-shimmer { background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 100%); }
+        .img-placeholder { background: linear-gradient(135deg, #0F2030 0%, #1A3040 100%); }
+        @keyframes spin-slow { to { transform: rotate(360deg); } }
+        .spin-slow { animation: spin-slow 2s linear infinite; }
+        @keyframes pulse-glow { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+        .panel-enter { animation: slideIn 0.2s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+      `}</style>
+
+      <div className="creatures-root max-w-6xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight">🐾 Catalogo Creature</h1>
+            <p className="text-xs text-white/30 mt-0.5 stat-mono">{creatures.length} creature nel database</p>
+          </div>
+          <button onClick={openNew}
+            className="flex items-center gap-2 bg-gradient-to-r from-[#3A9DBC] to-[#2D7A96] text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow-lg shadow-[#3A9DBC]/20 hover:shadow-[#3A9DBC]/40 transition-all">
+            <span className="text-lg leading-none">+</span> Nuova Creatura
           </button>
+        </div>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm mb-4">{error}</div>
         )}
-      </div>
 
-      {showNewForm && renderForm(false)}
+        <div className="flex gap-6">
+          {/* LEFT: Grid */}
+          <div className="flex-1 min-w-0">
+            {/* Filters */}
+            <div className="flex gap-2 mb-4 flex-wrap">
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Cerca..." className="bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-1.5 w-36 focus:outline-none focus:border-[#3A9DBC]/50" />
+              {(['all', ...ELEMENTS] as const).map(el => (
+                <button key={el} onClick={() => setFilter(el)}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${filter === el ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/50 hover:text-white hover:bg-white/10'}`}>
+                  {el === 'all' ? 'Tutti' : `${ELEMENT_META[el].emoji} ${ELEMENT_META[el].label}`}
+                </button>
+              ))}
+            </div>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm mb-4">{error}</div>
-      )}
+            {loading ? (
+              <div className="text-white/40 text-center py-16 text-sm">Caricamento creature...</div>
+            ) : filtered.length === 0 ? (
+              <div className="text-white/30 text-center py-16 text-sm">Nessuna creatura trovata</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {filtered.map(c => {
+                  const rm = RARITY_META[c.rarity]
+                  const em = ELEMENT_META[c.element]
+                  const isActive = panel === c.id
+                  return (
+                    <div key={c.id} onClick={() => isActive ? closePanel() : openEdit(c)}
+                      className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all select-none group
+                        ${isActive ? 'ring-2 ring-[#3A9DBC] shadow-lg shadow-[#3A9DBC]/20' : 'hover:scale-[1.02] hover:shadow-lg'}`}
+                      style={{ background: `linear-gradient(145deg, #0D1E2E, #0A1520)`, boxShadow: isActive ? `0 0 20px ${rm.glow}` : undefined }}>
 
-      {loading && <div className="text-white/50 text-center py-12">Caricamento creature...</div>}
+                      {/* Rarity accent line */}
+                      <div className="h-0.5 w-full" style={{ background: rm.color }} />
 
-      {!loading && creatures.length === 0 && (
-        <div className="text-white/40 text-center py-12">Nessuna creatura nel catalogo. Creane una!</div>
-      )}
-
-      {!loading && creatures.length > 0 && (
-        <div className="space-y-3 mb-10">
-          {creatures.map(c => (
-            <div key={c.id}>
-              {editingId === c.id && renderForm(true)}
-              {editingId !== c.id && (
-                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-bold text-white">{c.name}</p>
-                        <span className={`text-xs font-semibold ${RARITY_COLORS[c.rarity]}`}>{RARITY_LABELS[c.rarity]}</span>
-                        <span className="text-xs text-white/40">{ELEMENT_LABELS[c.element]}</span>
+                      {/* Image area */}
+                      <div className="relative h-28 img-placeholder flex items-center justify-center overflow-hidden">
+                        {c.image_url ? (
+                          <Image src={c.image_url} alt={c.name} fill className="object-cover"
+                            sizes="200px" onError={() => {}} />
+                        ) : (
+                          <div className="text-4xl opacity-30 group-hover:opacity-50 transition-opacity"
+                            style={{ filter: 'saturate(0)' }}>🐾</div>
+                        )}
+                        {/* Element badge */}
+                        <div className="absolute top-1.5 right-1.5 text-xs px-1.5 py-0.5 rounded-md font-semibold backdrop-blur-sm"
+                          style={{ background: em.bg, color: 'rgba(255,255,255,0.85)' }}>
+                          {em.emoji}
+                        </div>
                       </div>
-                      {c.description && <p className="text-sm text-white/50 mt-1 truncate">{c.description}</p>}
-                      <div className="flex gap-4 mt-2 text-xs text-white/40">
-                        <span>HP: <span className="text-white/70">{c.hp}</span></span>
-                        <span>ATK: <span className="text-white/70">{c.atk}</span></span>
-                        <span>DEF: <span className="text-white/70">{c.def}</span></span>
-                        {c.evolution_of && (
-                          <span>Evolve da: <span className="text-white/70">{creatures.find(x => x.id === c.evolution_of)?.name ?? '—'}</span></span>
+
+                      {/* Info */}
+                      <div className="px-3 py-2.5">
+                        <p className="font-bold text-sm text-white truncate">{c.name}</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-xs font-semibold" style={{ color: rm.color }}>{rm.label}</span>
+                          <span className="stat-mono text-xs text-white/30">{c.hp}hp</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT: Edit/Create Panel */}
+          {panel !== 'none' && (
+            <div className="w-80 shrink-0 panel-enter">
+              <div className="bg-[#0D1E2E] border border-white/10 rounded-2xl overflow-hidden sticky top-0">
+                {/* Panel header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                  <h2 className="font-bold text-sm">
+                    {panel === 'new' ? '+ Nuova Creatura' : `Modifica: ${editingCreature?.name ?? ''}`}
+                  </h2>
+                  <button onClick={closePanel} className="text-white/30 hover:text-white text-lg leading-none">✕</button>
+                </div>
+
+                <div className="p-4 overflow-y-auto max-h-[calc(100vh-160px)]">
+                  {/* Image section */}
+                  <div className="mb-4">
+                    <div className="relative h-36 bg-[#07111B] rounded-xl overflow-hidden mb-2 flex items-center justify-center">
+                      {editingCreature?.image_url ? (
+                        <Image src={editingCreature.image_url} alt={editingCreature.name} fill className="object-contain" sizes="320px" />
+                      ) : (
+                        <span className="text-5xl opacity-20">🐾</span>
+                      )}
+                      {artworkLoading && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <div className="w-8 h-8 border-2 border-[#3A9DBC] border-t-transparent rounded-full spin-slow" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Image mode tabs */}
+                    <div className="flex gap-1 mb-3 bg-white/5 p-1 rounded-lg">
+                      {(['preview', 'url', 'ai'] as ImageMode[]).map(m => (
+                        <button key={m} onClick={() => setImageMode(m)}
+                          className={`flex-1 text-xs py-1.5 rounded-md font-semibold transition-all ${imageMode === m ? 'bg-[#3A9DBC] text-white' : 'text-white/40 hover:text-white'}`}>
+                          {m === 'preview' ? '👁 Anteprima' : m === 'url' ? '🔗 URL' : '✨ AI'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {imageMode === 'url' && (
+                      <div className="space-y-2">
+                        <input value={manualUrl} onChange={e => setManualUrl(e.target.value)}
+                          placeholder="https://..." className="w-full bg-white/5 text-white text-xs border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50" />
+                        <button onClick={handleArtwork} disabled={artworkLoading || !manualUrl.startsWith('http')}
+                          className="w-full bg-white/10 text-white text-xs font-bold py-2 rounded-lg disabled:opacity-40 hover:bg-white/20 transition-colors">
+                          Imposta URL
+                        </button>
+                      </div>
+                    )}
+
+                    {imageMode === 'ai' && (
+                      <div className="space-y-2">
+                        <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={3}
+                          placeholder="Descrivi la creatura per l'AI..."
+                          className="w-full bg-white/5 text-white text-xs border border-white/10 rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-[#3A9DBC]/50" />
+                        <div className="flex gap-2">
+                          <select value={aiQuality} onChange={e => setAiQuality(e.target.value as any)}
+                            className="flex-1 bg-white/5 text-white text-xs border border-white/10 rounded-lg px-2 py-2">
+                            <option value="low">Bassa (~$0.01)</option>
+                            <option value="medium">Media (~$0.04)</option>
+                            <option value="high">Alta (~$0.17)</option>
+                          </select>
+                          <button onClick={handleArtwork}
+                            disabled={artworkLoading || !aiPrompt.trim() || panel === 'new'}
+                            className="flex-1 bg-gradient-to-r from-[#7B4DB8] to-[#5A35A0] text-white text-xs font-bold py-2 rounded-lg disabled:opacity-40 transition-all hover:brightness-110">
+                            {artworkLoading ? '⏳ Genera...' : '✨ Genera AI'}
+                          </button>
+                        </div>
+                        {panel === 'new' && (
+                          <p className="text-xs text-amber-400/70">Salva prima la creatura, poi genera l&apos;artwork</p>
                         )}
                       </div>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button onClick={() => startEdit(c)}
-                        className="bg-white/10 text-white text-sm font-bold px-3 py-1.5 rounded-lg hover:bg-white/20 transition-colors">
-                        Modifica
-                      </button>
-                      <button onClick={() => handleDelete(c)} disabled={deletingId === c.id}
-                        className="bg-red-500/20 text-red-400 text-sm font-bold px-3 py-1.5 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50">
-                        {deletingId === c.id ? '...' : 'Elimina'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+                    )}
 
-      <div className="border border-white/20 rounded-2xl p-6">
-        <h2 className="font-bold text-lg mb-4">Genera Artwork AI</h2>
-        <p className="text-sm text-white/50 mb-4">
-          Inserisci il nome di una creatura per generare automaticamente il suo artwork con l&apos;intelligenza artificiale.
-        </p>
-        <div className="flex gap-2 mb-4">
-          <input type="text" value={artworkCreatureName} placeholder="Nome creatura..."
-            onChange={e => setArtworkCreatureName(e.target.value)}
-            className="flex-1 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2" />
-          <button disabled={!artworkCreatureName.trim()}
-            className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-xl disabled:opacity-50">
-            Genera Artwork
-          </button>
-        </div>
-        <div className="bg-white/5 rounded-xl p-4 text-white/50 text-center">
-          Generazione artwork non ancora disponibile
+                    {artworkError && (
+                      <p className="text-xs text-red-400 mt-2">{artworkError}</p>
+                    )}
+                  </div>
+
+                  {/* Creature form */}
+                  <form onSubmit={handleSubmit} className="space-y-3">
+                    {formError && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">{formError}</div>
+                    )}
+
+                    <div>
+                      <label className="text-xs text-white/40 block mb-1">Nome *</label>
+                      <input type="text" value={formData.name} required
+                        onChange={e => setFormData(f => ({ ...f, name: e.target.value }))}
+                        className="w-full bg-white/5 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50" />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-white/40 block mb-1">Descrizione</label>
+                      <textarea value={formData.description} rows={2}
+                        onChange={e => setFormData(f => ({ ...f, description: e.target.value }))}
+                        className="w-full bg-white/5 text-white text-sm border border-white/10 rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-[#3A9DBC]/50" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-white/40 block mb-1">Rarità</label>
+                        <select value={formData.rarity} onChange={e => setFormData(f => ({ ...f, rarity: e.target.value as Rarity }))}
+                          className="w-full bg-white/5 text-white text-xs border border-white/10 rounded-lg px-2 py-2">
+                          {RARITIES.map(r => <option key={r} value={r}>{RARITY_META[r].label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-white/40 block mb-1">Elemento</label>
+                        <select value={formData.element} onChange={e => setFormData(f => ({ ...f, element: e.target.value as ElementType }))}
+                          className="w-full bg-white/5 text-white text-xs border border-white/10 rounded-lg px-2 py-2">
+                          {ELEMENTS.map(el => <option key={el} value={el}>{ELEMENT_META[el].emoji} {ELEMENT_META[el].label}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      {[['hp','HP',1],['atk','ATK',1],['def','DEF',0]].map(([field, label, min]) => (
+                        <div key={field}>
+                          <label className="text-xs text-white/40 block mb-1 stat-mono">{label}</label>
+                          <input type="number" value={(formData as any)[field]} min={min}
+                            onChange={e => setFormData(f => ({ ...f, [field]: +e.target.value }))}
+                            className="w-full bg-white/5 text-white text-sm border border-white/10 rounded-lg px-2 py-2 stat-mono focus:outline-none focus:border-[#3A9DBC]/50" />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-white/40 block mb-1">Evoluzione di</label>
+                      <select value={formData.evolution_of}
+                        onChange={e => setFormData(f => ({ ...f, evolution_of: e.target.value }))}
+                        className="w-full bg-white/5 text-white text-xs border border-white/10 rounded-lg px-2 py-2">
+                        <option value="">— Nessuna —</option>
+                        {creatures.filter(c => c.id !== panel).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      {panel !== 'new' && editingCreature && (
+                        <button type="button" onClick={() => handleDelete(editingCreature)}
+                          disabled={deletingId === panel}
+                          className="px-3 bg-red-500/15 text-red-400 text-xs font-bold py-3 rounded-xl hover:bg-red-500/25 transition-colors disabled:opacity-40">
+                          {deletingId === panel ? '...' : '🗑'}
+                        </button>
+                      )}
+                      <button type="submit" disabled={formLoading}
+                        className="flex-1 bg-gradient-to-r from-[#3A9DBC] to-[#2D7A96] text-white font-bold py-3 rounded-xl text-sm disabled:opacity-50 hover:brightness-110 transition-all">
+                        {formLoading ? 'Salvataggio...' : panel === 'new' ? 'Crea Creatura' : 'Salva Modifiche'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
+    </>
   )
 }
