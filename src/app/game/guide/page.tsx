@@ -150,9 +150,10 @@ function EvolutionDiagram() {
 
 function TipChips() {
   const tips = [
-    { text: 'Cammina lentamente per non perdere zone di cattura', color: '#3A9DBC' },
-    { text: 'Evolvi le creature più rare prima', color: '#F7C841' },
-    { text: 'Completa le missioni per monete extra', color: '#34D399' },
+    { text: 'Usa una rete migliore dallo zaino prima di lanciare — aumenta le chance', color: '#3A9DBC' },
+    { text: 'Accumula 3 duplicati della stessa creatura per sbloccare l\'evoluzione', color: '#F7C841' },
+    { text: 'Completa le missioni QR e di cattura per guadagnare monete extra', color: '#34D399' },
+    { text: 'Abbassa gli HP della creatura prima di lanciarla per una cattura più facile', color: '#E85D2F' },
   ]
   return (
     <div className="flex flex-col gap-2 mt-3">
@@ -193,6 +194,12 @@ function buildSections(): Section[] {
                 <div className="text-xs text-white/60 mt-1">{label}</div>
               </div>
             ))}
+          </div>
+          <div className="mt-3 rounded-xl border border-[#3A9DBC]/20 bg-[#3A9DBC]/5 px-3 py-2">
+            <p className="text-xs text-[#3A9DBC]">
+              📋 Per iniziare hai bisogno di un <strong>codice invito</strong> dall'organizzatore —
+              inseriscilo nella schermata di accesso oppure <strong>scansiona il QR code</strong> con la fotocamera.
+            </p>
           </div>
         </div>
       ),
@@ -268,24 +275,57 @@ function buildSections(): Section[] {
       content: (
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
-            L'admin crea missioni speciali per la sessione: cattura creature di un elemento specifico,
-            raggiungi luoghi, vinci duelli. Completare missioni dà <span className="text-[#F7C841] font-bold">EXP</span> e{' '}
-            <span className="text-[#F7C841] font-bold">monete extra!</span>
+            L'admin crea missioni speciali per la sessione. Toccane una per vedere tutti i dettagli,
+            i progressi e, se è di tipo <span className="text-[#34D399] font-bold">Scansione QR</span>,
+            il pulsante per aprire il lettore direttamente dall'app.
           </p>
           <div className="mt-3 space-y-2">
             {[
-              { icon: '🔥', label: 'Cattura 3 creature Fiamma', reward: '+150 EXP' },
-              { icon: '📍', label: 'Raggiungi il Faro del Monte', reward: '+80 EXP' },
-              { icon: '⚔️', label: 'Vinci 2 duelli PvP', reward: '+200 EXP' },
+              { icon: '🐾', label: 'Cattura — prendi la creatura indicata',   color: '#3A9DBC' },
+              { icon: '⚔️', label: 'Duello — vinci uno scontro PvP',         color: '#FBBF24' },
+              { icon: '📷', label: 'QR — scansiona il codice nascosto',       color: '#34D399' },
+              { icon: '🚶', label: 'Cammino — percorri la distanza (m)',      color: '#C084FC' },
+              { icon: '🎒', label: 'Raccolta — colleziona oggetti nel negozio', color: '#F97316' },
             ].map(m => (
-              <div key={m.label} className="flex items-center justify-between rounded-lg bg-white/5 border border-white/10 px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span>{m.icon}</span>
-                  <span className="text-xs text-white/80">{m.label}</span>
-                </div>
-                <span className="text-xs text-[#34D399] font-bold">{m.reward}</span>
+              <div key={m.label} className="flex items-center gap-3 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
+                <span className="text-base flex-shrink-0">{m.icon}</span>
+                <span className="text-xs text-white/80">{m.label}</span>
               </div>
             ))}
+          </div>
+          <p className="text-white/40 text-xs mt-3">
+            Ogni missione completata dona <span className="text-[#F7C841]">EXP</span> e <span className="text-[#F7C841]">monete 🪙</span> bonus.
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: 'qrscanner',
+      icon: '📷',
+      title: 'Scanner QR',
+      accent: '#34D399',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            Per le missioni di tipo <span className="text-[#34D399] font-bold">Scansione QR</span> — e
+            anche per unirsi a una sessione — puoi usare la fotocamera integrata per leggere i QR code.
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              { step: '1', text: 'Apri la missione QR e tocca "Scansiona QR"' },
+              { step: '2', text: 'Punta la fotocamera sul codice — viene letto automaticamente' },
+              { step: '3', text: 'Se la fotocamera non funziona usa il campo testo come alternativa' },
+            ].map(s => (
+              <div key={s.step} className="flex items-start gap-3 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
+                <span className="w-5 h-5 rounded-full bg-[#34D399]/20 text-[#34D399] text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.step}</span>
+                <span className="text-xs text-white/80">{s.text}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 rounded-xl border border-[#34D399]/20 bg-[#34D399]/5 px-3 py-2">
+            <p className="text-xs text-[#34D399]">
+              ℹ️ Al primo utilizzo il browser chiederà il permesso di accedere alla fotocamera. Concedilo per abilitare la scansione.
+            </p>
           </div>
         </div>
       ),
@@ -328,19 +368,23 @@ function buildSections(): Section[] {
       content: (
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
-            Nel negozio trovi pokeball, pozioni e boost. Ogni oggetto costa monete 💰.
-            Lo zaino mostra i tuoi oggetti e le monete disponibili.
+            Nel negozio trovi reti di cattura, pozioni e boost. Ogni oggetto costa monete 🪙.
+            Lo zaino mostra i tuoi oggetti; le reti migliori aumentano la probabilità di cattura.
+            All'inizio ricevi <span className="text-[#3A9DBC] font-bold">5× Rete Base</span> gratuite.
           </p>
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             {[
-              { emoji: '🟡', name: 'Pokeball', price: '10 💰' },
-              { emoji: '💊', name: 'Pozione', price: '25 💰' },
-              { emoji: '⚡', name: 'Boost EXP', price: '50 💰' },
+              { emoji: '🥅', name: 'Rete Base',       bonus: '+0%',   type: 'rete' },
+              { emoji: '🕸️', name: 'Rete Avanzata',   bonus: '+10%',  type: 'rete' },
+              { emoji: '✨', name: 'Rete Speciale',    bonus: '+20%',  type: 'rete' },
+              { emoji: '🌟', name: 'Rete Leggendaria', bonus: '+35%',  type: 'rete' },
             ].map(item => (
-              <div key={item.name} className="rounded-xl bg-white/5 border border-white/10 p-2 text-center">
-                <div className="text-2xl">{item.emoji}</div>
-                <div className="text-[10px] text-white/70 mt-1">{item.name}</div>
-                <div className="text-[10px] text-[#F7C841] font-bold mt-0.5">{item.price}</div>
+              <div key={item.name} className="rounded-xl bg-white/5 border border-white/10 p-2 flex items-center gap-2">
+                <span className="text-xl flex-shrink-0">{item.emoji}</span>
+                <div>
+                  <div className="text-xs text-white/80 font-medium">{item.name}</div>
+                  <div className="text-[10px] text-[#34D399] font-bold">{item.bonus} cattura</div>
+                </div>
               </div>
             ))}
           </div>

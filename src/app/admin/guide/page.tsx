@@ -149,8 +149,8 @@ function Divider() {
 /* ──────────────────── flow diagram ──────────────────── */
 
 function FlowDiagram() {
-  const steps = ['Sessione', 'Inviti', 'Giocatori', 'Missioni / Creature', 'Partita in corso', 'Classifica']
-  const colors = ['#3A9DBC', '#7B4DB8', '#34D399', '#F7C841', '#E85D2F', '#F7C841']
+  const steps = ['Sessione', 'Area Mappa', 'Inviti', 'Creature + QR', 'Missioni', 'Active', 'Classifica']
+  const colors = ['#3A9DBC', '#34D399', '#7B4DB8', '#F7C841', '#FBBF24', '#E85D2F', '#F7C841']
   return (
     <div
       style={{
@@ -190,13 +190,14 @@ function FlowDiagram() {
 /* ──────────────────── workflow timeline ──────────────────── */
 
 const workflowSteps = [
-  { icon: '✅', text: 'Crea la sessione con area GPS e date' },
+  { icon: '✅', text: 'Crea la sessione con area GPS, durata e testo narrativo' },
+  { icon: '✅', text: 'Verifica l\'area mappa (trascina i marker per adattarla)' },
   { icon: '✅', text: 'Genera N codici invito (uno per partecipante)' },
   { icon: '✅', text: 'Verifica che le creature abbiano artwork (genera con AI se mancante)' },
-  { icon: '✅', text: 'Crea 3–5 missioni bilanciate per la sessione' },
-  { icon: '✅', text: 'Stampa / condividi i QR code' },
-  { icon: '✅', text: 'Attiva la sessione quando inizia l\'evento' },
-  { icon: '👀', text: 'Monitora giocatori e invia notifiche durante il gioco' },
+  { icon: '✅', text: 'Crea 3–5 missioni bilanciate — includi almeno una di tipo QR' },
+  { icon: '✅', text: 'Stampa / condividi i QR code degli inviti e delle missioni QR' },
+  { icon: '✅', text: 'Porta la sessione a "Ready" → poi "Active" quando inizia l\'evento' },
+  { icon: '👀', text: 'Monitora giocatori e invia notifiche broadcast durante il gioco' },
   { icon: '🏆', text: 'A fine sessione: consulta classifica, premia i vincitori' },
 ]
 
@@ -278,10 +279,11 @@ function WorkflowTimeline() {
 /* ──────────────────── mission type table ──────────────────── */
 
 const missionTypes = [
-  { type: 'catch_creature', desc: 'Cattura N creature di un elemento specifico', color: '#34D399' },
-  { type: 'explore',        desc: 'Raggiungi una posizione GPS specifica',         color: '#3A9DBC' },
-  { type: 'duel_win',       desc: 'Vinci N duelli contro altri giocatori',          color: '#E85D2F' },
-  { type: 'collect_items',  desc: 'Raccogli oggetti nel negozio di gioco',          color: '#F7C841' },
+  { type: 'cattura',  desc: 'Cattura una creatura specifica (per nome/ID)',                color: '#3A9DBC' },
+  { type: 'duel',     desc: 'Vinci N duelli contro altri giocatori',                       color: '#FBBF24' },
+  { type: 'qr',       desc: 'Scansiona un QR code fisico nascosto nell\'area evento',     color: '#34D399' },
+  { type: 'walk',     desc: 'Percorri una distanza in metri (rilevata via GPS)',            color: '#C084FC' },
+  { type: 'collect',  desc: 'Acquista o usa N oggetti specifici nel negozio',             color: '#F97316' },
 ]
 
 function MissionTable() {
@@ -548,14 +550,26 @@ export default function AdminGuidePage() {
                 prima di condividere i codici invito.
               </Callout>
 
+              <SubHeader>Modificare una sessione</SubHeader>
+              <Prose>
+                Clicca sull&rsquo;icona ✏️ accanto a una sessione per aprire il pannello di modifica inline.
+                Puoi cambiare <strong style={{ color: '#e2e8f0' }}>nome</strong>,{' '}
+                <strong style={{ color: '#e2e8f0' }}>durata</strong>,{' '}
+                <strong style={{ color: '#e2e8f0' }}>area geografica</strong> (trascina i marker sulla mappa
+                interattiva) e il <strong style={{ color: '#e2e8f0' }}>testo narrativo</strong> (titolo storia,
+                intro e nome del villain). Salva per applicare i cambiamenti in tempo reale.
+              </Prose>
+
               <SubHeader>Stati della sessione</SubHeader>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
                 <Badge label="draft"    color="#94a3b8" />
+                <Badge label="ready"    color="#F7C841" />
                 <Badge label="active"   color="#34D399" />
-                <Badge label="finished" color="#E85D2F" />
+                <Badge label="ended"    color="#E85D2F" />
               </div>
               <p style={{ color: '#64748b', fontSize: '0.83rem', marginTop: '0.4rem' }}>
-                Solo le sessioni <Code>active</Code> sono visibili ai giocatori nell&rsquo;app.
+                Le sessioni <Code>ready</Code> e <Code>active</Code> accettano giocatori con codice invito.
+                Solo le sessioni <Code>active</Code> mostrano la mappa di gioco ai partecipanti.
               </p>
             </section>
 
@@ -574,7 +588,8 @@ export default function AdminGuidePage() {
               <StepList
                 items={[
                   'Admin → Inviti → seleziona la sessione → "Genera Invito"',
-                  'Ogni codice è monouso (un giocatore per codice)',
+                  'Scegli quanti codici generare (1–500) con un click',
+                  'Ogni codice è monouso — viene marcato come usato quando il giocatore si unisce',
                   'Admin → QR Codes → stampa / esporta i QR da distribuire fisicamente agli iscritti',
                 ]}
               />
@@ -584,6 +599,23 @@ export default function AdminGuidePage() {
                 attesi. Se ne aggiungi altri all&rsquo;ultimo minuto, puoi sempre generarne di nuovi
                 senza invalidare quelli già emessi.
               </Callout>
+
+              <SubHeader>Revocare e resettare un codice</SubHeader>
+              <Prose>
+                Nella lista inviti trovi per ogni codice: stato (<Code>attivo</Code> / <Code>usato</Code> /
+                <Code>revocato</Code>), utente che l&rsquo;ha utilizzato e data. Hai due azioni disponibili:
+              </Prose>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0.5rem 0' }}>
+                <div style={{ background: '#E85D2F0d', border: '1px solid #E85D2F2a', borderRadius: '8px', padding: '0.6rem 0.9rem', fontSize: '0.88rem', color: '#94a3b8' }}>
+                  <strong style={{ color: '#E85D2F' }}>Revoca:</strong>{' '}
+                  disattiva il codice — non può più essere usato.
+                </div>
+                <div style={{ background: '#34D3990d', border: '1px solid #34D3992a', borderRadius: '8px', padding: '0.6rem 0.9rem', fontSize: '0.88rem', color: '#94a3b8' }}>
+                  <strong style={{ color: '#34D399' }}>Reset:</strong>{' '}
+                  libera un codice già usato (rimuove l&rsquo;associazione giocatore). Utile se
+                  un partecipante deve cambiare account o ha avuto problemi di accesso.
+                </div>
+              </div>
 
               <SubHeader>Distribuzione dei codici</SubHeader>
               <div
@@ -600,7 +632,9 @@ export default function AdminGuidePage() {
                 <strong style={{ color: '#e2e8f0' }}>Fisico:</strong> stampa i QR code e consegnali
                 all&rsquo;ingresso dell&rsquo;evento.<br />
                 <strong style={{ color: '#e2e8f0' }}>Digitale:</strong> condividi il codice testuale
-                via email, chat o foglio di iscrizione.
+                via email, chat o foglio di iscrizione.<br />
+                <strong style={{ color: '#e2e8f0' }}>Scansione:</strong> i giocatori possono anche
+                scansionare il QR direttamente dall&rsquo;app con la fotocamera integrata.
               </div>
             </section>
 
@@ -681,11 +715,18 @@ export default function AdminGuidePage() {
               <StepList
                 items={[
                   'Admin → Missioni → seleziona la sessione → "Nuova Missione"',
-                  'Imposta titolo, tipo, obiettivo numerico (es. "cattura 3 creature")',
+                  'Imposta titolo, tipo e obiettivo numerico (es. "cattura 2 creature", "percorri 500 m")',
+                  'Per tipo qr: associa un QR Code esistente dalla sezione Admin → QR Codes',
                   'Definisci la ricompensa: EXP + monete proporzionali alla difficoltà',
                   'Pubblica la missione — i giocatori la vedono immediatamente nell\'app',
                 ]}
               />
+
+              <Callout type="info">
+                <strong>Missioni QR fisiche:</strong> crea i QR code in Admin → QR Codes, stampali e
+                nascondili nell&rsquo;area evento. I giocatori li trovano fisicamente e li scansionano
+                con la fotocamera integrata nell&rsquo;app per completare la missione.
+              </Callout>
 
               <Callout type="warning">
                 <strong>Bilanciamento difficoltà:</strong> missioni difficili devono sempre dare
