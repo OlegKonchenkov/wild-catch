@@ -256,7 +256,7 @@ function HomeLobby() {
         }
       `}</style>
 
-      <div style={{ minHeight: '100svh', background: 'linear-gradient(160deg, #0D1E2E 0%, #0A1520 60%)', maxWidth: 480, margin: '0 auto', paddingBottom: 48 }}>
+      <div style={{ minHeight: '100svh', width: '100%', background: 'linear-gradient(160deg, #0D1E2E 0%, #0A1520 60%)', maxWidth: 480, margin: '0 auto', paddingBottom: 48 }}>
 
         {/* ── Top bar ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>

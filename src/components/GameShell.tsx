@@ -57,7 +57,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   })
 
   return (
-    <div className="flex flex-col h-screen bg-[#0F1F2E] text-white">
+    <div className="flex flex-col bg-[#0F1F2E] text-white overflow-hidden" style={{ height: '100dvh' }}>
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-2 bg-[#0F1F2E]/95 border-b border-white/10 z-10">
         <div className="flex items-center gap-2">
