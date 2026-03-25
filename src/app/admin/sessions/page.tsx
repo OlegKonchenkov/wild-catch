@@ -4,6 +4,69 @@ import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import type { Bounds } from '@/components/admin/MapPicker'
 
+function SessionTimeInfo({ session }: { session: { status: string; start_at: string | null; end_at: string | null; duration_minutes: number } }) {
+  const [countdown, setCountdown] = useState('')
+
+  useEffect(() => {
+    if (session.status !== 'active') { setCountdown(''); return }
+
+    function computeEnd() {
+      if (session.end_at) return new Date(session.end_at)
+      if (session.start_at) return new Date(new Date(session.start_at).getTime() + session.duration_minutes * 60000)
+      return null
+    }
+
+    function tick() {
+      const end = computeEnd()
+      if (!end) { setCountdown(''); return }
+      const diff = end.getTime() - Date.now()
+      if (diff <= 0) { setCountdown('scaduta'); return }
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setCountdown(h > 0
+        ? `${h}h ${m.toString().padStart(2, '0')}m`
+        : `${m}m ${s.toString().padStart(2, '0')}s`)
+    }
+    tick()
+    const i = setInterval(tick, 1000)
+    return () => clearInterval(i)
+  }, [session.status, session.end_at, session.start_at, session.duration_minutes])
+
+  if (session.status === 'active' && countdown) {
+    const end = session.end_at
+      ? new Date(session.end_at)
+      : session.start_at
+        ? new Date(new Date(session.start_at).getTime() + session.duration_minutes * 60000)
+        : null
+    const diffMs = end ? end.getTime() - Date.now() : Infinity
+    const urgent = diffMs < 5 * 60 * 1000
+    return (
+      <span className={`font-mono font-bold ${urgent ? 'text-red-400 animate-pulse' : 'text-[#34d399]'}`}>
+        ⏱ {countdown} rimasti
+      </span>
+    )
+  }
+
+  if (session.status === 'ended' && session.end_at) {
+    return (
+      <span className="text-white/30">
+        Terminata {new Date(session.end_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+      </span>
+    )
+  }
+
+  if (session.status === 'active' && session.start_at) {
+    return (
+      <span className="text-white/40">
+        Avviata {new Date(session.start_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+      </span>
+    )
+  }
+
+  return null
+}
+
 const MapPicker = dynamic(() => import('@/components/admin/MapPicker'), { ssr: false })
 
 type WizardStep = 1 | 2 | 3 | 4
@@ -197,13 +260,15 @@ export default function SessionsPage() {
             <div className="flex items-start gap-3 p-4">
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-white truncate">{s.name}</p>
-                <p className="text-xs text-white/40 mt-0.5">
-                  {s.duration_minutes} min ·{' '}
+                <p className="text-xs text-white/40 mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                  <span>{s.duration_minutes} min</span>
+                  <span>·</span>
                   <span className={STATUS_COLOR[s.status] ?? 'text-white/40'}>
                     {STATUS_LABEL[s.status] ?? s.status}
                   </span>
-                  {s.area_bounds ? ' · 🗺 Area definita' : ' · ⚠️ Nessuna area'}
-                  {s.start_at && ` · ${new Date(s.start_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                  <span>·</span>
+                  <span>{s.area_bounds ? '🗺 Area definita' : '⚠️ Nessuna area'}</span>
+                  <SessionTimeInfo session={s} />
                 </p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">

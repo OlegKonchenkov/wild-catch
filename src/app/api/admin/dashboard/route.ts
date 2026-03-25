@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     supabase.from('encounters').select('id', { count: 'exact', head: true }).eq('session_id', sessionId),
     supabase.from('encounters').select('id', { count: 'exact', head: true }).eq('session_id', sessionId).eq('status', 'caught'),
     supabase.from('duels').select('id, status', { count: 'exact' }).eq('session_id', sessionId),
-    supabase.from('sessions').select('status, end_at, name').eq('id', sessionId).single(),
+    supabase.from('sessions').select('status, end_at, start_at, duration_minutes, name').eq('id', sessionId).single(),
   ])
 
   const caughtCount = caught.count ?? 0
@@ -27,6 +27,8 @@ export async function GET(request: Request) {
     sessionName: session.data?.name,
     sessionStatus: session.data?.status,
     endAt: session.data?.end_at,
+    startAt: session.data?.start_at,
+    durationMinutes: session.data?.duration_minutes,
     playerCount: players.count ?? 0,
     encounterTotal: encounters.count ?? 0,
     caughtCount,
