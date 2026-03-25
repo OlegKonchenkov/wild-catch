@@ -1,81 +1,191 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Item } from '@/lib/types'
+import type { Item, ItemType } from '@/lib/types'
+
+const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; color: string }> = {
+  rete:      { icon: '🎯', label: 'Rete',       hint: 'Aumenta la probabilità di cattura',       color: '#3A9DBC' },
+  esca:      { icon: '🍖', label: 'Esca',        hint: 'Attira creature rare nelle vicinanze',    color: '#34D399' },
+  uovo:      { icon: '🥚', label: 'Uovo',        hint: 'Incuba una nuova creatura casuale',       color: '#C084FC' },
+  battaglia: { icon: '⚔️', label: 'Battaglia',  hint: 'Potenzia ATK in duello',                  color: '#FBBF24' },
+}
+
+type Toast = { ok: boolean; text: string }
 
 export default function ShopPage() {
-  const [items, setItems] = useState<Item[]>([])
-  const [gold, setGold] = useState(0)
-  const [message, setMessage] = useState('')
+  const [items, setItems]         = useState<Item[]>([])
+  const [gold, setGold]           = useState(0)
+  const [filter, setFilter]       = useState<ItemType | 'all'>('all')
+  const [buying, setBuying]       = useState<string | null>(null)  // itemId being purchased
+  const [toast, setToast]         = useState<Toast | null>(null)
+  const [loading, setLoading]     = useState(true)
   const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
+  function showToast(ok: boolean, text: string) {
+    setToast({ ok, text })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const loadShop = useCallback(async () => {
     const sessionId = localStorage.getItem('current_session_id')
-    if (!sessionId) return
-
-    supabase.from('items').select('*').order('shop_price').then(({ data }) => {
-      if (data) setItems(data as unknown as Item[])
-    })
-
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      supabase.from('player_sessions').select('gold').eq('user_id', user.id).eq('session_id', sessionId).single()
-        .then(({ data }) => { if (data) setGold(data.gold) })
-    })
+    setLoading(true)
+    try {
+      const [itemsRes, user] = await Promise.all([
+        supabase.from('items').select('*').gt('shop_price', 0).order('type').order('shop_price'),
+        supabase.auth.getUser().then(r => r.data.user),
+      ])
+      if (itemsRes.data) setItems(itemsRes.data as unknown as Item[])
+      if (user && sessionId) {
+        const { data: ps } = await supabase
+          .from('player_sessions').select('gold')
+          .eq('user_id', user.id).eq('session_id', sessionId).single()
+        if (ps) setGold(ps.gold)
+      }
+    } finally {
+      setLoading(false)
+    }
   }, [supabase])
+
+  useEffect(() => { loadShop() }, [loadShop])
 
   async function buy(item: Item) {
     const sessionId = localStorage.getItem('current_session_id')
-    if (!sessionId) return
-
-    const res = await fetch('/api/game/shop/buy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId: item.id, sessionId }),
-    })
-    const data = await res.json()
-
-    if (res.ok) {
-      setGold(data.remainingGold)
-      setMessage(`Acquistato: ${data.itemName}!`)
-    } else {
-      setMessage(data.error)
+    if (!sessionId || buying) return
+    setBuying(item.id)
+    try {
+      const res = await fetch('/api/game/shop/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: item.id, sessionId }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setGold(data.remainingGold)
+        showToast(true, `${TYPE_META[item.type].icon} ${item.name} acquistato!`)
+      } else {
+        showToast(false, data.error ?? 'Errore acquisto')
+      }
+    } catch {
+      showToast(false, 'Errore di rete')
+    } finally {
+      setBuying(null)
     }
-    setTimeout(() => setMessage(''), 3000)
   }
 
-  const ITEM_TYPE_LABEL: Record<string, string> = {
-    rete: '🎯 Rete', esca: '🍖 Esca', uovo: '🥚 Uovo', battaglia: '⚔️ Battaglia'
-  }
+  const filtered = filter === 'all' ? items : items.filter(i => i.type === filter)
+  const types = [...new Set(items.map(i => i.type))] as ItemType[]
 
   return (
-    <div className="h-full overflow-y-auto p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-white">Shop</h1>
-        <span className="text-[#D4A96A] font-bold">💰 {gold} Oro</span>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 border-b border-white/10 bg-[#0A1520]/80">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-lg font-extrabold tracking-tight">🛒 Negozio</h1>
+          <div className="flex items-center gap-1.5 bg-[#D4A96A]/10 border border-[#D4A96A]/30 rounded-full px-3 py-1">
+            <span className="text-base">💰</span>
+            <span className="text-[#D4A96A] font-extrabold text-sm">{gold.toLocaleString('it-IT')}</span>
+            <span className="text-[#D4A96A]/50 text-xs">oro</span>
+          </div>
+        </div>
+
+        {/* Type filter pills */}
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
+          <button
+            onClick={() => setFilter('all')}
+            className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${
+              filter === 'all' ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/50 hover:text-white'
+            }`}
+          >
+            Tutti
+          </button>
+          {types.map(t => (
+            <button
+              key={t}
+              onClick={() => setFilter(t)}
+              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${
+                filter === t ? 'text-white' : 'bg-white/5 text-white/50 hover:text-white'
+              }`}
+              style={filter === t ? { backgroundColor: TYPE_META[t].color } : undefined}
+            >
+              {TYPE_META[t].icon} {TYPE_META[t].label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {message && (
-        <p className="text-[#F7C841] text-sm text-center mb-3 bg-[#F7C841]/10 rounded-lg p-2">{message}</p>
+      {/* Toast */}
+      {toast && (
+        <div className={`mx-4 mt-3 px-3 py-2 rounded-xl text-sm font-semibold text-center transition-all ${
+          toast.ok ? 'bg-green-500/15 text-green-300 border border-green-500/30' : 'bg-red-500/15 text-red-400 border border-red-500/30'
+        }`}>
+          {toast.ok ? '✓' : '⚠'} {toast.text}
+        </div>
       )}
 
-      <div className="space-y-2">
-        {items.map(item => (
-          <div key={item.id} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-3">
-            <div className="text-2xl">{ITEM_TYPE_LABEL[item.type]?.split(' ')[0]}</div>
-            <div className="flex-1">
-              <p className="font-bold text-white text-sm">{item.name}</p>
-              <p className="text-xs text-white/50">{item.description}</p>
-            </div>
-            <button
-              onClick={() => buy(item)}
-              disabled={gold < item.shop_price}
-              className="bg-[#D4A96A] text-[#0F1F2E] font-bold px-3 py-2 rounded-lg text-sm disabled:opacity-40"
-            >
-              💰 {item.shop_price}
-            </button>
-          </div>
-        ))}
+      {/* Item list */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {loading ? (
+          <div className="text-center text-white/30 py-16 text-sm">Caricamento...</div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center text-white/25 py-16 text-sm">Nessun oggetto disponibile</div>
+        ) : (
+          filtered.map(item => {
+            const meta   = TYPE_META[item.type]
+            const canBuy = gold >= item.shop_price && !buying
+            const isBuying = buying === item.id
+            return (
+              <div
+                key={item.id}
+                className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-3 transition-all"
+                style={{ borderColor: canBuy ? `${meta.color}33` : undefined }}
+              >
+                {/* Icon */}
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
+                  style={{ background: `${meta.color}18` }}
+                >
+                  {meta.icon}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <p className="font-bold text-white text-sm truncate">{item.name}</p>
+                    <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold shrink-0"
+                      style={{ background: `${meta.color}20`, color: meta.color }}>
+                      {meta.label}
+                    </span>
+                  </div>
+                  {item.description && (
+                    <p className="text-xs text-white/45 leading-relaxed line-clamp-2">{item.description}</p>
+                  )}
+                  {item.effect_value > 0 && (
+                    <p className="text-xs mt-0.5" style={{ color: meta.color }}>
+                      +{item.effect_value}% {meta.hint}
+                    </p>
+                  )}
+                </div>
+
+                {/* Buy button */}
+                <button
+                  onClick={() => buy(item)}
+                  disabled={!canBuy}
+                  className="shrink-0 flex flex-col items-center justify-center w-16 h-12 rounded-xl font-bold text-xs transition-all disabled:opacity-35"
+                  style={canBuy ? { background: `${meta.color}22`, color: meta.color, border: `1px solid ${meta.color}44` } : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  {isBuying ? (
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span className="text-sm">💰</span>
+                      <span>{item.shop_price}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )
+          })
+        )}
       </div>
     </div>
   )

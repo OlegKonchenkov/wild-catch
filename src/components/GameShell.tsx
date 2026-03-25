@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { href: '/game/map',      icon: '🗺️', label: 'Mappa'     },
   { href: '/game/bestiary', icon: '📖', label: 'Bestiario' },
   { href: '/game/missions', icon: '🎯', label: 'Missioni'  },
+  { href: '/game/shop',     icon: '🛒', label: 'Shop'      },
   { href: '/game/backpack', icon: '🎒', label: 'Zaino'     },
   { href: '/game/profile',  icon: '👤', label: 'Profilo'   },
   { href: '/game/guide',    icon: '❓', label: 'Guida'     },
