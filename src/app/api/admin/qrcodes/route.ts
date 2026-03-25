@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+
+const VALID_TYPES = ['oggetto', 'indizio', 'uovo', 'boss', 'evento'] as const
 
 async function requireAdmin(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -12,11 +15,18 @@ async function requireAdmin(supabase: any) {
 export async function POST(request: Request) {
   const supabase = await createClient()
   const auth = await requireAdmin(supabase)
-  if (auth && 'error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const { sessionId, type, payload, usesRemaining, label } = await request.json()
+  if (!sessionId || !type || !payload) {
+    return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
+  }
+  if (!VALID_TYPES.includes(type)) {
+    return NextResponse.json({ error: 'Tipo QR non valido' }, { status: 400 })
+  }
 
-  const { data, error } = await supabase.from('qr_codes').insert({
+  const admin = createAdminClient()
+  const { data, error } = await admin.from('qr_codes').insert({
     session_id: sessionId, type, payload, uses_remaining: usesRemaining ?? null, label,
   }).select().single()
 
@@ -27,13 +37,14 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   const supabase = await createClient()
   const auth = await requireAdmin(supabase)
-  if (auth && 'error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const { searchParams } = new URL(request.url)
   const sessionId = searchParams.get('sessionId')
   if (!sessionId) return NextResponse.json({ error: 'sessionId richiesto' }, { status: 400 })
 
-  const { data } = await supabase.from('qr_codes').select('*')
+  const admin = createAdminClient()
+  const { data } = await admin.from('qr_codes').select('*')
     .eq('session_id', sessionId).order('created_at', { ascending: false })
   return NextResponse.json({ qrCodes: data ?? [] })
 }

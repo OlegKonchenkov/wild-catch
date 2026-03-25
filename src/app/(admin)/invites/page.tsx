@@ -24,15 +24,18 @@ export default function InvitesPage() {
 
   async function generateCodes() {
     setLoading(true)
-    await fetch('/api/admin/invites', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: selectedId, quantity }),
-    })
-    const res = await fetch(`/api/admin/invites?sessionId=${selectedId}`)
-    const data = await res.json()
-    setInvites(data.invites ?? [])
-    setLoading(false)
+    try {
+      await fetch('/api/admin/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: selectedId, quantity }),
+      })
+      const res = await fetch(`/api/admin/invites?sessionId=${selectedId}`)
+      const data = await res.json()
+      setInvites(data.invites ?? [])
+    } finally {
+      setLoading(false)
+    }
   }
 
   function exportCSV() {
@@ -42,7 +45,8 @@ export default function InvitesPage() {
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `inviti_${selectedId}.csv`; a.click()
+    a.href = url; a.download = `inviti_${selectedId}.csv`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 

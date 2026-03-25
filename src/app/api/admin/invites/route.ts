@@ -33,9 +33,16 @@ export async function POST(request: Request) {
     .from('session_invites').select('code').eq('session_id', sessionId)
   existingCodes?.forEach(c => existing.add(c.code))
 
-  while (codes.length < quantity) {
+  const maxAttempts = quantity * 10
+  let attempts = 0
+  while (codes.length < quantity && attempts < maxAttempts) {
+    attempts++
     const code = generateCode()
     if (!existing.has(code)) { codes.push(code); existing.add(code) }
+  }
+
+  if (codes.length < quantity) {
+    return NextResponse.json({ error: 'Impossibile generare codici sufficienti' }, { status: 500 })
   }
 
   const invites = codes.map(code => ({ session_id: sessionId, code }))
@@ -65,7 +72,10 @@ export async function DELETE(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const { inviteId } = await request.json()
+  if (!inviteId) return NextResponse.json({ error: 'inviteId richiesto' }, { status: 400 })
+
   const admin = createAdminClient()
-  await admin.from('session_invites').update({ is_active: false }).eq('id', inviteId)
+  const { error } = await admin.from('session_invites').update({ is_active: false }).eq('id', inviteId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ revoked: true })
 }
