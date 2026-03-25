@@ -78,18 +78,22 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <main className="flex-1 overflow-hidden relative">{children}</main>
 
-      {/* Bottom navigation */}
-      <nav className="flex border-t border-white/10 bg-[#0F1F2E]/95 overflow-x-auto">
+      {/* Bottom navigation — horizontal scroll when items overflow */}
+      <nav
+        className="nav-scrollable flex border-t border-white/10 bg-[#0F1F2E]/95 flex-shrink-0"
+        style={{ overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}
+      >
         {NAV_ITEMS.map(({ href, icon, label }) => (
           <Link
             key={href}
             href={href}
-            className={`flex-shrink-0 flex-1 flex flex-col items-center py-2 gap-0.5 text-xs transition-colors ${
+            className={`flex-shrink-0 flex flex-col items-center py-2 gap-0.5 text-xs transition-colors ${
               pathname === href ? 'text-[#3A9DBC]' : 'text-white/50 hover:text-white/80'
             }`}
+            style={{ minWidth: 56, width: `${100 / NAV_ITEMS.length}%` }}
           >
             <span className="text-xl">{icon}</span>
-            <span>{label}</span>
+            <span className="truncate w-full text-center px-0.5">{label}</span>
           </Link>
         ))}
       </nav>
