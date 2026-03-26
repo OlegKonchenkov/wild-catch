@@ -66,9 +66,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Spostamento non valido', valid: false }, { status: 400 })
   }
 
-  // Check within bounds
+  // Check within bounds — add accuracy-based buffer so GPS jitter near the
+  // border doesn't falsely flag the player as out-of-bounds.
+  // 1 degree ≈ 111 km, so divide accuracy (m) by 111000 to get degrees.
+  const accuracyDeg = Math.max((accuracy ?? 50) / 111000, 0.0002) // min ~22 m buffer
   const bounds = session.area_bounds as { north: number; south: number; east: number; west: number } | null
-  const inBounds = bounds && bounds.north ? isWithinBounds(currentPos, bounds) : true
+  const inBounds = bounds && bounds.north != null
+    ? isWithinBounds(currentPos, {
+        north: bounds.north + accuracyDeg,
+        south: bounds.south - accuracyDeg,
+        east:  bounds.east  + accuracyDeg,
+        west:  bounds.west  - accuracyDeg,
+      })
+    : true
 
   // Update GPS position (PostGIS point format)
   await supabase

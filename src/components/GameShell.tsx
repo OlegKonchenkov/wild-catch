@@ -26,24 +26,20 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const [level, setLevel]   = useState<number>(1)
   const [endAt, setEndAt]   = useState<string | null>(null)
 
-  useEffect(() => {
-    const sessionId = localStorage.getItem('current_session_id')
-    if (!sessionId) return
+  const initRef = useRef(false)
 
+  function loadSessionData(sid: string) {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-
       Promise.all([
-        // Gold + level
         supabase.from('player_sessions')
           .select('gold, level')
           .eq('user_id', user.id)
-          .eq('session_id', sessionId)
+          .eq('session_id', sid)
           .single(),
-        // Session end time
         supabase.from('sessions')
           .select('end_at, start_at, duration_minutes')
-          .eq('id', sessionId)
+          .eq('id', sid)
           .single(),
       ]).then(([psResult, sessResult]) => {
         if (psResult.data) {
@@ -63,7 +59,42 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         }
       })
     })
-  }, [supabase])
+  }
+
+  useEffect(() => {
+    // Initial load
+    const sid = localStorage.getItem('current_session_id')
+    if (sid) {
+      initRef.current = true
+      loadSessionData(sid)
+    }
+
+    // Listen for localStorage changes from map/page.tsx restore flow
+    // (fires when another tab or the same page sets 'current_session_id')
+    function onStorage(e: StorageEvent) {
+      if (e.key === 'current_session_id' && e.newValue && !initRef.current) {
+        initRef.current = true
+        loadSessionData(e.newValue)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+
+    // Also poll once after 1.5s in case localStorage was empty on first render
+    // but gets populated by map/page.tsx restore flow (same-tab, no storage event)
+    const fallback = setTimeout(() => {
+      if (initRef.current) return
+      const sid2 = localStorage.getItem('current_session_id')
+      if (sid2) {
+        initRef.current = true
+        loadSessionData(sid2)
+      }
+    }, 1500)
+
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      clearTimeout(fallback)
+    }
+  }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll the active nav item into view whenever the route changes
   useEffect(() => {
