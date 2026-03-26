@@ -63,6 +63,7 @@ export default function ShopPage() {
         setGold(data.remainingGold)
         showToast(true, `${TYPE_META[item.type].icon} ${item.name} acquistato!`)
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+        window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
       } else {
         showToast(false, data.error ?? 'Errore acquisto')
       }

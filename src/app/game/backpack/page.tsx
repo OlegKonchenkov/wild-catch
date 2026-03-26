@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { ItemType } from '@/lib/types'
 
@@ -31,11 +31,27 @@ export default function BackpackPage() {
   const [filter, setFilter]       = useState<ItemType | 'all'>('all')
   const [usingId, setUsingId]     = useState<string | null>(null)
   const [toast, setToast]         = useState<string | null>(null)
-  const supabase = useMemo(() => createClient(), [])
+  const supabase   = useMemo(() => createClient(), [])
+  const userIdRef  = useRef<string | null>(null)
+  const sessionRef = useRef<string | null>(null)
 
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(null), 3500)
+  }
+
+  function fetchInventory() {
+    const uid = userIdRef.current
+    const sid = sessionRef.current
+    if (!uid || !sid) return
+    supabase
+      .from('player_inventory')
+      .select('id, quantity, items(id, name, type, description, effect_value, shop_price)')
+      .eq('user_id', uid)
+      .eq('session_id', sid)
+      .gt('quantity', 0)
+      .order('quantity', { ascending: false })
+      .then(({ data }) => { if (data) setInventory(data as unknown as InventoryRow[]) })
   }
 
   async function handleUse(row: InventoryRow) {
@@ -70,9 +86,12 @@ export default function BackpackPage() {
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
     if (!sessionId) { setLoading(false); return }
+    sessionRef.current = sessionId
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return }
+      userIdRef.current = user.id
+
       supabase
         .from('player_inventory')
         .select('id, quantity, items(id, name, type, description, effect_value, shop_price)')
@@ -84,8 +103,23 @@ export default function BackpackPage() {
           if (data) setInventory(data as unknown as InventoryRow[])
           setLoading(false)
         })
+
+      // Realtime: re-fetch whenever inventory changes (shop, QR rewards, item use)
+      const channel = supabase
+        .channel(`backpack-inv-${user.id}`)
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'player_inventory',
+          filter: `user_id=eq.${user.id}`,
+        }, () => fetchInventory())
+        .subscribe()
+
+      return () => { supabase.removeChannel(channel) }
     })
-  }, [supabase])
+
+    // Also respond to explicit refresh events
+    window.addEventListener('wc:refresh-backpack', fetchInventory)
+    return () => window.removeEventListener('wc:refresh-backpack', fetchInventory)
+  }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const types = [...new Set(inventory.map(r => r.items?.type).filter(Boolean))] as ItemType[]
   const filtered = filter === 'all' ? inventory : inventory.filter(r => r.items?.type === filter)

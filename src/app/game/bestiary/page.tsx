@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
@@ -23,11 +23,39 @@ export default function BestiaryPage() {
   const [filter, setFilter]                 = useState<'all' | 'caught' | 'missing'>('all')
   const [loading, setLoading]               = useState(true)
   const [selectedPcId, setSelectedPcId]     = useState<string | null>(null)
-  const supabase = useMemo(() => createClient(), [])
+  const supabase   = useMemo(() => createClient(), [])
+  const userIdRef  = useRef<string | null>(null)
+  const sessionRef = useRef<string | null>(null)
+
+  function fetchPlayerCreatures() {
+    const uid = userIdRef.current
+    const sid = sessionRef.current
+    if (!uid || !sid) return
+    supabase
+      .from('player_creatures')
+      .select('*, creatures(*)')
+      .eq('user_id', uid)
+      .eq('session_id', sid)
+      .then(({ data }) => { if (data) setPlayerCreatures(data as unknown as PlayerCreature[]) })
+  }
+
+  function fetchSelectedCreature() {
+    const uid = userIdRef.current
+    const sid = sessionRef.current
+    if (!uid || !sid) return
+    supabase
+      .from('player_sessions')
+      .select('selected_creature_id')
+      .eq('user_id', uid)
+      .eq('session_id', sid)
+      .single()
+      .then(({ data }) => { if (data?.selected_creature_id) setSelectedPcId(data.selected_creature_id) })
+  }
 
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
     if (!sessionId) { setLoading(false); return }
+    sessionRef.current = sessionId
 
     let done = 0
     function finish() { if (++done === 3) setLoading(false) }
@@ -43,6 +71,8 @@ export default function BestiaryPage() {
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { finish(); finish(); return }
+      userIdRef.current = user.id
+
       supabase
         .from('player_creatures')
         .select('*, creatures(*)')
@@ -60,8 +90,26 @@ export default function BestiaryPage() {
           if (data?.selected_creature_id) setSelectedPcId(data.selected_creature_id)
           finish()
         })
+
+      // Realtime: refresh creature list on any player_creatures change
+      const channel = supabase
+        .channel(`bestiary-pc-${user.id}`)
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'player_creatures',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchPlayerCreatures()
+          fetchSelectedCreature()
+        })
+        .subscribe()
+
+      return () => { supabase.removeChannel(channel) }
     })
-  }, [supabase])
+
+    // Also refresh on explicit event (e.g. from encounter page before realtime arrives)
+    window.addEventListener('wc:refresh-bestiary', fetchPlayerCreatures)
+    return () => window.removeEventListener('wc:refresh-bestiary', fetchPlayerCreatures)
+  }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function getPc(creatureId: string) {
     return playerCreatures.find(pc => pc.creature_id === creatureId) ?? null

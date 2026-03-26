@@ -198,6 +198,7 @@ export default function EncounterPage() {
       setMessage(data.evolved ? '✨ Evoluzione!' : '✅ Catturato!')
       if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
       window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+      window.dispatchEvent(new CustomEvent('wc:refresh-bestiary'))
     } else if (data.fled) {
       setAnimState('flee')
       setMessage('La creatura è fuggita...')
