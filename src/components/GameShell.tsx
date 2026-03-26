@@ -177,23 +177,45 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       {/* Bottom navigation — horizontal scroll when items overflow */}
       <nav
         ref={navRef}
-        className="nav-scrollable flex border-t border-white/10 bg-[#0F1F2E]/95 flex-shrink-0"
+        className="nav-scrollable relative flex border-t border-white/10 bg-[#0F1F2E]/95 flex-shrink-0"
         style={{ overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 'env(safe-area-inset-bottom)' } as React.CSSProperties}
       >
-        {NAV_ITEMS.map(({ href, icon, label }) => (
-          <Link
-            key={href}
-            href={href}
-            data-active={pathname === href ? 'true' : 'false'}
-            className={`flex-shrink-0 flex flex-col items-center py-2 gap-0.5 text-xs transition-colors ${
-              pathname === href ? 'text-[#3A9DBC]' : 'text-white/50 hover:text-white/80'
-            }`}
-            style={{ minWidth: 56, width: `${100 / NAV_ITEMS.length}%` }}
-          >
-            <span className="text-xl">{icon}</span>
-            <span className="truncate w-full text-center px-0.5">{label}</span>
-          </Link>
-        ))}
+        {(() => {
+          const inEncounter = pathname.startsWith('/game/encounter/')
+          if (inEncounter) {
+            return (
+              <>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span className="text-[10px] text-white/25 tracking-widest uppercase">⚔️ Incontro in corso — cattura o fuggi</span>
+                </div>
+                {NAV_ITEMS.map(({ href, icon, label }) => (
+                  <span
+                    key={href}
+                    className="flex-shrink-0 flex flex-col items-center py-2 gap-0.5 text-xs text-white/15 cursor-not-allowed select-none"
+                    style={{ minWidth: 56, width: `${100 / NAV_ITEMS.length}%` }}
+                  >
+                    <span className="text-xl">{icon}</span>
+                    <span className="truncate w-full text-center px-0.5">{label}</span>
+                  </span>
+                ))}
+              </>
+            )
+          }
+          return NAV_ITEMS.map(({ href, icon, label }) => (
+            <Link
+              key={href}
+              href={href}
+              data-active={pathname === href ? 'true' : 'false'}
+              className={`flex-shrink-0 flex flex-col items-center py-2 gap-0.5 text-xs transition-colors ${
+                pathname === href ? 'text-[#3A9DBC]' : 'text-white/50 hover:text-white/80'
+              }`}
+              style={{ minWidth: 56, width: `${100 / NAV_ITEMS.length}%` }}
+            >
+              <span className="text-xl">{icon}</span>
+              <span className="truncate w-full text-center px-0.5">{label}</span>
+            </Link>
+          ))
+        })()}
       </nav>
     </div>
   )

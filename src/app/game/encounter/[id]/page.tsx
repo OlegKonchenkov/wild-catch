@@ -34,6 +34,8 @@ export default function EncounterPage() {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<'caught' | 'fled' | 'evolved' | null>(null)
+  const [playerCreature, setPlayerCreature] = useState<{ name: string; maxHp: number; element: string } | null>(null)
+  const [playerHp, setPlayerHp] = useState<number | null>(null)
 
   // Item selection state
   const [reteItems, setReteItems] = useState<InvItem[]>([])
@@ -95,6 +97,30 @@ export default function EncounterPage() {
     })
   }, [supabase])
 
+  useEffect(() => {
+    if (!state) return
+    supabase
+      .from('encounters')
+      .select('player_creature_id')
+      .eq('id', state.encounterId)
+      .single()
+      .then(async ({ data: enc }) => {
+        if (!enc?.player_creature_id) return
+        const { data: pc } = await supabase
+          .from('player_creatures')
+          .select('creatures(name, hp, element)')
+          .eq('id', enc.player_creature_id)
+          .single()
+        if (pc) {
+          const cr = (pc as any).creatures as { name: string; hp: number; element: string }
+          if (cr) {
+            setPlayerCreature({ name: cr.name, maxHp: cr.hp, element: cr.element })
+            setPlayerHp(cr.hp)
+          }
+        }
+      })
+  }, [state?.encounterId, supabase])
+
   async function handleFight() {
     if (!state || loading) return
     setLoading(true)
@@ -121,6 +147,10 @@ export default function EncounterPage() {
       await new Promise(r => setTimeout(r, 400))
     }
     setAnimState('idle')
+
+    if (data.playerTookDamage && data.wildDamage > 0) {
+      setPlayerHp(prev => prev !== null ? Math.max(0, prev - data.wildDamage) : null)
+    }
 
     setState(prev => prev ? {
       ...prev,
@@ -164,10 +194,21 @@ export default function EncounterPage() {
       await new Promise(r => setTimeout(r, 700))
       setResult(data.evolved ? 'evolved' : 'caught')
       setMessage(data.evolved ? '✨ Evoluzione!' : '✅ Catturato!')
-    } else {
+    } else if (data.fled) {
       setAnimState('flee')
       setMessage('La creatura è fuggita...')
       setResult('fled')
+    } else {
+      // Counter-attack: encounter continues
+      if (data.wildDamage > 0) {
+        setPlayerHp(prev => prev !== null ? Math.max(0, prev - data.wildDamage) : null)
+        setAnimState('damage')
+        await new Promise(r => setTimeout(r, 400))
+        setAnimState('idle')
+        setMessage(`Cattura fallita! La creatura contrattacca (-${data.wildDamage} HP)`)
+      } else {
+        setMessage('Cattura fallita! La creatura resiste...')
+      }
     }
     setLoading(false)
   }
@@ -228,6 +269,17 @@ export default function EncounterPage() {
       <div className="mb-4">
         <HPBar current={state.wildHp} max={state.wildHpMax} label="HP Creatura" />
       </div>
+
+      {/* Player creature HP bar */}
+      {playerCreature && playerHp !== null && (
+        <div className="mb-3">
+          <HPBar
+            current={playerHp}
+            max={playerCreature.maxHp}
+            label={`${ELEMENT_EMOJI[playerCreature.element as keyof typeof ELEMENT_EMOJI] ?? ''} ${playerCreature.name}`}
+          />
+        </div>
+      )}
 
       {/* Message */}
       <AnimatePresence>

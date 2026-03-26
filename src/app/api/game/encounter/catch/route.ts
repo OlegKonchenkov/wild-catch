@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { rollCatch } from '@/lib/game/rng'
+import { rollCatch, calculateFightDamage } from '@/lib/game/rng'
 
 const ITEM_BONUSES: Record<string, number> = {
   'Rete Base': 0,
@@ -60,11 +60,19 @@ export async function POST(request: Request) {
   const caught = rollCatch(creature.rarity, bonus)
 
   if (!caught) {
-    await supabase
-      .from('encounters')
-      .update({ status: 'fled', resolved_at: new Date().toISOString() })
-      .eq('id', encounterId)
-    return NextResponse.json({ caught: false, result: 'fuggita' })
+    // 40% chance the creature flees immediately, 60% chance it counter-attacks and stays
+    const flees = Math.random() < 0.40
+    if (flees) {
+      await supabase
+        .from('encounters')
+        .update({ status: 'fled', resolved_at: new Date().toISOString() })
+        .eq('id', encounterId)
+      return NextResponse.json({ caught: false, fled: true, wildDamage: 0 })
+    } else {
+      // Counter-attack: encounter stays active
+      const counterDamage = calculateFightDamage(creature.atk)
+      return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage })
+    }
   }
 
   await supabase

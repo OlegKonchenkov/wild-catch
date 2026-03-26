@@ -22,6 +22,7 @@ export default function BestiaryPage() {
   const [message, setMessage]               = useState('')
   const [filter, setFilter]                 = useState<'all' | 'caught' | 'missing'>('all')
   const [loading, setLoading]               = useState(true)
+  const [selectedPcId, setSelectedPcId]     = useState<string | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function BestiaryPage() {
     if (!sessionId) { setLoading(false); return }
 
     let done = 0
-    function finish() { if (++done === 2) setLoading(false) }
+    function finish() { if (++done === 3) setLoading(false) }
 
     supabase.from('creatures').select('*').order('rarity').then(({ data }) => {
       if (data) setCreatures(
@@ -41,13 +42,24 @@ export default function BestiaryPage() {
     })
 
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { finish(); return }
+      if (!user) { finish(); finish(); return }
       supabase
         .from('player_creatures')
         .select('*, creatures(*)')
         .eq('user_id', user.id)
         .eq('session_id', sessionId)
         .then(({ data }) => { if (data) setPlayerCreatures(data as unknown as PlayerCreature[]); finish() })
+
+      supabase
+        .from('player_sessions')
+        .select('selected_creature_id')
+        .eq('user_id', user.id)
+        .eq('session_id', sessionId)
+        .single()
+        .then(({ data }) => {
+          if (data?.selected_creature_id) setSelectedPcId(data.selected_creature_id)
+          finish()
+        })
     })
   }, [supabase])
 
@@ -65,6 +77,7 @@ export default function BestiaryPage() {
     })
     if (res.ok) {
       const name = creatures.find(c => c.id === pc.creature_id)?.name ?? 'Creatura'
+      setSelectedPcId(pc.id)
       setMessage(`${name} selezionata come creatura attiva!`)
     }
   }
@@ -186,9 +199,11 @@ export default function BestiaryPage() {
                 whileTap={{ scale: 0.93 }}
                 onClick={() => setSelected({ creature, pc })}
                 className={`relative rounded-2xl overflow-hidden cursor-pointer border transition-all
-                  ${caught
-                    ? 'bg-gradient-to-b from-white/10 to-white/5 border-white/15 hover:border-white/30'
-                    : 'mystery-shimmer border-white/5 hover:border-white/10'
+                  ${caught && pc?.id === selectedPcId
+                    ? 'bg-gradient-to-b from-[#3A9DBC]/20 to-[#3A9DBC]/5 border-[#3A9DBC]/70'
+                    : caught
+                      ? 'bg-gradient-to-b from-white/10 to-white/5 border-white/15 hover:border-white/30'
+                      : 'mystery-shimmer border-white/5 hover:border-white/10'
                   }`}
               >
                 {/* Rarity stripe */}
@@ -227,6 +242,13 @@ export default function BestiaryPage() {
                   {pc && pc.duplicates_count > 1 && (
                     <div className="absolute top-1 left-1 bg-[#3A9DBC] text-white text-[9px] font-bold px-1 rounded">
                       ×{pc.duplicates_count}
+                    </div>
+                  )}
+
+                  {/* Active creature badge */}
+                  {pc?.id === selectedPcId && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-[#3A9DBC]/90 text-white text-[8px] font-black text-center py-0.5 tracking-wider">
+                      ⚔️ ATTIVA
                     </div>
                   )}
                 </div>
@@ -296,6 +318,11 @@ export default function BestiaryPage() {
                   <>
                     <div className="text-center mb-4">
                       <h3 className="text-2xl font-bold text-white">{creature.name}</h3>
+                      {pc?.id === selectedPcId && (
+                        <div className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#3A9DBC]/20 border border-[#3A9DBC]/40 text-[#3A9DBC] text-xs font-semibold">
+                          Creatura attiva ⚔️
+                        </div>
+                      )}
                       <div className="flex items-center justify-center gap-2 mt-1">
                         <span className="text-sm">{ELEMENT_EMOJI[creature.element]}</span>
                         <span className="text-xs px-2 py-0.5 rounded-full font-semibold"

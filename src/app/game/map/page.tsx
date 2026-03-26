@@ -17,6 +17,7 @@ function MapPageInner() {
   const [inBounds, setInBounds] = useState(true)
   const [sessionEnded, setSessionEnded] = useState(false)
   const sessionEndedRef = useRef(false)
+  const inBoundsRef = useRef(true)
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
   const [pendingEncounter, setPendingEncounter] = useState<{ encounterId: string; creature: { name: string; element: string; rarity: string } } | null>(null)
   const lastEncounterRef = useRef(0)
@@ -114,7 +115,10 @@ function MapPageInner() {
     }
 
     // Only update inBounds from responses that include it (valid position calls)
-    if (data.inBounds !== undefined) setInBounds(data.inBounds)
+    if (data.inBounds !== undefined) {
+      setInBounds(data.inBounds)
+      inBoundsRef.current = data.inBounds
+    }
 
     if (data.triggerEncounter && now - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS) {
       lastEncounterRef.current = now
@@ -135,6 +139,7 @@ function MapPageInner() {
       const delay = minMs + Math.random() * (maxMs - minMs)
       timeout = setTimeout(async () => {
         if (sessionEndedRef.current) return
+        if (!inBoundsRef.current) { scheduleTimerEncounter(); return }
         const now = Date.now()
         if (now - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS) {
           lastEncounterRef.current = now

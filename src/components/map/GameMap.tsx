@@ -68,7 +68,10 @@ export default function GameMap({ session, playerPosition, sessionId }: Props) {
   const followingRef = useRef(true)
   const prevPosRef = useRef<{ lat: number; lng: number } | null>(null)
   const headingRef = useRef<number | null>(null)
+  const playerPositionRef = useRef(playerPosition)
   const [following, setFollowing] = useState(true)
+
+  useEffect(() => { playerPositionRef.current = playerPosition }, [playerPosition])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -96,6 +99,20 @@ export default function GameMap({ session, playerPosition, sessionId }: Props) {
         ),
       })
       mapRef.current = map
+
+      // Immediately create marker if we already have a GPS position
+      const pos = playerPositionRef.current
+      if (pos) {
+        const icon = Leaflet.divIcon({
+          html: markerHTML(null),
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+          className: '',
+        })
+        markerRef.current = Leaflet.marker([pos.lat, pos.lng], { icon, zIndexOffset: 1000 }).addTo(map)
+        map.setView([pos.lat, pos.lng], 17, { animate: false })
+        firstFixRef.current = false
+      }
 
       Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
