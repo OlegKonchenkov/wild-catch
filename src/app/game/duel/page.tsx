@@ -3,13 +3,14 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
+import type { Rarity, Element } from '@/lib/types'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 
 interface ActiveCreature {
   playerCreatureId: string
   name: string
-  element: string
-  rarity: string
+  element: Element
+  rarity: Rarity
   hp: number
   atk: number
   image_url: string
