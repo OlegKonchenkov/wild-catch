@@ -24,15 +24,16 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const navRef   = useRef<HTMLElement>(null)
 
   const [gold, setGold]             = useState<number | null>(null)
-  const [level, setLevel]           = useState<number>(1)
+  const [level, setLevel]           = useState<number | null>(null)
   const [endAt, setEndAt]           = useState<string | null>(null)
   const [sessionEnded, setSessionEnded] = useState(false)
+  const [statsLoading, setStatsLoading] = useState(true)
 
   const initRef = useRef(false)
 
   function loadSessionData(sid: string) {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (!user) { setStatsLoading(false); return }
       Promise.all([
         supabase.from('player_sessions')
           .select('gold, level')
@@ -59,6 +60,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
             setEndAt(computed)
           }
         }
+        setStatsLoading(false)
       })
     })
   }
@@ -76,6 +78,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     function onStorage(e: StorageEvent) {
       if (e.key === 'current_session_id' && e.newValue && !initRef.current) {
         initRef.current = true
+        setStatsLoading(true)
         loadSessionData(e.newValue)
       }
     }
@@ -89,6 +92,9 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       if (sid2) {
         initRef.current = true
         loadSessionData(sid2)
+      } else {
+        // No session at all — stop shimmer
+        setStatsLoading(false)
       }
     }, 1500)
 
@@ -146,11 +152,16 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-2 bg-[#0F1F2E]/95 border-b border-white/10 z-10">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-[#F7C841]">Lv {level}</span>
+          {statsLoading
+            ? <div className="w-10 h-4 rounded bg-white/10 animate-pulse" />
+            : <span className="text-sm font-bold text-[#F7C841]">Lv {level ?? 1}</span>
+          }
         </div>
         <div className="flex items-center gap-1 text-[#D4A96A]">
-          <span className="text-sm">💰</span>
-          <span className="text-sm font-bold">{gold ?? '—'}</span>
+          {statsLoading
+            ? <div className="w-12 h-4 rounded bg-white/10 animate-pulse" />
+            : <><span className="text-sm">💰</span><span className="text-sm font-bold">{gold ?? '—'}</span></>
+          }
         </div>
         <div className={`text-sm font-mono ${
           timer.isCritical ? 'text-red-400 animate-pulse' :
