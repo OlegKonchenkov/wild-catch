@@ -169,6 +169,8 @@ export default function EncounterPage() {
       setMessage(`Danno inflitto: ${data.playerDamage} (×${data.elementMultiplier.toFixed(1)})`)
     }
 
+    if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+    window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
     setLoading(false)
   }
 
@@ -194,6 +196,8 @@ export default function EncounterPage() {
       await new Promise(r => setTimeout(r, 700))
       setResult(data.evolved ? 'evolved' : 'caught')
       setMessage(data.evolved ? '✨ Evoluzione!' : '✅ Catturato!')
+      if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+      window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
     } else if (data.fled) {
       setAnimState('flee')
       setMessage('La creatura è fuggita...')

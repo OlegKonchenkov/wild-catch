@@ -130,6 +130,7 @@ export default function DuelPage() {
             supabase.auth.getUser().then(({ data: { user } }) => {
               setResult(updated.winner_id === user?.id ? 'won' : 'lost')
               setIsMyTurn(false)
+              window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
             })
           }
           realtimeUpdatedRef.current = true
@@ -175,6 +176,12 @@ export default function DuelPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+
+    if (res.ok) {
+      const data = await res.json()
+      if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+      if (data.duelOver) window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+    }
 
     // If item was used, decrement local count and clear selection
     if (selectedItemId && res.ok) {

@@ -100,9 +100,12 @@ export async function POST(request: Request) {
 
   await supabase.from('duels').update(updatePayload).eq('id', duelId)
 
+  let myLevelUp: { newLevel: number; goldReward: number } | null = null
+
   if (duelOver) {
     const loserId = isChallenger ? duel.opponent_id : duel.challenger_id
-    await awardDuelResults(supabase, sessionId, user.id, loserId!)
+    const levelUps = await awardDuelResults(supabase, sessionId, user.id, loserId!)
+    myLevelUp = levelUps.winnerLevelUp
   }
 
   // ── Broadcast to both players ──────────────────────────────────────────────
@@ -123,10 +126,20 @@ export async function POST(request: Request) {
   })
   await supabase.removeChannel(channel)
 
-  return NextResponse.json({ damage, elementMultiplier: mult, nextTurn: duelOver ? null : nextTurn, duelOver })
+  return NextResponse.json({ damage, elementMultiplier: mult, nextTurn: duelOver ? null : nextTurn, duelOver, levelUp: myLevelUp })
 }
 
-async function awardDuelResults(supabase: any, sessionId: string, winnerId: string, loserId: string) {
-  await supabase.rpc('increment_player_stats', { p_user_id: winnerId, p_session_id: sessionId, p_exp: 15, p_score: 15 })
-  await supabase.rpc('increment_player_stats', { p_user_id: loserId,  p_session_id: sessionId, p_exp: 5,  p_score: 0  })
+async function awardDuelResults(
+  supabase: any, sessionId: string, winnerId: string, loserId: string
+): Promise<{ winnerLevelUp: { newLevel: number; goldReward: number } | null; loserLevelUp: { newLevel: number; goldReward: number } | null }> {
+  const [winResult, loseResult] = await Promise.all([
+    supabase.rpc('increment_player_stats', { p_user_id: winnerId, p_session_id: sessionId, p_exp: 30, p_score: 20 }),
+    supabase.rpc('increment_player_stats', { p_user_id: loserId,  p_session_id: sessionId, p_exp: 10, p_score: 0  }),
+  ])
+  const winRow  = Array.isArray(winResult.data)  ? winResult.data[0]  : null
+  const loseRow = Array.isArray(loseResult.data) ? loseResult.data[0] : null
+  return {
+    winnerLevelUp: winRow?.leveled_up  ? { newLevel: winRow.new_level,  goldReward: winRow.gold_reward  ?? 0 } : null,
+    loserLevelUp:  loseRow?.leveled_up ? { newLevel: loseRow.new_level, goldReward: loseRow.gold_reward ?? 0 } : null,
+  }
 }

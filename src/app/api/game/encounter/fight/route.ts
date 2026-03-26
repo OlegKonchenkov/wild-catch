@@ -109,6 +109,18 @@ export async function POST(request: Request) {
     })
     .eq('id', encounterId)
 
+  // Award 2 EXP per fight turn
+  const { data: rpcData } = await supabase.rpc('increment_player_stats', {
+    p_user_id: user.id,
+    p_session_id: encounter.session_id,
+    p_exp: 2,
+    p_score: 0,
+  })
+  const rpcRow  = Array.isArray(rpcData) ? rpcData[0] : null
+  const levelUp = rpcRow?.leveled_up
+    ? { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
+    : null
+
   return NextResponse.json({
     wildHpRemaining,
     wildHpMax: wildCreature.hp,
@@ -118,5 +130,6 @@ export async function POST(request: Request) {
     elementMultiplier: elementMult,
     fightResult,
     catchBonus: fightResult === 'catchable' ? 0.20 : 0,
+    levelUp,
   })
 }

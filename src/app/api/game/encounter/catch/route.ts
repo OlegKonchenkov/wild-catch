@@ -124,18 +124,23 @@ export async function POST(request: Request) {
     })
   }
 
-  // Award EXP and score
+  // Award EXP and score — new catch=15 EXP, duplicate=5 EXP
   const rarityMultiplier = { comune: 1, non_comune: 2, raro: 3, epico: 4, leggendario: 5 }
   const rarityMult = rarityMultiplier[creature.rarity as keyof typeof rarityMultiplier] ?? 1
-  const expGain = existing ? 3 : 10
-  const scoreGain = existing ? 3 : 10 * rarityMult
+  const expGain   = existing ? 5  : 15
+  const scoreGain = existing ? 5  : 15 * rarityMult
 
-  await supabase.rpc('increment_player_stats', {
+  const { data: rpcData } = await supabase.rpc('increment_player_stats', {
     p_user_id: user.id,
     p_session_id: encounter.session_id,
     p_exp: expGain,
     p_score: scoreGain,
   })
 
-  return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, scoreGain })
+  const rpcRow    = Array.isArray(rpcData) ? rpcData[0] : null
+  const levelUp   = rpcRow?.leveled_up
+    ? { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
+    : null
+
+  return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, scoreGain, levelUp })
 }

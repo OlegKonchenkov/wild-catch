@@ -335,6 +335,7 @@ export default function MissionsPage() {
       })
       const data = await res.json()
       setScanResult(res.ok ? data : { error: data.error ?? 'Errore sconosciuto', success: false })
+      if (res.ok && data.success) window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
     } catch {
       setScanResult({ error: 'Errore di rete', success: false })
     } finally {
