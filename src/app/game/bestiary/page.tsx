@@ -126,6 +126,26 @@ export default function BestiaryPage() {
           background-size: 200% auto;
           animation: shimmer 3s linear infinite;
         }
+        @keyframes wc-active-glow {
+          0%, 100% {
+            box-shadow: 0 0 0 2px #3ABCA8, 0 0 14px rgba(58,188,168,0.55), 0 0 32px rgba(58,188,168,0.20);
+          }
+          50% {
+            box-shadow: 0 0 0 2px #5DDDCA, 0 0 22px rgba(58,188,168,0.85), 0 0 48px rgba(58,188,168,0.35);
+          }
+        }
+        @keyframes wc-active-badge {
+          0%, 100% { opacity: 1; transform: scaleX(1); }
+          50% { opacity: 0.85; transform: scaleX(1.04); }
+        }
+        .wc-active-card {
+          animation: wc-active-glow 1.8s ease-in-out infinite;
+          border-color: #3ABCA8 !important;
+          background: linear-gradient(to bottom, rgba(58,188,168,0.22), rgba(58,188,168,0.06)) !important;
+        }
+        .wc-active-badge {
+          animation: wc-active-badge 1.8s ease-in-out infinite;
+        }
       `}</style>
 
       {/* Header */}
@@ -200,10 +220,10 @@ export default function BestiaryPage() {
                 onClick={() => setSelected({ creature, pc })}
                 className={`relative rounded-2xl overflow-hidden cursor-pointer border transition-all
                   ${caught && pc?.id === selectedPcId
-                    ? 'bg-gradient-to-b from-[#3A9DBC]/20 to-[#3A9DBC]/5 border-[#3A9DBC]/70'
+                    ? 'wc-active-card border-2'
                     : caught
-                      ? 'bg-gradient-to-b from-white/10 to-white/5 border-white/15 hover:border-white/30'
-                      : 'mystery-shimmer border-white/5 hover:border-white/10'
+                      ? 'bg-gradient-to-b from-white/10 to-white/5 border border-white/15 hover:border-white/30'
+                      : 'mystery-shimmer border border-white/5 hover:border-white/10'
                   }`}
               >
                 {/* Rarity stripe */}
@@ -247,8 +267,9 @@ export default function BestiaryPage() {
 
                   {/* Active creature badge */}
                   {pc?.id === selectedPcId && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-[#3A9DBC]/90 text-white text-[8px] font-black text-center py-0.5 tracking-wider">
-                      ⚔️ ATTIVA
+                    <div className="wc-active-badge absolute bottom-0 left-0 right-0 text-[#0A1520] text-[8px] font-black text-center py-1 tracking-widest uppercase"
+                      style={{ background: 'linear-gradient(90deg, #2BBFAC, #3ABCA8, #2BBFAC)' }}>
+                      ⚔ IN SQUADRA
                     </div>
                   )}
                 </div>

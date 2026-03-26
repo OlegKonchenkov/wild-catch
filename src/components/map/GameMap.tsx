@@ -165,18 +165,15 @@ export default function GameMap({ session, playerPosition, sessionId }: Props) {
       const bearing = headingRef.current
 
       if (markerRef.current) {
-        // Update position
-        ;(markerRef.current as { setLatLng(ll: [number, number]): void }).setLatLng([lat, lng])
-        // Update bearing via DOM (avoid recreating the marker)
         const marker = markerRef.current as import('leaflet').Marker
-        const el = marker.getElement?.()
-        const inner = el?.querySelector('.wc-player-inner') as HTMLElement | null
-        if (inner) {
-          inner.style.transform = `rotate(${bearing ?? 0}deg)`
-          // Show/hide cone
-          const cone = inner.querySelector('div:first-child') as HTMLElement | null
-          if (cone) cone.style.display = bearing !== null ? 'block' : 'none'
-        }
+        marker.setLatLng([lat, lng])
+        // Recreate icon so the cone appears/disappears correctly with bearing
+        marker.setIcon(Leaflet.divIcon({
+          html: markerHTML(bearing),
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+          className: '',
+        }))
       } else {
         const icon = Leaflet.divIcon({
           html: markerHTML(bearing),
