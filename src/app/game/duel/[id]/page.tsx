@@ -6,27 +6,41 @@ import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import HPBar from '@/components/creature/HPBar'
 
+interface BattagliaItem {
+  inventoryId: string
+  name: string
+  effectValue: number
+  quantity: number
+}
+
 export default function DuelPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
-  const [duel, setDuel] = useState<any>(null)
-  const [myHp, setMyHp] = useState(100)
-  const [opponentHp, setOpponentHp] = useState(100)
-  const [myHpMax, setMyHpMax] = useState(100)
+  const router  = useRouter()
+
+  const [duel, setDuel]                 = useState<any>(null)
+  const [myHp, setMyHp]                 = useState(100)
+  const [opponentHp, setOpponentHp]     = useState(100)
+  const [myHpMax, setMyHpMax]           = useState(100)
   const [opponentHpMax, setOpponentHpMax] = useState(100)
-  const [log, setLog] = useState<string[]>([])
-  const [waiting, setWaiting] = useState(true)
-  const [result, setResult] = useState<'won' | 'lost' | null>(null)
-  const [animState, setAnimState] = useState<'idle' | 'attack' | 'damage'>('idle')
+  const [log, setLog]                   = useState<string[]>([])
+  const [waiting, setWaiting]           = useState(true)
+  const [result, setResult]             = useState<'won' | 'lost' | null>(null)
+  const [animState, setAnimState]       = useState<'idle' | 'attack' | 'damage'>('idle')
   const [oppAnimState, setOppAnimState] = useState<'idle' | 'attack' | 'damage'>('idle')
-  const [userId, setUserId] = useState<string | null>(null)
-  const [myRole, setMyRole] = useState<'challenger' | 'opponent' | null>(null)
-  const [attacking, setAttacking] = useState(false)
-  const [lastDamage, setLastDamage] = useState<number | null>(null)
+  const [userId, setUserId]             = useState<string | null>(null)
+  const [myRole, setMyRole]             = useState<'challenger' | 'opponent' | null>(null)
+  const [isMyTurn, setIsMyTurn]         = useState(false)
+  const [attacking, setAttacking]       = useState(false)
+  const [lastDamage, setLastDamage]     = useState<{ amount: number; target: 'me' | 'opp' } | null>(null)
+  const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [showItems, setShowItems]       = useState(false)
+
   const realtimeUpdatedRef = useRef(false)
-  const surrenderedRef = useRef(false)
+  const surrenderedRef     = useRef(false)
   const supabase = useMemo(() => createClient(), [])
 
+  // Load duel + determine role
   useEffect(() => {
     supabase
       .from('duels')
@@ -45,55 +59,100 @@ export default function DuelPage() {
         const role = data.challenger_id === user.id ? 'challenger' : 'opponent'
         setMyRole(role)
 
-        const myCrData = role === 'challenger'
-          ? (data as any).challenger_creature?.creatures
-          : (data as any).opponent_creature?.creatures
-        const oppCrData = role === 'challenger'
-          ? (data as any).opponent_creature?.creatures
-          : (data as any).challenger_creature?.creatures
+        const myCrData  = role === 'challenger' ? (data as any).challenger_creature?.creatures : (data as any).opponent_creature?.creatures
+        const oppCrData = role === 'challenger' ? (data as any).opponent_creature?.creatures   : (data as any).challenger_creature?.creatures
 
-        if (myCrData) { setMyHp(myCrData.hp); setMyHpMax(myCrData.hp) }
+        if (myCrData)  { setMyHp(myCrData.hp);  setMyHpMax(myCrData.hp) }
         if (oppCrData) { setOpponentHp(oppCrData.hp); setOpponentHpMax(oppCrData.hp) }
+
+        // Challenger always goes first
+        if (data.status === 'active') {
+          setIsMyTurn(role === 'challenger')
+        }
+
+        // Load battaglia items for this session
+        const sessionId = localStorage.getItem('current_session_id')
+        if (sessionId) {
+          const { data: inv } = await supabase
+            .from('player_inventory')
+            .select('id, quantity, items(name, effect_value, type)')
+            .eq('user_id', user.id)
+            .eq('session_id', sessionId)
+            .gt('quantity', 0)
+          const filtered = (inv ?? [])
+            .filter((r: any) => r.items?.type === 'battaglia')
+            .map((r: any) => ({
+              inventoryId: r.id,
+              name: r.items.name,
+              effectValue: r.items.effect_value,
+              quantity: r.quantity,
+            }))
+          setBattagliaItems(filtered)
+        }
       })
 
     const channel = supabase
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
-        const { actorId, damage } = payload
+        const { actorId, damage, nextTurn, itemUsed } = payload
+
         setUserId(currentId => {
-          if (actorId === currentId) {
+          const iAttacked = actorId === currentId
+          if (iAttacked) {
             setOpponentHp(prev => Math.max(0, prev - damage))
             setOppAnimState('damage')
-            setLastDamage(damage)
-            setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 600)
+            setLastDamage({ amount: damage, target: 'opp' })
+            setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 700)
           } else {
             setMyHp(prev => Math.max(0, prev - damage))
             setAnimState('damage')
-            setLastDamage(damage)
-            setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 600)
+            setLastDamage({ amount: damage, target: 'me' })
+            setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 700)
           }
+
+          // Update turn based on nextTurn from server
+          if (nextTurn && currentId) {
+            setMyRole(role => {
+              setIsMyTurn(nextTurn === role)
+              return role
+            })
+          }
+
           return currentId
         })
-        setLog(prev => [`💥 ${damage} danno!`, ...prev.slice(0, 3)])
+
+        const atkLabel = itemUsed ? '⚔️+🗡️' : '⚔️'
+        setLog(prev => [`${atkLabel} ${damage} danno!`, ...prev.slice(0, 3)])
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${id}` },
         ({ new: updated }) => {
           if (updated.status === 'ended') {
             supabase.auth.getUser().then(({ data: { user } }) => {
               setResult(updated.winner_id === user?.id ? 'won' : 'lost')
+              setIsMyTurn(false)
             })
           }
           realtimeUpdatedRef.current = true
           setWaiting(updated.status === 'waiting')
+
+          // Sync turn from DB update (covers the joiner)
+          if (updated.status === 'active' && updated.current_turn) {
+            setMyRole(role => {
+              setIsMyTurn(updated.current_turn === role)
+              return role
+            })
+          }
         })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
   }, [id, supabase])
 
+  // Auto-surrender when my HP hits 0
   useEffect(() => {
     if (myHp === 0 && !result && !waiting && !surrenderedRef.current) {
       surrenderedRef.current = true
+      setIsMyTurn(false)
       fetch('/api/game/duel/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,19 +162,35 @@ export default function DuelPage() {
   }, [myHp, result, waiting, id])
 
   async function handleAttack() {
-    if (attacking) return
+    if (attacking || !isMyTurn) return
     setAttacking(true)
     setAnimState('attack')
     setTimeout(() => setAnimState('idle'), 400)
-    await fetch('/api/game/duel/action', {
+
+    const body: Record<string, string> = { duelId: id, action: 'attack' }
+    if (selectedItemId) body.itemId = selectedItemId
+
+    const res = await fetch('/api/game/duel/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ duelId: id, action: 'attack' }),
+      body: JSON.stringify(body),
     })
+
+    // If item was used, decrement local count and clear selection
+    if (selectedItemId && res.ok) {
+      setBattagliaItems(prev => prev
+        .map(it => it.inventoryId === selectedItemId ? { ...it, quantity: it.quantity - 1 } : it)
+        .filter(it => it.quantity > 0)
+      )
+      setSelectedItemId(null)
+      setShowItems(false)
+    }
+
     setAttacking(false)
   }
 
   async function handleSurrender() {
+    setIsMyTurn(false)
     await fetch('/api/game/duel/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -123,18 +198,17 @@ export default function DuelPage() {
     })
   }
 
-  const myCr = myRole === 'opponent'
-    ? duel?.opponent_creature?.creatures
-    : duel?.challenger_creature?.creatures
-  const oppCr = myRole === 'opponent'
-    ? duel?.challenger_creature?.creatures
-    : duel?.opponent_creature?.creatures
+  const myCr  = myRole === 'opponent' ? duel?.opponent_creature?.creatures  : duel?.challenger_creature?.creatures
+  const oppCr = myRole === 'opponent' ? duel?.challenger_creature?.creatures : duel?.opponent_creature?.creatures
+
+  const turnLabel = isMyTurn ? 'Il tuo turno' : 'Turno avversario'
+  const turnColor = isMyTurn ? '#34D399' : '#94a3b8'
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative"
       style={{ background: 'linear-gradient(180deg, #0a0f1a 0%, #111827 50%, #0a0f1a 100%)' }}>
 
-      {/* Ambient background glow */}
+      {/* Ambient glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 rounded-full opacity-15 blur-3xl"
           style={{ background: '#7B4DB8' }} />
@@ -225,73 +299,79 @@ export default function DuelPage() {
         )}
       </AnimatePresence>
 
-      {/* ── OPPONENT SECTION (top) ── */}
-      <div className="flex-none px-4 pt-4 pb-2 relative z-10">
-        <div className="flex items-center justify-between mb-2">
+      {/* ── OPPONENT ── */}
+      <div className="flex-none px-4 pt-4 pb-1 relative z-10">
+        <div className="flex items-center justify-between mb-1.5">
           <p className="text-xs text-white/30 uppercase tracking-widest">Avversario</p>
-          {oppCr && (
-            <p className="text-xs font-bold text-white/50 truncate max-w-[120px]">{oppCr.name}</p>
-          )}
+          {oppCr && <p className="text-xs font-bold text-white/40 truncate max-w-[140px]">{oppCr.name}</p>}
         </div>
-        {oppCr ? (
-          <HPBar current={opponentHp} max={opponentHpMax} label="" />
-        ) : (
-          <div className="h-4 bg-white/5 rounded-full animate-pulse" />
-        )}
+        {oppCr
+          ? <HPBar current={opponentHp} max={opponentHpMax} label="" />
+          : <div className="h-4 bg-white/5 rounded-full animate-pulse" />
+        }
       </div>
 
       {/* Opponent sprite */}
-      <div className="flex-none flex justify-center py-2 relative z-10">
+      <div className="flex-none flex justify-center pt-1 pb-1 relative z-10">
         <motion.div
           animate={
-            oppAnimState === 'damage'
-              ? { x: [0, 8, -8, 6, -6, 0], transition: { duration: 0.35 } }
-              : oppAnimState === 'attack'
-              ? { y: [0, 6, 0], transition: { duration: 0.25 } }
-              : {}
+            oppAnimState === 'damage' ? { x: [0, 8, -8, 6, -6, 0], transition: { duration: 0.35 } } :
+            oppAnimState === 'attack' ? { y: [0, 6, 0],             transition: { duration: 0.25 } } : {}
           }
           className="relative"
         >
-          {oppCr ? (
-            <CreatureSprite imageUrl={oppCr.image_url} name={oppCr.name} animState={oppAnimState} size={110} />
-          ) : (
-            <div className="w-[110px] h-[110px] rounded-full bg-white/5 animate-pulse" />
-          )}
+          {oppCr
+            ? <CreatureSprite imageUrl={oppCr.image_url} name={oppCr.name} animState={oppAnimState} size={100} />
+            : <div className="w-[100px] h-[100px] rounded-full bg-white/5 animate-pulse" />
+          }
           <AnimatePresence>
-            {lastDamage !== null && animState !== 'damage' && (
+            {lastDamage?.target === 'opp' && (
               <motion.div
-                key={lastDamage + 'opp'}
+                key={`opp-${lastDamage.amount}`}
                 initial={{ opacity: 1, y: 0, scale: 1 }}
-                animate={{ opacity: 0, y: -30, scale: 1.3 }}
+                animate={{ opacity: 0, y: -28, scale: 1.4 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.7 }}
-                className="absolute -top-2 left-1/2 -translate-x-1/2 font-extrabold text-[#E85D2F] text-lg pointer-events-none"
+                transition={{ duration: 0.65 }}
+                className="absolute -top-1 left-1/2 -translate-x-1/2 font-extrabold text-[#E85D2F] text-lg pointer-events-none"
                 style={{ textShadow: '0 0 10px rgba(232,93,47,0.8)' }}
               >
-                -{lastDamage}
+                -{lastDamage.amount}
               </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
       </div>
 
-      {/* VS divider */}
-      <div className="flex-none flex items-center gap-3 px-6 py-1 relative z-10">
-        <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08))' }} />
-        <span className="text-xs font-bold text-white/15 tracking-widest">VS</span>
-        <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.08), transparent)' }} />
+      {/* Turn indicator + VS */}
+      <div className="flex-none flex items-center gap-3 px-4 py-1 relative z-10">
+        <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06))' }} />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={isMyTurn ? 'my' : 'opp'}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.2 }}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full"
+            style={{ background: `${turnColor}18`, border: `1px solid ${turnColor}40` }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: turnColor }} />
+            <span className="text-[10px] font-bold" style={{ color: turnColor }}>{turnLabel}</span>
+          </motion.div>
+        </AnimatePresence>
+        <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.06), transparent)' }} />
       </div>
 
       {/* Battle log */}
-      <div className="flex-none px-4 h-8 overflow-hidden relative z-10">
+      <div className="flex-none px-4 h-7 overflow-hidden relative z-10">
         <AnimatePresence>
           {log[0] && (
             <motion.p
-              key={log[0]}
-              initial={{ opacity: 0, y: -8 }}
+              key={log[0] + log.length}
+              initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="text-xs text-center font-semibold text-white/50"
+              className="text-xs text-center font-semibold text-white/45"
             >
               {log[0]}
             </motion.p>
@@ -300,101 +380,161 @@ export default function DuelPage() {
       </div>
 
       {/* Player sprite */}
-      <div className="flex-none flex justify-center py-2 relative z-10">
+      <div className="flex-none flex justify-center pt-1 pb-1 relative z-10">
         <motion.div
           animate={
-            animState === 'damage'
-              ? { x: [0, -8, 8, -6, 6, 0], transition: { duration: 0.35 } }
-              : animState === 'attack'
-              ? { y: [0, -6, 0], transition: { duration: 0.25 } }
-              : {}
+            animState === 'damage' ? { x: [0, -8, 8, -6, 6, 0], transition: { duration: 0.35 } } :
+            animState === 'attack' ? { y: [0, -6, 0],            transition: { duration: 0.25 } } : {}
           }
           className="relative"
         >
-          {myCr ? (
-            <CreatureSprite imageUrl={myCr.image_url} name={myCr.name} animState={animState} size={130} />
-          ) : (
-            <div className="w-[130px] h-[130px] rounded-full bg-white/5 animate-pulse" />
-          )}
+          {myCr
+            ? <CreatureSprite imageUrl={myCr.image_url} name={myCr.name} animState={animState} size={120} />
+            : <div className="w-[120px] h-[120px] rounded-full bg-white/5 animate-pulse" />
+          }
           <AnimatePresence>
-            {lastDamage !== null && animState === 'damage' && (
+            {lastDamage?.target === 'me' && (
               <motion.div
-                key={lastDamage + 'me'}
+                key={`me-${lastDamage.amount}`}
                 initial={{ opacity: 1, y: 0, scale: 1 }}
-                animate={{ opacity: 0, y: -30, scale: 1.3 }}
+                animate={{ opacity: 0, y: -28, scale: 1.4 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.7 }}
-                className="absolute -top-2 left-1/2 -translate-x-1/2 font-extrabold text-red-400 text-lg pointer-events-none"
+                transition={{ duration: 0.65 }}
+                className="absolute -top-1 left-1/2 -translate-x-1/2 font-extrabold text-red-400 text-lg pointer-events-none"
                 style={{ textShadow: '0 0 10px rgba(248,113,113,0.8)' }}
               >
-                -{lastDamage}
+                -{lastDamage.amount}
               </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
       </div>
 
-      {/* ── PLAYER SECTION (bottom) ── */}
-      <div className="flex-none px-4 pt-2 pb-2 relative z-10">
-        <div className="flex items-center justify-between mb-2">
+      {/* ── MY HP ── */}
+      <div className="flex-none px-4 pt-1 pb-2 relative z-10">
+        <div className="flex items-center justify-between mb-1.5">
           <p className="text-xs text-white/30 uppercase tracking-widest">La tua creatura</p>
-          {myCr && (
-            <p className="text-xs font-bold text-white/50 truncate max-w-[120px]">{myCr.name}</p>
-          )}
+          {myCr && <p className="text-xs font-bold text-white/40 truncate max-w-[140px]">{myCr.name}</p>}
         </div>
-        {myCr ? (
-          <HPBar current={myHp} max={myHpMax} label="" />
-        ) : (
-          <div className="h-4 bg-white/5 rounded-full animate-pulse" />
-        )}
+        {myCr
+          ? <HPBar current={myHp} max={myHpMax} label="" />
+          : <div className="h-4 bg-white/5 rounded-full animate-pulse" />
+        }
       </div>
 
-      {/* Action buttons */}
-      <div className="flex-none px-4 pb-4 pt-2 relative z-10">
-        {!result && !waiting && (
+      {/* ── ACTIONS ── */}
+      {!result && !waiting && (
+        <div className="flex-none px-4 pb-4 pt-1 relative z-10 flex flex-col gap-2">
+
+          {/* Battaglia items picker */}
+          {battagliaItems.length > 0 && isMyTurn && (
+            <AnimatePresence>
+              {showItems && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-col gap-1.5 pb-1">
+                    {battagliaItems.map(item => (
+                      <button
+                        key={item.inventoryId}
+                        onClick={() => setSelectedItemId(selectedItemId === item.inventoryId ? null : item.inventoryId)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-all cursor-pointer"
+                        style={{
+                          background: selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                        }}
+                      >
+                        <span className="text-xl">⚔️</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-white truncate">{item.name}</p>
+                          <p className="text-[10px] text-[#FBBF24]">+{item.effectValue}% ATK</p>
+                        </div>
+                        <span className="text-xs text-white/30 shrink-0">×{item.quantity}</span>
+                        {selectedItemId === item.inventoryId && (
+                          <div className="w-4 h-4 rounded-full bg-[#FBBF24] flex items-center justify-center shrink-0">
+                            <svg viewBox="0 0 12 12" fill="white" className="w-2.5 h-2.5">
+                              <path d="M2 6l2.5 2.5L10 3.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
+
           <div className="flex gap-2">
+            {/* Items toggle */}
+            {battagliaItems.length > 0 && (
+              <motion.button
+                onClick={() => { if (isMyTurn) setShowItems(s => !s) }}
+                whileTap={{ scale: 0.95 }}
+                className="w-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-all"
+                style={{
+                  background: showItems ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${showItems ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  opacity: isMyTurn ? 1 : 0.4,
+                }}
+              >
+                <span className="text-lg leading-none">⚔️</span>
+                {selectedItemId && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#FBBF24]" />
+                )}
+              </motion.button>
+            )}
+
+            {/* Attack button */}
             <motion.button
               onClick={handleAttack}
-              disabled={attacking}
-              whileTap={{ scale: 0.95 }}
-              className="flex-1 relative overflow-hidden rounded-2xl py-4 font-extrabold text-white text-base cursor-pointer disabled:opacity-60"
+              disabled={attacking || !isMyTurn}
+              whileTap={isMyTurn ? { scale: 0.95 } : {}}
+              className="flex-1 relative overflow-hidden rounded-2xl py-4 font-extrabold text-white text-base cursor-pointer disabled:cursor-not-allowed transition-all"
               style={{
-                background: attacking
-                  ? 'linear-gradient(135deg, #c04a22 0%, #a03a18 100%)'
-                  : 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)',
-                boxShadow: attacking ? 'none' : '0 4px 20px rgba(232,93,47,0.4)',
+                background: isMyTurn
+                  ? selectedItemId
+                    ? 'linear-gradient(135deg, #FBBF24 0%, #d97706 100%)'
+                    : 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)'
+                  : 'rgba(255,255,255,0.06)',
+                boxShadow: isMyTurn && !attacking
+                  ? selectedItemId ? '0 4px 20px rgba(251,191,36,0.35)' : '0 4px 20px rgba(232,93,47,0.4)'
+                  : 'none',
+                opacity: attacking ? 0.7 : 1,
               }}
             >
               <span className="relative z-10 flex items-center justify-center gap-2">
                 {attacking ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
+                ) : isMyTurn ? (
                   <>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
                       <path d="M14.5 17.5L3 6V3h3l11.5 11.5M16.5 15.5l1.5 1.5M8 2l4 4M2 8l4 4M5 15l-2 2 2 2 2-2M15 5l2-2 2 2-2 2"/>
                     </svg>
-                    Attacca
+                    {selectedItemId ? 'Attacca (+ATK)' : 'Attacca'}
                   </>
+                ) : (
+                  <span className="text-white/40 text-sm">In attesa...</span>
                 )}
               </span>
             </motion.button>
+
+            {/* Surrender */}
             <motion.button
               onClick={handleSurrender}
               whileTap={{ scale: 0.95 }}
               className="w-14 rounded-2xl flex items-center justify-center cursor-pointer"
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
                 <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
                 <line x1="4" y1="22" x2="4" y2="15"/>
               </svg>
             </motion.button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

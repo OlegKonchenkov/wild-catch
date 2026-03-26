@@ -35,6 +35,22 @@ export async function POST(request: Request) {
     if (!duel) return NextResponse.json({ error: 'Stanza non trovata o già iniziata' }, { status: 404 })
     if (duel.challenger_id === user.id) return NextResponse.json({ error: 'Sei già in questa stanza' }, { status: 409 })
 
+    // Fetch both creatures' base HP to initialise server-side HP tracking
+    const [{ data: challengerPc }, { data: opponentPc }] = await Promise.all([
+      supabase
+        .from('player_creatures')
+        .select('creatures(hp)')
+        .eq('id', duel.challenger_creature_id)
+        .single(),
+      supabase
+        .from('player_creatures')
+        .select('creatures(hp)')
+        .eq('id', playerCreatureId)
+        .single(),
+    ])
+    const challengerHp = (challengerPc as any)?.creatures?.hp ?? 100
+    const opponentHp   = (opponentPc  as any)?.creatures?.hp ?? 100
+
     const { data: updated } = await supabase
       .from('duels')
       .update({
@@ -42,6 +58,9 @@ export async function POST(request: Request) {
         opponent_creature_id: playerCreatureId,
         status: 'active',
         started_at: new Date().toISOString(),
+        current_turn: 'challenger',
+        challenger_hp: challengerHp,
+        opponent_hp: opponentHp,
       })
       .eq('id', duel.id)
       .is('opponent_id', null)
