@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { isValidGPSSpeed, isWithinBounds, haversineDistance } from '@/lib/game/anti-cheat'
+import { isWithinBounds, haversineDistance } from '@/lib/game/anti-cheat'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const [{ data: playerSession }, { data: session }] = await Promise.all([
     supabase
       .from('player_sessions')
-      .select('id, last_position, joined_at')
+      .select('id, last_position')
       .eq('user_id', user.id)
       .eq('session_id', sessionId)
       .single(),
@@ -46,13 +46,6 @@ export async function POST(request: Request) {
   // PostGIS POINT serializes as { x: lng, y: lat }
   const rawPos = playerSession.last_position as { x: number; y: number } | null
   const prevPos = rawPos ? { lat: rawPos.y, lng: rawPos.x } : null
-  const now = Date.now()
-  const elapsed = prevPos ? now - new Date(playerSession.joined_at).getTime() : 0
-
-  // Anti-cheat: reject teleport-level jumps (> 60 km/h over elapsed time)
-  if (!isValidGPSSpeed(prevPos, currentPos, elapsed)) {
-    return NextResponse.json({ error: 'Spostamento non valido', valid: false }, { status: 400 })
-  }
 
   // Check within bounds — expand by GPS accuracy so jitter near the border
   // doesn't falsely flag the player as out-of-bounds.
