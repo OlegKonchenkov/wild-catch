@@ -62,6 +62,7 @@ export default function ShopPage() {
       if (res.ok) {
         setGold(data.remainingGold)
         showToast(true, `${TYPE_META[item.type].icon} ${item.name} acquistato!`)
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       } else {
         showToast(false, data.error ?? 'Errore acquisto')
       }

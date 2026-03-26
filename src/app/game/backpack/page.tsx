@@ -51,14 +51,13 @@ export default function BackpackPage() {
       const data = await res.json()
       if (data.used) {
         showToast(data.message ?? 'Oggetto usato!')
-        // Decrement locally
         setInventory(prev => prev.map(r =>
           r.id === row.id ? { ...r, quantity: r.quantity - 1 } : r
         ).filter(r => r.quantity > 0))
-        // Store esca activation in localStorage for client-side encounter boost
         if (data.activatedUntil) {
           localStorage.setItem('esca_active_until', data.activatedUntil)
         }
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       } else {
         showToast(data.error ?? 'Errore nell\'uso dell\'oggetto')
       }

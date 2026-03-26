@@ -107,8 +107,34 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     onExpired: () => router.replace('/game/profile?ended=1'),
   })
 
+  // Fix mobile viewport height after hard refresh: window.innerHeight is always accurate,
+  // whereas 100dvh can be off when the browser address bar is visible on page load.
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    function applyHeight() {
+      if (rootRef.current) rootRef.current.style.height = `${window.innerHeight}px`
+    }
+    applyHeight()
+    window.addEventListener('resize', applyHeight)
+    window.addEventListener('orientationchange', applyHeight)
+    return () => {
+      window.removeEventListener('resize', applyHeight)
+      window.removeEventListener('orientationchange', applyHeight)
+    }
+  }, [])
+
+  // Refresh header stats (gold, level) whenever the game changes them
+  useEffect(() => {
+    function onRefresh() {
+      const sid = localStorage.getItem('current_session_id')
+      if (sid) loadSessionData(sid)
+    }
+    window.addEventListener('wc:refresh-stats', onRefresh)
+    return () => window.removeEventListener('wc:refresh-stats', onRefresh)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div className="flex flex-col bg-[#0F1F2E] text-white overflow-hidden" style={{ height: '100dvh' }}>
+    <div ref={rootRef} className="flex flex-col bg-[#0F1F2E] text-white overflow-hidden" style={{ height: '100dvh' }}>
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-2 bg-[#0F1F2E]/95 border-b border-white/10 z-10">
         <div className="flex items-center gap-2">
