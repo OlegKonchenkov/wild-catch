@@ -89,7 +89,7 @@ function BattleDiagram() {
           ⚔️ Attacca
         </button>
         <button className="flex-1 bg-[#3A9DBC]/80 hover:bg-[#3A9DBC] text-white text-xs font-bold py-2 rounded-lg transition-colors">
-          🎯 Lancia Pokeball
+          🥅 Lancia Rete
         </button>
       </div>
     </div>
@@ -212,9 +212,9 @@ function buildSections(): Section[] {
       content: (
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
-            La mappa mostra la tua posizione in tempo reale. Quando sei abbastanza vicino a una zona
-            di cattura, il pulsante <span className="text-[#34D399] font-bold">'CERCA'</span> si attiva.
-            Tocca per avviare un incontro!
+            La mappa mostra la tua posizione in tempo reale. Cammina nell'area di gioco e gli incontri
+            si attivano <span className="text-[#34D399] font-bold">automaticamente</span> — sia via GPS
+            quando ti muovi, sia con un timer casuale ogni pochi minuti. Non serve toccare nulla!
           </p>
           <MiniMap />
         </div>
@@ -339,8 +339,8 @@ function buildSections(): Section[] {
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
             Sfida altri giocatori in duelli <span className="text-[#E85D2F] font-bold">1v1 in tempo reale!</span>{' '}
-            Vai nel tuo Profilo, trova un giocatore e invia la sfida. Entrambi usano la propria
-            creatura attiva, a turni alternati.
+            Vai su <span className="text-[#E85D2F] font-bold">⚔️ Duelli</span> nel menu, crea una stanza
+            e condividi il codice con l'avversario. Entrambi usano la propria creatura attiva, a turni alternati.
           </p>
           <div className="mt-3 flex items-center justify-center gap-3">
             <div className="flex flex-col items-center gap-1">
