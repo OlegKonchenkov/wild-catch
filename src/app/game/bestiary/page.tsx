@@ -58,7 +58,10 @@ export default function BestiaryPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerCreatureId: pc.id, sessionId }),
     })
-    if (res.ok) setMessage(`${pc.creature?.name} selezionata come creatura attiva!`)
+    if (res.ok) {
+      const name = creatures.find(c => c.id === pc.creature_id)?.name ?? 'Creatura'
+      setMessage(`${name} selezionata come creatura attiva!`)
+    }
   }
 
   async function handleEvolve(pc: PlayerCreature) {
