@@ -29,6 +29,7 @@ export default function EncounterPage() {
   const supabase = useMemo(() => createClient(), [])
 
   const [state, setState] = useState<EncounterState | null>(null)
+  const [loadError, setLoadError] = useState(false)
   const [animState, setAnimState] = useState<'idle' | 'attack' | 'damage' | 'catch' | 'flee'>('idle')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -42,8 +43,36 @@ export default function EncounterPage() {
   const [showItems, setShowItems] = useState(false)
 
   useEffect(() => {
+    // Try sessionStorage first (fast path — set by map page popup)
     const stored = sessionStorage.getItem(`encounter_${id}`)
-    if (stored) setState(JSON.parse(stored))
+    if (stored) {
+      setState(JSON.parse(stored))
+      return
+    }
+
+    // Fallback: fetch encounter from server (direct URL navigation, page refresh, etc.)
+    fetch(`/api/game/encounter/get?id=${id}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.encounterId) { setLoadError(true); return }
+        // Ended encounter — show result screen instead of blocking
+        if (data.status && data.status !== 'active') {
+          setResult(data.status === 'caught' ? 'caught' : 'fled')
+          setState({ encounterId: data.encounterId, creature: data.creature, wildHp: 0, wildHpMax: data.wildHpMax ?? 100, catchBonus: 0, turns: 0 })
+          return
+        }
+        const newState: EncounterState = {
+          encounterId: data.encounterId,
+          creature: data.creature,
+          wildHp: data.wildHp,
+          wildHpMax: data.wildHpMax,
+          catchBonus: data.wildHp <= data.wildHpMax * 0.3 ? 0.20 : 0,
+          turns: 0,
+        }
+        sessionStorage.setItem(`encounter_${id}`, JSON.stringify(newState))
+        setState(newState)
+      })
+      .catch(() => { /* leave as loading */ })
   }, [id])
 
   useEffect(() => {
@@ -148,6 +177,18 @@ export default function EncounterPage() {
   }
 
   if (!state) {
+    if (loadError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
+          <p className="text-4xl">😶</p>
+          <p className="text-white font-bold">Incontro non trovato</p>
+          <p className="text-white/50 text-sm">L'incontro potrebbe essere già terminato.</p>
+          <button onClick={() => router.push('/game/map')} className="bg-[#3A9DBC] text-white font-bold py-3 px-8 rounded-xl">
+            Torna alla mappa
+          </button>
+        </div>
+      )
+    }
     return (
       <div className="flex items-center justify-center h-full text-white">
         Caricamento incontro...
