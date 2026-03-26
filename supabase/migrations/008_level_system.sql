@@ -7,6 +7,9 @@
 --     can show level-up notifications and rewards
 --   • Auto-awards 15–40 random gold on every level-up
 
+-- Drop old void-returning function before recreating with TABLE return type
+DROP FUNCTION IF EXISTS increment_player_stats(UUID, UUID, INTEGER, INTEGER);
+
 CREATE OR REPLACE FUNCTION increment_player_stats(
   p_user_id   UUID,
   p_session_id UUID,
