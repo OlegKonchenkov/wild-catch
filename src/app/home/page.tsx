@@ -553,6 +553,16 @@ function HomeLobby() {
                       >
                         ▶ Gioca
                       </button>
+                    ) : ps.sessions?.status === 'ended' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#F7C841', whiteSpace: 'nowrap' }}>⚡ {ps.exp ?? 0}</div>
+                        <button
+                          onClick={() => { localStorage.setItem('current_session_id', ps.session_id); router.push('/game/map') }}
+                          style={{ background: 'rgba(123,77,184,0.3)', color: '#C084FC', border: '1px solid rgba(123,77,184,0.5)', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, whiteSpace: 'nowrap' }}
+                        >
+                          👁 Vedi
+                        </button>
+                      </div>
                     ) : (
                       <div style={{ fontSize: 13, fontWeight: 700, color: '#F7C841', whiteSpace: 'nowrap' }}>⚡ {ps.exp ?? 0}</div>
                     )}
