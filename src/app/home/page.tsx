@@ -601,9 +601,20 @@ function HomeLobby() {
             <div>
               {history.map(ps => {
                 const isPlayable = ps.sessions?.status === 'active' || ps.sessions?.status === 'ready'
+                const isEnded    = ps.sessions?.status === 'ended'
+                const isClickable = isPlayable || isEnded
+                function enterSession() {
+                  localStorage.setItem('current_session_id', ps.session_id)
+                  router.push('/game/map')
+                }
                 return (
-                  <div key={ps.session_id} className="hi-item">
-                    <div className="hi-icon">🎮</div>
+                  <div
+                    key={ps.session_id}
+                    className="hi-item"
+                    onClick={isClickable ? enterSession : undefined}
+                    style={{ cursor: isClickable ? 'pointer' : 'default', position: 'relative', transition: 'background 0.15s' }}
+                  >
+                    <div className="hi-icon">{isEnded ? '🏁' : '🎮'}</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{ps.sessions?.name ?? 'Sessione'}</div>
                       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
@@ -613,29 +624,19 @@ function HomeLobby() {
                         }
                         {' · '}
                         <span style={{ color: ps.sessions?.status === 'active' ? '#34D399' : ps.sessions?.status === 'ready' ? '#F7C841' : 'rgba(255,255,255,0.25)' }}>
-                          {ps.sessions?.status === 'ended' ? 'Terminata' : ps.sessions?.status === 'active' ? 'In corso' : ps.sessions?.status === 'ready' ? 'In attesa' : ps.sessions?.status ?? '—'}
+                          {isEnded ? 'Terminata' : ps.sessions?.status === 'active' ? 'In corso' : ps.sessions?.status === 'ready' ? 'In attesa' : ps.sessions?.status ?? '—'}
                         </span>
                       </div>
                     </div>
                     {isPlayable ? (
-                      <button
-                        onClick={() => { localStorage.setItem('current_session_id', ps.session_id); router.push('/game/map') }}
-                        style={{ background: '#3ABCA8', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, padding: '7px 12px', borderRadius: 8, whiteSpace: 'nowrap' }}
-                      >
-                        ▶ Gioca
-                      </button>
-                    ) : ps.sessions?.status === 'ended' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#F7C841', whiteSpace: 'nowrap' }}>⚡ {ps.exp ?? 0}</div>
-                        <button
-                          onClick={() => { localStorage.setItem('current_session_id', ps.session_id); router.push('/game/map') }}
-                          style={{ background: 'rgba(123,77,184,0.3)', color: '#C084FC', border: '1px solid rgba(123,77,184,0.5)', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, whiteSpace: 'nowrap' }}
-                        >
-                          👁 Vedi
-                        </button>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#3ABCA8' }}>▶</span>
+                    ) : isEnded ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#F7C841', whiteSpace: 'nowrap' }}>⚡ {ps.exp ?? 0}</span>
+                        <span style={{ fontSize: 10, color: '#C084FC', fontWeight: 600 }}>👁 Vedi</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#F7C841', whiteSpace: 'nowrap' }}>⚡ {ps.exp ?? 0}</div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#F7C841', whiteSpace: 'nowrap' }}>⚡ {ps.exp ?? 0}</span>
                     )}
                   </div>
                 )
