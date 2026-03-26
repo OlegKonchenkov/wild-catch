@@ -197,6 +197,15 @@ export default function SessionsPage() {
     loadSessions()
   }
 
+  async function restartSession(sid: string, name: string) {
+    if (!confirm(`Riavviare "${name}"?\n\nLa sessione tornerà in stato Bozza. Dovrai impostare una nuova area e durata prima di attivarla.`)) return
+    const res = await fetch('/api/admin/session/restart', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid }),
+    })
+    if (res.ok) loadSessions()
+  }
+
   async function deleteSession(sid: string, name: string) {
     if (!confirm(`Eliminare definitivamente "${name}"?\n\nTutti i dati correlati verranno eliminati.`)) return
     setDeletingId(sid)
@@ -288,6 +297,12 @@ export default function SessionsPage() {
                   <button onClick={() => closeSession(s.id)}
                     className="bg-red-500/15 text-red-400 border border-red-500/25 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-500/25 transition-colors">
                     ⏹ Termina
+                  </button>
+                )}
+                {s.status === 'ended' && (
+                  <button onClick={() => restartSession(s.id, s.name)}
+                    className="bg-[#7B4DB8]/20 text-[#C084FC] border border-[#7B4DB8]/30 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#7B4DB8]/30 transition-colors">
+                    🔄 Riavvia
                   </button>
                 )}
                 <button

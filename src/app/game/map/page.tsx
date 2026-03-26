@@ -31,13 +31,31 @@ function MapPageInner() {
       router.replace('/game/map')
       return
     }
-    const sid = localStorage.getItem('current_session_id')
-    if (!sid) { router.push('/home'); return }
-    setSessionId(sid)
-    sessionIdRef.current = sid
 
-    supabase.from('sessions').select('*').eq('id', sid).single()
-      .then(({ data }) => { if (data) setSession(data as unknown as Session) })
+    function init(sid: string) {
+      setSessionId(sid)
+      sessionIdRef.current = sid
+      supabase.from('sessions').select('*').eq('id', sid).single()
+        .then(({ data }) => { if (data) setSession(data as unknown as Session) })
+    }
+
+    const sid = localStorage.getItem('current_session_id')
+    if (sid) {
+      init(sid)
+    } else {
+      // localStorage was cleared — ask the server which session this player is in
+      fetch('/api/auth/restore')
+        .then(r => r.json())
+        .then((d: { sessionId: string | null }) => {
+          if (d.sessionId) {
+            localStorage.setItem('current_session_id', d.sessionId)
+            init(d.sessionId)
+          } else {
+            router.push('/home')
+          }
+        })
+        .catch(() => router.push('/home'))
+    }
   }, [])
 
   const triggerEncounter = useCallback(async (trigger: 'gps' | 'timer' = 'gps') => {
@@ -49,7 +67,7 @@ function MapPageInner() {
       body: JSON.stringify({ sessionId: sid, trigger }),
     })
     const data = await res.json()
-    if (data.encounterId) {
+    if (data.encounterId && data.creature) {
       sessionStorage.setItem(`encounter_${data.encounterId}`, JSON.stringify({
         encounterId: data.encounterId,
         creature: data.creature,
@@ -60,8 +78,11 @@ function MapPageInner() {
       }))
       setPendingEncounter(data)
       setShowEncounterPopup(true)
+    } else if (data.encounterId) {
+      // Encounter already in progress — go directly to the battle page
+      router.push(`/game/encounter/${data.encounterId}`)
     }
-  }, [])
+  }, [router])
 
   const onGPSPosition = useCallback(async (pos: { lat: number; lng: number; accuracy: number }) => {
     const sid = sessionIdRef.current

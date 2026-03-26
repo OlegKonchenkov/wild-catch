@@ -5,8 +5,8 @@
 //   HTML pages      → network-first (always fresh on new deploy)
 //   /api/*          → network-only (never cache game data)
 
-const STATIC_CACHE  = 'wc-static-v3'
-const IMAGE_CACHE   = 'wc-images-v3'
+const STATIC_CACHE  = 'wc-static-v4'
+const IMAGE_CACHE   = 'wc-images-v4'
 const MAX_IMG_CACHE = 80
 
 function isStaticAsset(url) {

@@ -1,7 +1,7 @@
 'use client'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 
@@ -20,6 +20,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const navRef   = useRef<HTMLElement>(null)
 
   const [gold, setGold]     = useState<number | null>(null)
   const [level, setLevel]   = useState<number>(1)
@@ -32,34 +33,43 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
 
-      // Gold + level
-      supabase.from('player_sessions')
-        .select('gold, level')
-        .eq('user_id', user.id)
-        .eq('session_id', sessionId)
-        .single()
-        .then(({ data }) => {
-          if (data) { setGold(data.gold); setLevel(data.level ?? 1) }
-        })
-    })
-
-    // Session end time — prefer end_at, fall back to start_at + duration_minutes
-    supabase.from('sessions')
-      .select('end_at, start_at, duration_minutes')
-      .eq('id', sessionId)
-      .single()
-      .then(({ data }) => {
-        if (!data) return
-        if (data.end_at) {
-          setEndAt(data.end_at)
-        } else if (data.start_at && data.duration_minutes) {
-          const computed = new Date(
-            new Date(data.start_at).getTime() + data.duration_minutes * 60 * 1000
-          ).toISOString()
-          setEndAt(computed)
+      Promise.all([
+        // Gold + level
+        supabase.from('player_sessions')
+          .select('gold, level')
+          .eq('user_id', user.id)
+          .eq('session_id', sessionId)
+          .single(),
+        // Session end time
+        supabase.from('sessions')
+          .select('end_at, start_at, duration_minutes')
+          .eq('id', sessionId)
+          .single(),
+      ]).then(([psResult, sessResult]) => {
+        if (psResult.data) {
+          setGold(psResult.data.gold)
+          setLevel(psResult.data.level ?? 1)
+        }
+        const sess = sessResult.data
+        if (sess) {
+          if (sess.end_at) {
+            setEndAt(sess.end_at)
+          } else if (sess.start_at && sess.duration_minutes) {
+            const computed = new Date(
+              new Date(sess.start_at).getTime() + sess.duration_minutes * 60 * 1000
+            ).toISOString()
+            setEndAt(computed)
+          }
         }
       })
+    })
   }, [supabase])
+
+  // Scroll the active nav item into view whenever the route changes
+  useEffect(() => {
+    const active = navRef.current?.querySelector('[data-active="true"]') as HTMLElement | null
+    active?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+  }, [pathname])
 
   const timer = useSessionTimer({
     endAt,
@@ -90,13 +100,15 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
 
       {/* Bottom navigation — horizontal scroll when items overflow */}
       <nav
+        ref={navRef}
         className="nav-scrollable flex border-t border-white/10 bg-[#0F1F2E]/95 flex-shrink-0"
-        style={{ overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}
+        style={{ overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 'env(safe-area-inset-bottom)' } as React.CSSProperties}
       >
         {NAV_ITEMS.map(({ href, icon, label }) => (
           <Link
             key={href}
             href={href}
+            data-active={pathname === href ? 'true' : 'false'}
             className={`flex-shrink-0 flex flex-col items-center py-2 gap-0.5 text-xs transition-colors ${
               pathname === href ? 'text-[#3A9DBC]' : 'text-white/50 hover:text-white/80'
             }`}

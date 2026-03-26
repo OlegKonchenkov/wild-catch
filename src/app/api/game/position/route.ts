@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}))
   const { lat, lng, accuracy, sessionId } = body
 
-  if (!lat || !lng || !sessionId) {
+  if (lat == null || lng == null || !sessionId) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
   }
 

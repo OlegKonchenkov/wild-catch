@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const body = await request.json().catch(() => ({}))
-  const { encounterId } = body
+  const { encounterId, itemId } = body
 
   if (!encounterId) return NextResponse.json({ error: 'encounterId mancante' }, { status: 400 })
 
@@ -46,6 +46,26 @@ export async function POST(request: Request) {
   const playerCr = (playerCreature as any).creatures
   const isRarePlus = RARE_TIERS.includes(wildCreature.rarity)
 
+  // Apply battaglia item ATK boost
+  let atkMultiplier = 1
+  if (itemId) {
+    const { data: invItem } = await supabase
+      .from('player_inventory')
+      .select('quantity, items(effect_value, type)')
+      .eq('id', itemId)
+      .eq('user_id', user.id)
+      .single()
+
+    const inv = invItem as { quantity: number; items: { effect_value: number; type: string } } | null
+    if (inv && inv.quantity > 0 && inv.items?.type === 'battaglia') {
+      atkMultiplier = 1 + (inv.items.effect_value ?? 0) / 100
+      await supabase
+        .from('player_inventory')
+        .update({ quantity: inv.quantity - 1 })
+        .eq('id', itemId)
+    }
+  }
+
   let wildHpRemaining = encounter.wild_creature_hp
   let playerTookDamage = false
   let playerDamage = 0
@@ -62,7 +82,7 @@ export async function POST(request: Request) {
     playerCr.element as Element,
     wildCreature.element as Element
   )
-  playerDamage = Math.round(calculateFightDamage(playerCr.atk) * elementMult)
+  playerDamage = Math.round(calculateFightDamage(playerCr.atk) * elementMult * atkMultiplier)
   wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
 
   // Non-rare attacks after player

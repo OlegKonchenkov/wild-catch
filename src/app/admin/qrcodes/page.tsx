@@ -108,11 +108,73 @@ function buildPayload(t: QRCodeType, f: Fields): any {
   }
 }
 
+/* ── QR Preview Modal ────────────────────────── */
+function QRModal({ qr, onClose, onDownload }: { qr: any; onClose: () => void; onDownload: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const info = TYPE_INFO[qr.type as QRCodeType]
+
+  useEffect(() => {
+    if (!canvasRef.current) return
+    import('qrcode').then(QRCode => {
+      QRCode.toCanvas(canvasRef.current!, qr.id, {
+        width: 220,
+        margin: 2,
+        color: { dark: '#0F1F2E', light: '#ffffff' },
+      })
+    })
+  }, [qr.id])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70" />
+      <div
+        className="relative bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 max-w-xs w-full shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-2xl">{info?.icon ?? '📷'}</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-white truncate">{qr.label || info?.label || qr.type}</p>
+            <p className="text-xs text-white/40">{info?.label} · {info?.description}</p>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white text-xl leading-none ml-1">✕</button>
+        </div>
+
+        {/* QR canvas */}
+        <div className="flex justify-center bg-white rounded-xl p-3 mb-4">
+          <canvas ref={canvasRef} />
+        </div>
+
+        {/* Meta */}
+        <div className="space-y-1 mb-4">
+          <div className="flex justify-between text-xs">
+            <span className="text-white/40">ID</span>
+            <span className="text-white/60 font-mono">{qr.id.slice(0, 8)}…</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-white/40">Usi rimanenti</span>
+            <span className={`font-bold ${qr.uses_remaining === 0 ? 'text-red-400' : qr.uses_remaining === null ? 'text-[#34d399]' : 'text-[#F7C841]'}`}>
+              {qr.uses_remaining === null ? '∞ illimitati' : qr.uses_remaining === 0 ? '⛔ Esaurito' : `${qr.uses_remaining} rimasti`}
+            </span>
+          </div>
+        </div>
+
+        <button onClick={onDownload}
+          className="w-full bg-[#3A9DBC] text-white font-bold py-2.5 rounded-xl text-sm">
+          ⬇ Scarica PNG
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /* ── Page ────────────────────────────────────── */
 export default function QRCodesPage() {
   const [sessions, setSessions]         = useState<any[]>([])
   const [selectedId, setSelectedId]     = useState('')
   const [qrCodes, setQrCodes]           = useState<any[]>([])
+  const [previewQr, setPreviewQr]       = useState<any | null>(null)
 
   // Reference data for selects
   const [creatures, setCreatures]       = useState<any[]>([])

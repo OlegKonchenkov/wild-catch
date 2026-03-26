@@ -3,6 +3,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { ItemType } from '@/lib/types'
 
+const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
+
 const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; color: string }> = {
   rete:      { icon: '🎯', label: 'Rete',      hint: 'Aumenta la probabilità di cattura',    color: '#3A9DBC' },
   esca:      { icon: '🍖', label: 'Esca',       hint: 'Attira creature rare nelle vicinanze', color: '#34D399' },
@@ -27,7 +29,44 @@ export default function BackpackPage() {
   const [inventory, setInventory] = useState<InventoryRow[]>([])
   const [loading, setLoading]     = useState(true)
   const [filter, setFilter]       = useState<ItemType | 'all'>('all')
+  const [usingId, setUsingId]     = useState<string | null>(null)
+  const [toast, setToast]         = useState<string | null>(null)
   const supabase = useMemo(() => createClient(), [])
+
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  async function handleUse(row: InventoryRow) {
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId) return
+    setUsingId(row.id)
+    try {
+      const res = await fetch('/api/game/item/use', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inventoryId: row.id, sessionId }),
+      })
+      const data = await res.json()
+      if (data.used) {
+        showToast(data.message ?? 'Oggetto usato!')
+        // Decrement locally
+        setInventory(prev => prev.map(r =>
+          r.id === row.id ? { ...r, quantity: r.quantity - 1 } : r
+        ).filter(r => r.quantity > 0))
+        // Store esca activation in localStorage for client-side encounter boost
+        if (data.activatedUntil) {
+          localStorage.setItem('esca_active_until', data.activatedUntil)
+        }
+      } else {
+        showToast(data.error ?? 'Errore nell\'uso dell\'oggetto')
+      }
+    } catch {
+      showToast('Errore di rete')
+    }
+    setUsingId(null)
+  }
 
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
@@ -55,7 +94,13 @@ export default function BackpackPage() {
   const totalItems = inventory.reduce((s, r) => s + r.quantity, 0)
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden relative">
+      {/* Toast */}
+      {toast && (
+        <div className="absolute top-4 left-4 right-4 z-50 bg-[#0F1F2E] border border-[#3A9DBC]/40 text-white text-sm px-4 py-3 rounded-xl shadow-xl text-center animate-in fade-in slide-in-from-top-2">
+          {toast}
+        </div>
+      )}
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-white/10 bg-[#0A1520]/80">
         <div className="flex items-center justify-between mb-3">
@@ -152,16 +197,26 @@ export default function BackpackPage() {
                   )}
                 </div>
 
-                {/* Quantity badge */}
-                <div className="shrink-0 text-right">
+                {/* Quantity + optional Use button */}
+                <div className="shrink-0 flex flex-col items-end gap-1">
                   <div
                     className="inline-flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-lg font-extrabold text-sm"
                     style={{ background: `${meta.color}22`, color: meta.color }}
                   >
                     ×{row.quantity}
                   </div>
+                  {USABLE_FROM_BACKPACK.includes(item.type as ItemType) && (
+                    <button
+                      onClick={() => handleUse(row)}
+                      disabled={usingId === row.id}
+                      className="text-xs font-bold px-2.5 py-1 rounded-lg transition-all disabled:opacity-50"
+                      style={{ background: `${meta.color}25`, color: meta.color }}
+                    >
+                      {usingId === row.id ? '...' : 'Usa'}
+                    </button>
+                  )}
                   {item.shop_price > 0 && (
-                    <p className="text-xs text-white/25 mt-0.5 text-center">💰{item.shop_price}</p>
+                    <p className="text-xs text-white/25">💰{item.shop_price}</p>
                   )}
                 </div>
               </div>
