@@ -28,20 +28,26 @@ export default function BestiaryPage() {
     const sessionId = localStorage.getItem('current_session_id')
     if (!sessionId) { setLoading(false); return }
 
-    const creaturesPromise = supabase.from('creatures').select('*').order('rarity')
-    const pcPromise = supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return { data: null }
-      return supabase.from('player_creatures').select('*, creatures(*)').eq('user_id', user.id).eq('session_id', sessionId)
-    })
+    let done = 0
+    function finish() { if (++done === 2) setLoading(false) }
 
-    Promise.all([creaturesPromise, pcPromise]).then(([creaturesRes, pcRes]) => {
-      if (creaturesRes.data) setCreatures(
-        [...(creaturesRes.data as unknown as Creature[])].sort(
+    supabase.from('creatures').select('*').order('rarity').then(({ data }) => {
+      if (data) setCreatures(
+        [...(data as unknown as Creature[])].sort(
           (a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
         )
       )
-      if (pcRes.data) setPlayerCreatures(pcRes.data as unknown as PlayerCreature[])
-      setLoading(false)
+      finish()
+    })
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { finish(); return }
+      supabase
+        .from('player_creatures')
+        .select('*, creatures(*)')
+        .eq('user_id', user.id)
+        .eq('session_id', sessionId)
+        .then(({ data }) => { if (data) setPlayerCreatures(data as unknown as PlayerCreature[]); finish() })
     })
   }, [supabase])
 
