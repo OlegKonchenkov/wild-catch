@@ -88,12 +88,19 @@ function MapPageInner() {
     const sid = sessionIdRef.current
     if (!sid) return
 
+    // Skip inaccurate fixes — they would store wrong coordinates in the DB
+    // and trigger false "fuori dall'area" warnings. The map marker still
+    // updates from useGPS state regardless of this server-call filter.
+    if (pos.accuracy > 100) return
+
     const now = Date.now()
     const res = await fetch('/api/game/position', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, sessionId: sid }),
     })
+    if (!res.ok) return  // network/auth error — keep current inBounds state
+
     const data = await res.json()
 
     if (data.sessionEnded) {
@@ -101,7 +108,8 @@ function MapPageInner() {
       return
     }
 
-    setInBounds(data.inBounds)
+    // Only update inBounds from responses that include it (valid position calls)
+    if (data.inBounds !== undefined) setInBounds(data.inBounds)
 
     if (data.triggerEncounter && now - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS) {
       lastEncounterRef.current = now

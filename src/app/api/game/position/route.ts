@@ -2,51 +2,37 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isValidGPSSpeed, isWithinBounds, haversineDistance } from '@/lib/game/anti-cheat'
 
-// Rate limiting: track last request time per user in memory
-// For production scale, use Redis; for MVP this works within a single serverless instance
-const lastRequestTime = new Map<string, number>()
-const RATE_LIMIT_MS = 5000
-
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
-  // Rate limit: 1 req per 5s per user
-  const now = Date.now()
-  const lastTime = lastRequestTime.get(user.id) ?? 0
-  if (now - lastTime < RATE_LIMIT_MS) {
-    return NextResponse.json({ error: 'Troppo veloce' }, { status: 429 })
-  }
-  lastRequestTime.set(user.id, now)
-
   const body = await request.json().catch(() => ({}))
   const { lat, lng, accuracy, sessionId } = body
 
-  if (lat == null || lng == null || !sessionId) {
+  if (typeof lat !== 'number' || typeof lng !== 'number' || !sessionId) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
   }
 
-  // Get player session
-  const { data: playerSession } = await supabase
-    .from('player_sessions')
-    .select('id, last_position, joined_at')
-    .eq('user_id', user.id)
-    .eq('session_id', sessionId)
-    .single()
+  // Get player session and session details in parallel
+  const [{ data: playerSession }, { data: session }] = await Promise.all([
+    supabase
+      .from('player_sessions')
+      .select('id, last_position, joined_at')
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId)
+      .single(),
+    supabase
+      .from('sessions')
+      .select('status, area_bounds, end_at')
+      .eq('id', sessionId)
+      .single(),
+  ])
 
   if (!playerSession) return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
+  if (!session)       return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
 
-  // Get session details
-  const { data: session } = await supabase
-    .from('sessions')
-    .select('status, area_bounds, end_at')
-    .eq('id', sessionId)
-    .single()
-
-  if (!session) return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
-
-  // Check session expiry (first-layer: on every GPS poll)
+  // Check session expiry on every GPS poll
   if (session.status === 'ended') {
     return NextResponse.json({ sessionEnded: true })
   }
@@ -56,22 +42,23 @@ export async function POST(request: Request) {
   }
 
   const currentPos = { lat, lng }
-  // PostGIS POINT serializes as { x: lng, y: lat } — note axis order
+
+  // PostGIS POINT serializes as { x: lng, y: lat }
   const rawPos = playerSession.last_position as { x: number; y: number } | null
   const prevPos = rawPos ? { lat: rawPos.y, lng: rawPos.x } : null
+  const now = Date.now()
   const elapsed = prevPos ? now - new Date(playerSession.joined_at).getTime() : 0
 
-  // Anti-cheat: validate speed
+  // Anti-cheat: reject teleport-level jumps (> 60 km/h over elapsed time)
   if (!isValidGPSSpeed(prevPos, currentPos, elapsed)) {
     return NextResponse.json({ error: 'Spostamento non valido', valid: false }, { status: 400 })
   }
 
-  // Check within bounds — add accuracy-based buffer so GPS jitter near the
-  // border doesn't falsely flag the player as out-of-bounds.
-  // 1 degree ≈ 111 km, so divide accuracy (m) by 111000 to get degrees.
-  const accuracyDeg = Math.max((accuracy ?? 50) / 111000, 0.0002) // min ~22 m buffer
+  // Check within bounds — expand by GPS accuracy so jitter near the border
+  // doesn't falsely flag the player as out-of-bounds.
+  const accuracyDeg = Math.max((accuracy ?? 50) / 111000, 0.0002) // min ~22 m
   const bounds = session.area_bounds as { north: number; south: number; east: number; west: number } | null
-  const inBounds = bounds && bounds.north != null
+  const inBounds = bounds && typeof bounds.north === 'number'
     ? isWithinBounds(currentPos, {
         north: bounds.north + accuracyDeg,
         south: bounds.south - accuracyDeg,
@@ -80,30 +67,22 @@ export async function POST(request: Request) {
       })
     : true
 
-  // Update GPS position (PostGIS point format)
+  // Persist GPS position (PostGIS point format)
   await supabase
     .from('player_sessions')
     .update({ last_position: `(${lng},${lat})` })
     .eq('id', playerSession.id)
 
-  // Determine if encounter should trigger
+  // Encounter trigger: only when in bounds, session active, moved enough, good accuracy
   let triggerEncounter = false
   if (inBounds && session.status === 'active') {
     const distanceMoved = prevPos ? haversineDistance(prevPos, currentPos) : 0
-    // Accept most mobile GPS (50-150m accuracy); only reject very noisy signals
-    const usableAccuracy = (accuracy ?? 200) < 150
+    const goodAccuracy = (accuracy ?? 200) < 150
 
-    if (usableAccuracy && distanceMoved >= 10) {
-      // 25% chance per 10m of movement
-      triggerEncounter = Math.random() < 0.25
+    if (goodAccuracy && distanceMoved >= 10) {
+      triggerEncounter = Math.random() < 0.25  // 25% per ≥10 m step
     }
-    // GPS fallback: timer-based trigger handled client-side (60-180s random)
   }
 
-  return NextResponse.json({
-    valid: true,
-    inBounds,
-    triggerEncounter,
-    sessionStatus: session.status,
-  })
+  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status })
 }

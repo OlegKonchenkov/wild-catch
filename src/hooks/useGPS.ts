@@ -32,7 +32,9 @@ export function useGPS(onPosition?: (pos: GPSPosition) => void) {
           accuracy: pos.coords.accuracy,
           timestamp: pos.timestamp,
         }
+        // Always update the map marker so the player sees their position
         setPosition(gpsPos)
+        // The callback (server call) applies its own accuracy gate
         onPositionRef.current?.(gpsPos)
       },
       (err) => {
@@ -47,7 +49,11 @@ export function useGPS(onPosition?: (pos: GPSPosition) => void) {
             setError('Errore GPS')
         }
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,  // always request a fresh fix — no stale cached positions
+      }
     )
 
     return () => {
