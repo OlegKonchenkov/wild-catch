@@ -26,19 +26,20 @@ function MapPageInner() {
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
-    // ?restored=<sessionId> comes from auth callback after re-login on a new device
-    const restored = searchParams.get('restored')
-    if (restored) {
-      localStorage.setItem('current_session_id', restored)
-      router.replace('/game/map')
-      return
-    }
-
     function init(sid: string) {
       setSessionId(sid)
       sessionIdRef.current = sid
+      localStorage.setItem('current_session_id', sid)
       supabase.from('sessions').select('*').eq('id', sid).single()
         .then(({ data }) => { if (data) setSession(data as unknown as Session) })
+    }
+
+    // ?restored=<sid> from auth callback OR history re-entry from home page
+    const restored = searchParams.get('restored')
+    if (restored) {
+      init(restored)
+      router.replace('/game/map')
+      return
     }
 
     const sid = localStorage.getItem('current_session_id')

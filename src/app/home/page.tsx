@@ -83,9 +83,6 @@ function HomeLobby() {
   }, [supabase, router])
 
   async function loadData(userId: string) {
-    // Clear potentially stale session from previous user before restore
-    localStorage.removeItem('current_session_id')
-
     // Phase 1 — profile + restore in parallel (both independent)
     const [profileRes, restoreRes] = await Promise.all([
       fetch('/api/profile'),
@@ -612,6 +609,12 @@ function HomeLobby() {
                 const statusLabel = isEnded ? 'Terminata' : status === 'active' ? 'In corso' : status === 'ready' ? 'In attesa' : status ?? '—'
                 const statusColor = status === 'active' ? '#34D399' : status === 'ready' ? '#F7C841' : 'rgba(255,255,255,0.25)'
 
+                function enterSession() {
+                  // Pass session_id in URL so map page reads it even if localStorage
+                  // is cleared by a concurrent loadData call during navigation
+                  router.push(`/game/map?restored=${ps.session_id}`)
+                }
+
                 const inner = (
                   <>
                     <div className="hi-icon">{isEnded ? '🏁' : '🎮'}</div>
@@ -639,10 +642,7 @@ function HomeLobby() {
                     key={ps.session_id}
                     className="hi-item"
                     style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', textAlign: 'left' }}
-                    onClick={() => {
-                      localStorage.setItem('current_session_id', ps.session_id)
-                      router.push('/game/map')
-                    }}
+                    onClick={enterSession}
                   >
                     {inner}
                   </button>
