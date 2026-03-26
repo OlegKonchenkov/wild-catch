@@ -21,28 +21,28 @@ export default function BestiaryPage() {
   const [selected, setSelected]             = useState<{ creature: Creature; pc: PlayerCreature | null } | null>(null)
   const [message, setMessage]               = useState('')
   const [filter, setFilter]                 = useState<'all' | 'caught' | 'missing'>('all')
+  const [loading, setLoading]               = useState(true)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
-    if (!sessionId) return
+    if (!sessionId) { setLoading(false); return }
 
-    supabase.from('creatures').select('*').order('rarity').then(({ data }) => {
-      if (data) setCreatures(
-        [...(data as unknown as Creature[])].sort(
+    Promise.all([
+      supabase.from('creatures').select('*').order('rarity'),
+      supabase.auth.getUser().then(({ data: { user } }) =>
+        user
+          ? supabase.from('player_creatures').select('*, creatures(*)').eq('user_id', user.id).eq('session_id', sessionId)
+          : Promise.resolve({ data: null })
+      ),
+    ]).then(([creaturesRes, pcRes]) => {
+      if (creaturesRes.data) setCreatures(
+        [...(creaturesRes.data as unknown as Creature[])].sort(
           (a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
         )
       )
-    })
-
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      supabase
-        .from('player_creatures')
-        .select('*, creatures(*)')
-        .eq('user_id', user.id)
-        .eq('session_id', sessionId)
-        .then(({ data }) => { if (data) setPlayerCreatures(data as unknown as PlayerCreature[]) })
+      if (pcRes.data) setPlayerCreatures(pcRes.data as unknown as PlayerCreature[])
+      setLoading(false)
     })
   }, [supabase])
 
@@ -153,7 +153,20 @@ export default function BestiaryPage() {
           </motion.p>
         )}
 
-        <div className="grid grid-cols-3 gap-2 pb-24">
+        {loading && (
+          <div className="grid grid-cols-3 gap-2 pb-24">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="rounded-xl bg-white/5 border border-white/8 p-2 flex flex-col items-center gap-1.5"
+                style={{ animationDelay: `${i * 60}ms` }}>
+                <div className="w-14 h-14 rounded-lg bg-white/10 animate-pulse" />
+                <div className="w-12 h-2.5 rounded bg-white/10 animate-pulse" />
+                <div className="w-8 h-2 rounded bg-white/5 animate-pulse" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && <div className="grid grid-cols-3 gap-2 pb-24">
           {filtered.map((creature, i) => {
             const pc = getPc(creature.id)
             const caught = !!pc
@@ -227,7 +240,7 @@ export default function BestiaryPage() {
               </motion.div>
             )
           })}
-        </div>
+        </div>}
       </div>
 
       {/* Detail bottom sheet */}
