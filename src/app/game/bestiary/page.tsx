@@ -28,14 +28,13 @@ export default function BestiaryPage() {
     const sessionId = localStorage.getItem('current_session_id')
     if (!sessionId) { setLoading(false); return }
 
-    Promise.all([
-      supabase.from('creatures').select('*').order('rarity'),
-      supabase.auth.getUser().then(({ data: { user } }) =>
-        user
-          ? supabase.from('player_creatures').select('*, creatures(*)').eq('user_id', user.id).eq('session_id', sessionId)
-          : Promise.resolve({ data: null })
-      ),
-    ]).then(([creaturesRes, pcRes]) => {
+    const creaturesPromise = supabase.from('creatures').select('*').order('rarity')
+    const pcPromise = supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return { data: null }
+      return supabase.from('player_creatures').select('*, creatures(*)').eq('user_id', user.id).eq('session_id', sessionId)
+    })
+
+    Promise.all([creaturesPromise, pcPromise]).then(([creaturesRes, pcRes]) => {
       if (creaturesRes.data) setCreatures(
         [...(creaturesRes.data as unknown as Creature[])].sort(
           (a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
