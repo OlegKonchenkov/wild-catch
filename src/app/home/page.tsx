@@ -600,45 +600,54 @@ function HomeLobby() {
           ) : (
             <div>
               {history.map(ps => {
-                const isPlayable = ps.sessions?.status === 'active' || ps.sessions?.status === 'ready'
-                const isEnded    = ps.sessions?.status === 'ended'
+                const status     = Array.isArray(ps.sessions) ? (ps.sessions[0] as any)?.status : ps.sessions?.status
+                const sessName   = Array.isArray(ps.sessions) ? (ps.sessions[0] as any)?.name   : ps.sessions?.name
+                const sessStart  = Array.isArray(ps.sessions) ? (ps.sessions[0] as any)?.start_at : ps.sessions?.start_at
+                const isPlayable = status === 'active' || status === 'ready'
+                const isEnded    = status === 'ended'
                 const isClickable = isPlayable || isEnded
-                function enterSession() {
-                  localStorage.setItem('current_session_id', ps.session_id)
-                  router.push('/game/map')
-                }
-                return (
-                  <div
-                    key={ps.session_id}
-                    className="hi-item"
-                    onClick={isClickable ? enterSession : undefined}
-                    style={{ cursor: isClickable ? 'pointer' : 'default', position: 'relative', transition: 'background 0.15s' }}
-                  >
+                const dateStr = sessStart
+                  ? new Date(sessStart).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : new Date(ps.joined_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
+                const statusLabel = isEnded ? 'Terminata' : status === 'active' ? 'In corso' : status === 'ready' ? 'In attesa' : status ?? '—'
+                const statusColor = status === 'active' ? '#34D399' : status === 'ready' ? '#F7C841' : 'rgba(255,255,255,0.25)'
+
+                const inner = (
+                  <>
                     <div className="hi-icon">{isEnded ? '🏁' : '🎮'}</div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{ps.sessions?.name ?? 'Sessione'}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{sessName ?? 'Sessione'}</div>
                       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-                        {ps.sessions?.start_at
-                          ? new Date(ps.sessions.start_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
-                          : new Date(ps.joined_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
-                        }
-                        {' · '}
-                        <span style={{ color: ps.sessions?.status === 'active' ? '#34D399' : ps.sessions?.status === 'ready' ? '#F7C841' : 'rgba(255,255,255,0.25)' }}>
-                          {isEnded ? 'Terminata' : ps.sessions?.status === 'active' ? 'In corso' : ps.sessions?.status === 'ready' ? 'In attesa' : ps.sessions?.status ?? '—'}
-                        </span>
+                        {dateStr} · <span style={{ color: statusColor }}>{statusLabel}</span>
                       </div>
                     </div>
                     {isPlayable ? (
                       <span style={{ fontSize: 12, fontWeight: 700, color: '#3ABCA8' }}>▶</span>
                     ) : isEnded ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#F7C841', whiteSpace: 'nowrap' }}>⚡ {ps.exp ?? 0}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#F7C841' }}>⚡ {ps.exp ?? 0}</span>
                         <span style={{ fontSize: 10, color: '#C084FC', fontWeight: 600 }}>👁 Vedi</span>
                       </div>
                     ) : (
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#F7C841', whiteSpace: 'nowrap' }}>⚡ {ps.exp ?? 0}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#F7C841' }}>⚡ {ps.exp ?? 0}</span>
                     )}
-                  </div>
+                  </>
+                )
+
+                return isClickable ? (
+                  <button
+                    key={ps.session_id}
+                    className="hi-item"
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', textAlign: 'left' }}
+                    onClick={() => {
+                      localStorage.setItem('current_session_id', ps.session_id)
+                      router.push('/game/map')
+                    }}
+                  >
+                    {inner}
+                  </button>
+                ) : (
+                  <div key={ps.session_id} className="hi-item">{inner}</div>
                 )
               })}
             </div>
