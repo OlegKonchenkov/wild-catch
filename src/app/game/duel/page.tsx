@@ -139,20 +139,22 @@ export default function DuelLobbyPage() {
 
               <p className="text-[10px] text-white/30 uppercase tracking-widest mb-2">La tua creatura</p>
 
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0">
-                  <CreatureSprite imageUrl={creature.image_url} name={creature.name} animState="idle" size={72} />
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full blur-2xl opacity-30 pointer-events-none"
+                    style={{ background: rarityColor, transform: 'scale(0.8)' }} />
+                  <CreatureSprite imageUrl={creature.image_url} name={creature.name} animState="idle" size={140} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-extrabold text-white text-base leading-tight truncate">{creature.name}</p>
-                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <div className="text-center">
+                  <p className="font-extrabold text-white text-lg leading-tight">{creature.name}</p>
+                  <div className="flex items-center justify-center gap-1.5 mt-1 flex-wrap">
                     <span className="text-sm">{elementEmoji}</span>
                     <span className="text-[11px] px-2 py-0.5 rounded-full font-bold text-white"
                       style={{ backgroundColor: rarityColor }}>
                       {creature.rarity}
                     </span>
                   </div>
-                  <div className="flex gap-3 mt-1.5">
+                  <div className="flex justify-center gap-4 mt-1.5">
                     <span className="text-[11px] text-white/40">HP <span className="text-white/70 font-semibold">{creature.hp}</span></span>
                     <span className="text-[11px] text-white/40">ATK <span className="text-white/70 font-semibold">{creature.atk}</span></span>
                   </div>
