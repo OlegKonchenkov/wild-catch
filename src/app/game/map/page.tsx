@@ -15,6 +15,8 @@ function MapPageInner() {
   const [session, setSession] = useState<Session | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [inBounds, setInBounds] = useState(true)
+  const [sessionEnded, setSessionEnded] = useState(false)
+  const sessionEndedRef = useRef(false)
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
   const [pendingEncounter, setPendingEncounter] = useState<{ encounterId: string; creature: { name: string; element: string; rarity: string } } | null>(null)
   const lastEncounterRef = useRef(0)
@@ -86,7 +88,7 @@ function MapPageInner() {
 
   const onGPSPosition = useCallback(async (pos: { lat: number; lng: number; accuracy: number }) => {
     const sid = sessionIdRef.current
-    if (!sid) return
+    if (!sid || sessionEndedRef.current) return
 
     // Skip inaccurate fixes — they would store wrong coordinates in the DB
     // and trigger false "fuori dall'area" warnings. The map marker still
@@ -104,7 +106,9 @@ function MapPageInner() {
     const data = await res.json()
 
     if (data.sessionEnded) {
-      router.push('/game/profile?ended=1')
+      // Session over — stop future GPS calls, show read-only banner (no redirect)
+      sessionEndedRef.current = true
+      setSessionEnded(true)
       return
     }
 
@@ -115,7 +119,7 @@ function MapPageInner() {
       lastEncounterRef.current = now
       await triggerEncounter('gps')
     }
-  }, [router, triggerEncounter])
+  }, [triggerEncounter])
 
   const { position, error: gpsError } = useGPS(onGPSPosition)
 
@@ -129,6 +133,7 @@ function MapPageInner() {
     function scheduleTimerEncounter() {
       const delay = minMs + Math.random() * (maxMs - minMs)
       timeout = setTimeout(async () => {
+        if (sessionEndedRef.current) return
         const now = Date.now()
         if (now - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS) {
           lastEncounterRef.current = now
@@ -153,6 +158,13 @@ function MapPageInner() {
         playerPosition={position ? { lat: position.lat, lng: position.lng } : null}
         sessionId={sessionId!}
       />
+
+      {/* Session ended overlay on map */}
+      {sessionEnded && (
+        <div className="absolute top-2 left-2 right-2 bg-[#7B4DB8]/80 text-[#E9D5FF] text-xs px-3 py-2 rounded-xl z-[900] text-center backdrop-blur-sm">
+          🏁 Sessione terminata — la mappa è in sola lettura
+        </div>
+      )}
 
       {/* GPS error */}
       {gpsError && (

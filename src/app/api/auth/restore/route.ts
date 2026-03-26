@@ -14,7 +14,7 @@ export async function GET() {
     .from('player_sessions')
     .select('session_id, sessions!inner(status)')
     .eq('user_id', user.id)
-    .in('sessions.status', ['active', 'ready'])
+    .in('sessions.status', ['active', 'ready', 'ended'])
     .order('created_at', { ascending: false })
     .limit(1)
     .single()

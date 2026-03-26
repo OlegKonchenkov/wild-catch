@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // GET /api/game/leaderboard?sessionId=X
 export async function GET(request: Request) {
@@ -10,8 +11,9 @@ export async function GET(request: Request) {
   const sessionId = new URL(request.url).searchParams.get('sessionId')
   if (!sessionId) return NextResponse.json({ error: 'sessionId richiesto' }, { status: 400 })
 
-  // All player sessions for this session, ordered by exp
-  const { data: players } = await supabase
+  // Use admin client to bypass RLS — every player in the session can see the full leaderboard
+  const adminSupabase = createAdminClient()
+  const { data: players } = await adminSupabase
     .from('player_sessions')
     .select('user_id, exp, gold')
     .eq('session_id', sessionId)

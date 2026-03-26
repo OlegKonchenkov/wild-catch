@@ -23,9 +23,10 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), [])
   const navRef   = useRef<HTMLElement>(null)
 
-  const [gold, setGold]     = useState<number | null>(null)
-  const [level, setLevel]   = useState<number>(1)
-  const [endAt, setEndAt]   = useState<string | null>(null)
+  const [gold, setGold]             = useState<number | null>(null)
+  const [level, setLevel]           = useState<number>(1)
+  const [endAt, setEndAt]           = useState<string | null>(null)
+  const [sessionEnded, setSessionEnded] = useState(false)
 
   const initRef = useRef(false)
 
@@ -105,7 +106,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
 
   const timer = useSessionTimer({
     endAt,
-    onExpired: () => router.replace('/game/profile?ended=1'),
+    onExpired: () => setSessionEnded(true),
   })
 
   // Fix mobile viewport height after hard refresh: window.innerHeight is always accurate,
@@ -136,6 +137,12 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div ref={rootRef} className="flex flex-col bg-[#0F1F2E] text-white overflow-hidden" style={{ height: '100dvh' }}>
+      {/* Session-ended read-only banner */}
+      {sessionEnded && (
+        <div className="flex-none bg-[#7B4DB8]/20 border-b border-[#7B4DB8]/40 px-4 py-1.5 text-center">
+          <p className="text-[11px] text-[#C084FC] font-semibold">🏁 Sessione terminata — modalità visualizzazione</p>
+        </div>
+      )}
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-2 bg-[#0F1F2E]/95 border-b border-white/10 z-10">
         <div className="flex items-center gap-2">
