@@ -21,6 +21,7 @@ export default function DuelPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [myRole, setMyRole] = useState<'challenger' | 'opponent' | null>(null)
   const realtimeUpdatedRef = useRef(false)
+  const surrenderedRef = useRef(false)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -86,6 +87,18 @@ export default function DuelPage() {
 
     return () => { supabase.removeChannel(channel) }
   }, [id, supabase])
+
+  // When my HP reaches 0, auto-surrender so the server ends the duel and awards EXP
+  useEffect(() => {
+    if (myHp === 0 && !result && !waiting && !surrenderedRef.current) {
+      surrenderedRef.current = true
+      fetch('/api/game/duel/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duelId: id, action: 'surrender' }),
+      })
+    }
+  }, [myHp, result, waiting, id])
 
   async function handleAttack() {
     await fetch('/api/game/duel/action', {
@@ -160,8 +173,19 @@ export default function DuelPage() {
 
       {result && (
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-center">
-          <p className="text-3xl font-bold text-white mb-2">{result === 'won' ? '🏆 Vittoria!' : '💀 Sconfitta'}</p>
-          <button onClick={() => router.push('/game/map')} className="bg-[#3A9DBC] text-white font-bold py-3 px-8 rounded-xl">
+          <p className="text-3xl font-bold text-white mb-1">
+            {result === 'won' ? '🏆 Vittoria!' : '💀 Sconfitta'}
+          </p>
+          <p className={`text-xl font-bold mb-5 ${result === 'won' ? 'text-[#34D399]' : 'text-white/40'}`}>
+            +{result === 'won' ? 15 : 5} EXP
+          </p>
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+              router.push('/game/map')
+            }}
+            className="bg-[#3A9DBC] text-white font-bold py-3 px-8 rounded-xl"
+          >
             Torna alla Mappa
           </button>
         </motion.div>
