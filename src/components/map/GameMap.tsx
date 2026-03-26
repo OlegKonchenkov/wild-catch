@@ -5,7 +5,6 @@ import type { Session } from '@/lib/types'
 interface Props {
   session: Session
   playerPosition: { lat: number; lng: number } | null
-  onEncounterTrigger: (encounterId: string, creature: unknown) => void
   sessionId: string
 }
 
@@ -61,7 +60,7 @@ function markerHTML(bearing: number | null): string {
   `
 }
 
-export default function GameMap({ session, playerPosition, onEncounterTrigger, sessionId }: Props) {
+export default function GameMap({ session, playerPosition, sessionId }: Props) {
   const mapRef = useRef<unknown>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const markerRef = useRef<unknown>(null)

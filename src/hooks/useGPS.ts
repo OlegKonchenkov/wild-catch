@@ -8,8 +8,14 @@ export interface GPSPosition {
   timestamp: number
 }
 
+// Module-level cache — survives component unmounts (e.g. navigating to encounter page and back).
+// Without this, every remount starts with position=null and the marker disappears until the
+// next GPS callback fires.
+let cachedPosition: GPSPosition | null = null
+
 export function useGPS(onPosition?: (pos: GPSPosition) => void) {
-  const [position, setPosition] = useState<GPSPosition | null>(null)
+  // Initialise with cached value so the marker is visible immediately on remount
+  const [position, setPosition] = useState<GPSPosition | null>(cachedPosition)
   const [error, setError] = useState<string | null>(null)
   const watchIdRef = useRef<number | null>(null)
   const onPositionRef = useRef(onPosition)
@@ -32,27 +38,22 @@ export function useGPS(onPosition?: (pos: GPSPosition) => void) {
           accuracy: pos.coords.accuracy,
           timestamp: pos.timestamp,
         }
-        // Always update the map marker so the player sees their position
-        setPosition(gpsPos)
-        // The callback (server call) applies its own accuracy gate
-        onPositionRef.current?.(gpsPos)
+        cachedPosition = gpsPos        // persist for next mount
+        setPosition(gpsPos)            // always update the map marker
+        onPositionRef.current?.(gpsPos) // server call applies its own accuracy gate
       },
       (err) => {
-        switch (err.code) {
-          case GeolocationPositionError.PERMISSION_DENIED:
-            setError('Abilita il GPS per giocare')
-            break
-          case GeolocationPositionError.POSITION_UNAVAILABLE:
-            setError('GPS non disponibile. Spostati in un luogo aperto')
-            break
-          default:
-            setError('Errore GPS')
+        if (err.code === GeolocationPositionError.PERMISSION_DENIED) {
+          setError('Abilita il GPS per giocare')
+        } else if (err.code === GeolocationPositionError.POSITION_UNAVAILABLE) {
+          setError('GPS non disponibile. Spostati in un luogo aperto')
         }
+        // TIMEOUT: silently ignore — watchPosition will retry automatically
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,  // always request a fresh fix — no stale cached positions
+        timeout: 30000,   // 30 s — avoids spurious TIMEOUT errors during GPS acquisition
+        maximumAge: 3000, // accept positions up to 3 s old for instant display on remount
       }
     )
 

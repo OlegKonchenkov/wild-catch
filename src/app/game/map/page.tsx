@@ -151,7 +151,6 @@ function MapPageInner() {
       <GameMap
         session={session}
         playerPosition={position ? { lat: position.lat, lng: position.lng } : null}
-        onEncounterTrigger={(id) => router.push(`/game/encounter/${id}`)}
         sessionId={sessionId!}
       />
 
