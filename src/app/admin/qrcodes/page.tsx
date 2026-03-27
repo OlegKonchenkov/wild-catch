@@ -195,17 +195,19 @@ function QRModal({
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={onShare}
-            className="inline-flex items-center justify-center gap-1.5 bg-white/10 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-white/15 transition-colors"
+            aria-label="Condividi QR"
+            title="Condividi"
+            className="inline-flex items-center justify-center bg-white/10 text-white w-full h-10 rounded-xl hover:bg-white/15 transition-colors"
           >
             <IconShare />
-            Condividi
           </button>
           <button
             onClick={onDownload}
-            className="inline-flex items-center justify-center gap-1.5 bg-[#3A9DBC] text-white font-bold py-2.5 rounded-xl text-sm hover:brightness-110 transition-all"
+            aria-label="Scarica QR PNG"
+            title="Scarica PNG"
+            className="inline-flex items-center justify-center bg-[#3A9DBC] text-white w-full h-10 rounded-xl hover:brightness-110 transition-all"
           >
             <IconDownload />
-            PNG
           </button>
         </div>
       </div>
@@ -498,24 +500,27 @@ export default function QRCodesPage() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={(e) => { e.stopPropagation(); setPreviewQr(qr) }}
-                className="inline-flex items-center gap-1.5 bg-white/10 text-white/80 px-3 py-1.5 rounded-lg text-sm hover:bg-white/15 transition-colors"
+                aria-label="Apri preview QR"
+                title="Preview"
+                className="inline-flex items-center justify-center bg-white/10 text-white/80 w-9 h-9 rounded-lg hover:bg-white/15 transition-colors"
               >
                 <IconEye />
-                Preview
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); shareQR(qr) }}
-                className="inline-flex items-center gap-1.5 bg-white/10 text-white/80 px-3 py-1.5 rounded-lg text-sm hover:bg-white/15 transition-colors"
+                aria-label="Condividi QR"
+                title="Condividi"
+                className="inline-flex items-center justify-center bg-white/10 text-white/80 w-9 h-9 rounded-lg hover:bg-white/15 transition-colors"
               >
                 <IconShare />
-                Condividi
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); downloadQR(qr.id, qr.label) }}
-                className="inline-flex items-center gap-1.5 bg-[#3A9DBC] text-white px-3 py-1.5 rounded-lg text-sm hover:brightness-110 transition-all"
+                aria-label="Scarica QR PNG"
+                title="Scarica PNG"
+                className="inline-flex items-center justify-center bg-[#3A9DBC] text-white w-9 h-9 rounded-lg hover:brightness-110 transition-all"
               >
                 <IconDownload />
-                PNG
               </button>
             </div>
           </div>
