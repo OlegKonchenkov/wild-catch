@@ -1,0 +1,109 @@
+<h2>Design — Section 1: Architecture & Tech Stack</h2>
+<p class="subtitle">The technical foundation for WildCatch PWA</p>
+
+<div class="section">
+  <span class="label">Stack (confirmed from GDD + our decisions)</span>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+
+    <div style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;color:#6b7280;letter-spacing:1px;margin-bottom:10px">FRONTEND</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:36px;height:36px;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">⚡</div>
+          <div><div style="font-weight:700;font-size:13px">Next.js 15 (App Router)</div><div style="font-size:11px;color:#6b7280">SSR, API routes, PWA via next-pwa</div></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:36px;height:36px;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">🎨</div>
+          <div><div style="font-weight:700;font-size:13px">Tailwind CSS v4</div><div style="font-size:11px;color:#6b7280">Mediterranean palette, mobile-first</div></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:36px;height:36px;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">📱</div>
+          <div><div style="font-weight:700;font-size:13px">PWA (installable)</div><div style="font-size:11px;color:#6b7280">Service Worker, offline inventory, home screen icon</div></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:36px;height:36px;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">✨</div>
+          <div><div style="font-weight:700;font-size:13px">Framer Motion</div><div style="font-size:11px;color:#6b7280">Capture animations, encounter transitions, level-up effects</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;color:#6b7280;letter-spacing:1px;margin-bottom:10px">BACKEND & SERVICES</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:36px;height:36px;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">🗄️</div>
+          <div><div style="font-weight:700;font-size:13px">Supabase</div><div style="font-size:11px;color:#6b7280">PostgreSQL + Auth (Google OAuth) + Realtime + Storage</div></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:36px;height:36px;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">▲</div>
+          <div><div style="font-weight:700;font-size:13px">Vercel</div><div style="font-size:11px;color:#6b7280">Hosting, edge functions, auto CI/CD from GitHub</div></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:36px;height:36px;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">📧</div>
+          <div><div style="font-weight:700;font-size:13px">Resend</div><div style="font-size:11px;color:#6b7280">Magic link fallback email (Google OAuth primary)</div></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:36px;height:36px;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">🖼️</div>
+          <div><div style="font-weight:700;font-size:13px">OpenAI gpt-image-1.5</div><div style="font-size:11px;color:#6b7280">Creature artwork generation (~$3–5 for full set)</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">System Architecture Flow</span>
+  <div style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px;margin-top:10px;font-size:13px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">
+      <div style="background:rgba(58,157,188,0.2);border:1px solid rgba(58,157,188,0.4);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:18px">📱</div><div style="font-weight:700;font-size:12px">Player PWA</div><div style="font-size:10px;color:#6b7280">Next.js + Tailwind</div>
+      </div>
+      <div style="color:#6b7280">⟷</div>
+      <div style="background:rgba(232,93,47,0.2);border:1px solid rgba(232,93,47,0.4);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:18px">🔌</div><div style="font-weight:700;font-size:12px">API Routes</div><div style="font-size:10px;color:#6b7280">Next.js serverless</div>
+      </div>
+      <div style="color:#6b7280">⟷</div>
+      <div style="background:rgba(90,138,60,0.2);border:1px solid rgba(90,138,60,0.4);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:18px">🗄️</div><div style="font-weight:700;font-size:12px">Supabase</div><div style="font-size:10px;color:#6b7280">DB + Auth + Storage</div>
+      </div>
+      <div style="color:#6b7280">⟷</div>
+      <div style="background:rgba(247,200,65,0.2);border:1px solid rgba(247,200,65,0.4);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:18px">⚡</div><div style="font-weight:700;font-size:12px">Realtime</div><div style="font-size:10px;color:#6b7280">Duels + dashboard</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;justify-content:center">
+      <div style="background:rgba(123,77,184,0.2);border:1px solid rgba(123,77,184,0.4);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:18px">🛠️</div><div style="font-weight:700;font-size:12px">Admin Panel</div><div style="font-size:10px;color:#6b7280">Separate auth, same Next.js app (/admin)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">Key Architecture Decisions</span>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+    <div style="background:rgba(16,185,129,0.08);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px">
+      <strong>Server-side RNG only</strong> — All encounter triggers, capture rolls, and duel damage are calculated on the server. Players cannot cheat by intercepting requests.
+    </div>
+    <div style="background:rgba(16,185,129,0.08);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px">
+      <strong>GPS + timer fallback</strong> — Browser Geolocation API, polling every 10s. If accuracy &gt;50m or unavailable, timer-based encounters (60–180s random interval) keep the game running.
+    </div>
+    <div style="background:rgba(16,185,129,0.08);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px">
+      <strong>Single-tenant, event-scoped</strong> — One Supabase project, one admin team. Sessions are scoped: player progress, creatures, and leaderboard are per-session. Hall of Fame persists across seasons.
+    </div>
+    <div style="background:rgba(16,185,129,0.08);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px">
+      <strong>Google OAuth primary, magic link fallback</strong> — One-tap login on Android/iOS. GDPR-K checkbox for under-14s. Session JWT managed by Supabase Auth.
+    </div>
+    <div style="background:rgba(16,185,129,0.08);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px">
+      <strong>Offline partial via Service Worker</strong> — Inventory, Bestiadex, and active mission cached locally. Syncs on reconnect. Critical for spotty outdoor connectivity.
+    </div>
+    <div style="background:rgba(16,185,129,0.08);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px">
+      <strong>Cost: ~€0/month for MVP</strong> — Vercel Hobby (free), Supabase Free tier (500MB / 50k auth), Resend free (3k emails/month). Scale to paid only when needed.
+    </div>
+  </div>
+</div>
+
+<div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:14px;margin-top:4px;text-align:center">
+  <div style="font-size:13px;color:#d1d5db">Does this architecture look right? Approve to continue to <strong>Section 2: Player Experience & Screens</strong></div>
+</div>

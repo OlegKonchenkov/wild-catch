@@ -1,0 +1,102 @@
+<h2>Verifica Piano Free — Tutto Risolto ✅</h2>
+<p class="subtitle">Ogni componente funziona su Vercel Hobby + Supabase Free. Zero costi mensili per MVP.</p>
+
+<div class="section">
+  <span class="label">⚠️ Problema trovato e risolto: Cron Job sessione</span>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+    <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px">
+      <div style="font-weight:700;color:#f87171;margin-bottom:6px">❌ Non funziona su Free</div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        Vercel Hobby: max 2 cron jobs, frequenza minima <strong>1 volta al giorno</strong><br/>
+        → "controlla ogni minuto se la sessione è scaduta" = impossibile su free
+      </div>
+    </div>
+    <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:12px">
+      <div style="font-weight:700;color:#34d399;margin-bottom:6px">✅ Soluzione: 3 livelli gratuiti</div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        <strong>1.</strong> <em>Ogni chiamata GPS</em> (ogni 10s) controlla se <code style="background:rgba(255,255,255,0.1);padding:1px 4px;border-radius:3px">now() ≥ end_at</code> → chiude automaticamente<br/>
+        <strong>2.</strong> <em>Supabase pg_cron</em> (gratis, dentro Postgres) ogni 1 min come fallback<br/>
+        <strong>3.</strong> <em>Admin dashboard</em> polling ogni 30s → chiude se scaduta
+      </div>
+    </div>
+  </div>
+  <div style="background:rgba(16,185,129,0.05);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 8px 8px 0;font-size:12px;color:#9ca3af;margin-top:8px">
+    <strong>In pratica:</strong> la sessione si chiude entro max 10 secondi dallo scadere del timer (al prossimo aggiornamento GPS di qualsiasi giocatore). Supabase pg_cron garantisce la chiusura anche se tutti i giocatori sono fermi. Zero Vercel Pro richiesto.
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">Verifica completa limiti Vercel Hobby (Free)</span>
+  <div style="overflow-x:auto;margin-top:10px">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:rgba(255,255,255,0.05)">
+          <th style="text-align:left;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.1)">Funzione</th>
+          <th style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.1)">Limite Free</th>
+          <th style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.1)">Nostro uso</th>
+          <th style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.1)">Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Serverless functions</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">100GB-hrs/mese</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">~2–5GB-hrs/evento</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#34d399">✅</td></tr>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Bandwidth</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">100GB/mese</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">~1–3GB/evento</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#34d399">✅</td></tr>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Function timeout</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">10 secondi</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">GPS/cattura/duello ~100ms</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#34d399">✅</td></tr>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Cron jobs</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Max 1/giorno</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Non usato → pg_cron</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#34d399">✅ spostato</td></tr>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Deploy automatici</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Illimitati</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Push su GitHub</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#34d399">✅</td></tr>
+        <tr><td style="padding:8px 12px">PWA / static assets</td><td style="text-align:center;padding:8px 12px">Illimitati</td><td style="text-align:center;padding:8px 12px">App + immagini creature</td><td style="text-align:center;padding:8px 12px;color:#34d399">✅</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">Verifica completa limiti Supabase Free</span>
+  <div style="overflow-x:auto;margin-top:10px">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:rgba(255,255,255,0.05)">
+          <th style="text-align:left;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.1)">Funzione</th>
+          <th style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.1)">Limite Free</th>
+          <th style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.1)">Nostro uso</th>
+          <th style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.1)">Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Database</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">500MB</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">~10–30MB/evento</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#34d399">✅</td></tr>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Auth (utenti attivi)</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">50.000 MAU</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Max 200 per evento</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#34d399">✅</td></tr>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Storage (immagini)</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">1GB</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">~150MB (30 creature HD)</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#34d399">✅</td></tr>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Realtime (WebSocket)</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">200 connessioni simultanee</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Max 200 giocatori</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#fbbf24">⚠️ esatto limite</td></tr>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">pg_cron (scheduler)</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Incluso gratis</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Chiusura sessione ogni 1min</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#34d399">✅</td></tr>
+        <tr><td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">Edge Functions</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">500.000 invoc./mese</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05)">~10–50k per evento</td><td style="text-align:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:#34d399">✅</td></tr>
+        <tr><td style="padding:8px 12px">Pausa inattività</td><td style="text-align:center;padding:8px 12px">Dopo 7 giorni</td><td style="text-align:center;padding:8px 12px">Keep-alive ping settimanale</td><td style="text-align:center;padding:8px 12px;color:#fbbf24">⚠️ gestito</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">2 avvertenze gialle — gestite</span>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+    <div style="background:rgba(251,191,36,0.08);border-left:3px solid #fbbf24;padding:10px 14px;border-radius:0 8px 8px 0;font-size:12px;color:#9ca3af">
+      <strong style="color:#fbbf24">⚠️ Realtime 200 connessioni simultanee</strong> — coincide esattamente con il limite massimo dell'evento (200 giocatori). Se si supera: non tutti i giocatori ricevono aggiornamenti leaderboard live. <strong>Soluzione:</strong> leaderboard live solo per admin dashboard (1 canale); giocatori ricevono aggiornamenti ogni 30s via polling HTTP normale invece di WebSocket. Duelli rimangono realtime (2 connessioni per duello, priorità alta).
+    </div>
+    <div style="background:rgba(251,191,36,0.08);border-left:3px solid #fbbf24;padding:10px 14px;border-radius:0 8px 8px 0;font-size:12px;color:#9ca3af">
+      <strong style="color:#fbbf24">⚠️ Pausa Supabase dopo 7 giorni inattivi</strong> — il DB va in pausa se non ci sono query per una settimana. <strong>Soluzione:</strong> un semplice Vercel Cron (1/giorno, gratis) fa una query keep-alive. Oppure aggiornare a Supabase Pro ($25/mese) solo nel periodo degli eventi.
+    </div>
+  </div>
+</div>
+
+<div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:14px;margin-top:4px">
+  <div style="font-weight:700;color:#34d399;font-size:15px;margin-bottom:8px">💰 Costo totale mensile: €0</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px">
+    <span style="background:rgba(16,185,129,0.15);padding:4px 12px;border-radius:20px">Vercel Hobby: €0</span>
+    <span style="background:rgba(16,185,129,0.15);padding:4px 12px;border-radius:20px">Supabase Free: €0</span>
+    <span style="background:rgba(16,185,129,0.15);padding:4px 12px;border-radius:20px">Resend Free: €0</span>
+    <span style="background:rgba(16,185,129,0.15);padding:4px 12px;border-radius:20px">Immagini AI: ~€3–5 una tantum</span>
+    <span style="background:rgba(16,185,129,0.15);padding:4px 12px;border-radius:20px">Dominio: ~€10/anno opzionale</span>
+  </div>
+</div>
+
+<div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:14px;margin-top:12px;text-align:center">
+  <div style="font-size:13px;color:#d1d5db">Tutto verificato e compatibile con piano free. Approva per <strong>Sezione 5: UI/UX Mockup</strong></div>
+</div>

@@ -1,0 +1,84 @@
+<h2>3 Implementation Approaches</h2>
+<p class="subtitle">How should we structure and build WildCatch? Pick one — my recommendation is highlighted.</p>
+
+<div class="options">
+
+  <div class="option" data-choice="mvp-first" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>MVP-First — Ship fast, iterate</h3>
+      <p>Build only Phase 1 (encounters, capture, Bestiadex, GPS, leaderboard) and run a real event ASAP. Add duels, missions, QR codes, shop in Phase 2 after real player feedback.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>First event in 6–8 weeks</li>
+          <li>Real feedback before building complex features</li>
+          <li>Lower risk — validate concept early</li>
+          <li>GPS + capture loop is the core fun</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>No duels = less engagement</li>
+          <li>No missions = shallow narrative</li>
+          <li>May feel incomplete</li>
+        </ul></div>
+      </div>
+      <div style="margin-top:10px;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px">
+        <strong>Timeline:</strong> 6–8 weeks to first event
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="full-phase1" onclick="toggleSelect(this)" style="outline:2px solid rgba(99,102,241,0.6);background:rgba(99,102,241,0.08)">
+    <div class="letter" style="background:rgba(99,102,241,0.8)">B</div>
+    <div class="content">
+      <h3>Full Phase 1+2 — Complete experience ⭐ Recommended</h3>
+      <p>Build the complete game as designed in the GDD: encounters, capture, duels, missions, QR eggs, shop, admin dashboard, leaderboard — all before the first event. The escape room narrative requires missions and QR codes to work properly.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Complete escape room + creature experience</li>
+          <li>Missions give the story backbone</li>
+          <li>QR codes enable physical exploration</li>
+          <li>Admin can configure full events</li>
+          <li>Duels drive player-vs-player engagement</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>10–14 weeks to first event</li>
+          <li>More upfront work</li>
+        </ul></div>
+      </div>
+      <div style="margin-top:10px;padding:8px 12px;background:rgba(99,102,241,0.1);border-radius:8px;font-size:13px">
+        <strong>Timeline:</strong> 10–14 weeks to first full event
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="parallel-tracks" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Parallel Tracks — Admin first, player second</h3>
+      <p>Build the admin panel and creature/session management first, so you can start creating content (30 creatures, story, missions) while the player-facing app is being built in parallel. Requires 2 developers.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Content creation starts immediately</li>
+          <li>Admin team isn't blocked</li>
+          <li>Fastest overall delivery if 2 devs</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Requires coordinating 2 parallel workstreams</li>
+          <li>API contracts must be agreed upfront</li>
+          <li>More complex project management</li>
+        </ul></div>
+      </div>
+      <div style="margin-top:10px;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px">
+        <strong>Timeline:</strong> 8–10 weeks with 2 devs
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:14px;margin-top:16px">
+  <div style="font-weight:700;color:#818cf8;margin-bottom:6px">💡 Why I recommend B</div>
+  <div style="font-size:13px;color:#d1d5db;line-height:1.7">
+    The escape room + linear story design (A+B narrative mechanic) <strong>requires missions and QR codes to function</strong> — without them it's just GPS walking with creature encounters, not an escape room. The full Phase 1+2 build is the minimum viable <em>event experience</em>. The extra weeks are worth it to deliver the narrative layer that makes WildCatch different from simply a Pokémon GO clone.
+  </div>
+</div>

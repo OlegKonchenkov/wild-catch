@@ -1,0 +1,91 @@
+<h2>Design Corrections — Applied</h2>
+<p class="subtitle">4 important updates to the design based on your feedback</p>
+
+<div class="section">
+  <div style="display:flex;flex-direction:column;gap:12px;margin-top:6px">
+
+    <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:14px">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <div style="font-size:22px">🇬🇧</div>
+        <div>
+          <div style="font-weight:700;color:#34d399;margin-bottom:4px">1. App language: English throughout</div>
+          <div style="font-size:13px;color:#9ca3af">All UI labels, button text, system messages in English. Italian only appears in admin-entered content (creature names, story text) — whatever the admin writes. Screen names: Map, Bestiary, Missions, Backpack, Profile.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:14px">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <div style="font-size:22px">📍</div>
+        <div>
+          <div style="font-weight:700;color:#34d399;margin-bottom:4px">2. Map = small defined area, not the whole city</div>
+          <div style="font-size:13px;color:#9ca3af">The map shows only the event's bounding box (e.g. a park, a piazza, a museum grounds). Admin sets the bounding box when creating a session. Outside the area → encounters stop, player sees "You're outside the event area" message. Map tiles are OpenStreetMap cropped to the bounds — works at any location worldwide, not just Pesaro.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:14px">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <div style="font-size:22px">📖</div>
+        <div>
+          <div style="font-weight:700;color:#34d399;margin-bottom:4px">3. Story / narrative is fully admin-configurable</div>
+          <div style="font-size:13px;color:#9ca3af;line-height:1.7">
+            The app has no hardcoded story. The admin sets per session:
+            <ul style="margin:8px 0 0;padding-left:18px;line-height:1.9">
+              <li><strong>Event name & tagline</strong> (e.g. "WildCatch: The Lost Key")</li>
+              <li><strong>Story intro text</strong> (shown at onboarding — written by admin, can be any theme)</li>
+              <li><strong>Chapter titles & descriptions</strong> (the escape room arc)</li>
+              <li><strong>NPC names</strong> (villain, arena boss, ally character)</li>
+              <li><strong>Mission flavor text</strong> (each mission has admin-written narrative)</li>
+            </ul>
+            The UI renders whatever narrative content the admin enters. This session could be a Pokémon-themed escape room. Next session could be a pirate adventure. The game engine is theme-agnostic.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:14px">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <div style="font-size:22px">🔧</div>
+        <div>
+          <div style="font-weight:700;color:#34d399;margin-bottom:4px">4. How this works technically</div>
+          <div style="font-size:13px;color:#9ca3af;line-height:1.7">
+            A <code style="background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:4px">sessions</code> table stores all narrative metadata as structured JSON fields:
+            <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px;margin-top:8px;font-family:monospace;font-size:11px;color:#86efac">
+              {<br/>
+              &nbsp;&nbsp;"story_title": "The Lost Key",<br/>
+              &nbsp;&nbsp;"story_intro": "A mysterious creature has stolen...",<br/>
+              &nbsp;&nbsp;"villain_name": "Shadow Master",<br/>
+              &nbsp;&nbsp;"chapters": [<br/>
+              &nbsp;&nbsp;&nbsp;&nbsp;{ "title": "The First Clue", "description": "..." },<br/>
+              &nbsp;&nbsp;&nbsp;&nbsp;{ "title": "The Hidden Chamber", "description": "..." }<br/>
+              &nbsp;&nbsp;],<br/>
+              &nbsp;&nbsp;"area_bounds": { "sw": [...], "ne": [...] }<br/>
+              }
+            </div>
+            Admin fills this in a rich text form. Players see it rendered in the Missions screen.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="background:rgba(247,200,65,0.1);border:1px solid rgba(247,200,65,0.3);border-radius:10px;padding:14px;margin-top:4px">
+  <div style="font-weight:700;color:#F7C841;margin-bottom:6px">Updated Screen Names (English)</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <span style="background:rgba(255,255,255,0.08);padding:4px 12px;border-radius:20px;font-size:13px">🗺️ Map</span>
+    <span style="background:rgba(255,255,255,0.08);padding:4px 12px;border-radius:20px;font-size:13px">📖 Bestiary</span>
+    <span style="background:rgba(255,255,255,0.08);padding:4px 12px;border-radius:20px;font-size:13px">🎯 Missions</span>
+    <span style="background:rgba(255,255,255,0.08);padding:4px 12px;border-radius:20px;font-size:13px">🎒 Backpack</span>
+    <span style="background:rgba(255,255,255,0.08);padding:4px 12px;border-radius:20px;font-size:13px">👤 Profile</span>
+    <span style="background:rgba(255,255,255,0.08);padding:4px 12px;border-radius:20px;font-size:13px">⚡ Duel</span>
+    <span style="background:rgba(255,255,255,0.08);padding:4px 12px;border-radius:20px;font-size:13px">🛒 Shop</span>
+    <span style="background:rgba(255,255,255,0.08);padding:4px 12px;border-radius:20px;font-size:13px">🏆 Leaderboard</span>
+  </div>
+</div>
+
+<div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:14px;margin-top:12px;text-align:center">
+  <div style="font-size:13px;color:#d1d5db">Corrections applied. Ready for <strong>Section 3: Admin Panel</strong> — where all of this gets configured.</div>
+</div>

@@ -1,0 +1,161 @@
+<h2>Design — Section 3: Admin Panel</h2>
+<p class="subtitle">Semplice, chiaro, rapido — gestibile da smartphone durante un evento live</p>
+
+<div class="section">
+  <span class="label">Principio guida: 3 tap per qualsiasi azione critica</span>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+    <div style="background:rgba(232,93,47,0.1);border:1px solid rgba(232,93,47,0.3);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:28px">⚡</div>
+      <div style="font-weight:700;font-size:13px;color:#E85D2F;margin:4px 0">Quick Actions</div>
+      <div style="font-size:11px;color:#9ca3af">Pulsanti fissi in cima al pannello per le azioni più usate durante l'evento</div>
+    </div>
+    <div style="background:rgba(247,200,65,0.1);border:1px solid rgba(247,200,65,0.3);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:28px">📱</div>
+      <div style="font-weight:700;font-size:13px;color:#F7C841;margin:4px 0">Mobile First</div>
+      <div style="font-size:11px;color:#9ca3af">Pulsanti grandi, form brevi, niente tabelle complesse — usabile con una mano sola</div>
+    </div>
+    <div style="background:rgba(90,138,60,0.1);border:1px solid rgba(90,138,60,0.3);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:28px">🔒</div>
+      <div style="font-weight:700;font-size:13px;color:#5A8A3C;margin:4px 0">Accesso Separato</div>
+      <div style="font-size:11px;color:#9ca3af">Login admin distinto dai giocatori — solo email/password o Google con ruolo admin</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">Navigazione Admin (sidebar su desktop, bottom nav su mobile)</span>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+
+    <div style="background:rgba(232,93,47,0.12);border:1px solid rgba(232,93,47,0.35);border-radius:10px;padding:12px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+        <div style="font-size:20px">⚡</div>
+        <div style="font-weight:700;color:#E85D2F">Dashboard Live</div>
+        <div style="font-size:10px;color:#6b7280;background:rgba(232,93,47,0.2);padding:2px 8px;border-radius:10px;margin-left:auto">HOME</div>
+      </div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        Contatori in tempo reale: giocatori attivi · incontri totali · creature catturate · duelli in corso<br/>
+        <strong>Quick Actions sempre visibili:</strong>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <span style="background:rgba(232,93,47,0.3);padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">📢 Invia notifica</span>
+          <span style="background:rgba(232,93,47,0.3);padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">🎁 Dai risorsa a giocatore</span>
+          <span style="background:rgba(232,93,47,0.3);padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">⚔️ Lancia evento speciale</span>
+          <span style="background:rgba(232,93,47,0.3);padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">🔴 Termina sessione</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+        <div style="font-size:20px">📋</div>
+        <div style="font-weight:700">Sessioni</div>
+      </div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        Crea nuova sessione con wizard in 4 step:<br/>
+        <strong>1.</strong> Nome evento + tema narrativo (titolo storia, testo intro, nome antagonista)<br/>
+        <strong>2.</strong> Area di gioco — disegna il bounding box sulla mappa<br/>
+        <strong>3.</strong> Configurazione incontri — quali creature, frequenza GPS/timer, probabilità rarità<br/>
+        <strong>4.</strong> Avvia · Metti in pausa · Termina
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+        <div style="font-size:20px">🐾</div>
+        <div style="font-weight:700">Creature</div>
+      </div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        CRUD completo: nome · elemento · rarità · statistiche · immagine (upload o genera con AI)<br/>
+        Copia creature da sessione precedente con 1 click<br/>
+        Preview card della creatura mentre la compili
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+        <div style="font-size:20px">🎯</div>
+        <div style="font-weight:700">Missioni & Capitoli</div>
+      </div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        Crea capitoli della storia (escape room arcs) con titolo + descrizione narrativa<br/>
+        Aggiungi missioni a ogni capitolo: tipo (cattura / duello / QR / enigma) + obiettivo + ricompensa<br/>
+        Ordina i capitoli con drag-and-drop<br/>
+        Missioni opzionali vs obbligatorie per progredire
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+        <div style="font-size:20px">📷</div>
+        <div style="font-weight:700">QR Code</div>
+      </div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        Genera QR fisici da stampare e posizionare nell'area<br/>
+        Tipo: Uovo nascosto · Indizio storia · Oggetto speciale · Evento boss · Codice segreto<br/>
+        Preview del contenuto che vedrà il giocatore quando scansiona<br/>
+        Stampa diretta o esporta PDF con etichette
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+        <div style="font-size:20px">👥</div>
+        <div style="font-weight:700">Giocatori</div>
+      </div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        Lista giocatori attivi con livello · creature catturate · missione corrente<br/>
+        Cerca per nickname · Dai/togli risorse manualmente<br/>
+        Ruoli speciali: assegna "Capo Palestra" o "Antagonista" a un giocatore admin<br/>
+        Ban/kick in caso di comportamento scorretto
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+        <div style="font-size:20px">🏆</div>
+        <div style="font-weight:700">Classifica & Hall of Fame</div>
+      </div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        Classifica live della sessione corrente<br/>
+        Chiudi sessione → seleziona top 3 → aggiungi alla Hall of Fame automaticamente<br/>
+        Storico di tutte le sessioni passate
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">Wizard "Crea Sessione" — esempio rapido (4 step)</span>
+  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:12px">
+    <div style="background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);border-radius:8px;padding:8px 12px;text-align:center;flex:1;min-width:100px">
+      <div style="font-size:16px">✏️</div>
+      <div style="font-weight:700;margin:2px 0">Step 1</div>
+      <div style="color:#9ca3af">Nome evento<br/>Tema narrativo<br/>~2 min</div>
+    </div>
+    <div style="color:#6b7280">→</div>
+    <div style="background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);border-radius:8px;padding:8px 12px;text-align:center;flex:1;min-width:100px">
+      <div style="font-size:16px">🗺️</div>
+      <div style="font-weight:700;margin:2px 0">Step 2</div>
+      <div style="color:#9ca3af">Disegna area<br/>sulla mappa<br/>~1 min</div>
+    </div>
+    <div style="color:#6b7280">→</div>
+    <div style="background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);border-radius:8px;padding:8px 12px;text-align:center;flex:1;min-width:100px">
+      <div style="font-size:16px">🐾</div>
+      <div style="font-weight:700;margin:2px 0">Step 3</div>
+      <div style="color:#9ca3af">Seleziona creature<br/>e frequenza<br/>~3 min</div>
+    </div>
+    <div style="color:#6b7280">→</div>
+    <div style="background:rgba(90,138,60,0.2);border:1px solid rgba(90,138,60,0.4);border-radius:8px;padding:8px 12px;text-align:center;flex:1;min-width:100px">
+      <div style="font-size:16px">🚀</div>
+      <div style="font-weight:700;margin:2px 0">Step 4</div>
+      <div style="color:#9ca3af">Rivedi e avvia<br/>Sessione attiva!<br/>~1 min</div>
+    </div>
+  </div>
+  <div style="margin-top:8px;background:rgba(90,138,60,0.1);border-radius:8px;padding:10px;font-size:12px;color:#9ca3af;text-align:center">
+    ⏱️ <strong>Tempo totale per creare un nuovo evento: ~7 minuti</strong> — missioni e QR si aggiungono separatamente in anticipo
+  </div>
+</div>
+
+<div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:14px;margin-top:4px;text-align:center">
+  <div style="font-size:13px;color:#d1d5db">Admin panel ok? Approva per <strong>Sezione 4: Database & Meccaniche di gioco</strong></div>
+</div>

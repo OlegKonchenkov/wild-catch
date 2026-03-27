@@ -1,0 +1,58 @@
+<h2>WildCatch — GDD Analysis & Project Overview</h2>
+<p class="subtitle">Reading your Game Design Document — here's what we're building</p>
+
+<div class="section">
+  <span class="label">Core Concept</span>
+  <p>An outdoor creature-catching PWA (mobile-first, no app store) inspired by Pokémon GO mechanics but legally independent — original IP, original creatures ("Bestie/Creature"), GPS-triggered encounters, duels, missions, and an admin panel for live event management.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+  <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:16px">
+    <h3 style="margin:0 0 8px;color:#818cf8">Tech Stack (from GDD)</h3>
+    <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.8">
+      <li>Next.js 14+ (App Router)</li>
+      <li>Supabase (DB + Auth + Realtime)</li>
+      <li>Vercel (hosting + CI/CD)</li>
+      <li>Resend (magic link email)</li>
+      <li>PWA (installable, offline partial)</li>
+    </ul>
+  </div>
+  <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:16px">
+    <h3 style="margin:0 0 8px;color:#34d399">Two Phases (from GDD)</h3>
+    <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.8">
+      <li><strong>Phase 1 MVP:</strong> Auth, GPS encounters, capture, Bestiadex, sessions, leaderboard</li>
+      <li><strong>Phase 2:</strong> Duels (realtime), missions, eggs, QR codes, shop, admin dashboard</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">Key Screens to Design (Player)</span>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+    <span style="background:rgba(99,102,241,0.2);padding:4px 12px;border-radius:20px;font-size:13px">🗺️ Map / Radar</span>
+    <span style="background:rgba(99,102,241,0.2);padding:4px 12px;border-radius:20px;font-size:13px">⚔️ Encounter Screen</span>
+    <span style="background:rgba(99,102,241,0.2);padding:4px 12px;border-radius:20px;font-size:13px">📖 Bestiadex</span>
+    <span style="background:rgba(99,102,241,0.2);padding:4px 12px;border-radius:20px;font-size:13px">🎒 Inventory</span>
+    <span style="background:rgba(99,102,241,0.2);padding:4px 12px;border-radius:20px;font-size:13px">⚡ Duel</span>
+    <span style="background:rgba(99,102,241,0.2);padding:4px 12px;border-radius:20px;font-size:13px">🎯 Missions</span>
+    <span style="background:rgba(99,102,241,0.2);padding:4px 12px;border-radius:20px;font-size:13px">🛒 Shop</span>
+    <span style="background:rgba(99,102,241,0.2);padding:4px 12px;border-radius:20px;font-size:13px">👤 Profile / Leaderboard</span>
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">Key Screens to Design (Admin)</span>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+    <span style="background:rgba(251,146,60,0.2);padding:4px 12px;border-radius:20px;font-size:13px">📊 Live Dashboard</span>
+    <span style="background:rgba(251,146,60,0.2);padding:4px 12px;border-radius:20px;font-size:13px">🐾 Creature CRUD</span>
+    <span style="background:rgba(251,146,60,0.2);padding:4px 12px;border-radius:20px;font-size:13px">📋 Session Manager</span>
+    <span style="background:rgba(251,146,60,0.2);padding:4px 12px;border-radius:20px;font-size:13px">🎯 Mission Builder</span>
+    <span style="background:rgba(251,146,60,0.2);padding:4px 12px;border-radius:20px;font-size:13px">📱 QR Generator</span>
+    <span style="background:rgba(251,146,60,0.2);padding:4px 12px;border-radius:20px;font-size:13px">🔔 Notifications</span>
+  </div>
+</div>
+
+<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:12px;padding:16px;margin-top:8px">
+  <h3 style="margin:0 0 8px;color:#fbbf24">🖼️ Image Cost Research — Running in background...</h3>
+  <p style="margin:0;font-size:14px;color:#d1d5db">Evaluating OpenAI gpt-image-1 vs Google Gemini/Imagen 3 pricing for ~70–120 creature + UI images needed for MVP. Results coming shortly.</p>
+</div>

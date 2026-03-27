@@ -1,0 +1,174 @@
+<h2>Design — Sezione 4: Database & Meccaniche di Gioco</h2>
+<p class="subtitle">Schema dati e logica delle meccaniche principali</p>
+
+<div class="section">
+  <span class="label">Schema Database (Supabase / PostgreSQL)</span>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+
+    <div style="background:rgba(58,157,188,0.08);border:1px solid rgba(58,157,188,0.25);border-radius:10px;padding:12px">
+      <div style="font-size:11px;font-weight:700;color:#3A9DBC;letter-spacing:1px;margin-bottom:8px">CORE TABLES</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">users</div>
+          <div style="color:#6b7280;margin-top:2px">id · email · nickname · avatar_url · created_at<br/><em>Gestita da Supabase Auth</em></div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">creatures</div>
+          <div style="color:#6b7280;margin-top:2px">id · name · description · element · rarity · hp · atk · def · min_level · image_url · spawn_weight · evolution_of</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">items</div>
+          <div style="color:#6b7280;margin-top:2px">id · name · type (rete/esca/uovo/battaglia) · effect_value · description · image_url · shop_price</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(232,93,47,0.08);border:1px solid rgba(232,93,47,0.25);border-radius:10px;padding:12px">
+      <div style="font-size:11px;font-weight:700;color:#E85D2F;letter-spacing:1px;margin-bottom:8px">SESSION TABLES</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">sessions</div>
+          <div style="color:#6b7280;margin-top:2px">id · name · status · area_bounds · start_at · end_at<br/><strong style="color:#fb923c">narrative_config (JSON)</strong>: story_title, intro_text, villain_name, chapters[]</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">player_sessions</div>
+          <div style="color:#6b7280;margin-top:2px">id · user_id · session_id · level · exp · gold · role (player/boss/villain) · last_position · joined_at</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">hall_of_fame</div>
+          <div style="color:#6b7280;margin-top:2px">id · user_id · session_id · rank · score · creatures_caught · season_label · awarded_at</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(90,138,60,0.08);border:1px solid rgba(90,138,60,0.25);border-radius:10px;padding:12px">
+      <div style="font-size:11px;font-weight:700;color:#5A8A3C;letter-spacing:1px;margin-bottom:8px">GAMEPLAY TABLES</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">player_creatures</div>
+          <div style="color:#6b7280;margin-top:2px">id · user_id · creature_id · session_id · duplicates_count · evolved · caught_at</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">player_inventory</div>
+          <div style="color:#6b7280;margin-top:2px">id · user_id · session_id · item_id · quantity</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">encounters</div>
+          <div style="color:#6b7280;margin-top:2px">id · user_id · creature_id · session_id · status (active/caught/fled) · trigger (gps/timer) · started_at · resolved_at</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">duels</div>
+          <div style="color:#6b7280;margin-top:2px">id · challenger_id · opponent_id · session_id · status · winner_id · room_code · started_at</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(123,77,184,0.08);border:1px solid rgba(123,77,184,0.25);border-radius:10px;padding:12px">
+      <div style="font-size:11px;font-weight:700;color:#7B4DB8;letter-spacing:1px;margin-bottom:8px">MISSION & QR TABLES</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">missions</div>
+          <div style="color:#6b7280;margin-top:2px">id · session_id · chapter_order · title · description · type · target · target_count · reward_gold · reward_exp · reward_item_id · is_required</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">player_missions</div>
+          <div style="color:#6b7280;margin-top:2px">id · user_id · mission_id · progress · completed_at</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px">
+          <div style="font-weight:700;color:#e2e8f0">qr_codes</div>
+          <div style="color:#6b7280;margin-top:2px">id · session_id · type · payload (JSON) · uses_remaining · label · created_at</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">Meccaniche Chiave — Logica Server-Side</span>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+
+    <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:12px">
+      <div style="font-weight:700;font-size:13px;color:#F7C841;margin-bottom:6px">🎲 RNG Cattura (server-side)</div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        Probabilità base per rarità: Comune 70% · Non comune 45% · Raro 25% · Epico 12% · Leggendario 5%<br/>
+        Ogni tipo di Rete aggiunge un bonus additivo (+10%, +20%, ecc.)<br/>
+        RNG calcolato esclusivamente su API route — il client non vede mai la soglia<br/>
+        <strong>1 solo tentativo per incontro</strong> — se fallisce, la creatura fugge
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:12px">
+      <div style="font-weight:700;font-size:13px;color:#3A9DBC;margin-bottom:6px">📍 Trigger Incontri GPS + Timer</div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        GPS polling ogni 10s — se spostamento ≥ 20m → valuta incontro con probabilità P_zona<br/>
+        Se GPS accuracy > 50m o non disponibile → fallback timer random 60–180s<br/>
+        Pool creature filtrato per: livello giocatore + zona attiva + esche attive<br/>
+        Max 1 incontro attivo per volta — non si può avere 2 creature contemporaneamente
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:12px">
+      <div style="font-weight:700;font-size:13px;color:#7B4DB8;margin-bottom:6px">⚡ Duelli Realtime (Supabase Realtime)</div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        Connessione via codice stanza (4 lettere) o QR condiviso<br/>
+        Danno = (ATK creatura × livello giocatore) × moltiplicatore elemento × dado (0.8–1.2 random)<br/>
+        <strong>Creature rare+: prima mossa sempre dell'avversario</strong><br/>
+        Oggetti battaglia usabili durante il duello (+ATK o +DEF per 1 turno)<br/>
+        Vincitore: EXP + oggetto casuale. Perdente: EXP consolazione<br/>
+        Realtime via WebSocket Supabase — nessun polling
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:12px">
+      <div style="font-weight:700;font-size:13px;color:#5A8A3C;margin-bottom:6px">🥚 Sistema Uova</div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        Uova ottenibili da missioni, ricompense duello o QR fisici<br/>
+        Schiusa via: distanza GPS percorsa (es. 500m) OPPURE X incontri completati OPPURE scan QR speciale<br/>
+        Rarità creatura nell'uovo configurabile dall'admin per ogni tipo di uovo<br/>
+        Animazione schiusa con reveal progressivo della creatura
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:12px">
+      <div style="font-weight:700;font-size:13px;color:#E85D2F;margin-bottom:6px">📈 Progressione & Livelli</div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.8">
+        EXP da: cattura nuova (+10) · duplicato (+3) · duello vinto (+15) · missione completata (+20–50)<br/>
+        Ogni livello sblocca creature di rarità superiore nel pool spawn<br/>
+        <strong>Reset per sessione</strong> — si riparte da livello 1 a ogni evento<br/>
+        <strong>Hall of Fame permanente</strong> — punteggio finale, top 3 per stagione, badge visibili sul profilo
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:12px">
+      <div style="font-weight:700;font-size:13px;color:#D4A96A;margin-bottom:6px">🛡️ Sistema Elementi (opzionale, attivabile dall'admin)</div>
+      <div style="font-size:12px;color:#9ca3af">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:4px">
+          <div style="background:rgba(232,93,47,0.15);border-radius:6px;padding:6px;text-align:center">
+            <div>🔥 Fiamma</div><div style="font-size:10px;color:#6b7280">Forte: Terra, Bosco<br/>Debole: Adriatico</div>
+          </div>
+          <div style="background:rgba(58,157,188,0.15);border-radius:6px;padding:6px;text-align:center">
+            <div>🌊 Adriatico</div><div style="font-size:10px;color:#6b7280">Forte: Fiamma, Terra<br/>Debole: Bosco</div>
+          </div>
+          <div style="background:rgba(90,138,60,0.15);border-radius:6px;padding:6px;text-align:center">
+            <div>🌿 Bosco</div><div style="font-size:10px;color:#6b7280">Forte: Adriatico<br/>Debole: Fiamma</div>
+          </div>
+          <div style="background:rgba(212,169,106,0.15);border-radius:6px;padding:6px;text-align:center">
+            <div>⛰️ Terra</div><div style="font-size:10px;color:#6b7280">Forte: Fiamma<br/>Debole: Adriatico</div>
+          </div>
+          <div style="background:rgba(247,200,65,0.15);border-radius:6px;padding:6px;text-align:center">
+            <div>🎵 Armonia</div><div style="font-size:10px;color:#6b7280">+15% danno base<br/>Nessuna debolezza</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:6px;text-align:center;font-size:11px;color:#6b7280">
+            Admin può disattivare il sistema elementi per eventi più semplici
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:14px;margin-top:4px;text-align:center">
+  <div style="font-size:13px;color:#d1d5db">Database e meccaniche ok? Approva per <strong>Sezione 5: UI/UX Visual Design</strong> — mockup schermate principali</div>
+</div>
