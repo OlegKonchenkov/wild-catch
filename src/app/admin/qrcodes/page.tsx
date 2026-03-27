@@ -350,6 +350,7 @@ export default function QRCodesPage() {
   const [selectedId, setSelectedId]     = useState('')
   const [qrCodes, setQrCodes]           = useState<any[]>([])
   const [previewQr, setPreviewQr]       = useState<any | null>(null)
+  const [editorOpen, setEditorOpen]     = useState(false)
   const [editingQrId, setEditingQrId]   = useState<string | null>(null)
 
   // Reference data for selects
@@ -388,24 +389,36 @@ export default function QRCodesPage() {
     setFields(prev => ({ ...prev, [key]: val }))
   }
 
-  function clearEditor(nextType: QRCodeType = type) {
+  function openNewEditor() {
+    setEditingQrId(null)
+    setType('oggetto')
+    setLabel('')
+    setFields(defaultFields('oggetto'))
+    setUsesRemaining(null)
+    setError('')
+    setEditorOpen(true)
+  }
+
+  function clearEditor(nextType: QRCodeType = 'oggetto') {
     setEditingQrId(null)
     setType(nextType)
     setLabel('')
     setFields(defaultFields(nextType))
     setUsesRemaining(null)
     setError('')
+    setEditorOpen(false)
   }
 
   function startEditing(qr: any) {
     const qrType = qr.type as QRCodeType
+    setPreviewQr(null)
     setEditingQrId(qr.id)
     setType(qrType)
     setLabel(String(qr.label ?? ''))
     setUsesRemaining(typeof qr.uses_remaining === 'number' ? qr.uses_remaining : null)
     setFields(payloadToFields(qrType, qr.payload ?? {}))
     setError('')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setEditorOpen(true)
   }
 
   async function saveQR() {
@@ -431,7 +444,7 @@ export default function QRCodesPage() {
         setQrCodes(prev => [data.qrCode, ...prev])
         setActionMsg({ ok: true, text: 'QR creato correttamente' })
       }
-      clearEditor(type)
+      clearEditor('oggetto')
       setTimeout(() => setActionMsg(null), 2400)
     } else {
       setError(data.error ?? (isEditing ? 'Errore nel salvataggio' : 'Errore nella creazione'))
@@ -457,7 +470,7 @@ export default function QRCodesPage() {
 
     setQrCodes(prev => prev.filter(row => row.id !== qr.id))
     if (previewQr?.id === qr.id) setPreviewQr(null)
-    if (editingQrId === qr.id) clearEditor(type)
+    if (editingQrId === qr.id) clearEditor('oggetto')
     setActionMsg({ ok: true, text: 'QR eliminato' })
     setTimeout(() => setActionMsg(null), 2400)
   }
@@ -540,7 +553,16 @@ export default function QRCodesPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-4">📷 QR Codes</h1>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h1 className="text-2xl font-bold">📷 QR Codes</h1>
+        <button
+          onClick={openNewEditor}
+          disabled={!selectedId}
+          className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+        >
+          + Nuovo QR Code
+        </button>
+      </div>
       {actionMsg && (
         <p className={`mb-4 text-sm rounded-lg px-3 py-2 border ${
           actionMsg.ok
@@ -558,147 +580,6 @@ export default function QRCodesPage() {
           className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2">
           {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-      </div>
-
-      {/* Create form */}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-5 mb-6 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-bold text-white">
-            {editingQrId ? 'Modifica QR Code' : 'Crea nuovo QR Code'}
-          </h2>
-          {editingQrId && (
-            <button
-              onClick={() => clearEditor(type)}
-              className="text-xs bg-white/10 text-white/80 px-3 py-1.5 rounded-lg hover:bg-white/15 transition-colors"
-            >
-              Annulla modifica
-            </button>
-          )}
-        </div>
-
-        {/* Type selector */}
-        <Field label="Tipo di QR Code">
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-1">
-            {(Object.keys(TYPE_INFO) as QRCodeType[]).map(t => (
-              <button key={t} onClick={() => handleTypeChange(t)}
-                className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border text-xs font-semibold transition-colors ${
-                  type === t ? 'bg-[#3A9DBC]/20 border-[#3A9DBC] text-[#3A9DBC]' : 'bg-white/5 border-white/10 text-white/50 hover:border-white/30'
-                }`}>
-                <span className="text-xl">{TYPE_INFO[t].icon}</span>
-                {TYPE_INFO[t].label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-white/35 mt-2 italic">{info.description}</p>
-        </Field>
-
-        {/* Label */}
-        <Field label="Etichetta QR" hint="Nome visivo per riconoscere questo QR nell'elenco (es. 'Stazione A')">
-          <input value={label} onChange={e => setLabel(e.target.value)}
-            placeholder="es. Stazione A" className={cls} />
-        </Field>
-
-        {/* Dynamic fields per type */}
-        <div className="space-y-3 border-t border-white/10 pt-4">
-          <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">Contenuto del QR</p>
-
-          {type === 'oggetto' && (
-            <>
-              <Field label="Oggetto da consegnare" hint="Seleziona l'oggetto che il giocatore riceverà scansionando questo QR">
-                <SearchSelect
-                  options={itemOptions}
-                  value={String(fields.item_id)}
-                  onChange={v => setField('item_id', v)}
-                  placeholder="Seleziona oggetto..."
-                />
-              </Field>
-              <Field label="Quantità" hint="Quanti oggetti riceve il giocatore">
-                <input type="number" value={fields.quantity} min={1} onChange={e => setField('quantity', +e.target.value)} className={cls} />
-              </Field>
-            </>
-          )}
-
-          {type === 'indizio' && (
-            <>
-              <Field label="Capitolo di riferimento" hint="A quale missione/capitolo appartiene questo indizio">
-                <input type="number" value={fields.chapter_order} min={1} onChange={e => setField('chapter_order', +e.target.value)} className={cls} />
-              </Field>
-              <Field label="Testo dell'indizio" hint="Il messaggio narrativo mostrato al giocatore">
-                <textarea value={String(fields.text)} onChange={e => setField('text', e.target.value)}
-                  rows={3} className={cls + ' resize-none'} placeholder="es. Il segreto si nasconde tra le rovine al tramonto..." />
-              </Field>
-              <ImageInput
-                label="Immagine (opzionale)"
-                hint="Immagine mostrata insieme al testo dell'indizio"
-                value={String(fields.image_url)}
-                onChange={v => setField('image_url', v)}
-                optional
-              />
-            </>
-          )}
-
-          {type === 'uovo' && (
-            <Field label="Rarità dell'uovo" hint="Determina la rarità delle creature ottenibili dall'uovo">
-              <select value={String(fields.egg_rarity)} onChange={e => setField('egg_rarity', e.target.value)} className={cls}>
-                <option value="comune">⚪ Comune</option>
-                <option value="raro">🔵 Raro</option>
-                <option value="epico">🟣 Epico</option>
-                <option value="leggendario">🟡 Leggendario</option>
-              </select>
-            </Field>
-          )}
-
-          {type === 'boss' && (
-            <>
-              <Field label="Creatura boss" hint="Seleziona la creatura che apparirà come boss da scansionare">
-                <SearchSelect
-                  options={creatureOptions}
-                  value={String(fields.creature_id)}
-                  onChange={v => setField('creature_id', v)}
-                  placeholder="Seleziona creatura..."
-                />
-              </Field>
-              <Field label="Livello del boss" hint="Livello con cui la creatura appare come boss (più alto = più difficile)">
-                <input type="number" value={fields.level_override} min={1} onChange={e => setField('level_override', +e.target.value)} className={cls} />
-              </Field>
-            </>
-          )}
-
-          {type === 'evento' && (
-            <>
-              <Field label="Tipo di bonus" hint="Quale effetto si attiva quando il giocatore scansiona">
-                <select value={String(fields.event_type)} onChange={e => setField('event_type', e.target.value)} className={cls}>
-                  <option value="bonus_exp">✨ Moltiplicatore EXP</option>
-                  <option value="spawn_rate_boost">🐾 Aumento spawn creature</option>
-                  <option value="double_gold">🪙 Oro raddoppiato</option>
-                </select>
-              </Field>
-              <Field label="Moltiplicatore" hint="es. 2 = doppio effetto, 3 = triplo">
-                <input type="number" value={fields.multiplier} min={1} step={0.5} onChange={e => setField('multiplier', +e.target.value)} className={cls} />
-              </Field>
-              <Field label="Durata (minuti)" hint="Per quanti minuti rimane attivo il bonus">
-                <input type="number" value={fields.duration_minutes} min={1} onChange={e => setField('duration_minutes', +e.target.value)} className={cls} />
-              </Field>
-            </>
-          )}
-        </div>
-
-        {/* Uses remaining */}
-        <Field label="Utilizzi massimi" hint="Lascia vuoto per utilizzi illimitati. Utile per QR esclusivi (es. 1 solo uso).">
-          <input type="number" placeholder="∞ illimitati" min={1}
-            value={usesRemaining ?? ''}
-            onChange={e => setUsesRemaining(e.target.value ? +e.target.value : null)}
-            className="w-40 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm" />
-        </Field>
-
-        {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {error}</p>}
-
-        <button onClick={saveQR} disabled={creating || !selectedId}
-          className="w-full bg-[#E85D2F] text-white font-bold py-2.5 rounded-lg disabled:opacity-50">
-          {creating
-            ? (editingQrId ? 'Salvataggio...' : 'Creazione...')
-            : (editingQrId ? `💾 Salva modifiche — ${info.label}` : `${info.icon} Crea QR — ${info.label}`)}
-        </button>
       </div>
 
       {/* QR list */}
@@ -749,6 +630,156 @@ export default function QRCodesPage() {
           )
         })}
       </div>
+
+      {editorOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) clearEditor('oggetto') }}
+        >
+          <div className="bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 w-full max-w-xl shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-white">
+                {editingQrId ? '✏️ Modifica QR Code' : '+ Nuovo QR Code'}
+              </h2>
+              <button onClick={() => clearEditor('oggetto')} className="text-white/40 hover:text-white text-xl leading-none">✕</button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Type selector */}
+              <Field label="Tipo di QR Code">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-1">
+                  {(Object.keys(TYPE_INFO) as QRCodeType[]).map(t => (
+                    <button key={t} onClick={() => handleTypeChange(t)}
+                      className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border text-xs font-semibold transition-colors ${
+                        type === t ? 'bg-[#3A9DBC]/20 border-[#3A9DBC] text-[#3A9DBC]' : 'bg-white/5 border-white/10 text-white/50 hover:border-white/30'
+                      }`}>
+                      <span className="text-xl">{TYPE_INFO[t].icon}</span>
+                      {TYPE_INFO[t].label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-white/35 mt-2 italic">{info.description}</p>
+              </Field>
+
+              {/* Label */}
+              <Field label="Etichetta QR" hint="Nome visivo per riconoscere questo QR nell'elenco (es. 'Stazione A')">
+                <input value={label} onChange={e => setLabel(e.target.value)}
+                  placeholder="es. Stazione A" className={cls} autoFocus />
+              </Field>
+
+              {/* Dynamic fields per type */}
+              <div className="space-y-3 border-t border-white/10 pt-4">
+                <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">Contenuto del QR</p>
+
+                {type === 'oggetto' && (
+                  <>
+                    <Field label="Oggetto da consegnare" hint="Seleziona l'oggetto che il giocatore riceverà scansionando questo QR">
+                      <SearchSelect
+                        options={itemOptions}
+                        value={String(fields.item_id)}
+                        onChange={v => setField('item_id', v)}
+                        placeholder="Seleziona oggetto..."
+                      />
+                    </Field>
+                    <Field label="Quantità" hint="Quanti oggetti riceve il giocatore">
+                      <input type="number" value={fields.quantity} min={1} onChange={e => setField('quantity', +e.target.value)} className={cls} />
+                    </Field>
+                  </>
+                )}
+
+                {type === 'indizio' && (
+                  <>
+                    <Field label="Capitolo di riferimento" hint="A quale missione/capitolo appartiene questo indizio">
+                      <input type="number" value={fields.chapter_order} min={1} onChange={e => setField('chapter_order', +e.target.value)} className={cls} />
+                    </Field>
+                    <Field label="Testo dell'indizio" hint="Il messaggio narrativo mostrato al giocatore">
+                      <textarea value={String(fields.text)} onChange={e => setField('text', e.target.value)}
+                        rows={3} className={cls + ' resize-none'} placeholder="es. Il segreto si nasconde tra le rovine al tramonto..." />
+                    </Field>
+                    <ImageInput
+                      label="Immagine (opzionale)"
+                      hint="Immagine mostrata insieme al testo dell'indizio"
+                      value={String(fields.image_url)}
+                      onChange={v => setField('image_url', v)}
+                      optional
+                    />
+                  </>
+                )}
+
+                {type === 'uovo' && (
+                  <Field label="Rarità dell'uovo" hint="Determina la rarità delle creature ottenibili dall'uovo">
+                    <select value={String(fields.egg_rarity)} onChange={e => setField('egg_rarity', e.target.value)} className={cls}>
+                      <option value="comune">⚪ Comune</option>
+                      <option value="raro">🔵 Raro</option>
+                      <option value="epico">🟣 Epico</option>
+                      <option value="leggendario">🟡 Leggendario</option>
+                    </select>
+                  </Field>
+                )}
+
+                {type === 'boss' && (
+                  <>
+                    <Field label="Creatura boss" hint="Seleziona la creatura che apparirà come boss da scansionare">
+                      <SearchSelect
+                        options={creatureOptions}
+                        value={String(fields.creature_id)}
+                        onChange={v => setField('creature_id', v)}
+                        placeholder="Seleziona creatura..."
+                      />
+                    </Field>
+                    <Field label="Livello del boss" hint="Livello con cui la creatura appare come boss (più alto = più difficile)">
+                      <input type="number" value={fields.level_override} min={1} onChange={e => setField('level_override', +e.target.value)} className={cls} />
+                    </Field>
+                  </>
+                )}
+
+                {type === 'evento' && (
+                  <>
+                    <Field label="Tipo di bonus" hint="Quale effetto si attiva quando il giocatore scansiona">
+                      <select value={String(fields.event_type)} onChange={e => setField('event_type', e.target.value)} className={cls}>
+                        <option value="bonus_exp">✨ Moltiplicatore EXP</option>
+                        <option value="spawn_rate_boost">🐾 Aumento spawn creature</option>
+                        <option value="double_gold">🪙 Oro raddoppiato</option>
+                      </select>
+                    </Field>
+                    <Field label="Moltiplicatore" hint="es. 2 = doppio effetto, 3 = triplo">
+                      <input type="number" value={fields.multiplier} min={1} step={0.5} onChange={e => setField('multiplier', +e.target.value)} className={cls} />
+                    </Field>
+                    <Field label="Durata (minuti)" hint="Per quanti minuti rimane attivo il bonus">
+                      <input type="number" value={fields.duration_minutes} min={1} onChange={e => setField('duration_minutes', +e.target.value)} className={cls} />
+                    </Field>
+                  </>
+                )}
+              </div>
+
+              {/* Uses remaining */}
+              <Field label="Utilizzi massimi" hint="Lascia vuoto per utilizzi illimitati. Utile per QR esclusivi (es. 1 solo uso).">
+                <input type="number" placeholder="∞ illimitati" min={1}
+                  value={usesRemaining ?? ''}
+                  onChange={e => setUsesRemaining(e.target.value ? +e.target.value : null)}
+                  className="w-40 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm" />
+              </Field>
+
+              {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {error}</p>}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => clearEditor('oggetto')}
+                  className="flex-1 bg-white/5 border border-white/10 text-white/60 font-semibold py-2.5 rounded-xl text-sm"
+                >
+                  Annulla
+                </button>
+                <button onClick={saveQR} disabled={creating || !selectedId}
+                  className="flex-1 bg-[#E85D2F] text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50">
+                  {creating
+                    ? (editingQrId ? 'Salvataggio...' : 'Creazione...')
+                    : (editingQrId ? 'Salva modifiche' : 'Crea QR Code')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {previewQr && (
         <QRModal
