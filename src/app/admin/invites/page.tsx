@@ -10,6 +10,39 @@ interface Invite {
   created_at: string
 }
 
+function IconCopy({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 15H5a2 2 0 01-2-2V5a2 2 0 012-2h8a2 2 0 012 2v2" />
+    </svg>
+  )
+}
+
+function IconShare({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12l8-5M8 12l8 5M6 13.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zm12-6a2.5 2.5 0 100-5 2.5 2.5 0 000 5zm0 12a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+    </svg>
+  )
+}
+
+function IconDownload({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l4-4m-4 4l-4-4M4 19h16" />
+    </svg>
+  )
+}
+
+function IconReset({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M6.5 9a7 7 0 0111.7-2.2M17.5 15a7 7 0 01-11.7 2.2" />
+    </svg>
+  )
+}
+
 export default function InvitesPage() {
   const [sessions, setSessions]     = useState<any[]>([])
   const [selectedId, setSelectedId] = useState('')
@@ -19,6 +52,7 @@ export default function InvitesPage() {
   const [loading, setLoading]       = useState(false)
   const [resetting, setResetting]   = useState<string | null>(null)
   const [filter, setFilter]         = useState<'all' | 'available' | 'used'>('all')
+  const [actionMsg, setActionMsg]   = useState<{ ok: boolean; text: string } | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -51,6 +85,55 @@ export default function InvitesPage() {
   }
 
   useEffect(() => { if (selectedId) loadInvites(selectedId) }, [selectedId])
+
+  function pushActionMsg(ok: boolean, text: string) {
+    setActionMsg({ ok, text })
+    setTimeout(() => setActionMsg(null), 2500)
+  }
+
+  async function copyText(text: string) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  }
+
+  async function copyInviteCode(code: string) {
+    try {
+      const ok = await copyText(code)
+      pushActionMsg(ok, ok ? 'Codice copiato negli appunti' : 'Copia non riuscita')
+    } catch {
+      pushActionMsg(false, 'Copia non riuscita')
+    }
+  }
+
+  async function shareInviteCode(code: string) {
+    const text = `Codice invito Wild Catch: ${code}`
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Codice invito Wild Catch',
+          text,
+        })
+        pushActionMsg(true, 'Codice condiviso')
+        return
+      }
+      const ok = await copyText(code)
+      pushActionMsg(ok, ok ? 'Condivisione non disponibile: codice copiato' : 'Condivisione non riuscita')
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      pushActionMsg(false, 'Condivisione non riuscita')
+    }
+  }
 
   async function generateCodes() {
     setLoading(true)
@@ -103,6 +186,7 @@ export default function InvitesPage() {
     a.href = url; a.download = `inviti_${selectedId}.csv`
     document.body.appendChild(a); a.click()
     document.body.removeChild(a); URL.revokeObjectURL(url)
+    pushActionMsg(true, 'CSV scaricato')
   }
 
   const usedCount      = invites.filter(i => i.used_by_user_id).length
@@ -117,6 +201,15 @@ export default function InvitesPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-4">🎟️ Codici Invito</h1>
+      {actionMsg && (
+        <p className={`mb-4 text-sm rounded-lg px-3 py-2 border ${
+          actionMsg.ok
+            ? 'text-[#34d399] bg-[#34d399]/10 border-[#34d399]/30'
+            : 'text-red-400 bg-red-400/10 border-red-400/30'
+        }`}>
+          {actionMsg.text}
+        </p>
+      )}
 
       {/* Session selector */}
       <div className="mb-4">
@@ -144,8 +237,9 @@ export default function InvitesPage() {
             </button>
             {invites.length > 0 && (
               <button onClick={exportCSV}
-                className="bg-[#34d399] text-[#0F1F2E] font-bold px-4 py-2 rounded-lg">
-                ⬇ CSV
+                className="inline-flex items-center gap-1.5 bg-[#34d399] text-[#0F1F2E] font-bold px-4 py-2 rounded-lg">
+                <IconDownload className="w-4 h-4" />
+                CSV
               </button>
             )}
           </div>
@@ -214,16 +308,35 @@ export default function InvitesPage() {
                       }
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      {inv.used_by_user_id && (
+                      <div className="flex justify-end items-center gap-1.5">
                         <button
-                          onClick={() => resetCode(inv.id)}
-                          disabled={resetting === inv.id}
-                          className="text-xs text-[#F7C841]/60 hover:text-[#F7C841] transition-colors disabled:opacity-40"
-                          title="Resetta codice — lo rende disponibile di nuovo"
+                          onClick={() => copyInviteCode(inv.code)}
+                          className="inline-flex items-center gap-1 bg-white/10 text-white/75 hover:text-white px-2 py-1 rounded-md text-xs transition-colors"
+                          title="Copia codice invito"
                         >
-                          {resetting === inv.id ? '...' : '🔄 Reset'}
+                          <IconCopy className="w-3.5 h-3.5" />
+                          Copia
                         </button>
-                      )}
+                        <button
+                          onClick={() => shareInviteCode(inv.code)}
+                          className="inline-flex items-center gap-1 bg-white/10 text-white/75 hover:text-white px-2 py-1 rounded-md text-xs transition-colors"
+                          title="Condividi codice invito"
+                        >
+                          <IconShare className="w-3.5 h-3.5" />
+                          Condividi
+                        </button>
+                        {inv.used_by_user_id && (
+                          <button
+                            onClick={() => resetCode(inv.id)}
+                            disabled={resetting === inv.id}
+                            className="inline-flex items-center gap-1 text-xs text-[#F7C841]/70 hover:text-[#F7C841] transition-colors disabled:opacity-40 px-2 py-1 rounded-md"
+                            title="Resetta codice — lo rende disponibile di nuovo"
+                          >
+                            <IconReset className="w-3.5 h-3.5" />
+                            {resetting === inv.id ? '...' : 'Reset'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

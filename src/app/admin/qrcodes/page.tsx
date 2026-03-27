@@ -85,6 +85,31 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 const cls = 'w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm'
 
+function IconEye({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+function IconDownload({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l4-4m-4 4l-4-4M4 19h16" />
+    </svg>
+  )
+}
+
+function IconShare({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12l8-5M8 12l8 5M6 13.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zm12-6a2.5 2.5 0 100-5 2.5 2.5 0 000 5zm0 12a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+    </svg>
+  )
+}
+
 /* ── Default payload fields per type ─────────── */
 type Fields = Record<string, string | number>
 
@@ -109,7 +134,14 @@ function buildPayload(t: QRCodeType, f: Fields): any {
 }
 
 /* ── QR Preview Modal ────────────────────────── */
-function QRModal({ qr, onClose, onDownload }: { qr: any; onClose: () => void; onDownload: () => void }) {
+function QRModal({
+  qr, onClose, onDownload, onShare,
+}: {
+  qr: any
+  onClose: () => void
+  onDownload: () => void
+  onShare: () => void
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const info = TYPE_INFO[qr.type as QRCodeType]
 
@@ -160,10 +192,22 @@ function QRModal({ qr, onClose, onDownload }: { qr: any; onClose: () => void; on
           </div>
         </div>
 
-        <button onClick={onDownload}
-          className="w-full bg-[#3A9DBC] text-white font-bold py-2.5 rounded-xl text-sm">
-          ⬇ Scarica PNG
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={onShare}
+            className="inline-flex items-center justify-center gap-1.5 bg-white/10 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-white/15 transition-colors"
+          >
+            <IconShare />
+            Condividi
+          </button>
+          <button
+            onClick={onDownload}
+            className="inline-flex items-center justify-center gap-1.5 bg-[#3A9DBC] text-white font-bold py-2.5 rounded-xl text-sm hover:brightness-110 transition-all"
+          >
+            <IconDownload />
+            PNG
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -186,6 +230,7 @@ export default function QRCodesPage() {
   const [usesRemaining, setUsesRemaining] = useState<number | null>(null)
   const [creating, setCreating]         = useState(false)
   const [error, setError]               = useState('')
+  const [actionMsg, setActionMsg]       = useState<{ ok: boolean; text: string } | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -237,6 +282,46 @@ export default function QRCodesPage() {
     link.download = `qr_${qrLabel || qrId}.png`
     link.href = canvas.toDataURL()
     link.click()
+    setActionMsg({ ok: true, text: 'QR scaricato in PNG' })
+    setTimeout(() => setActionMsg(null), 2400)
+  }
+
+  async function copyText(text: string) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  }
+
+  async function shareQR(qr: any) {
+    const info = TYPE_INFO[qr.type as QRCodeType]
+    const text = `${qr.label || info?.label || 'QR WildCatch'}\nID: ${qr.id}`
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: qr.label || info?.label || 'QR WildCatch',
+          text,
+        })
+        setActionMsg({ ok: true, text: 'QR condiviso' })
+      } else {
+        const ok = await copyText(text)
+        setActionMsg({ ok, text: ok ? 'Condivisione non disponibile: testo copiato' : 'Condivisione non riuscita' })
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      setActionMsg({ ok: false, text: 'Condivisione non riuscita' })
+    } finally {
+      setTimeout(() => setActionMsg(null), 2600)
+    }
   }
 
   // Build select options
@@ -248,6 +333,15 @@ export default function QRCodesPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-4">📷 QR Codes</h1>
+      {actionMsg && (
+        <p className={`mb-4 text-sm rounded-lg px-3 py-2 border ${
+          actionMsg.ok
+            ? 'text-[#34d399] bg-[#34d399]/10 border-[#34d399]/30'
+            : 'text-red-400 bg-red-400/10 border-red-400/30'
+        }`}>
+          {actionMsg.text}
+        </p>
+      )}
 
       {/* Session selector */}
       <div className="mb-4">
@@ -389,18 +483,54 @@ export default function QRCodesPage() {
       <div className="space-y-2">
         {qrCodes.length === 0 && <p className="text-white/30 text-sm">Nessun QR code per questa sessione.</p>}
         {qrCodes.map(qr => (
-          <div key={qr.id} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-3">
+          <div
+            key={qr.id}
+            onClick={() => setPreviewQr(qr)}
+            className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-3 cursor-pointer hover:bg-white/8 transition-colors"
+            title="Apri anteprima QR"
+          >
             <span className="text-2xl">{TYPE_INFO[qr.type as QRCodeType]?.icon ?? '📷'}</span>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-bold">{qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || qr.type}</p>
               <p className="text-xs text-white/40 font-mono truncate">{qr.id}</p>
               <p className="text-xs text-white/40">{qr.uses_remaining === null ? '∞ usi illimitati' : `${qr.uses_remaining} usi rimanenti`}</p>
             </div>
-            <button onClick={() => downloadQR(qr.id, qr.label)}
-              className="bg-[#3A9DBC] text-white px-3 py-1.5 rounded-lg text-sm shrink-0">⬇ PNG</button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); setPreviewQr(qr) }}
+                className="inline-flex items-center gap-1.5 bg-white/10 text-white/80 px-3 py-1.5 rounded-lg text-sm hover:bg-white/15 transition-colors"
+              >
+                <IconEye />
+                Preview
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); shareQR(qr) }}
+                className="inline-flex items-center gap-1.5 bg-white/10 text-white/80 px-3 py-1.5 rounded-lg text-sm hover:bg-white/15 transition-colors"
+              >
+                <IconShare />
+                Condividi
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); downloadQR(qr.id, qr.label) }}
+                className="inline-flex items-center gap-1.5 bg-[#3A9DBC] text-white px-3 py-1.5 rounded-lg text-sm hover:brightness-110 transition-all"
+              >
+                <IconDownload />
+                PNG
+              </button>
+            </div>
           </div>
         ))}
       </div>
+
+      {previewQr && (
+        <QRModal
+          qr={previewQr}
+          onClose={() => setPreviewQr(null)}
+          onDownload={() => downloadQR(previewQr.id, previewQr.label)}
+          onShare={() => shareQR(previewQr)}
+        />
+      )}
     </div>
   )
 }
+
