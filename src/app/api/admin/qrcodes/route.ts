@@ -48,3 +48,47 @@ export async function GET(request: Request) {
     .eq('session_id', sessionId).order('created_at', { ascending: false })
   return NextResponse.json({ qrCodes: data ?? [] })
 }
+
+export async function PATCH(request: Request) {
+  const supabase = await createClient()
+  const auth = await requireAdmin(supabase)
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
+  const { qrId, type, payload, usesRemaining, label } = await request.json()
+  if (!qrId || !type || !payload) {
+    return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
+  }
+  if (!VALID_TYPES.includes(type)) {
+    return NextResponse.json({ error: 'Tipo QR non valido' }, { status: 400 })
+  }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('qr_codes')
+    .update({
+      type,
+      payload,
+      uses_remaining: usesRemaining ?? null,
+      label: label ?? '',
+    })
+    .eq('id', qrId)
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ qrCode: data })
+}
+
+export async function DELETE(request: Request) {
+  const supabase = await createClient()
+  const auth = await requireAdmin(supabase)
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
+  const { qrId } = await request.json()
+  if (!qrId) return NextResponse.json({ error: 'qrId richiesto' }, { status: 400 })
+
+  const admin = createAdminClient()
+  const { error } = await admin.from('qr_codes').delete().eq('id', qrId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ deleted: true })
+}

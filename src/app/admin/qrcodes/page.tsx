@@ -110,6 +110,138 @@ function IconShare({ className = 'w-4 h-4' }: { className?: string }) {
   )
 }
 
+function IconEdit({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 20h9" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  )
+}
+
+function IconTrash({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M8 6V4h8v2m-1 0v14H9V6" />
+    </svg>
+  )
+}
+
+function asNumber(v: unknown, fallback: number): number {
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function payloadToFields(type: QRCodeType, payload: any): Fields {
+  const p = payload ?? {}
+  switch (type) {
+    case 'oggetto':
+      return { item_id: String(p.item_id ?? ''), quantity: asNumber(p.quantity, 1) }
+    case 'indizio':
+      return {
+        chapter_order: asNumber(p.chapter_order, 1),
+        text: String(p.text ?? ''),
+        image_url: String(p.image_url ?? ''),
+      }
+    case 'uovo':
+      return { egg_rarity: String(p.egg_rarity ?? 'comune') }
+    case 'boss':
+      return {
+        creature_id: String(p.creature_id ?? ''),
+        level_override: asNumber(p.level_override, 10),
+      }
+    case 'evento':
+      return {
+        event_type: String(p.event_type ?? 'bonus_exp'),
+        multiplier: asNumber(p.effect?.multiplier, 2),
+        duration_minutes: asNumber(p.effect?.duration_minutes, 10),
+      }
+  }
+}
+
+function getEventTypeLabel(eventType: string): string {
+  switch (eventType) {
+    case 'bonus_exp': return 'Moltiplicatore EXP'
+    case 'spawn_rate_boost': return 'Aumento spawn creature'
+    case 'double_gold': return 'Oro raddoppiato'
+    default: return eventType
+  }
+}
+
+function getQrDescription(qr: any, items: any[], creatures: any[]): string {
+  const payload = qr.payload ?? {}
+  switch (qr.type as QRCodeType) {
+    case 'oggetto': {
+      const item = items.find(i => i.id === payload.item_id)
+      const itemName = item?.name ?? 'Oggetto sconosciuto'
+      const qty = asNumber(payload.quantity, 1)
+      return `${itemName} ×${qty}`
+    }
+    case 'indizio': {
+      const chapter = asNumber(payload.chapter_order, 1)
+      const text = String(payload.text ?? '').trim()
+      return text ? `Capitolo ${chapter}: ${text}` : `Indizio capitolo ${chapter}`
+    }
+    case 'uovo':
+      return `Uovo rarità ${String(payload.egg_rarity ?? 'comune')}`
+    case 'boss': {
+      const creature = creatures.find(c => c.id === payload.creature_id)
+      const creatureName = creature?.name ?? 'Creatura sconosciuta'
+      const level = asNumber(payload.level_override, 10)
+      return `${creatureName} livello ${level}`
+    }
+    case 'evento': {
+      const eventType = getEventTypeLabel(String(payload.event_type ?? 'bonus_exp'))
+      const multiplier = asNumber(payload.effect?.multiplier, 2)
+      const minutes = asNumber(payload.effect?.duration_minutes, 10)
+      return `${eventType} ×${multiplier} per ${minutes} min`
+    }
+    default:
+      return TYPE_INFO[qr.type as QRCodeType]?.description ?? 'QR speciale'
+  }
+}
+
+function getQrDetails(qr: any, items: any[], creatures: any[]) {
+  const payload = qr.payload ?? {}
+  const details: { label: string; value: string }[] = [
+    { label: 'Etichetta', value: qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || 'QR' },
+    { label: 'Tipo', value: TYPE_INFO[qr.type as QRCodeType]?.label ?? qr.type },
+    { label: 'Descrizione', value: getQrDescription(qr, items, creatures) },
+    {
+      label: 'Utilizzi',
+      value: qr.uses_remaining === null
+        ? 'Illimitati'
+        : qr.uses_remaining === 0
+          ? 'Esaurito'
+          : `${qr.uses_remaining} rimanenti`,
+    },
+    { label: 'Creato il', value: formatDateTime(qr.created_at) },
+  ]
+
+  switch (qr.type as QRCodeType) {
+    case 'indizio':
+      if (payload.image_url) details.push({ label: 'Immagine', value: 'Presente' })
+      break
+    case 'uovo':
+      if (payload.egg_rarity) details.push({ label: 'Rarità', value: String(payload.egg_rarity) })
+      break
+    case 'evento':
+      details.push({ label: 'Evento', value: getEventTypeLabel(String(payload.event_type ?? 'bonus_exp')) })
+      break
+    default:
+      break
+  }
+
+  return details
+}
+
 /* ── Default payload fields per type ─────────── */
 type Fields = Record<string, string | number>
 
@@ -135,9 +267,10 @@ function buildPayload(t: QRCodeType, f: Fields): any {
 
 /* ── QR Preview Modal ────────────────────────── */
 function QRModal({
-  qr, onClose, onDownload, onShare,
+  qr, details, onClose, onDownload, onShare,
 }: {
   qr: any
+  details: { label: string; value: string }[]
   onClose: () => void
   onDownload: () => void
   onShare: () => void
@@ -160,7 +293,7 @@ function QRModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70" />
       <div
-        className="relative bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 max-w-xs w-full shadow-2xl"
+        className="relative bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -179,17 +312,13 @@ function QRModal({
         </div>
 
         {/* Meta */}
-        <div className="space-y-1 mb-4">
-          <div className="flex justify-between text-xs">
-            <span className="text-white/40">ID</span>
-            <span className="text-white/60 font-mono">{qr.id.slice(0, 8)}…</span>
-          </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-white/40">Usi rimanenti</span>
-            <span className={`font-bold ${qr.uses_remaining === 0 ? 'text-red-400' : qr.uses_remaining === null ? 'text-[#34d399]' : 'text-[#F7C841]'}`}>
-              {qr.uses_remaining === null ? '∞ illimitati' : qr.uses_remaining === 0 ? '⛔ Esaurito' : `${qr.uses_remaining} rimasti`}
-            </span>
-          </div>
+        <div className="space-y-2 mb-4">
+          {details.map(detail => (
+            <div key={detail.label} className="flex justify-between items-start gap-4 text-xs">
+              <span className="text-white/40 shrink-0">{detail.label}</span>
+              <span className="text-white/75 text-right leading-relaxed">{detail.value}</span>
+            </div>
+          ))}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -221,6 +350,7 @@ export default function QRCodesPage() {
   const [selectedId, setSelectedId]     = useState('')
   const [qrCodes, setQrCodes]           = useState<any[]>([])
   const [previewQr, setPreviewQr]       = useState<any | null>(null)
+  const [editingQrId, setEditingQrId]   = useState<string | null>(null)
 
   // Reference data for selects
   const [creatures, setCreatures]       = useState<any[]>([])
@@ -258,21 +388,119 @@ export default function QRCodesPage() {
     setFields(prev => ({ ...prev, [key]: val }))
   }
 
-  async function createQR() {
+  function clearEditor(nextType: QRCodeType = type) {
+    setEditingQrId(null)
+    setType(nextType)
+    setLabel('')
+    setFields(defaultFields(nextType))
+    setUsesRemaining(null)
+    setError('')
+  }
+
+  function startEditing(qr: any) {
+    const qrType = qr.type as QRCodeType
+    setEditingQrId(qr.id)
+    setType(qrType)
+    setLabel(String(qr.label ?? ''))
+    setUsesRemaining(typeof qr.uses_remaining === 'number' ? qr.uses_remaining : null)
+    setFields(payloadToFields(qrType, qr.payload ?? {}))
+    setError('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function saveQR() {
     setError('')
     setCreating(true)
+    const isEditing = !!editingQrId
     const res = await fetch('/api/admin/qrcodes', {
-      method: 'POST',
+      method: isEditing ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: selectedId, type, payload: buildPayload(type, fields), usesRemaining, label }),
+      body: JSON.stringify(
+        isEditing
+          ? { qrId: editingQrId, type, payload: buildPayload(type, fields), usesRemaining, label }
+          : { sessionId: selectedId, type, payload: buildPayload(type, fields), usesRemaining, label },
+      ),
     })
     const data = await res.json()
     setCreating(false)
     if (res.ok) {
-      setQrCodes(prev => [data.qrCode, ...prev])
-      setLabel(''); setFields(defaultFields(type))
+      if (isEditing) {
+        setQrCodes(prev => prev.map(qr => (qr.id === editingQrId ? data.qrCode : qr)))
+        setActionMsg({ ok: true, text: 'QR aggiornato correttamente' })
+      } else {
+        setQrCodes(prev => [data.qrCode, ...prev])
+        setActionMsg({ ok: true, text: 'QR creato correttamente' })
+      }
+      clearEditor(type)
+      setTimeout(() => setActionMsg(null), 2400)
     } else {
-      setError(data.error ?? 'Errore nella creazione')
+      setError(data.error ?? (isEditing ? 'Errore nel salvataggio' : 'Errore nella creazione'))
+    }
+  }
+
+  async function deleteQR(qr: any) {
+    const ok = window.confirm(`Eliminare definitivamente il QR "${qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || 'senza etichetta'}"?`)
+    if (!ok) return
+
+    const res = await fetch('/api/admin/qrcodes', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ qrId: qr.id }),
+    })
+    const data = await res.json()
+
+    if (!res.ok) {
+      setActionMsg({ ok: false, text: data.error ?? 'Eliminazione non riuscita' })
+      setTimeout(() => setActionMsg(null), 2400)
+      return
+    }
+
+    setQrCodes(prev => prev.filter(row => row.id !== qr.id))
+    if (previewQr?.id === qr.id) setPreviewQr(null)
+    if (editingQrId === qr.id) clearEditor(type)
+    setActionMsg({ ok: true, text: 'QR eliminato' })
+    setTimeout(() => setActionMsg(null), 2400)
+  }
+
+  function getQrActionLabel(qr: any) {
+    return qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || 'QR'
+  }
+
+  function getQrDescriptionForUi(qr: any) {
+    return getQrDescription(qr, items, creatures)
+  }
+
+  function getPreviewDetails(qr: any) {
+    return getQrDetails(qr, items, creatures)
+  }
+
+  function getShareText(qr: any) {
+    const title = getQrActionLabel(qr)
+    const description = getQrDescriptionForUi(qr)
+    return `${title}\n${description}`
+  }
+
+  function getDownloadName(qrId: string, qrLabel: string) {
+    const safeLabel = qrLabel?.trim() ? qrLabel.trim() : qrId
+    return `qr_${safeLabel}`.replace(/\s+/g, '_')
+  }
+
+  async function handleShare(qr: any) {
+    const title = getQrActionLabel(qr)
+    const text = getShareText(qr)
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text })
+        setActionMsg({ ok: true, text: 'QR condiviso' })
+      } else {
+        const copied = await copyText(text)
+        setActionMsg({ ok: copied, text: copied ? 'Condivisione non disponibile: descrizione copiata' : 'Condivisione non riuscita' })
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      setActionMsg({ ok: false, text: 'Condivisione non riuscita' })
+    } finally {
+      setTimeout(() => setActionMsg(null), 2600)
     }
   }
 
@@ -281,7 +509,7 @@ export default function QRCodesPage() {
     const canvas = document.createElement('canvas')
     await QRCode.toCanvas(canvas, qrId, { width: 300 })
     const link = document.createElement('a')
-    link.download = `qr_${qrLabel || qrId}.png`
+    link.download = `${getDownloadName(qrId, qrLabel)}.png`
     link.href = canvas.toDataURL()
     link.click()
     setActionMsg({ ok: true, text: 'QR scaricato in PNG' })
@@ -302,28 +530,6 @@ export default function QRCodesPage() {
     const ok = document.execCommand('copy')
     document.body.removeChild(ta)
     return ok
-  }
-
-  async function shareQR(qr: any) {
-    const info = TYPE_INFO[qr.type as QRCodeType]
-    const text = `${qr.label || info?.label || 'QR WildCatch'}\nID: ${qr.id}`
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: qr.label || info?.label || 'QR WildCatch',
-          text,
-        })
-        setActionMsg({ ok: true, text: 'QR condiviso' })
-      } else {
-        const ok = await copyText(text)
-        setActionMsg({ ok, text: ok ? 'Condivisione non disponibile: testo copiato' : 'Condivisione non riuscita' })
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
-      setActionMsg({ ok: false, text: 'Condivisione non riuscita' })
-    } finally {
-      setTimeout(() => setActionMsg(null), 2600)
-    }
   }
 
   // Build select options
@@ -356,7 +562,19 @@ export default function QRCodesPage() {
 
       {/* Create form */}
       <div className="bg-white/5 border border-white/10 rounded-xl p-5 mb-6 space-y-4">
-        <h2 className="font-bold text-white">Crea nuovo QR Code</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-bold text-white">
+            {editingQrId ? 'Modifica QR Code' : 'Crea nuovo QR Code'}
+          </h2>
+          {editingQrId && (
+            <button
+              onClick={() => clearEditor(type)}
+              className="text-xs bg-white/10 text-white/80 px-3 py-1.5 rounded-lg hover:bg-white/15 transition-colors"
+            >
+              Annulla modifica
+            </button>
+          )}
+        </div>
 
         {/* Type selector */}
         <Field label="Tipo di QR Code">
@@ -475,64 +693,70 @@ export default function QRCodesPage() {
 
         {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {error}</p>}
 
-        <button onClick={createQR} disabled={creating || !selectedId}
+        <button onClick={saveQR} disabled={creating || !selectedId}
           className="w-full bg-[#E85D2F] text-white font-bold py-2.5 rounded-lg disabled:opacity-50">
-          {creating ? 'Creazione...' : `${info.icon} Crea QR — ${info.label}`}
+          {creating
+            ? (editingQrId ? 'Salvataggio...' : 'Creazione...')
+            : (editingQrId ? `💾 Salva modifiche — ${info.label}` : `${info.icon} Crea QR — ${info.label}`)}
         </button>
       </div>
 
       {/* QR list */}
       <div className="space-y-2">
         {qrCodes.length === 0 && <p className="text-white/30 text-sm">Nessun QR code per questa sessione.</p>}
-        {qrCodes.map(qr => (
-          <div
-            key={qr.id}
-            onClick={() => setPreviewQr(qr)}
-            className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-3 cursor-pointer hover:bg-white/8 transition-colors"
-            title="Apri anteprima QR"
-          >
-            <span className="text-2xl">{TYPE_INFO[qr.type as QRCodeType]?.icon ?? '📷'}</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-bold">{qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || qr.type}</p>
-              <p className="text-xs text-white/40 font-mono truncate">{qr.id}</p>
-              <p className="text-xs text-white/40">{qr.uses_remaining === null ? '∞ usi illimitati' : `${qr.uses_remaining} usi rimanenti`}</p>
+        {qrCodes.map(qr => {
+          const description = getQrDescriptionForUi(qr)
+          return (
+            <div
+              key={qr.id}
+              onClick={() => setPreviewQr(qr)}
+              className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-3 cursor-pointer hover:bg-white/8 transition-colors"
+              title="Apri anteprima QR"
+            >
+              <span className="text-2xl">{TYPE_INFO[qr.type as QRCodeType]?.icon ?? '📷'}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-bold">{getQrActionLabel(qr)}</p>
+                <p className="text-xs text-white/45 truncate">{description}</p>
+                <p className="text-xs text-white/40">{qr.uses_remaining === null ? '∞ usi illimitati' : `${qr.uses_remaining} usi rimanenti`}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setPreviewQr(qr) }}
+                  aria-label="Apri preview QR"
+                  title="Preview"
+                  className="inline-flex items-center justify-center bg-white/10 text-white/80 w-9 h-9 rounded-lg hover:bg-white/15 transition-colors"
+                >
+                  <IconEye />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); startEditing(qr) }}
+                  aria-label="Modifica QR"
+                  title="Modifica"
+                  className="inline-flex items-center justify-center bg-white/10 text-white/80 w-9 h-9 rounded-lg hover:bg-white/15 transition-colors"
+                >
+                  <IconEdit />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteQR(qr) }}
+                  aria-label="Elimina QR"
+                  title="Elimina"
+                  className="inline-flex items-center justify-center bg-red-500/20 text-red-300 w-9 h-9 rounded-lg hover:bg-red-500/30 transition-colors"
+                >
+                  <IconTrash />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={(e) => { e.stopPropagation(); setPreviewQr(qr) }}
-                aria-label="Apri preview QR"
-                title="Preview"
-                className="inline-flex items-center justify-center bg-white/10 text-white/80 w-9 h-9 rounded-lg hover:bg-white/15 transition-colors"
-              >
-                <IconEye />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); shareQR(qr) }}
-                aria-label="Condividi QR"
-                title="Condividi"
-                className="inline-flex items-center justify-center bg-white/10 text-white/80 w-9 h-9 rounded-lg hover:bg-white/15 transition-colors"
-              >
-                <IconShare />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); downloadQR(qr.id, qr.label) }}
-                aria-label="Scarica QR PNG"
-                title="Scarica PNG"
-                className="inline-flex items-center justify-center bg-[#3A9DBC] text-white w-9 h-9 rounded-lg hover:brightness-110 transition-all"
-              >
-                <IconDownload />
-              </button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {previewQr && (
         <QRModal
           qr={previewQr}
+          details={getPreviewDetails(previewQr)}
           onClose={() => setPreviewQr(null)}
           onDownload={() => downloadQR(previewQr.id, previewQr.label)}
-          onShare={() => shareQR(previewQr)}
+          onShare={() => handleShare(previewQr)}
         />
       )}
     </div>
