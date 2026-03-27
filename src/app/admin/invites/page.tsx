@@ -280,28 +280,34 @@ export default function InvitesPage() {
           </div>
 
           {/* Table */}
-          <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden max-h-[480px] overflow-y-auto">
+          <div className="bg-white/5 border border-white/10 rounded-xl max-h-[480px] overflow-y-auto overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-[#0d1e2e] border-b border-white/10">
                 <tr className="text-white/40 text-xs">
-                  <th className="text-left px-4 py-2.5 font-semibold">Codice</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Stato</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Usato da</th>
-                  <th className="px-4 py-2.5"></th>
+                  <th className="text-left px-3 sm:px-4 py-2.5 font-semibold">Codice</th>
+                  <th className="text-left px-3 sm:px-4 py-2.5 font-semibold">Stato</th>
+                  <th className="hidden sm:table-cell text-left px-4 py-2.5 font-semibold">Usato da</th>
+                  <th className="px-3 sm:px-4 py-2.5"></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(inv => (
                   <tr key={inv.id} className="border-b border-white/5 hover:bg-white/3 transition-colors">
-                    <td className="px-4 py-2.5">
+                    <td className="px-3 sm:px-4 py-3 sm:py-2.5">
                       <span className={`font-mono font-bold text-sm ${
                         inv.used_by_user_id ? 'text-white/30 line-through' :
                         inv.is_active ? 'text-[#3A9DBC]' : 'text-red-400'
                       }`}>
                         {inv.code}
                       </span>
+                      <div className="sm:hidden mt-1 text-[11px] text-white/45">
+                        {inv.used_by_user_id
+                          ? (nickMap[inv.used_by_user_id] ? `🎮 ${nickMap[inv.used_by_user_id]}` : `…${inv.used_by_user_id.slice(-8)}`)
+                          : <span className="text-white/20">—</span>
+                        }
+                      </div>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-3 sm:px-4 py-3 sm:py-2.5">
                       {inv.used_by_user_id ? (
                         <span className="text-xs bg-white/5 text-white/30 px-2 py-0.5 rounded-full">Usato</span>
                       ) : inv.is_active ? (
@@ -310,15 +316,15 @@ export default function InvitesPage() {
                         <span className="text-xs bg-red-900/20 text-red-400 px-2 py-0.5 rounded-full">Disattivato</span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-white/50 text-xs">
+                    <td className="hidden sm:table-cell px-4 py-2.5 text-white/50 text-xs">
                       {inv.used_by_user_id
                         ? (nickMap[inv.used_by_user_id] ? `🎮 ${nickMap[inv.used_by_user_id]}` : `…${inv.used_by_user_id.slice(-8)}`)
                         : <span className="text-white/20">—</span>
                       }
                     </td>
-                    <td className="px-4 py-2.5 text-right">
+                    <td className="px-3 sm:px-4 py-3 sm:py-2.5 text-right">
                       {!inv.used_by_user_id ? (
-                        <div className="flex justify-end items-center gap-1.5">
+                        <div className="flex justify-end items-center gap-1 sm:gap-1.5">
                           <button
                             onClick={() => copyInviteCode(inv.code)}
                             aria-label="Copia codice invito"
