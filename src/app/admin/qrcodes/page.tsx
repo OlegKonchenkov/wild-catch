@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ImageInput } from '@/components/admin/ImageInput'
+import { AdminInlineSpinner, AdminListSkeleton } from '@/components/admin/AdminLoading'
 import type { QRCodeType } from '@/lib/types'
 
 /* ── Searchable select ───────────────────────── */
@@ -350,6 +351,8 @@ export default function QRCodesPage() {
   const [selectedId, setSelectedId]     = useState('')
   const [qrCodes, setQrCodes]           = useState<any[]>([])
   const [previewQr, setPreviewQr]       = useState<any | null>(null)
+  const [loadingSessions, setLoadingSessions] = useState(true)
+  const [loadingQrCodes, setLoadingQrCodes]   = useState(false)
   const [editorOpen, setEditorOpen]     = useState(false)
   const [editingQrId, setEditingQrId]   = useState<string | null>(null)
 
@@ -367,9 +370,11 @@ export default function QRCodesPage() {
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
-    supabase.from('sessions').select('id, name').then(({ data }) => {
-      if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) }
-    })
+    supabase.from('sessions').select('id, name')
+      .then(({ data }) => {
+        if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) }
+      })
+      .then(() => setLoadingSessions(false), () => setLoadingSessions(false))
     // Load creatures and items for selects
     fetch('/api/admin/creatures').then(r => r.json()).then(d => setCreatures(d.creatures ?? []))
     fetch('/api/admin/items').then(r => r.json()).then(d => setItems(d.items ?? []))
@@ -377,8 +382,10 @@ export default function QRCodesPage() {
 
   useEffect(() => {
     if (!selectedId) return
+    setLoadingQrCodes(true)
     fetch(`/api/admin/qrcodes?sessionId=${selectedId}`)
       .then(r => r.json()).then(d => setQrCodes(d.qrCodes ?? []))
+      .finally(() => setLoadingQrCodes(false))
   }, [selectedId])
 
   function handleTypeChange(t: QRCodeType) {
@@ -577,14 +584,23 @@ export default function QRCodesPage() {
       <div className="mb-4">
         <label className="block text-xs text-white/50 mb-1">Sessione</label>
         <select value={selectedId} onChange={e => setSelectedId(e.target.value)}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2">
+          disabled={loadingSessions}
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 disabled:opacity-50">
           {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
+        {loadingSessions && (
+          <div className="mt-2">
+            <AdminInlineSpinner label="Caricamento sessioni..." />
+          </div>
+        )}
       </div>
 
       {/* QR list */}
       <div className="space-y-2">
-        {qrCodes.length === 0 && <p className="text-white/30 text-sm">Nessun QR code per questa sessione.</p>}
+        {loadingQrCodes && qrCodes.length === 0 && (
+          <AdminListSkeleton rows={5} itemClassName="h-[78px]" />
+        )}
+        {!loadingQrCodes && qrCodes.length === 0 && <p className="text-white/30 text-sm">Nessun QR code per questa sessione.</p>}
         {qrCodes.map(qr => {
           const description = getQrDescriptionForUi(qr)
           return (

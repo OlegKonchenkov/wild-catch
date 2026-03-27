@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { AdminInlineSpinner, AdminTableSkeleton } from '@/components/admin/AdminLoading'
 
 interface Player {
   userId: string
@@ -19,6 +20,7 @@ export default function PlayersPage() {
   const [sessions, setSessions]         = useState<any[]>([])
   const [selectedId, setSelectedId]     = useState('')
   const [players, setPlayers]           = useState<Player[]>([])
+  const [loadingSessions, setLoadingSessions] = useState(true)
   const [loadingPlayers, setLoadingPlayers] = useState(false)
 
   // Notify — shared state for both "all" and single-player
@@ -31,9 +33,12 @@ export default function PlayersPage() {
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
-    supabase.from('sessions').select('id, name, status').then(({ data }) => {
-      if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) }
-    })
+    supabase.from('sessions')
+      .select('id, name, status')
+      .then(({ data }) => {
+        if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) }
+      })
+      .then(() => setLoadingSessions(false), () => setLoadingSessions(false))
   }, [supabase])
 
   useEffect(() => {
@@ -111,10 +116,16 @@ export default function PlayersPage() {
           <label className="block text-xs text-white/50 mb-1">Sessione</label>
           <select
             value={selectedId} onChange={e => setSelectedId(e.target.value)}
-            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2"
+            disabled={loadingSessions}
+            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 disabled:opacity-50"
           >
             {sessions.map(s => <option key={s.id} value={s.id}>{s.name} ({s.status})</option>)}
           </select>
+          {loadingSessions && (
+            <div className="mt-2">
+              <AdminInlineSpinner label="Caricamento sessioni..." />
+            </div>
+          )}
         </div>
         <div className="flex items-end">
           <button
@@ -130,7 +141,9 @@ export default function PlayersPage() {
       {/* Players table */}
       <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden mb-8">
         {loadingPlayers && players.length === 0 ? (
-          <p className="text-white/50 text-sm p-4">Caricamento giocatori...</p>
+          <div className="p-4">
+            <AdminTableSkeleton rows={5} columns={6} />
+          </div>
         ) : players.length === 0 ? (
           <p className="text-white/50 text-sm p-4">Nessun giocatore in questa sessione.</p>
         ) : (

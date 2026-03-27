@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
+import { AdminListSkeleton } from '@/components/admin/AdminLoading'
 
 type Rarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario'
 type ElementType = 'fiamma' | 'adriatico' | 'bosco' | 'terra' | 'armonia'
@@ -229,7 +230,7 @@ export default function CreaturesPage() {
             </div>
 
             {loading ? (
-              <div className="text-white/40 text-center py-16 text-sm">Caricamento creature...</div>
+              <AdminListSkeleton rows={8} itemClassName="h-44" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" />
             ) : filtered.length === 0 ? (
               <div className="text-white/30 text-center py-16 text-sm">Nessuna creatura trovata</div>
             ) : (

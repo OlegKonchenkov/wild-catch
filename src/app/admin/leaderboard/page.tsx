@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { AdminInlineSpinner, AdminListSkeleton } from '@/components/admin/AdminLoading'
 
 interface LeaderboardEntry {
   user_id: string
@@ -15,19 +16,21 @@ export default function AdminLeaderboard() {
   const [entries, setEntries]   = useState<LeaderboardEntry[]>([])
   const [sessions, setSessions] = useState<any[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [loadingSessions, setLoadingSessions] = useState(true)
   const [loading, setLoading]   = useState(false)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     supabase.from('sessions').select('id, name, status').order('created_at', { ascending: false })
       .then(({ data }) => { if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) } })
+      .then(() => setLoadingSessions(false), () => setLoadingSessions(false))
   }, [supabase])
 
   useEffect(() => {
     if (!selectedId) return
-    setLoading(true)
 
     async function load() {
+      setLoading(true)
       // Step 1: player_sessions ordered by exp
       const { data: players } = await supabase
         .from('player_sessions')
@@ -80,19 +83,22 @@ export default function AdminLeaderboard() {
 
       <div className="mb-4">
         <select
-          value={selectedId ?? ''} onChange={e => setSelectedId(e.target.value)}
-          className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 w-full"
+          value={selectedId ?? ''} onChange={e => setSelectedId(e.target.value)} disabled={loadingSessions}
+          className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 w-full disabled:opacity-50"
         >
           {sessions.map(s => (
             <option key={s.id} value={s.id}>{s.name} ({s.status})</option>
           ))}
         </select>
+        {loadingSessions && (
+          <div className="mt-2">
+            <AdminInlineSpinner label="Caricamento sessioni..." />
+          </div>
+        )}
       </div>
 
       {loading ? (
-        <div className="space-y-2">
-          {[1,2,3].map(i => <div key={i} className="bg-white/5 rounded-xl h-16 animate-pulse" />)}
-        </div>
+        <AdminListSkeleton rows={4} itemClassName="h-16" />
       ) : entries.length === 0 ? (
         <p className="text-white/40 text-sm">Nessun giocatore in questa sessione.</p>
       ) : (

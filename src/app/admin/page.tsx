@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { AdminInlineSpinner, AdminListSkeleton } from '@/components/admin/AdminLoading'
 
 interface Stats {
   sessionName: string; sessionStatus: string
@@ -100,6 +101,8 @@ export default function AdminDashboard() {
   const [sessions, setSessions] = useState<any[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
+  const [loadingSessions, setLoadingSessions] = useState(true)
+  const [loadingStats, setLoadingStats] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notifText, setNotifText] = useState('')
   const supabase = useMemo(() => createClient(), [])
@@ -109,7 +112,7 @@ export default function AdminDashboard() {
       .then(({ data }) => { if (data) { setSessions(data); if (data[0] && !selectedId) setSelectedId(data[0].id) } })
 
   useEffect(() => {
-    loadSessions()
+    loadSessions().then(() => setLoadingSessions(false), () => setLoadingSessions(false))
     const channel = supabase
       .channel('admin-dashboard-sessions')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => loadSessions())
@@ -120,10 +123,12 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!selectedId) return
     const fetchStats = () => {
+      setLoadingStats(true)
       fetch(`/api/admin/dashboard?sessionId=${selectedId}`)
         .then(r => r.ok ? r.json() : Promise.reject(r.status))
         .then(data => { setStats(data); setError(null) })
         .catch(e => setError(`Errore caricamento stats (${e})`))
+        .finally(() => setLoadingStats(false))
     }
     fetchStats()
     const i = setInterval(fetchStats, 10000)
@@ -167,14 +172,31 @@ export default function AdminDashboard() {
       {/* Session selector */}
       <div className="mb-4">
         <select
-          value={selectedId ?? ''} onChange={e => setSelectedId(e.target.value)}
-          className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 w-full"
+          value={selectedId ?? ''} onChange={e => setSelectedId(e.target.value)} disabled={loadingSessions}
+          className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 w-full disabled:opacity-50"
         >
           {sessions.map(s => (
             <option key={s.id} value={s.id}>{s.name} ({s.status})</option>
           ))}
         </select>
+        {loadingSessions && (
+          <div className="mt-2">
+            <AdminInlineSpinner label="Caricamento sessioni..." />
+          </div>
+        )}
+        {!loadingSessions && sessions.length === 0 && (
+          <p className="text-white/40 text-xs mt-2">Nessuna sessione disponibile.</p>
+        )}
       </div>
+
+      {loadingStats && !stats && (
+        <div className="space-y-4 mb-5">
+          <AdminListSkeleton rows={1} itemClassName="h-[44px]" />
+          <AdminListSkeleton rows={4} itemClassName="h-[132px]" className="grid grid-cols-2 md:grid-cols-4 gap-3" />
+          <AdminListSkeleton rows={2} itemClassName="h-[72px]" className="grid grid-cols-2 gap-3" />
+          <AdminListSkeleton rows={2} itemClassName="h-[44px]" />
+        </div>
+      )}
 
       {stats && (
         <>

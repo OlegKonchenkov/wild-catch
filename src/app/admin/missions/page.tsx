@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { AdminInlineSpinner, AdminListSkeleton } from '@/components/admin/AdminLoading'
 
 interface Mission {
   id: string
@@ -177,6 +178,8 @@ export default function AdminMissions() {
   const [sessions, setSessions]   = useState<any[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [missions, setMissions]   = useState<Mission[]>([])
+  const [loadingSessions, setLoadingSessions] = useState(true)
+  const [loadingMissions, setLoadingMissions] = useState(false)
 
   // Reference data for target selects
   const [creatures, setCreatures] = useState<Creature[]>([])
@@ -195,12 +198,15 @@ export default function AdminMissions() {
   useEffect(() => {
     supabase.from('sessions').select('id, name, status').order('created_at', { ascending: false })
       .then(({ data }) => { if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) } })
+      .then(() => setLoadingSessions(false), () => setLoadingSessions(false))
   }, [supabase])
 
   /* ── Load missions when session changes ── */
   function loadMissions(sid: string) {
+    setLoadingMissions(true)
     supabase.from('missions').select('*').eq('session_id', sid).order('chapter_order')
       .then(({ data }) => { if (data) setMissions(data as Mission[]) })
+      .then(() => setLoadingMissions(false), () => setLoadingMissions(false))
   }
   useEffect(() => { if (selectedId) loadMissions(selectedId) }, [selectedId])
 
@@ -291,8 +297,8 @@ export default function AdminMissions() {
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">🎯 Missioni</h1>
-        <button onClick={openNew}
-          className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-lg text-sm">
+        <button onClick={openNew} disabled={!selectedId}
+          className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50">
           + Nuova missione
         </button>
       </div>
@@ -301,9 +307,15 @@ export default function AdminMissions() {
       <div className="mb-4">
         <label className="block text-xs text-white/50 mb-1">Sessione</label>
         <select value={selectedId ?? ''} onChange={e => setSelectedId(e.target.value)}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2">
+          disabled={loadingSessions}
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 disabled:opacity-50">
           {sessions.map(s => <option key={s.id} value={s.id}>{s.name} ({s.status})</option>)}
         </select>
+        {loadingSessions && (
+          <div className="mt-2">
+            <AdminInlineSpinner label="Caricamento sessioni..." />
+          </div>
+        )}
       </div>
 
       {/* Chapter order info box */}
@@ -315,7 +327,9 @@ export default function AdminMissions() {
       </div>
 
       {/* Missions list */}
-      {missions.length === 0 ? (
+      {loadingMissions && missions.length === 0 ? (
+        <AdminListSkeleton rows={5} itemClassName="h-[88px]" />
+      ) : missions.length === 0 ? (
         <p className="text-white/40 text-sm">Nessuna missione per questa sessione.</p>
       ) : (
         <div className="space-y-2 mb-6">

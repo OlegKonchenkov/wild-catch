@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
+import { AdminListSkeleton } from '@/components/admin/AdminLoading'
 import type { Bounds } from '@/components/admin/MapPicker'
 
 function SessionTimeInfo({ session }: { session: { status: string; start_at: string | null; end_at: string | null; duration_minutes: number } }) {
@@ -104,6 +105,7 @@ interface EditForm {
 
 export default function SessionsPage() {
   const [sessions, setSessions]   = useState<Session[]>([])
+  const [loadingSessions, setLoadingSessions] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const supabase = useMemo(() => createClient(), [])
@@ -131,7 +133,7 @@ export default function SessionsPage() {
       .then(({ data }) => { if (data) setSessions(data as Session[]) })
 
   useEffect(() => {
-    loadSessions()
+    loadSessions().then(() => setLoadingSessions(false), () => setLoadingSessions(false))
     const channel = supabase
       .channel('admin-sessions-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => loadSessions())
@@ -264,7 +266,11 @@ export default function SessionsPage() {
       </div>
 
       {/* ── Existing sessions ── */}
-      {sessions.length === 0 && (
+      {loadingSessions && sessions.length === 0 && (
+        <AdminListSkeleton rows={4} itemClassName="h-[88px]" />
+      )}
+
+      {!loadingSessions && sessions.length === 0 && (
         <p className="text-white/40 text-sm py-4 text-center">Nessuna sessione ancora.</p>
       )}
 

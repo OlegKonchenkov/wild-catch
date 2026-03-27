@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { AdminInlineSpinner, AdminTableSkeleton } from '@/components/admin/AdminLoading'
 
 interface Invite {
   id: string
@@ -49,38 +50,47 @@ export default function InvitesPage() {
   const [invites, setInvites]       = useState<Invite[]>([])
   const [nickMap, setNickMap]       = useState<Record<string, string>>({})
   const [quantity, setQuantity]     = useState(50)
-  const [loading, setLoading]       = useState(false)
+  const [loadingSessions, setLoadingSessions] = useState(true)
+  const [loadingInvites, setLoadingInvites]   = useState(false)
+  const [generating, setGenerating]           = useState(false)
   const [resetting, setResetting]   = useState<string | null>(null)
   const [filter, setFilter]         = useState<'all' | 'available' | 'used'>('all')
   const [actionMsg, setActionMsg]   = useState<{ ok: boolean; text: string } | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
-    supabase.from('sessions').select('id, name, status').then(({ data }) => {
-      if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) }
-    })
+    supabase.from('sessions').select('id, name, status')
+      .then(({ data }) => {
+        if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) }
+      })
+      .then(() => setLoadingSessions(false), () => setLoadingSessions(false))
   }, [supabase])
 
   async function loadInvites(sid: string) {
-    const res  = await fetch(`/api/admin/invites?sessionId=${sid}`)
-    const data = await res.json()
-    const list: Invite[] = data.invites ?? []
-    setInvites(list)
+    setLoadingInvites(true)
+    try {
+      const res  = await fetch(`/api/admin/invites?sessionId=${sid}`)
+      const data = await res.json()
+      const list: Invite[] = data.invites ?? []
+      setInvites(list)
 
-    // Fetch nicknames for users who used codes
-    const userIds = [...new Set(list.map(i => i.used_by_user_id).filter(Boolean))] as string[]
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, nickname')
-        .in('user_id', userIds)
-      if (profiles) {
-        const map: Record<string, string> = {}
-        profiles.forEach(p => { map[p.user_id] = p.nickname ?? p.user_id.slice(0, 8) })
-        setNickMap(map)
+      // Fetch nicknames for users who used codes
+      const userIds = [...new Set(list.map(i => i.used_by_user_id).filter(Boolean))] as string[]
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, nickname')
+          .in('user_id', userIds)
+        if (profiles) {
+          const map: Record<string, string> = {}
+          profiles.forEach(p => { map[p.user_id] = p.nickname ?? p.user_id.slice(0, 8) })
+          setNickMap(map)
+        }
+      } else {
+        setNickMap({})
       }
-    } else {
-      setNickMap({})
+    } finally {
+      setLoadingInvites(false)
     }
   }
 
@@ -136,7 +146,7 @@ export default function InvitesPage() {
   }
 
   async function generateCodes() {
-    setLoading(true)
+    setGenerating(true)
     try {
       await fetch('/api/admin/invites', {
         method: 'POST',
@@ -145,7 +155,7 @@ export default function InvitesPage() {
       })
       await loadInvites(selectedId)
     } finally {
-      setLoading(false)
+      setGenerating(false)
     }
   }
 
@@ -224,9 +234,15 @@ export default function InvitesPage() {
       <div className="mb-4">
         <label className="block text-xs text-white/50 mb-1">Sessione</label>
         <select value={selectedId} onChange={e => setSelectedId(e.target.value)}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2">
+          disabled={loadingSessions}
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 disabled:opacity-50">
           {sessions.map(s => <option key={s.id} value={s.id}>{s.name} ({s.status})</option>)}
         </select>
+        {loadingSessions && (
+          <div className="mt-2">
+            <AdminInlineSpinner label="Caricamento sessioni..." />
+          </div>
+        )}
       </div>
 
       {/* Generate */}
@@ -240,9 +256,9 @@ export default function InvitesPage() {
               className="w-24 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2" />
           </div>
           <div className="flex gap-2 items-end">
-            <button onClick={generateCodes} disabled={loading || !selectedId}
+            <button onClick={generateCodes} disabled={generating || !selectedId}
               className="bg-[#3A9DBC] text-white font-bold px-5 py-2 rounded-lg disabled:opacity-50">
-              {loading ? 'Generazione...' : 'Genera'}
+              {generating ? 'Generazione...' : 'Genera'}
             </button>
             {invites.length > 0 && (
               <button onClick={exportCSV}
@@ -255,8 +271,12 @@ export default function InvitesPage() {
         </div>
       </div>
 
+      {loadingInvites && invites.length === 0 && (
+        <AdminTableSkeleton rows={5} columns={4} />
+      )}
+
       {/* Stats + filters */}
-      {invites.length > 0 && (
+      {!loadingInvites && invites.length > 0 && (
         <>
           <div className="flex items-center gap-3 mb-3">
             <div className="flex gap-2 text-xs">

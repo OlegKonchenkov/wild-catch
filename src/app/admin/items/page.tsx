@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
+import { AdminListSkeleton } from '@/components/admin/AdminLoading'
 
 interface Item {
   id: string
@@ -137,7 +138,7 @@ export default function ItemsPage() {
 
       {/* Items list */}
       {loading ? (
-        <p className="text-white/40 text-sm">Caricamento...</p>
+        <AdminListSkeleton rows={5} itemClassName="h-[86px]" />
       ) : filtered.length === 0 ? (
         <p className="text-white/30 text-sm">Nessun oggetto trovato.</p>
       ) : (
