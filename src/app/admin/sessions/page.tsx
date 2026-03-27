@@ -130,7 +130,14 @@ export default function SessionsPage() {
     supabase.from('sessions').select('*').order('created_at', { ascending: false })
       .then(({ data }) => { if (data) setSessions(data as Session[]) })
 
-  useEffect(() => { loadSessions() }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadSessions()
+    const channel = supabase
+      .channel('admin-sessions-list')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => loadSessions())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Edit ───────────────────────────────────────────────── */
   function openEdit(s: Session) {

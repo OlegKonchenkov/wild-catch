@@ -16,6 +16,7 @@ function MapPageInner() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [inBounds, setInBounds] = useState(true)
   const [sessionEnded, setSessionEnded] = useState(false)
+  const [sessionRestarted, setSessionRestarted] = useState(false)
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
@@ -153,6 +154,23 @@ function MapPageInner() {
     return () => clearTimeout(timeout)
   }, [sessionId, triggerEncounter])
 
+  // Realtime broadcast: session_ended / session_restarted from admin
+  useEffect(() => {
+    if (!sessionId) return
+    const channel = supabase
+      .channel(`map:session:${sessionId}`)
+      .on('broadcast', { event: 'session_ended' }, () => {
+        sessionEndedRef.current = true
+        setSessionEnded(true)
+      })
+      .on('broadcast', { event: 'session_restarted' }, () => {
+        setSessionRestarted(true)
+        setTimeout(() => router.push('/home'), 3000)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [sessionId, supabase, router])
+
   if (!session) {
     return <div className="flex items-center justify-center h-full text-white">Caricamento mappa...</div>
   }
@@ -164,6 +182,17 @@ function MapPageInner() {
         playerPosition={position ? { lat: position.lat, lng: position.lng } : null}
         sessionId={sessionId!}
       />
+
+      {/* Session restarted overlay */}
+      {sessionRestarted && (
+        <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-[1100] backdrop-blur-sm">
+          <div className="bg-[#0F1F2E] border border-[#3A9DBC] rounded-2xl p-6 mx-4 text-center">
+            <div className="text-3xl mb-3">🔄</div>
+            <p className="text-white font-bold text-lg">Sessione ripristinata</p>
+            <p className="text-white/60 text-sm mt-1">Verrai reindirizzato alla home...</p>
+          </div>
+        </div>
+      )}
 
       {/* Session ended overlay on map */}
       {sessionEnded && (

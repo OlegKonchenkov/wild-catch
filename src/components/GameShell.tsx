@@ -164,6 +164,17 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('wc:level-up', onLevelUp)
   }, [])
 
+  // Realtime: admin chiude sessione → banner immediato (anche se player è fermo)
+  useEffect(() => {
+    const sid = localStorage.getItem('current_session_id')
+    if (!sid) return
+    const channel = supabase
+      .channel(`shell:session:${sid}`)
+      .on('broadcast', { event: 'session_ended' }, () => setSessionEnded(true))
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [supabase])
+
   const xpPct = exp !== null && level !== null ? xpProgress(exp, level) : 0
 
   return (
