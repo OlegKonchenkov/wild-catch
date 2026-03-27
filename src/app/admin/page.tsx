@@ -104,10 +104,18 @@ export default function AdminDashboard() {
   const [notifText, setNotifText] = useState('')
   const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
+  const loadSessions = () =>
     supabase.from('sessions').select('id, name, status').order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) } })
-  }, [supabase])
+      .then(({ data }) => { if (data) { setSessions(data); if (data[0] && !selectedId) setSelectedId(data[0].id) } })
+
+  useEffect(() => {
+    loadSessions()
+    const channel = supabase
+      .channel('admin-dashboard-sessions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => loadSessions())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selectedId) return
@@ -139,7 +147,10 @@ export default function AdminDashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: selectedId }),
     })
-    window.location.reload()
+    // Re-fetch stats immediately — realtime channel aggiorna sessions dropdown
+    fetch(`/api/admin/dashboard?sessionId=${selectedId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setStats(data) })
   }
 
   const catchRate = stats && stats.encounterTotal > 0

@@ -53,9 +53,13 @@ export default function PlayersPage() {
     }
 
     fetchPlayers()
-    const interval = setInterval(fetchPlayers, 30000)
-    return () => { cancelled = true; clearInterval(interval) }
-  }, [selectedId])
+    const channel = supabase
+      .channel(`admin-players-${selectedId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'player_sessions', filter: `session_id=eq.${selectedId}` },
+        () => fetchPlayers())
+      .subscribe()
+    return () => { cancelled = true; supabase.removeChannel(channel) }
+  }, [selectedId, supabase])
 
   async function sendNotify() {
     if (!notifyTarget || !notifyTitle.trim() || !notifyMessage.trim()) return

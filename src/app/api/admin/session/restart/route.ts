@@ -24,5 +24,15 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Notify connected players that the session is being restarted
+  const channel = admin.channel(`session:${sessionId}`)
+  await new Promise<void>(resolve => channel.subscribe(() => resolve()))
+  await channel.send({
+    type: 'broadcast',
+    event: 'session_restarted',
+    payload: { sessionId },
+  })
+  await admin.removeChannel(channel)
+
   return NextResponse.json({ restarted: true })
 }
