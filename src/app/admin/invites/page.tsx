@@ -168,8 +168,17 @@ export default function InvitesPage() {
         delete next[inv.used_by_user_id]
         return next
       })
+      pushActionMsg(true, 'Codice resettato')
+    } else {
+      pushActionMsg(false, 'Reset non riuscito')
     }
     setResetting(null)
+  }
+
+  async function confirmAndReset(inv: Invite) {
+    const ok = window.confirm(`Resettare il codice ${inv.code}? Tornerà disponibile per un nuovo giocatore.`)
+    if (!ok) return
+    await resetCode(inv.id)
   }
 
   function exportCSV() {
@@ -308,35 +317,40 @@ export default function InvitesPage() {
                       }
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <div className="flex justify-end items-center gap-1.5">
-                        <button
-                          onClick={() => copyInviteCode(inv.code)}
-                          className="inline-flex items-center gap-1 bg-white/10 text-white/75 hover:text-white px-2 py-1 rounded-md text-xs transition-colors"
-                          title="Copia codice invito"
-                        >
-                          <IconCopy className="w-3.5 h-3.5" />
-                          Copia
-                        </button>
-                        <button
-                          onClick={() => shareInviteCode(inv.code)}
-                          className="inline-flex items-center gap-1 bg-white/10 text-white/75 hover:text-white px-2 py-1 rounded-md text-xs transition-colors"
-                          title="Condividi codice invito"
-                        >
-                          <IconShare className="w-3.5 h-3.5" />
-                          Condividi
-                        </button>
-                        {inv.used_by_user_id && (
+                      {!inv.used_by_user_id ? (
+                        <div className="flex justify-end items-center gap-1.5">
                           <button
-                            onClick={() => resetCode(inv.id)}
-                            disabled={resetting === inv.id}
-                            className="inline-flex items-center gap-1 text-xs text-[#F7C841]/70 hover:text-[#F7C841] transition-colors disabled:opacity-40 px-2 py-1 rounded-md"
-                            title="Resetta codice — lo rende disponibile di nuovo"
+                            onClick={() => copyInviteCode(inv.code)}
+                            aria-label="Copia codice invito"
+                            title="Copia codice"
+                            className="inline-flex items-center justify-center bg-white/10 text-white/75 hover:text-white w-11 h-11 rounded-lg transition-colors"
                           >
-                            <IconReset className="w-3.5 h-3.5" />
-                            {resetting === inv.id ? '...' : 'Reset'}
+                            <IconCopy className="w-4 h-4" />
                           </button>
-                        )}
-                      </div>
+                          <button
+                            onClick={() => shareInviteCode(inv.code)}
+                            aria-label="Condividi codice invito"
+                            title="Condividi codice"
+                            className="inline-flex items-center justify-center bg-white/10 text-white/75 hover:text-white w-11 h-11 rounded-lg transition-colors"
+                          >
+                            <IconShare className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => confirmAndReset(inv)}
+                          disabled={resetting === inv.id}
+                          aria-label="Resetta codice invito usato"
+                          title="Reset codice usato"
+                          className="inline-flex items-center justify-center bg-[#F7C841]/15 text-[#F7C841] hover:bg-[#F7C841]/25 w-11 h-11 rounded-lg transition-colors disabled:opacity-40"
+                        >
+                          {resetting === inv.id ? (
+                            <span className="text-[11px] font-bold">...</span>
+                          ) : (
+                            <IconReset className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
