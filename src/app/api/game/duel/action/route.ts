@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateFightDamage } from '@/lib/game/rng'
 import { getElementMultiplier } from '@/lib/game/elements'
+import { incrementMissionProgress } from '@/lib/game/missions'
 import type { Element } from '@/lib/types'
 
 export async function POST(request: Request) {
@@ -35,6 +36,8 @@ export async function POST(request: Request) {
       .update({ status: 'ended', winner_id: oppUserId, ended_at: new Date().toISOString() })
       .eq('id', duelId)
     await awardDuelResults(supabase, duel.session_id, oppUserId!, user.id)
+    // Track duel mission for the winner (opponent)
+    incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel.session_id }).catch(() => {})
     return NextResponse.json({ ended: true, winnerId: oppUserId })
   }
 
@@ -154,6 +157,8 @@ export async function POST(request: Request) {
   if (duelOver) {
     const levelUps = await awardDuelResults(supabase, duel.session_id, user.id, oppUserId!)
     myLevelUp = levelUps.winnerLevelUp
+    // Track duel missions for the winner (fire-and-forget)
+    incrementMissionProgress({ type: 'duel', userId: user.id, sessionId: duel.session_id }).catch(() => {})
   }
 
   // ── Broadcast ──────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { incrementMissionProgress } from '@/lib/game/missions'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -67,6 +68,14 @@ export async function POST(request: Request) {
     })
     if (invError) return NextResponse.json({ error: 'Errore aggiunta oggetto' }, { status: 500 })
   }
+
+  // Track collect missions for the purchased item (fire-and-forget)
+  incrementMissionProgress({
+    type: 'collect',
+    target: item.name,
+    userId: user.id,
+    sessionId,
+  }).catch(() => {})
 
   return NextResponse.json({
     success: true,

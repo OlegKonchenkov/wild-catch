@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { incrementMissionProgress } from '@/lib/game/missions'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -185,6 +186,24 @@ export async function POST(request: Request) {
       result = { ...result, eventType: payload.event_type, effect: payload.effect }
       break
     }
+  }
+
+  // Track qr missions (match on qr label or any qr scan)
+  incrementMissionProgress({
+    type: 'qr',
+    target: qr.label ?? '',
+    userId: user.id,
+    sessionId,
+  }).catch(() => {})
+
+  // Track collect missions when an item QR is scanned
+  if (qr.type === 'oggetto' && (result as any).itemName) {
+    incrementMissionProgress({
+      type: 'collect',
+      target: (result as any).itemName,
+      userId: user.id,
+      sessionId,
+    }).catch(() => {})
   }
 
   return NextResponse.json({ success: true, ...result })

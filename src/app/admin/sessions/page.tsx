@@ -89,10 +89,13 @@ interface Session {
   duration_minutes: number
   area_bounds: Bounds | null
   narrative_config: any
+  starter_kit: Array<{ item_id: string; quantity: number }> | null
   start_at: string | null
   end_at: string | null
   created_at: string
 }
+
+interface Item { id: string; name: string; type: string }
 
 interface EditForm {
   name: string
@@ -101,6 +104,7 @@ interface EditForm {
   storyTitle: string
   introText: string
   villainName: string
+  starterKit: Array<{ item_id: string; quantity: number }>
 }
 
 export default function SessionsPage() {
@@ -116,6 +120,7 @@ export default function SessionsPage() {
   const [editLoading, setEditLoading] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [editOk, setEditOk]       = useState(false)
+  const [allItems, setAllItems]   = useState<Item[]>([])
 
   // Create wizard
   const [step, setStep]           = useState<WizardStep>(1)
@@ -153,7 +158,14 @@ export default function SessionsPage() {
       storyTitle: s.narrative_config?.story_title ?? '',
       introText: s.narrative_config?.intro_text ?? '',
       villainName: s.narrative_config?.villain_name ?? '',
+      starterKit: Array.isArray(s.starter_kit) ? s.starter_kit : [],
     })
+    // Load items if not already loaded
+    if (allItems.length === 0) {
+      supabase.from('items').select('id, name, type').order('type').then(({ data }) => {
+        if (data) setAllItems(data as Item[])
+      })
+    }
   }
 
   function closeEdit() { setEditingId(null); setEditForm(null); setEditError(null) }
@@ -175,6 +187,7 @@ export default function SessionsPage() {
           villain_name: editForm.villainName,
           chapters: sessions.find(s => s.id === editingId)?.narrative_config?.chapters ?? [],
         },
+        starterKit: editForm.starterKit,
       }),
     })
     const data = await res.json()
@@ -403,6 +416,73 @@ export default function SessionsPage() {
                     onBoundsChange={b => setEditForm(f => f && ({ ...f, areaBounds: b }))}
                   />
                 </div>
+
+                {/* Starter Kit */}
+                <details className="bg-white/3 border border-white/10 rounded-xl">
+                  <summary className="px-3 py-2 text-xs font-semibold text-white/60 cursor-pointer select-none hover:text-white/80">
+                    🎒 Kit iniziale giocatori {editForm.starterKit.length > 0 ? `(${editForm.starterKit.length} oggetti)` : '(fallback: 5× Rete Base)'}
+                  </summary>
+                  <div className="px-3 pb-3 pt-2 border-t border-white/10 space-y-2">
+                    <p className="text-xs text-white/40 leading-relaxed">
+                      Oggetti ricevuti automaticamente al momento del join. Se vuoto, verrà distribuita la Rete Base ×5.
+                    </p>
+
+                    {/* Current kit */}
+                    {editForm.starterKit.map((entry, i) => {
+                      const item = allItems.find(it => it.id === entry.item_id)
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <select
+                            value={entry.item_id}
+                            onChange={e => setEditForm(f => {
+                              if (!f) return f
+                              const kit = [...f.starterKit]
+                              kit[i] = { ...kit[i], item_id: e.target.value }
+                              return { ...f, starterKit: kit }
+                            })}
+                            className="flex-1 bg-[#0F1F2E] border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-[#3A9DBC]"
+                          >
+                            <option value="">— Seleziona —</option>
+                            {allItems.map(it => (
+                              <option key={it.id} value={it.id}>{it.name} ({it.type})</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number" min={1} max={99}
+                            value={entry.quantity}
+                            onChange={e => setEditForm(f => {
+                              if (!f) return f
+                              const kit = [...f.starterKit]
+                              kit[i] = { ...kit[i], quantity: Math.max(1, +e.target.value) }
+                              return { ...f, starterKit: kit }
+                            })}
+                            className="w-16 bg-white/10 border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none focus:border-[#3A9DBC]"
+                          />
+                          <button
+                            onClick={() => setEditForm(f => {
+                              if (!f) return f
+                              return { ...f, starterKit: f.starterKit.filter((_, j) => j !== i) }
+                            })}
+                            className="text-red-400/60 hover:text-red-400 text-sm px-1"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )
+                    })}
+
+                    <button
+                      onClick={() => setEditForm(f => f && ({
+                        ...f,
+                        starterKit: [...f.starterKit, { item_id: allItems[0]?.id ?? '', quantity: 1 }],
+                      }))}
+                      disabled={allItems.length === 0}
+                      className="text-xs text-[#3A9DBC] hover:text-[#5AB5D0] disabled:text-white/20 font-semibold"
+                    >
+                      + Aggiungi oggetto
+                    </button>
+                  </div>
+                </details>
 
                 {/* Save/cancel */}
                 {editError && <p className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {editError}</p>}

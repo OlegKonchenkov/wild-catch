@@ -1,13 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rollCatch, calculateFightDamage } from '@/lib/game/rng'
-
-const ITEM_BONUSES: Record<string, number> = {
-  'Rete Base': 0,
-  'Rete Avanzata': 0.10,
-  'Rete Speciale': 0.20,
-  'Rete Leggendaria': 0.35,
-}
+import { incrementMissionProgress } from '@/lib/game/missions'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -32,22 +26,22 @@ export async function POST(request: Request) {
 
   const creature = (encounter as any).creatures
 
-  // Get item bonus
+  // Get item bonus from effect_value (rete/esca items stored as % integer, e.g. 10 = +10%)
   let bonus = 0
   if (itemId) {
     const { data: invItem } = await supabase
       .from('player_inventory')
-      .select('quantity, items(name)')
+      .select('quantity, items(type, effect_value)')
       .eq('id', itemId)
       .eq('user_id', user.id)
       .single()
 
-    if (invItem && invItem.quantity > 0) {
-      const itemName = (invItem as any).items?.name ?? ''
-      bonus = ITEM_BONUSES[itemName] ?? 0
+    const inv = invItem as { quantity: number; items: { type: string; effect_value: number } } | null
+    if (inv && inv.quantity > 0 && (inv.items?.type === 'rete' || inv.items?.type === 'esca')) {
+      bonus = (inv.items.effect_value ?? 0) / 100
       await supabase
         .from('player_inventory')
-        .update({ quantity: invItem.quantity - 1 })
+        .update({ quantity: inv.quantity - 1 })
         .eq('id', itemId)
     }
   }
@@ -141,6 +135,14 @@ export async function POST(request: Request) {
   const levelUp   = rpcRow?.leveled_up
     ? { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
     : null
+
+  // Track cattura missions (fire-and-forget, don't block response)
+  incrementMissionProgress({
+    type: 'cattura',
+    target: creature.name,
+    userId: user.id,
+    sessionId: encounter.session_id,
+  }).catch(() => {})
 
   return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, scoreGain, levelUp })
 }

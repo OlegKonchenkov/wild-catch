@@ -10,7 +10,7 @@ export async function PATCH(request: Request) {
   if (!isAdmin) return NextResponse.json({ error: 'Non autorizzato' }, { status: 403 })
 
   const body = await request.json().catch(() => ({}))
-  const { sessionId, name, narrativeConfig, areaBounds, durationMinutes } = body
+  const { sessionId, name, narrativeConfig, areaBounds, durationMinutes, starterKit } = body
 
   if (!sessionId) return NextResponse.json({ error: 'sessionId richiesto' }, { status: 400 })
 
@@ -19,6 +19,7 @@ export async function PATCH(request: Request) {
   if (narrativeConfig  !== undefined) updates.narrative_config = narrativeConfig
   if (areaBounds       !== undefined) updates.area_bounds      = areaBounds
   if (durationMinutes  !== undefined) updates.duration_minutes = durationMinutes
+  if (starterKit       !== undefined) updates.starter_kit      = starterKit
 
   // BUG-01: se la sessione è attiva e si aggiorna duration_minutes,
   // ricalcola end_at da start_at + nuova durata e lo persiste
