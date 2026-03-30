@@ -3,8 +3,8 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
-import { RARITY_COLORS, ELEMENT_EMOJI } from '@/lib/types'
-import type { Creature, PlayerCreature } from '@/lib/types'
+import { RARITY_COLORS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
+import type { Creature, PlayerCreature, Element } from '@/lib/types'
 
 const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario']
 const MYSTERY_HINTS: Record<string, string> = {
@@ -21,6 +21,8 @@ export default function BestiaryPage() {
   const [selected, setSelected]             = useState<{ creature: Creature; pc: PlayerCreature | null } | null>(null)
   const [message, setMessage]               = useState('')
   const [filter, setFilter]                 = useState<'all' | 'caught' | 'missing'>('all')
+  const [rarityFilter, setRarityFilter]     = useState<string>('all')
+  const [showWeakness, setShowWeakness]     = useState(false)
   const [loading, setLoading]               = useState(true)
   const [selectedPcId, setSelectedPcId]     = useState<string | null>(null)
   const supabase   = useMemo(() => createClient(), [])
@@ -153,15 +155,83 @@ export default function BestiaryPage() {
     }
   }
 
+  const RARITY_LABELS: Record<string, string> = {
+    comune: 'Comune', non_comune: 'Non Com.', raro: 'Raro', epico: 'Epico', leggendario: 'Legg.',
+  }
+
   const caughtCount = playerCreatures.length
   const filtered = creatures.filter(c => {
-    if (filter === 'caught')  return !!getPc(c.id)
-    if (filter === 'missing') return !getPc(c.id)
+    if (filter === 'caught')  { if (!getPc(c.id)) return false }
+    if (filter === 'missing') { if (getPc(c.id))  return false }
+    if (rarityFilter !== 'all' && c.rarity !== rarityFilter) return false
     return true
   })
 
+  const ELEM_META: Record<string, { label: string; emoji: string }> = {
+    fiamma:    { label: 'Fiamma',    emoji: '🔥' },
+    adriatico: { label: 'Adriatico', emoji: '🌊' },
+    bosco:     { label: 'Bosco',     emoji: '🌿' },
+    terra:     { label: 'Terra',     emoji: '🪨' },
+    armonia:   { label: 'Armonia',   emoji: '✨' },
+  }
+
+  const ELEM_TABLE: Record<string, { strong: string[]; weak: string[] }> = {
+    fiamma:    { strong: ['bosco', 'armonia'],           weak: ['adriatico', 'terra'] },
+    adriatico: { strong: ['fiamma', 'terra'],            weak: ['bosco'] },
+    bosco:     { strong: ['adriatico'],                  weak: ['fiamma'] },
+    terra:     { strong: ['fiamma', 'armonia'],          weak: ['adriatico'] },
+    armonia:   { strong: ['fiamma', 'adriatico', 'bosco', 'terra', 'armonia'], weak: ['fiamma', 'terra'] },
+  }
+
   return (
     <div className="h-full overflow-y-auto">
+      {/* Modale debolezze elementali */}
+      <AnimatePresence>
+        {showWeakness && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-[200] flex items-end justify-center backdrop-blur-sm"
+            onClick={() => setShowWeakness(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="bg-[#0F1F2E] border-t border-white/10 rounded-t-3xl w-full max-w-lg pb-10"
+              onClick={e => e.stopPropagation()}>
+              <div className="flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 bg-white/20 rounded-full" />
+              </div>
+              <div className="px-5">
+                <h2 className="text-lg font-bold text-white mb-1">Forze & Debolezze</h2>
+                <p className="text-xs text-white/40 mb-4">+50% danno quando attacchi un tipo debole</p>
+                <div className="space-y-2">
+                  {Object.entries(ELEM_TABLE).map(([el, { strong, weak }]) => (
+                    <div key={el} className="bg-white/5 rounded-xl px-3 py-2.5 flex items-center gap-3">
+                      <span className="text-xl w-8 text-center">{ELEM_META[el].emoji}</span>
+                      <div className="flex-1">
+                        <p className="text-xs text-white/60 font-semibold">{ELEM_META[el].label}</p>
+                        <div className="flex gap-1 mt-0.5 flex-wrap">
+                          {strong.map(s => (
+                            <span key={s} className="text-[10px] bg-[#34D399]/15 text-[#34D399] px-1.5 py-0.5 rounded">
+                              ↑ {ELEM_META[s].emoji}
+                            </span>
+                          ))}
+                          {weak.map(w => (
+                            <span key={w} className="text-[10px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded">
+                              ↓ {ELEM_META[w].emoji}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-white/20 mt-3 text-center">
+                  ✨ Armonia: +15% su tutti, debole vs 🔥 e 🪨
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <style>{`
         .silhouette { filter: brightness(0.15) saturate(0) blur(0.5px) contrast(0.8); }
         .silhouette-soft { filter: brightness(0.12) saturate(0) blur(2px) contrast(0.7); }
@@ -200,7 +270,13 @@ export default function BestiaryPage() {
       <div className="sticky top-0 z-10 bg-[#0A1520]/95 backdrop-blur-sm px-4 pt-4 pb-3 border-b border-white/5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h1 className="text-xl font-bold text-white">Bestiario</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-white">Bestiario</h1>
+              <button onClick={() => setShowWeakness(true)}
+                className="w-6 h-6 rounded-full bg-white/10 text-white/50 text-xs font-bold hover:bg-white/20 hover:text-white flex items-center justify-center">
+                ?
+              </button>
+            </div>
             <p className="text-xs text-white/40 mt-0.5">
               <span className="text-[#3A9DBC] font-semibold">{caughtCount}</span>
               <span className="text-white/30"> / {creatures.length} scoperti</span>
@@ -219,13 +295,27 @@ export default function BestiaryPage() {
         </div>
 
         {/* Filter tabs */}
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 mb-2">
           {([['all', 'Tutti'], ['caught', '✓ Catturati'], ['missing', '? Mancanti']] as const).map(([v, l]) => (
             <button key={v} onClick={() => setFilter(v)}
               className={`flex-1 text-xs py-1.5 rounded-lg font-semibold transition-all ${
                 filter === v ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/40 hover:text-white/70'
               }`}>
               {l}
+            </button>
+          ))}
+        </div>
+        {/* Rarità filter */}
+        <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+          {(['all', 'comune', 'non_comune', 'raro', 'epico', 'leggendario'] as const).map(r => (
+            <button key={r} onClick={() => setRarityFilter(r)}
+              className={`shrink-0 text-[10px] px-2 py-1 rounded-md font-semibold transition-all ${
+                rarityFilter === r
+                  ? 'bg-white/20 text-white'
+                  : 'bg-white/5 text-white/30 hover:text-white/60'
+              }`}
+              style={rarityFilter === r && r !== 'all' ? { color: RARITY_COLORS[r] } : {}}>
+              {r === 'all' ? 'Tutte ★' : RARITY_LABELS[r]}
             </button>
           ))}
         </div>
@@ -303,6 +393,13 @@ export default function BestiaryPage() {
                   {caught && (
                     <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#34D399] flex items-center justify-center">
                       <span className="text-[9px] font-black text-white">✓</span>
+                    </div>
+                  )}
+
+                  {/* Evolvibile badge */}
+                  {pc && pc.duplicates_count >= 3 && !pc.evolved && (
+                    <div className="absolute top-1 left-1 animate-bounce">
+                      <span className="text-sm">✨</span>
                     </div>
                   )}
 
@@ -421,6 +518,24 @@ export default function BestiaryPage() {
                           <p className="text-xs text-white/40 mt-0.5">{s.label}</p>
                         </div>
                       ))}
+                    </div>
+
+                    {/* Difficoltà cattura + % base */}
+                    <div className="bg-white/5 rounded-xl px-4 py-2.5 mb-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-white/40 mb-0.5">Cattura</p>
+                        <p className="text-sm font-bold text-[#34D399]">
+                          {Math.round((RARITY_CATCH_RATES[creature.rarity] ?? 0.5) * 100)}% base
+                        </p>
+                        <p className="text-[10px] text-white/30">
+                          {['Molto facile','Facile','Normale','Difficile','Molto difficile'][((creature as any).catch_difficulty ?? 1) - 1]}
+                        </p>
+                      </div>
+                      <div className="flex gap-0.5">
+                        {[1,2,3,4,5].map(n => (
+                          <span key={n} className={`text-base ${n <= ((creature as any).catch_difficulty ?? 1) ? 'opacity-100' : 'opacity-20'}`}>⭐</span>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Actions */}

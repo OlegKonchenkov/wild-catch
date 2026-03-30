@@ -12,8 +12,9 @@ const NAV = [
   { href: '/admin/items',       label: '🎒 Oggetti'    },
   { href: '/admin/qrcodes',     label: '📷 QR Codes'   },
   { href: '/admin/invites',     label: '🎟️ Inviti'     },
-  { href: '/admin/players',     label: '👥 Giocatori'  },
-  { href: '/admin/leaderboard', label: '🏆 Classifica' },
+  { href: '/admin/players',       label: '👥 Giocatori'   },
+  { href: '/admin/level-rewards', label: '⭐ Livelli'      },
+  { href: '/admin/leaderboard',   label: '🏆 Classifica'  },
   { href: '/admin/guide',       label: '📘 Guida Admin' },
 ]
 

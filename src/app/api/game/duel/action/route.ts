@@ -11,11 +11,10 @@ export async function POST(request: Request) {
 
   const { duelId, action, itemId } = await request.json()
   // action: 'attack' | 'surrender'
-  // itemId: optional — inventory ID of a 'battaglia' item to use with this attack
 
   const { data: duel } = await supabase
     .from('duels')
-    .select('*, challenger_creature:player_creatures!challenger_creature_id(*, creatures(*)), opponent_creature:player_creatures!opponent_creature_id(*, creatures(*))')
+    .select('*')
     .eq('id', duelId)
     .eq('status', 'active')
     .single()
@@ -27,16 +26,16 @@ export async function POST(request: Request) {
   if (!isChallenger && !isOpponent) return NextResponse.json({ error: 'Non sei in questo duello' }, { status: 403 })
 
   const myRole: 'challenger' | 'opponent' = isChallenger ? 'challenger' : 'opponent'
+  const oppUserId = isChallenger ? duel.opponent_id : duel.challenger_id
 
   // ── Surrender ──────────────────────────────────────────────────────────────
   if (action === 'surrender') {
-    const winnerId = isChallenger ? duel.opponent_id : duel.challenger_id
     await supabase
       .from('duels')
-      .update({ status: 'ended', winner_id: winnerId, ended_at: new Date().toISOString() })
+      .update({ status: 'ended', winner_id: oppUserId, ended_at: new Date().toISOString() })
       .eq('id', duelId)
-    await awardDuelResults(supabase, duel.session_id, winnerId!, user.id)
-    return NextResponse.json({ ended: true, winnerId })
+    await awardDuelResults(supabase, duel.session_id, oppUserId!, user.id)
+    return NextResponse.json({ ended: true, winnerId: oppUserId })
   }
 
   // ── Turn check ─────────────────────────────────────────────────────────────
@@ -44,26 +43,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Non è il tuo turno' }, { status: 409 })
   }
 
-  // ── Creature stats ──────────────────────────────────────────────────────────
-  const challengerCr = (duel as any).challenger_creature?.creatures
-  const opponentCr   = (duel as any).opponent_creature?.creatures
-  if (!challengerCr || !opponentCr) {
+  // ── Load all lineups ───────────────────────────────────────────────────────
+  const { data: allLineups } = await supabase
+    .from('duel_lineups')
+    .select('*, player_creatures(*, creatures(name, element, hp, atk))')
+    .eq('duel_id', duelId)
+    .order('slot', { ascending: true })
+
+  if (!allLineups || allLineups.length < 2) {
+    return NextResponse.json({ error: 'Lineup non trovato' }, { status: 500 })
+  }
+
+  const myActive  = allLineups.find(l => l.user_id === user.id    && l.is_active)
+  const oppActive = allLineups.find(l => l.user_id === oppUserId  && l.is_active)
+
+  if (!myActive || !oppActive) {
+    return NextResponse.json({ error: 'Creature attive non trovate' }, { status: 500 })
+  }
+
+  const myCreature  = (myActive  as any).player_creatures?.creatures
+  const oppCreature = (oppActive as any).player_creatures?.creatures
+
+  if (!myCreature || !oppCreature) {
     return NextResponse.json({ error: 'Dati creature non disponibili' }, { status: 500 })
   }
 
-  const attackerCr = isChallenger ? challengerCr : opponentCr
-  const defenderCr = isChallenger ? opponentCr   : challengerCr
-
   // ── Optional battaglia item ────────────────────────────────────────────────
   let atkMultiplier = 1
-  const sessionId = duel.session_id
   if (itemId) {
     const { data: invItem } = await supabase
       .from('player_inventory')
       .select('quantity, items(effect_value, type)')
       .eq('id', itemId)
       .eq('user_id', user.id)
-      .eq('session_id', sessionId)
+      .eq('session_id', duel.session_id)
       .single()
 
     const inv = invItem as { quantity: number; items: { effect_value: number; type: string } } | null
@@ -77,38 +90,73 @@ export async function POST(request: Request) {
   }
 
   // ── Damage calculation ─────────────────────────────────────────────────────
-  const mult   = getElementMultiplier(attackerCr.element as Element, defenderCr.element as Element)
-  const damage = Math.round(calculateFightDamage(attackerCr.atk) * mult * atkMultiplier)
+  const mult   = getElementMultiplier(myCreature.element as Element, oppCreature.element as Element)
+  const damage = Math.round(calculateFightDamage(myCreature.atk) * mult * atkMultiplier)
+  const newOppHp = Math.max(0, oppActive.current_hp - damage)
 
-  // ── Update HP server-side ──────────────────────────────────────────────────
-  const defenderHpField: 'challenger_hp' | 'opponent_hp' = isChallenger ? 'opponent_hp' : 'challenger_hp'
-  const currentDefenderHp: number = isChallenger ? (duel.opponent_hp ?? defenderCr.hp) : (duel.challenger_hp ?? defenderCr.hp)
-  const newDefenderHp = Math.max(0, currentDefenderHp - damage)
+  // Update opponent active creature HP (+ mark fainted if dead)
+  await supabase
+    .from('duel_lineups')
+    .update({
+      current_hp: newOppHp,
+      ...(newOppHp === 0 ? { fainted_at: new Date().toISOString(), is_active: false } : {}),
+    })
+    .eq('id', oppActive.id)
+
+  // ── Handle faint & auto-switch ────────────────────────────────────────────
+  let switchedTo: { userId: string; slot: number; playerCreatureId: string; name: string } | null = null
+  let duelOver = false
+  let winnerId: string | null = null
+
+  if (newOppHp === 0) {
+    // Remaining opponent creatures (not yet fainted, excluding the one we just killed)
+    const oppRemaining = allLineups
+      .filter(l => l.user_id === oppUserId && !l.fainted_at && l.id !== oppActive.id)
+      .sort((a, b) => a.slot - b.slot)
+
+    if (oppRemaining.length === 0) {
+      // All fainted — we win
+      duelOver = true
+      winnerId = user.id
+      await supabase
+        .from('duels')
+        .update({ status: 'ended', winner_id: user.id, ended_at: new Date().toISOString() })
+        .eq('id', duelId)
+    } else {
+      // Switch to next creature
+      const next = oppRemaining[0]
+      await supabase.from('duel_lineups').update({ is_active: true }).eq('id', next.id)
+
+      // Update duel's active creature ref for the opponent
+      const oppCreatureField = isChallenger ? 'opponent_creature_id' : 'challenger_creature_id'
+      await supabase
+        .from('duels')
+        .update({ [oppCreatureField]: next.player_creature_id })
+        .eq('id', duelId)
+
+      const nextName = (next as any).player_creatures?.creatures?.name ?? 'Creatura'
+      switchedTo = {
+        userId: oppUserId!,
+        slot: next.slot,
+        playerCreatureId: next.player_creature_id,
+        name: nextName,
+      }
+    }
+  }
+
   const nextTurn: 'challenger' | 'opponent' = isChallenger ? 'opponent' : 'challenger'
-
-  const duelOver = newDefenderHp === 0
-
-  const updatePayload: Record<string, unknown> = {
-    [defenderHpField]: newDefenderHp,
-    current_turn: duelOver ? null : nextTurn,
-  }
-  if (duelOver) {
-    updatePayload.status    = 'ended'
-    updatePayload.winner_id = user.id
-    updatePayload.ended_at  = new Date().toISOString()
+  if (!duelOver) {
+    await supabase.from('duels').update({ current_turn: nextTurn }).eq('id', duelId)
   }
 
-  await supabase.from('duels').update(updatePayload).eq('id', duelId)
-
+  // ── Awards ─────────────────────────────────────────────────────────────────
   let myLevelUp: { newLevel: number; goldReward: number } | null = null
-
   if (duelOver) {
-    const loserId = isChallenger ? duel.opponent_id : duel.challenger_id
-    const levelUps = await awardDuelResults(supabase, sessionId, user.id, loserId!)
+    const levelUps = await awardDuelResults(supabase, duel.session_id, user.id, oppUserId!)
     myLevelUp = levelUps.winnerLevelUp
   }
 
-  // ── Broadcast to both players ──────────────────────────────────────────────
+  // ── Broadcast ──────────────────────────────────────────────────────────────
   const channel = supabase.channel(`duel:${duelId}`)
   await new Promise<void>(resolve => channel.subscribe(() => resolve()))
   await channel.send({
@@ -121,25 +169,39 @@ export async function POST(request: Request) {
       elementMultiplier: mult,
       itemUsed: atkMultiplier > 1,
       nextTurn: duelOver ? null : nextTurn,
-      newDefenderHp,
+      newOppHp,
+      switchedTo,
+      duelOver,
+      winnerId,
     },
   })
   await supabase.removeChannel(channel)
 
-  return NextResponse.json({ damage, elementMultiplier: mult, nextTurn: duelOver ? null : nextTurn, duelOver, levelUp: myLevelUp })
+  return NextResponse.json({
+    damage,
+    elementMultiplier: mult,
+    nextTurn: duelOver ? null : nextTurn,
+    duelOver,
+    switchedTo,
+    levelUp: myLevelUp,
+  })
 }
 
 async function awardDuelResults(
-  supabase: any, sessionId: string, winnerId: string, loserId: string
-): Promise<{ winnerLevelUp: { newLevel: number; goldReward: number } | null; loserLevelUp: { newLevel: number; goldReward: number } | null }> {
-  const [winResult, loseResult] = await Promise.all([
+  supabase: any,
+  sessionId: string,
+  winnerId: string,
+  loserId: string,
+): Promise<{ winnerLevelUp: { newLevel: number; goldReward: number } | null }> {
+  // REQ-XP-03: chi perde = 0 XP. Chi vince ottiene XP + score
+  const [winResult] = await Promise.all([
     supabase.rpc('increment_player_stats', { p_user_id: winnerId, p_session_id: sessionId, p_exp: 30, p_score: 20 }),
-    supabase.rpc('increment_player_stats', { p_user_id: loserId,  p_session_id: sessionId, p_exp: 10, p_score: 0  }),
+    supabase.rpc('increment_player_stats', { p_user_id: loserId,  p_session_id: sessionId, p_exp: 0,  p_score: 0  }),
   ])
-  const winRow  = Array.isArray(winResult.data)  ? winResult.data[0]  : null
-  const loseRow = Array.isArray(loseResult.data) ? loseResult.data[0] : null
+  const winRow = Array.isArray(winResult.data) ? winResult.data[0] : null
   return {
-    winnerLevelUp: winRow?.leveled_up  ? { newLevel: winRow.new_level,  goldReward: winRow.gold_reward  ?? 0 } : null,
-    loserLevelUp:  loseRow?.leveled_up ? { newLevel: loseRow.new_level, goldReward: loseRow.gold_reward ?? 0 } : null,
+    winnerLevelUp: winRow?.leveled_up
+      ? { newLevel: winRow.new_level, goldReward: winRow.gold_reward ?? 0 }
+      : null,
   }
 }

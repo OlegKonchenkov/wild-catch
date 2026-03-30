@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { href: '/game/backpack', icon: '🎒', label: 'Zaino'     },
   { href: '/game/profile',  icon: '🏆', label: 'Classifica'},
   { href: '/game/guide',    icon: '❓', label: 'Guida'     },
-  { href: '/home',          icon: '🏠', label: 'Home'      },
+  { href: '/home',          icon: '🏠', label: 'Profilo'   },
 ]
 
 // XP formula: level = floor(exp/50) + 1
@@ -164,13 +164,16 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('wc:level-up', onLevelUp)
   }, [])
 
-  // Realtime: admin chiude sessione → banner immediato (anche se player è fermo)
+  // Realtime: admin chiude sessione o aggiorna durata → aggiornamento immediato
   useEffect(() => {
     const sid = localStorage.getItem('current_session_id')
     if (!sid) return
     const channel = supabase
       .channel(`shell:session:${sid}`)
       .on('broadcast', { event: 'session_ended' }, () => setSessionEnded(true))
+      .on('broadcast', { event: 'session_duration_updated' }, ({ payload }) => {
+        if (payload?.endAt) setEndAt(payload.endAt)
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [supabase])

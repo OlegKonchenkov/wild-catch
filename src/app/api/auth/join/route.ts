@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   // Check session status separately (avoids FK join ambiguity)
   const { data: session, error: sessionError } = await admin
     .from('sessions')
-    .select('id, status')
+    .select('id, status, starter_kit')
     .eq('id', invite.session_id)
     .single()
 
@@ -93,20 +93,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Errore creazione profilo giocatore' }, { status: 500 })
   }
 
-  // Give starter kit: 5x Rete Base
-  const { data: reteBase } = await admin
-    .from('items')
-    .select('id')
-    .eq('name', 'Rete Base')
-    .single()
+  // REQ-INV-03: give starter kit — session-configured or fallback to 5x Rete Base
+  const starterKit: Array<{ item_id: string; quantity: number }> = Array.isArray(session.starter_kit)
+    ? (session.starter_kit as Array<{ item_id: string; quantity: number }>)
+    : []
 
-  if (reteBase) {
-    await admin.from('player_inventory').insert({
-      user_id: user.id,
-      session_id: sessionId,
-      item_id: reteBase.id,
-      quantity: 5,
-    })
+  if (starterKit.length > 0) {
+    const kitRows = starterKit
+      .filter(k => k.item_id && k.quantity > 0)
+      .map(k => ({ user_id: user.id, session_id: sessionId, item_id: k.item_id, quantity: k.quantity }))
+    if (kitRows.length > 0) await admin.from('player_inventory').insert(kitRows)
+  } else {
+    // Fallback: 5x Rete Base
+    const { data: reteBase } = await admin.from('items').select('id').eq('name', 'Rete Base').single()
+    if (reteBase) {
+      await admin.from('player_inventory').insert({
+        user_id: user.id, session_id: sessionId, item_id: reteBase.id, quantity: 5,
+      })
+    }
   }
 
   return NextResponse.json({ sessionId })

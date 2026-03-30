@@ -20,8 +20,37 @@ export async function PATCH(request: Request) {
   if (areaBounds       !== undefined) updates.area_bounds      = areaBounds
   if (durationMinutes  !== undefined) updates.duration_minutes = durationMinutes
 
+  // BUG-01: se la sessione è attiva e si aggiorna duration_minutes,
+  // ricalcola end_at da start_at + nuova durata e lo persiste
+  let newEndAt: string | null = null
+  if (durationMinutes !== undefined) {
+    const { data: sess } = await supabase
+      .from('sessions')
+      .select('status, start_at')
+      .eq('id', sessionId)
+      .single()
+    if (sess?.status === 'active' && sess.start_at) {
+      newEndAt = new Date(
+        new Date(sess.start_at).getTime() + durationMinutes * 60 * 1000
+      ).toISOString()
+      updates.end_at = newEndAt
+    }
+  }
+
   const { error } = await supabase.from('sessions').update(updates).eq('id', sessionId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ updated: true })
+  // Broadcast end_at aggiornato a tutti i player connessi
+  if (newEndAt) {
+    const channel = supabase.channel(`session:${sessionId}`)
+    await new Promise<void>(resolve => channel.subscribe(() => resolve()))
+    await channel.send({
+      type: 'broadcast',
+      event: 'session_duration_updated',
+      payload: { sessionId, endAt: newEndAt },
+    })
+    await supabase.removeChannel(channel)
+  }
+
+  return NextResponse.json({ updated: true, endAt: newEndAt })
 }

@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const body = await request.json()
-  const { name, description, rarity, element, hp, atk, def: defVal, evolution_of } = body
+  const { name, description, rarity, element, hp, atk, def: defVal, evolution_of, session_id, catch_difficulty } = body
 
   if (!name || typeof name !== 'string' || name.trim() === '') {
     return NextResponse.json({ error: 'Il nome è obbligatorio' }, { status: 400 })
@@ -56,6 +56,7 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient()
+  const diffVal = catch_difficulty !== undefined ? validateInt(catch_difficulty, 1) : 1
   const { data, error } = await admin.from('creatures').insert({
     name: name.trim(),
     description: description ?? '',
@@ -65,6 +66,8 @@ export async function POST(request: Request) {
     atk: atkVal,
     def: defParsed,
     evolution_of: evolution_of ?? null,
+    session_id: session_id ?? null,
+    catch_difficulty: diffVal ?? 1,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -170,7 +170,7 @@ const cls = 'w-full bg-white/10 text-white border border-white/20 rounded-lg px-
 const EMPTY_FORM = {
   title: '', description: '', type: 'cattura', target: '',
   target_count: 1, reward_gold: 50, reward_exp: 100,
-  chapter_order: 1, is_required: false,
+  chapter_order: 1, is_required: false, for_all_sessions: false,
 }
 
 /* ── Page ────────────────────────────────────── */
@@ -273,11 +273,13 @@ export default function AdminMissions() {
     setSaving(true); setFormError('')
     const isEdit = panel !== null && panel !== 'new'
 
+    const { for_all_sessions, ...formFields } = form as any
     if (isEdit) {
-      const { error } = await supabase.from('missions').update({ ...form }).eq('id', (panel as Mission).id)
+      const { error } = await supabase.from('missions').update({ ...formFields }).eq('id', (panel as Mission).id)
       if (error) { setFormError(error.message); setSaving(false); return }
     } else {
-      const { error } = await supabase.from('missions').insert({ ...form, session_id: selectedId })
+      const scopeSessionId = for_all_sessions ? null : selectedId
+      const { error } = await supabase.from('missions').insert({ ...formFields, session_id: scopeSessionId })
       if (error) { setFormError(error.message); setSaving(false); return }
     }
 
@@ -447,6 +449,17 @@ export default function AdminMissions() {
                   <span className="text-white/40 ml-1">— mostrata in evidenza ai giocatori</span>
                 </span>
               </label>
+
+              {panel === 'new' && (
+                <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer select-none">
+                  <input type="checkbox" checked={(form as any).for_all_sessions}
+                    onChange={e => setForm(f => ({ ...f, for_all_sessions: e.target.checked } as any))} />
+                  <span>
+                    <strong>🌐 Tutte le sessioni</strong>
+                    <span className="text-white/40 ml-1">— visibile in ogni sessione, non solo quella selezionata</span>
+                  </span>
+                </label>
+              )}
 
               {formError && (
                 <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {formError}</p>

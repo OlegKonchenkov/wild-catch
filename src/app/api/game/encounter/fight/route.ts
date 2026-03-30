@@ -46,8 +46,9 @@ export async function POST(request: Request) {
   const playerCr = (playerCreature as any).creatures
   const isRarePlus = RARE_TIERS.includes(wildCreature.rarity)
 
-  // Apply battaglia item ATK boost
+  // Apply item effect: battaglia = ATK boost, pozione = anti-weakness (caps element mult at 1.0)
   let atkMultiplier = 1
+  let antiWeakness = false
   if (itemId) {
     const { data: invItem } = await supabase
       .from('player_inventory')
@@ -57,12 +58,15 @@ export async function POST(request: Request) {
       .single()
 
     const inv = invItem as { quantity: number; items: { effect_value: number; type: string } } | null
-    if (inv && inv.quantity > 0 && inv.items?.type === 'battaglia') {
-      atkMultiplier = 1 + (inv.items.effect_value ?? 0) / 100
-      await supabase
-        .from('player_inventory')
-        .update({ quantity: inv.quantity - 1 })
-        .eq('id', itemId)
+    if (inv && inv.quantity > 0) {
+      if (inv.items?.type === 'battaglia') {
+        atkMultiplier = 1 + (inv.items.effect_value ?? 0) / 100
+        await supabase.from('player_inventory').update({ quantity: inv.quantity - 1 }).eq('id', itemId)
+      } else if (inv.items?.type === 'pozione') {
+        // REQ-INV-04: anti-weakness — neutralise type disadvantage (cap element mult at 1.0)
+        antiWeakness = true
+        await supabase.from('player_inventory').update({ quantity: inv.quantity - 1 }).eq('id', itemId)
+      }
     }
   }
 
@@ -78,10 +82,12 @@ export async function POST(request: Request) {
   }
 
   // Player attacks with element multiplier
-  const elementMult = getElementMultiplier(
+  let elementMult = getElementMultiplier(
     playerCr.element as Element,
     wildCreature.element as Element
   )
+  // REQ-INV-04: anti-weakness potion neutralises disadvantage (mult < 1 → 1)
+  if (antiWeakness && elementMult < 1) elementMult = 1
   playerDamage = Math.round(calculateFightDamage(playerCr.atk) * elementMult * atkMultiplier)
   wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
 
@@ -109,17 +115,7 @@ export async function POST(request: Request) {
     })
     .eq('id', encounterId)
 
-  // Award 2 EXP per fight turn
-  const { data: rpcData } = await supabase.rpc('increment_player_stats', {
-    p_user_id: user.id,
-    p_session_id: encounter.session_id,
-    p_exp: 2,
-    p_score: 0,
-  })
-  const rpcRow  = Array.isArray(rpcData) ? rpcData[0] : null
-  const levelUp = rpcRow?.leveled_up
-    ? { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
-    : null
+  // REQ-XP-02: nessun XP per attacchi — XP solo da cattura
 
   return NextResponse.json({
     wildHpRemaining,
@@ -130,6 +126,6 @@ export async function POST(request: Request) {
     elementMultiplier: elementMult,
     fightResult,
     catchBonus: fightResult === 'catchable' ? 0.20 : 0,
-    levelUp,
+    levelUp: null,
   })
 }

@@ -5,6 +5,28 @@ import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import HPBar from '@/components/creature/HPBar'
+import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
+import type { Element, Rarity } from '@/lib/types'
+
+interface LineupEntry {
+  id: string
+  user_id: string
+  slot: number
+  player_creature_id: string
+  current_hp: number
+  is_active: boolean
+  fainted_at: string | null
+  player_creatures: {
+    creatures: {
+      name: string
+      element: Element
+      rarity: Rarity
+      hp: number
+      atk: number
+      image_url: string
+    }
+  }
+}
 
 interface BattagliaItem {
   inventoryId: string
@@ -17,114 +39,130 @@ export default function DuelPage() {
   const { id } = useParams<{ id: string }>()
   const router  = useRouter()
 
-  const [duel, setDuel]                 = useState<any>(null)
-  const [myHp, setMyHp]                 = useState(100)
-  const [opponentHp, setOpponentHp]     = useState(100)
-  const [myHpMax, setMyHpMax]           = useState(100)
-  const [opponentHpMax, setOpponentHpMax] = useState(100)
-  const [log, setLog]                   = useState<string[]>([])
-  const [waiting, setWaiting]           = useState(true)
-  const [result, setResult]             = useState<'won' | 'lost' | null>(null)
-  const [animState, setAnimState]       = useState<'idle' | 'attack' | 'damage'>('idle')
-  const [oppAnimState, setOppAnimState] = useState<'idle' | 'attack' | 'damage'>('idle')
-  const [userId, setUserId]             = useState<string | null>(null)
-  const [myRole, setMyRole]             = useState<'challenger' | 'opponent' | null>(null)
-  const [isMyTurn, setIsMyTurn]         = useState(false)
-  const [attacking, setAttacking]       = useState(false)
-  const [lastDamage, setLastDamage]     = useState<{ amount: number; target: 'me' | 'opp' } | null>(null)
+  const [duel, setDuel]                     = useState<any>(null)
+  const [myLineup, setMyLineup]             = useState<LineupEntry[]>([])
+  const [oppLineup, setOppLineup]           = useState<LineupEntry[]>([])
+  const [log, setLog]                       = useState<string[]>([])
+  const [waiting, setWaiting]               = useState(true)
+  const [result, setResult]                 = useState<'won' | 'lost' | null>(null)
+  const [animState, setAnimState]           = useState<'idle' | 'attack' | 'damage'>('idle')
+  const [oppAnimState, setOppAnimState]     = useState<'idle' | 'attack' | 'damage'>('idle')
+  const [userId, setUserId]                 = useState<string | null>(null)
+  const [myRole, setMyRole]                 = useState<'challenger' | 'opponent' | null>(null)
+  const [isMyTurn, setIsMyTurn]             = useState(false)
+  const [attacking, setAttacking]           = useState(false)
+  const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp' } | null>(null)
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
-  const [showItems, setShowItems]       = useState(false)
+  const [showItems, setShowItems]           = useState(false)
+  const [switchNotice, setSwitchNotice]     = useState<string | null>(null)
 
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
   const supabase = useMemo(() => createClient(), [])
 
-  // Load duel + determine role
+  // Load duel + lineups + role
   useEffect(() => {
-    supabase
-      .from('duels')
-      .select('*, challenger_creature:player_creatures!challenger_creature_id(*, creatures(*)), opponent_creature:player_creatures!opponent_creature_id(*, creatures(*))')
-      .eq('id', id)
-      .single()
-      .then(async ({ data }) => {
-        if (!data) return
-        setDuel(data)
-        if (!realtimeUpdatedRef.current) setWaiting(data.status === 'waiting')
+    async function init() {
+      const { data: duelData } = await supabase
+        .from('duels')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        setUserId(user.id)
+      if (!duelData) return
+      setDuel(duelData)
+      if (!realtimeUpdatedRef.current) setWaiting(duelData.status === 'waiting')
 
-        const role = data.challenger_id === user.id ? 'challenger' : 'opponent'
-        setMyRole(role)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      setUserId(user.id)
 
-        const myCrData  = role === 'challenger' ? (data as any).challenger_creature?.creatures : (data as any).opponent_creature?.creatures
-        const oppCrData = role === 'challenger' ? (data as any).opponent_creature?.creatures   : (data as any).challenger_creature?.creatures
+      const role: 'challenger' | 'opponent' = duelData.challenger_id === user.id ? 'challenger' : 'opponent'
+      setMyRole(role)
 
-        if (myCrData)  { setMyHp(myCrData.hp);  setMyHpMax(myCrData.hp) }
-        if (oppCrData) { setOpponentHp(oppCrData.hp); setOpponentHpMax(oppCrData.hp) }
+      if (duelData.status === 'active') setIsMyTurn(role === 'challenger')
 
-        // Challenger always goes first
-        if (data.status === 'active') {
-          setIsMyTurn(role === 'challenger')
-        }
+      // Load lineups
+      const { data: lineups } = await supabase
+        .from('duel_lineups')
+        .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, image_url))')
+        .eq('duel_id', id)
+        .order('slot', { ascending: true })
 
-        // Load battaglia items for this session
-        const sessionId = localStorage.getItem('current_session_id')
-        if (sessionId) {
-          const { data: inv } = await supabase
-            .from('player_inventory')
-            .select('id, quantity, items(name, effect_value, type)')
-            .eq('user_id', user.id)
-            .eq('session_id', sessionId)
-            .gt('quantity', 0)
-          const filtered = (inv ?? [])
-            .filter((r: any) => r.items?.type === 'battaglia')
-            .map((r: any) => ({
-              inventoryId: r.id,
-              name: r.items.name,
-              effectValue: r.items.effect_value,
-              quantity: r.quantity,
-            }))
-          setBattagliaItems(filtered)
-        }
-      })
+      if (lineups) {
+        const mine = lineups.filter((l: LineupEntry) => l.user_id === user.id)
+        const opp  = lineups.filter((l: LineupEntry) => l.user_id !== user.id)
+        setMyLineup(mine)
+        setOppLineup(opp)
+      }
 
+      // Load battaglia items
+      const sessionId = localStorage.getItem('current_session_id')
+      if (sessionId) {
+        const { data: inv } = await supabase
+          .from('player_inventory')
+          .select('id, quantity, items(name, effect_value, type)')
+          .eq('user_id', user.id)
+          .eq('session_id', sessionId)
+          .gt('quantity', 0)
+        const filtered = ((inv ?? []) as any[])
+          .filter(r => r.items?.type === 'battaglia')
+          .map(r => ({ inventoryId: r.id, name: r.items.name, effectValue: r.items.effect_value, quantity: r.quantity }))
+        setBattagliaItems(filtered)
+      }
+    }
+
+    init()
+
+    // Realtime: broadcast duel_action
     const channel = supabase
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
-        const { actorId, damage, nextTurn, itemUsed } = payload
+        const { actorId, damage, nextTurn, itemUsed, switchedTo } = payload
 
         setUserId(currentId => {
           const iAttacked = actorId === currentId
           if (iAttacked) {
-            setOpponentHp(prev => Math.max(0, prev - damage))
             setOppAnimState('damage')
             setLastDamage({ amount: damage, target: 'opp' })
             setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 700)
           } else {
-            setMyHp(prev => Math.max(0, prev - damage))
             setAnimState('damage')
             setLastDamage({ amount: damage, target: 'me' })
             setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 700)
           }
-
-          // Update turn based on nextTurn from server
           if (nextTurn && currentId) {
-            setMyRole(role => {
-              setIsMyTurn(nextTurn === role)
-              return role
-            })
+            setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
           }
-
           return currentId
         })
+
+        if (switchedTo) {
+          setSwitchNotice(`${switchedTo.name} entra in battaglia!`)
+          setTimeout(() => setSwitchNotice(null), 2500)
+        }
 
         const atkLabel = itemUsed ? '⚔️+🗡️' : '⚔️'
         setLog(prev => [`${atkLabel} ${damage} danno!`, ...prev.slice(0, 3)])
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${id}` },
+      // Realtime lineup HP updates
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'duel_lineups', filter: `duel_id=eq.${id}` },
+        ({ new: updated }) => {
+          const updateLineup = (prev: LineupEntry[]) =>
+            prev.map(l => l.id === updated.id ? { ...l, ...updated } : l)
+          setMyLineup(prev => {
+            if (prev.some(l => l.id === updated.id)) return updateLineup(prev)
+            return prev
+          })
+          setOppLineup(prev => {
+            if (prev.some(l => l.id === updated.id)) return updateLineup(prev)
+            return prev
+          })
+        })
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${id}` },
         ({ new: updated }) => {
           if (updated.status === 'ended') {
             supabase.auth.getUser().then(({ data: { user } }) => {
@@ -136,12 +174,8 @@ export default function DuelPage() {
           realtimeUpdatedRef.current = true
           setWaiting(updated.status === 'waiting')
 
-          // Sync turn from DB update (covers the joiner)
           if (updated.status === 'active' && updated.current_turn) {
-            setMyRole(role => {
-              setIsMyTurn(updated.current_turn === role)
-              return role
-            })
+            setMyRole(role => { setIsMyTurn(updated.current_turn === role); return role })
           }
         })
       .subscribe()
@@ -149,9 +183,11 @@ export default function DuelPage() {
     return () => { supabase.removeChannel(channel) }
   }, [id, supabase])
 
-  // Auto-surrender when my HP hits 0
+  // Auto-surrender when all my creatures faint
   useEffect(() => {
-    if (myHp === 0 && !result && !waiting && !surrenderedRef.current) {
+    if (myLineup.length === 0 || result || waiting || surrenderedRef.current) return
+    const allFainted = myLineup.length > 0 && myLineup.every(l => l.fainted_at !== null)
+    if (allFainted) {
       surrenderedRef.current = true
       setIsMyTurn(false)
       fetch('/api/game/duel/action', {
@@ -160,7 +196,7 @@ export default function DuelPage() {
         body: JSON.stringify({ duelId: id, action: 'surrender' }),
       })
     }
-  }, [myHp, result, waiting, id])
+  }, [myLineup, result, waiting, id])
 
   async function handleAttack() {
     if (attacking || !isMyTurn) return
@@ -183,7 +219,6 @@ export default function DuelPage() {
       if (data.duelOver) window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
     }
 
-    // If item was used, decrement local count and clear selection
     if (selectedItemId && res.ok) {
       setBattagliaItems(prev => prev
         .map(it => it.inventoryId === selectedItemId ? { ...it, quantity: it.quantity - 1 } : it)
@@ -192,7 +227,6 @@ export default function DuelPage() {
       setSelectedItemId(null)
       setShowItems(false)
     }
-
     setAttacking(false)
   }
 
@@ -205,11 +239,17 @@ export default function DuelPage() {
     })
   }
 
-  const myCr  = myRole === 'opponent' ? duel?.opponent_creature?.creatures  : duel?.challenger_creature?.creatures
-  const oppCr = myRole === 'opponent' ? duel?.challenger_creature?.creatures : duel?.opponent_creature?.creatures
+  const myActive  = myLineup.find(l => l.is_active)
+  const oppActive = oppLineup.find(l => l.is_active)
+  const myActiveCr  = myActive?.player_creatures?.creatures
+  const oppActiveCr = oppActive?.player_creatures?.creatures
+  const myHp        = myActive?.current_hp ?? 0
+  const myHpMax     = myActiveCr?.hp ?? 100
+  const oppHp       = oppActive?.current_hp ?? 0
+  const oppHpMax    = oppActiveCr?.hp ?? 100
 
-  const turnLabel = isMyTurn ? 'Il tuo turno' : 'Turno avversario'
   const turnColor = isMyTurn ? '#34D399' : '#94a3b8'
+  const turnLabel = isMyTurn ? 'Il tuo turno' : 'Turno avversario'
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative"
@@ -236,14 +276,12 @@ export default function DuelPage() {
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               className="mb-6"
             >
-              <div className="w-20 h-20 rounded-full border-2 border-[#E85D2F]/40 flex items-center justify-center"
+              <div className="w-20 h-20 rounded-full border-2 border-[#E85D2F]/40 flex items-center justify-center text-4xl"
                 style={{ boxShadow: '0 0 30px rgba(232,93,47,0.3)' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#E85D2F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10">
-                  <path d="M14.5 17.5L3 6V3h3l11.5 11.5M16.5 15.5l1.5 1.5M8 2l4 4M2 8l4 4M5 15l-2 2 2 2 2-2M15 5l2-2 2 2-2 2"/>
-                </svg>
+                ⚔️
               </div>
             </motion.div>
-            <p className="text-xl font-extrabold text-white mb-2">In attesa...</p>
+            <p className="text-xl font-extrabold text-white mb-1">In attesa...</p>
             <p className="text-white/40 text-sm mb-6">L'avversario sta per entrare</p>
             {duel?.room_code && (
               <div className="bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-center">
@@ -285,19 +323,13 @@ export default function DuelPage() {
                   border: `1px solid ${result === 'won' ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.1)'}`,
                 }}>
                 <span className="text-xl font-extrabold" style={{ color: result === 'won' ? '#34D399' : 'rgba(255,255,255,0.4)' }}>
-                  +{result === 'won' ? 15 : 5} EXP
+                  +{result === 'won' ? '30 EXP · +20 punti' : '0 EXP'}
                 </span>
               </div>
               <button
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
-                  router.push('/game/map')
-                }}
+                onClick={() => { window.dispatchEvent(new CustomEvent('wc:refresh-stats')); router.push('/game/map') }}
                 className="w-full py-4 rounded-2xl font-extrabold text-white text-base cursor-pointer active:scale-[0.97] transition-transform"
-                style={{
-                  background: 'linear-gradient(135deg, #3A9DBC 0%, #2a7a99 100%)',
-                  boxShadow: '0 4px 20px rgba(58,157,188,0.35)',
-                }}
+                style={{ background: 'linear-gradient(135deg, #3A9DBC 0%, #2a7a99 100%)', boxShadow: '0 4px 20px rgba(58,157,188,0.35)' }}
               >
                 Torna alla Mappa
               </button>
@@ -306,31 +338,42 @@ export default function DuelPage() {
         )}
       </AnimatePresence>
 
-      {/* ── OPPONENT ── */}
-      <div className="flex-none px-4 pt-4 pb-1 relative z-10">
-        <div className="flex items-center justify-between mb-1.5">
-          <p className="text-xs text-white/30 uppercase tracking-widest">Avversario</p>
-          {oppCr && <p className="text-xs font-bold text-white/40 truncate max-w-[140px]">{oppCr.name}</p>}
+      {/* ── OPPONENT SECTION ── */}
+      <div className="flex-none px-4 pt-3 pb-1 relative z-10">
+        {/* Opponent lineup bar */}
+        <LineupBar lineup={oppLineup} label="Avversario" />
+        {/* Opponent active creature HP */}
+        <div className="mt-2">
+          {oppActiveCr
+            ? <HPBar current={oppHp} max={oppHpMax} label={oppActiveCr.name} />
+            : <div className="h-4 bg-white/5 rounded-full animate-pulse" />
+          }
         </div>
-        {oppCr
-          ? <HPBar current={opponentHp} max={opponentHpMax} label="" />
-          : <div className="h-4 bg-white/5 rounded-full animate-pulse" />
-        }
       </div>
 
       {/* Opponent sprite */}
-      <div className="flex-none flex justify-center pt-1 pb-1 relative z-10">
+      <div className="flex-none flex justify-center pt-1 relative z-10">
         <motion.div
           animate={
             oppAnimState === 'damage' ? { x: [0, 8, -8, 6, -6, 0], transition: { duration: 0.35 } } :
-            oppAnimState === 'attack' ? { y: [0, 6, 0],             transition: { duration: 0.25 } } : {}
+            oppAnimState === 'attack' ? { y: [0, 6, 0],            transition: { duration: 0.25 } } : {}
           }
           className="relative"
         >
-          {oppCr
-            ? <CreatureSprite imageUrl={oppCr.image_url} name={oppCr.name} animState={oppAnimState} size={100} />
-            : <div className="w-[100px] h-[100px] rounded-full bg-white/5 animate-pulse" />
-          }
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={oppActive?.id ?? 'opp-loading'}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.3 }}
+            >
+              {oppActiveCr
+                ? <CreatureSprite imageUrl={oppActiveCr.image_url} name={oppActiveCr.name} animState={oppAnimState} size={100} />
+                : <div className="w-[100px] h-[100px] rounded-full bg-white/5 animate-pulse" />
+              }
+            </motion.div>
+          </AnimatePresence>
           <AnimatePresence>
             {lastDamage?.target === 'opp' && (
               <motion.div
@@ -349,22 +392,34 @@ export default function DuelPage() {
         </motion.div>
       </div>
 
-      {/* Turn indicator + VS */}
+      {/* Turn indicator + Switch notice */}
       <div className="flex-none flex items-center gap-3 px-4 py-1 relative z-10">
         <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06))' }} />
         <AnimatePresence mode="wait">
-          <motion.div
-            key={isMyTurn ? 'my' : 'opp'}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.2 }}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full"
-            style={{ background: `${turnColor}18`, border: `1px solid ${turnColor}40` }}
-          >
-            <div className="w-1.5 h-1.5 rounded-full" style={{ background: turnColor }} />
-            <span className="text-[10px] font-bold" style={{ color: turnColor }}>{turnLabel}</span>
-          </motion.div>
+          {switchNotice ? (
+            <motion.div
+              key="switch"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#7B4DB8]/20 border border-[#7B4DB8]/40"
+            >
+              <span className="text-[10px] font-bold text-[#C084FC]">✨ {switchNotice}</span>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={isMyTurn ? 'my' : 'opp'}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full"
+              style={{ background: `${turnColor}18`, border: `1px solid ${turnColor}40` }}
+            >
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: turnColor }} />
+              <span className="text-[10px] font-bold" style={{ color: turnColor }}>{turnLabel}</span>
+            </motion.div>
+          )}
         </AnimatePresence>
         <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.06), transparent)' }} />
       </div>
@@ -387,7 +442,7 @@ export default function DuelPage() {
       </div>
 
       {/* Player sprite */}
-      <div className="flex-none flex justify-center pt-1 pb-1 relative z-10">
+      <div className="flex-none flex justify-center pt-1 relative z-10">
         <motion.div
           animate={
             animState === 'damage' ? { x: [0, -8, 8, -6, 6, 0], transition: { duration: 0.35 } } :
@@ -395,10 +450,20 @@ export default function DuelPage() {
           }
           className="relative"
         >
-          {myCr
-            ? <CreatureSprite imageUrl={myCr.image_url} name={myCr.name} animState={animState} size={120} />
-            : <div className="w-[120px] h-[120px] rounded-full bg-white/5 animate-pulse" />
-          }
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={myActive?.id ?? 'my-loading'}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.3 }}
+            >
+              {myActiveCr
+                ? <CreatureSprite imageUrl={myActiveCr.image_url} name={myActiveCr.name} animState={animState} size={120} />
+                : <div className="w-[120px] h-[120px] rounded-full bg-white/5 animate-pulse" />
+              }
+            </motion.div>
+          </AnimatePresence>
           <AnimatePresence>
             {lastDamage?.target === 'me' && (
               <motion.div
@@ -417,22 +482,20 @@ export default function DuelPage() {
         </motion.div>
       </div>
 
-      {/* ── MY HP ── */}
+      {/* ── MY SECTION ── */}
       <div className="flex-none px-4 pt-1 pb-2 relative z-10">
-        <div className="flex items-center justify-between mb-1.5">
-          <p className="text-xs text-white/30 uppercase tracking-widest">La tua creatura</p>
-          {myCr && <p className="text-xs font-bold text-white/40 truncate max-w-[140px]">{myCr.name}</p>}
-        </div>
-        {myCr
-          ? <HPBar current={myHp} max={myHpMax} label="" />
+        {myActiveCr
+          ? <HPBar current={myHp} max={myHpMax} label={myActiveCr.name} />
           : <div className="h-4 bg-white/5 rounded-full animate-pulse" />
         }
+        <div className="mt-1.5">
+          <LineupBar lineup={myLineup} label="La tua squadra" reverse />
+        </div>
       </div>
 
       {/* ── ACTIONS ── */}
       {!result && !waiting && (
         <div className="flex-none px-4 pb-4 pt-1 relative z-10 flex flex-col gap-2">
-
           {/* Battaglia items picker */}
           {battagliaItems.length > 0 && isMyTurn && (
             <AnimatePresence>
@@ -458,13 +521,6 @@ export default function DuelPage() {
                           <p className="text-[10px] text-[#FBBF24]">+{item.effectValue}% ATK</p>
                         </div>
                         <span className="text-xs text-white/30 shrink-0">×{item.quantity}</span>
-                        {selectedItemId === item.inventoryId && (
-                          <div className="w-4 h-4 rounded-full bg-[#FBBF24] flex items-center justify-center shrink-0">
-                            <svg viewBox="0 0 12 12" fill="white" className="w-2.5 h-2.5">
-                              <path d="M2 6l2.5 2.5L10 3.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </div>
-                        )}
                       </button>
                     ))}
                   </div>
@@ -486,10 +542,8 @@ export default function DuelPage() {
                   opacity: isMyTurn ? 1 : 0.4,
                 }}
               >
-                <span className="text-lg leading-none">⚔️</span>
-                {selectedItemId && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#FBBF24]" />
-                )}
+                <span className="text-lg leading-none">🗡️</span>
+                {selectedItemId && <div className="w-1.5 h-1.5 rounded-full bg-[#FBBF24]" />}
               </motion.button>
             )}
 
@@ -515,12 +569,7 @@ export default function DuelPage() {
                 {attacking ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : isMyTurn ? (
-                  <>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                      <path d="M14.5 17.5L3 6V3h3l11.5 11.5M16.5 15.5l1.5 1.5M8 2l4 4M2 8l4 4M5 15l-2 2 2 2 2-2M15 5l2-2 2 2-2 2"/>
-                    </svg>
-                    {selectedItemId ? 'Attacca (+ATK)' : 'Attacca'}
-                  </>
+                  <>⚔️ {selectedItemId ? 'Attacca (+ATK)' : 'Attacca'}</>
                 ) : (
                   <span className="text-white/40 text-sm">In attesa...</span>
                 )}
@@ -542,6 +591,70 @@ export default function DuelPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Lineup bar component ───────────────────────────────────────────────────────
+function LineupBar({ lineup, label, reverse }: {
+  lineup: LineupEntry[]
+  label: string
+  reverse?: boolean
+}) {
+  if (lineup.length === 0) {
+    return (
+      <div className="flex items-center gap-2">
+        <p className="text-[9px] text-white/25 uppercase tracking-widest">{label}</p>
+        <div className="flex gap-1">
+          {[1,2,3].map(i => <div key={i} className="w-4 h-4 rounded-full bg-white/5 animate-pulse" />)}
+        </div>
+      </div>
+    )
+  }
+
+  const sorted = [...lineup].sort((a, b) => a.slot - b.slot)
+
+  return (
+    <div className={`flex items-center gap-2 ${reverse ? 'flex-row-reverse' : ''}`}>
+      <p className="text-[9px] text-white/25 uppercase tracking-widest shrink-0">{label}</p>
+      <div className={`flex gap-1.5 ${reverse ? 'flex-row-reverse' : ''}`}>
+        {sorted.map(entry => {
+          const cr = entry.player_creatures?.creatures
+          const color = cr ? RARITY_COLORS[cr.rarity] : '#94a3b8'
+          const isFainted = !!entry.fainted_at
+          const isActive  = entry.is_active
+          const hpPct = cr ? Math.max(0, (entry.current_hp / cr.hp) * 100) : 0
+
+          return (
+            <div
+              key={entry.id}
+              className="relative w-5 h-5 rounded-full flex items-center justify-center overflow-hidden"
+              style={{
+                background: isFainted ? 'rgba(255,255,255,0.05)' : `${color}30`,
+                border: `1.5px solid ${isActive ? color : isFainted ? 'rgba(255,255,255,0.1)' : color + '60'}`,
+                boxShadow: isActive ? `0 0 6px ${color}80` : 'none',
+                opacity: isFainted ? 0.4 : 1,
+              }}
+              title={cr?.name ?? `Slot ${entry.slot}`}
+            >
+              {isFainted ? (
+                <span className="text-[8px] text-white/30 font-bold">✕</span>
+              ) : (
+                <span className="text-[7px]" style={{ color }}>
+                  {Math.round(hpPct)}
+                </span>
+              )}
+              {/* HP fill indicator along bottom */}
+              {!isFainted && (
+                <div
+                  className="absolute bottom-0 left-0 h-[3px] transition-all duration-500"
+                  style={{ width: `${hpPct}%`, background: hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444' }}
+                />
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 export type Element = 'fiamma' | 'adriatico' | 'bosco' | 'terra' | 'armonia'
 export type Rarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario'
 export type SessionStatus = 'draft' | 'ready' | 'active' | 'ended'
-export type ItemType = 'rete' | 'esca' | 'uovo' | 'battaglia'
+export type ItemType = 'rete' | 'esca' | 'uovo' | 'battaglia' | 'pozione' | 'cura'
 export type QRCodeType = 'uovo' | 'indizio' | 'oggetto' | 'boss' | 'evento'
 export type EncounterStatus = 'active' | 'caught' | 'fled' | 'fought'
 export type DuelStatus = 'waiting' | 'active' | 'ended'
@@ -29,6 +29,8 @@ export interface Creature {
   lottie_url: string | null
   spawn_weight: number
   evolution_of: string | null
+  catch_difficulty: number
+  session_id: string | null
 }
 
 export interface Session {

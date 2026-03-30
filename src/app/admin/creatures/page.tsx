@@ -18,6 +18,8 @@ interface Creature {
   def: number
   evolution_of: string | null
   image_url: string
+  session_id: string | null
+  catch_difficulty: number
 }
 
 const RARITIES: Rarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario']
@@ -41,7 +43,7 @@ const ELEMENT_META: Record<ElementType, { label: string; emoji: string; bg: stri
 
 const EMPTY_FORM = {
   name: '', description: '', rarity: 'comune' as Rarity, element: 'armonia' as ElementType,
-  hp: 50, atk: 10, def: 5, evolution_of: '',
+  hp: 50, atk: 10, def: 5, evolution_of: '', session_id: '', catch_difficulty: 1,
 }
 
 type ImageMode = 'preview' | 'url' | 'upload' | 'ai'
@@ -70,6 +72,12 @@ export default function CreaturesPage() {
 
   const [filter, setFilter] = useState<ElementType | 'all'>('all')
   const [search, setSearch] = useState('')
+  const [sessions, setSessions] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    supabase.from('sessions').select('id, name').order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setSessions(data) })
+  }, [supabase])
 
   const loadCreatures = useCallback(async () => {
     setLoading(true); setError(null)
@@ -92,7 +100,8 @@ export default function CreaturesPage() {
   function openEdit(c: Creature) {
     setPanel(c.id)
     setFormData({ name: c.name, description: c.description, rarity: c.rarity, element: c.element,
-      hp: c.hp, atk: c.atk, def: c.def, evolution_of: c.evolution_of ?? '' })
+      hp: c.hp, atk: c.atk, def: c.def, evolution_of: c.evolution_of ?? '',
+      session_id: c.session_id ?? '', catch_difficulty: c.catch_difficulty ?? 1 })
     setFormError(null); setImageMode('preview')
     setManualUrl(c.image_url ?? ''); setAiPrompt(c.description ?? ''); setArtworkError(null)
   }
@@ -109,6 +118,8 @@ export default function CreaturesPage() {
       name: formData.name, description: formData.description, rarity: formData.rarity,
       element: formData.element, hp: Number(formData.hp), atk: Number(formData.atk),
       def: Number(formData.def), evolution_of: formData.evolution_of || null,
+      session_id: (formData as any).session_id || null,
+      catch_difficulty: Number((formData as any).catch_difficulty) || 1,
     }
     try {
       const res = await fetch(isEdit ? `/api/admin/creatures/${panel}` : '/api/admin/creatures', {
@@ -443,6 +454,29 @@ export default function CreaturesPage() {
                           <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-white/40 block mb-1">Disponibile in</label>
+                      <select value={(formData as any).session_id}
+                        onChange={e => setFormData(f => ({ ...f, session_id: e.target.value } as any))}
+                        className="w-full bg-white/5 text-white text-xs border border-white/10 rounded-lg px-2 py-2">
+                        <option value="">🌐 Tutte le sessioni</option>
+                        {sessions.map(s => <option key={s.id} value={s.id}>🎯 {s.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-white/40 block mb-1">Difficoltà cattura</label>
+                      <div className="flex gap-1">
+                        {[1,2,3,4,5].map(n => (
+                          <button key={n} type="button"
+                            onClick={() => setFormData(f => ({ ...f, catch_difficulty: n } as any))}
+                            className={`text-xl leading-none transition-all ${n <= ((formData as any).catch_difficulty ?? 1) ? 'opacity-100' : 'opacity-25'}`}>
+                            ⭐
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="flex gap-2 pt-1">

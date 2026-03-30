@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
@@ -40,9 +40,15 @@ export default function EncounterPage() {
   // Item selection state
   const [reteItems, setReteItems] = useState<InvItem[]>([])
   const [battagliaItems, setBattagliaItems] = useState<InvItem[]>([])
+  const [pozioneItems, setPozioneItems] = useState<InvItem[]>([])
+  const [curaItems, setCuraItems] = useState<InvItem[]>([])
   const [selectedReteId, setSelectedReteId] = useState<string | null>(null)
   const [selectedBattagliaId, setSelectedBattagliaId] = useState<string | null>(null)
+  const [selectedPozioneId, setSelectedPozioneId] = useState<string | null>(null)
   const [showItems, setShowItems] = useState(false)
+  const [turnTimer, setTurnTimer] = useState(45)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoFightRef = useRef(false)
 
   useEffect(() => {
     // Try sessionStorage first (fast path — set by map page popup)
@@ -93,6 +99,8 @@ export default function EncounterPage() {
           const rows = data as unknown as InvItem[]
           setReteItems(rows.filter(r => r.items?.type === 'rete'))
           setBattagliaItems(rows.filter(r => r.items?.type === 'battaglia'))
+          setPozioneItems(rows.filter(r => r.items?.type === 'pozione'))
+          setCuraItems(rows.filter(r => r.items?.type === 'cura'))
         })
     })
   }, [supabase])
@@ -121,24 +129,56 @@ export default function EncounterPage() {
       })
   }, [state?.encounterId, supabase])
 
+  // REQ-BAT-04: timer 45s per turno — auto-attack quando scade
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    setTurnTimer(45)
+    autoFightRef.current = false
+    timerRef.current = setInterval(() => {
+      setTurnTimer(prev => {
+        if (prev <= 1) {
+          if (!autoFightRef.current) {
+            autoFightRef.current = true
+            // trigger auto-attack
+            document.getElementById('wc-fight-btn')?.click()
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
+
+  useEffect(() => {
+    if (state && !result) resetTimer()
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [state?.encounterId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleFight() {
     if (!state || loading) return
+    resetTimer()
     setLoading(true)
     setMessage('')
     setShowItems(false)
 
+    // REQ-INV-04: pass pozione (anti-weakness) or battaglia item to fight
+    const activeItemId = selectedPozioneId ?? selectedBattagliaId ?? null
     const res = await fetch('/api/game/encounter/fight', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ encounterId: state.encounterId, itemId: selectedBattagliaId }),
+      body: JSON.stringify({ encounterId: state.encounterId, itemId: activeItemId }),
     })
     const data = await res.json()
-    setSelectedBattagliaId(null)
-    // Remove used item from local list
     if (selectedBattagliaId) {
       setBattagliaItems(prev => prev.map(i => i.id === selectedBattagliaId
         ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))
     }
+    if (selectedPozioneId) {
+      setPozioneItems(prev => prev.map(i => i.id === selectedPozioneId
+        ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))
+    }
+    setSelectedBattagliaId(null)
+    setSelectedPozioneId(null)
 
     if (!res.ok) { setMessage(data.error); setLoading(false); return }
 
@@ -176,6 +216,7 @@ export default function EncounterPage() {
 
   async function handleCatch() {
     if (!state || loading) return
+    resetTimer()
     setLoading(true)
     setShowItems(false)
 
@@ -218,6 +259,29 @@ export default function EncounterPage() {
     setLoading(false)
   }
 
+  // REQ-PRO-03: healing item — restores player HP, skips attack turn
+  async function handleHeal(itemId: string) {
+    if (!state || loading) return
+    resetTimer()
+    setLoading(true)
+    setShowItems(false)
+    const res = await fetch('/api/game/encounter/heal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ encounterId: state.encounterId, itemId }),
+    })
+    const data = await res.json()
+    if (res.ok && data.healed) {
+      setCuraItems(prev => prev.map(i => i.id === itemId
+        ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))
+      setPlayerHp(prev => prev !== null ? Math.min(data.maxHp, prev + data.healAmount) : data.healAmount)
+      setMessage(`+${data.healAmount} HP ripristinati 💚`)
+    } else {
+      setMessage(data.error ?? 'Cura fallita')
+    }
+    setLoading(false)
+  }
+
   function handleFlee() {
     router.back()
   }
@@ -244,155 +308,244 @@ export default function EncounterPage() {
 
   const rarityColor = RARITY_COLORS[state.creature.rarity ?? 'comune']
   const elementEmoji = ELEMENT_EMOJI[state.creature.element ?? 'fiamma']
-  const hasItems = reteItems.length > 0 || battagliaItems.length > 0
+  const hasItems = reteItems.length > 0 || battagliaItems.length > 0 || pozioneItems.length > 0 || curaItems.length > 0
+  const timerPct = (turnTimer / 45) * 100
+  const timerUrgent = turnTimer <= 10
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-[#0F1F2E] to-[#1A3A2E] p-4">
-      {/* Creature header */}
-      <div className="text-center mb-4">
-        <h2 className="text-2xl font-bold text-white">{state.creature.name}</h2>
-        <div className="flex items-center justify-center gap-2 mt-1">
-          <span className="text-lg">{elementEmoji}</span>
-          <span className="text-xs px-2 py-0.5 rounded-full text-white font-bold"
-            style={{ backgroundColor: rarityColor }}>
-            {state.creature.rarity}
+    <div className="flex flex-col h-full bg-gradient-to-b from-[#0F1F2E] via-[#122030] to-[#1A2E20] overflow-hidden">
+
+      {/* ── BATTLE FIELD ─────────────────────────────────── */}
+      <div className="relative flex-1 min-h-0">
+
+        {/* Wild creature — top right (Pokémon avversario) */}
+        <div className="absolute top-3 right-3 left-1/2 flex flex-col items-end gap-1.5">
+          {/* Wild HP card */}
+          <div className="bg-[#0A1520]/85 backdrop-blur-sm rounded-xl px-3 py-2 w-full max-w-[160px] border border-white/10">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider truncate max-w-[90px]">
+                {state.creature.name}
+              </span>
+              <span className="text-[10px]">{elementEmoji}</span>
+            </div>
+            <HPBar current={state.wildHp} max={state.wildHpMax} label="" />
+            <p className="text-right text-[9px] text-white/30 mt-0.5 font-mono">
+              {state.wildHp}/{state.wildHpMax}
+            </p>
+          </div>
+          {/* Rarity badge */}
+          <span className="text-[9px] px-2 py-0.5 rounded-full text-white font-bold"
+            style={{ backgroundColor: rarityColor + 'cc' }}>
+            {state.creature.rarity?.replace('_',' ')}
           </span>
         </div>
-      </div>
 
-      {/* Creature sprite */}
-      <div className="flex-1 flex items-center justify-center">
-        <CreatureSprite
-          imageUrl={state.creature.image_url ?? ''}
-          name={state.creature.name ?? ''}
-          animState={animState}
-          size={240}
-        />
-      </div>
-
-      {/* HP bar */}
-      <div className="mb-4">
-        <HPBar current={state.wildHp} max={state.wildHpMax} label="HP Creatura" />
-      </div>
-
-      {/* Player creature HP bar */}
-      {playerCreature && playerHp !== null && (
-        <div className="mb-3">
-          <HPBar
-            current={playerHp}
-            max={playerCreature.maxHp}
-            label={`${ELEMENT_EMOJI[playerCreature.element as keyof typeof ELEMENT_EMOJI] ?? ''} ${playerCreature.name}`}
+        {/* Wild sprite — top-right area */}
+        <motion.div
+          className="absolute top-2 right-4"
+          animate={animState === 'damage' ? { x: [-6, 6, -4, 4, 0] } :
+                   animState === 'flee'   ? { x: [0, 60], opacity: [1, 0] } :
+                   animState === 'catch'  ? { scale: [1, 0.8, 0.6, 0.1], opacity: [1, 1, 0.8, 0] } :
+                   { y: [0, -4, 0] }}
+          transition={animState === 'idle'
+            ? { duration: 2.5, repeat: Infinity, ease: 'easeInOut' }
+            : { duration: 0.5 }}
+        >
+          <CreatureSprite
+            imageUrl={state.creature.image_url ?? ''}
+            name={state.creature.name ?? ''}
+            animState="idle"
+            size={130}
           />
+        </motion.div>
+
+        {/* Player creature — bottom left (Pokémon del giocatore) */}
+        <div className="absolute bottom-3 left-3 right-1/2 flex flex-col gap-1.5">
+          {playerCreature && playerHp !== null && (
+            <div className="bg-[#0A1520]/85 backdrop-blur-sm rounded-xl px-3 py-2 border border-white/10">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider truncate max-w-[90px]">
+                  {playerCreature.name}
+                </span>
+                <span className="text-[10px]">
+                  {ELEMENT_EMOJI[playerCreature.element as keyof typeof ELEMENT_EMOJI] ?? ''}
+                </span>
+              </div>
+              <HPBar current={playerHp} max={playerCreature.maxHp} label="" />
+              <p className="text-[9px] text-white/30 mt-0.5 font-mono">
+                {playerHp}/{playerCreature.maxHp}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Player sprite placeholder — bottom left */}
+        <motion.div
+          className="absolute bottom-16 left-4"
+          animate={animState === 'attack' ? { x: [0, 20, 0] } :
+                   animState === 'damage' ? { x: [-4, 4, -2, 2, 0], opacity: [1, 0.5, 1, 0.5, 1] } :
+                   { y: [0, -3, 0] }}
+          transition={animState === 'idle'
+            ? { duration: 2, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }
+            : { duration: 0.35 }}
+        >
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-b from-[#3A9DBC]/30 to-[#3A9DBC]/10 border border-[#3A9DBC]/30 flex items-center justify-center text-3xl">
+            {playerCreature ? (ELEMENT_EMOJI[playerCreature.element as keyof typeof ELEMENT_EMOJI] ?? '⚔️') : '⚔️'}
+          </div>
+        </motion.div>
+
+        {/* Battle message — center */}
+        <AnimatePresence>
+          {message && (
+            <motion.div
+              key={message}
+              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="absolute bottom-1/3 left-4 right-4 bg-[#0A1520]/90 border border-white/10 rounded-xl px-3 py-2 text-center backdrop-blur-sm"
+            >
+              <p className="text-sm text-[#F7C841] font-semibold">{message}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ── TIMER BAR ──────────────────────────────────────── */}
+      {!result && (
+        <div className="px-4 pb-1">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="flex-1 h-1.5 bg-white/8 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full rounded-full transition-colors"
+                style={{ width: `${timerPct}%`, background: timerUrgent ? '#EF4444' : '#34D399' }}
+                animate={timerUrgent ? { opacity: [1, 0.5, 1] } : {}}
+                transition={timerUrgent ? { duration: 0.5, repeat: Infinity } : {}}
+              />
+            </div>
+            <span className={`text-xs font-mono font-bold w-6 text-right ${timerUrgent ? 'text-red-400' : 'text-white/40'}`}>
+              {turnTimer}
+            </span>
+          </div>
         </div>
       )}
 
-      {/* Message */}
-      <AnimatePresence>
-        {message && (
-          <motion.p
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="text-center text-sm text-[#F7C841] mb-3"
-          >
-            {message}
-          </motion.p>
-        )}
-      </AnimatePresence>
-
-      {/* Items panel (slide-up) */}
+      {/* ── ITEMS PANEL ────────────────────────────────────── */}
       <AnimatePresence>
         {showItems && (
           <motion.div
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
-            className="mb-3 rounded-2xl border border-white/10 bg-[#0A1520]/90 p-3 space-y-3"
+            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-3 overflow-hidden"
           >
-            {reteItems.length > 0 && (
-              <div>
-                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Reti — bonus cattura</p>
-                <div className="flex flex-wrap gap-2">
-                  {reteItems.map(inv => (
-                    <button
-                      key={inv.id}
-                      onClick={() => setSelectedReteId(prev => prev === inv.id ? null : inv.id)}
-                      className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-semibold transition-all border ${
-                        selectedReteId === inv.id
-                          ? 'bg-[#3A9DBC] text-white border-[#3A9DBC]'
-                          : 'bg-white/5 text-white/70 border-white/10'
-                      }`}
-                    >
-                      🎯 {inv.items.name}
-                      {inv.items.effect_value > 0 && <span className="text-[#34D399]">+{inv.items.effect_value}%</span>}
-                      <span className="opacity-50">×{inv.quantity}</span>
-                    </button>
-                  ))}
+            <div className="rounded-2xl border border-white/10 bg-[#0A1520]/90 p-3 space-y-3 mb-2">
+              {reteItems.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Reti — bonus cattura</p>
+                  <div className="flex flex-wrap gap-2">
+                    {reteItems.map(inv => (
+                      <button key={inv.id}
+                        onClick={() => setSelectedReteId(prev => prev === inv.id ? null : inv.id)}
+                        className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-semibold transition-all border ${
+                          selectedReteId === inv.id ? 'bg-[#3A9DBC] text-white border-[#3A9DBC]' : 'bg-white/5 text-white/70 border-white/10'
+                        }`}>
+                        🎯 {inv.items.name}
+                        {inv.items.effect_value > 0 && <span className="text-[#34D399]">+{inv.items.effect_value}%</span>}
+                        <span className="opacity-50">×{inv.quantity}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {battagliaItems.length > 0 && (
-              <div>
-                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Potenziamenti — bonus ATK</p>
-                <div className="flex flex-wrap gap-2">
-                  {battagliaItems.map(inv => (
-                    <button
-                      key={inv.id}
-                      onClick={() => setSelectedBattagliaId(prev => prev === inv.id ? null : inv.id)}
-                      className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-semibold transition-all border ${
-                        selectedBattagliaId === inv.id
-                          ? 'bg-[#FBBF24] text-[#0F1F2E] border-[#FBBF24]'
-                          : 'bg-white/5 text-white/70 border-white/10'
-                      }`}
-                    >
-                      ⚔️ {inv.items.name}
-                      {inv.items.effect_value > 0 && <span className="text-[#FBBF24]">+{inv.items.effect_value}%</span>}
-                      <span className="opacity-50">×{inv.quantity}</span>
-                    </button>
-                  ))}
+              )}
+              {battagliaItems.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Potenziamenti — bonus ATK</p>
+                  <div className="flex flex-wrap gap-2">
+                    {battagliaItems.map(inv => (
+                      <button key={inv.id}
+                        onClick={() => setSelectedBattagliaId(prev => prev === inv.id ? null : inv.id)}
+                        className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-semibold transition-all border ${
+                          selectedBattagliaId === inv.id ? 'bg-[#FBBF24] text-[#0F1F2E] border-[#FBBF24]' : 'bg-white/5 text-white/70 border-white/10'
+                        }`}>
+                        ⚔️ {inv.items.name}
+                        {inv.items.effect_value > 0 && <span className="text-[#FBBF24]">+{inv.items.effect_value}%</span>}
+                        <span className="opacity-50">×{inv.quantity}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+              {pozioneItems.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Pozione — annulla debolezza</p>
+                  <div className="flex flex-wrap gap-2">
+                    {pozioneItems.map(inv => (
+                      <button key={inv.id}
+                        onClick={() => setSelectedPozioneId(prev => prev === inv.id ? null : inv.id)}
+                        className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-semibold transition-all border ${
+                          selectedPozioneId === inv.id ? 'bg-[#7B4DB8] text-white border-[#7B4DB8]' : 'bg-white/5 text-white/70 border-white/10'
+                        }`}>
+                        🧪 {inv.items.name}
+                        <span className="opacity-50">×{inv.quantity}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {curaItems.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Cura — ripristina HP (salta turno)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {curaItems.map(inv => (
+                      <button key={inv.id}
+                        onClick={() => handleHeal(inv.id)}
+                        disabled={loading}
+                        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-semibold transition-all border bg-[#34D399]/15 text-[#34D399] border-[#34D399]/40 disabled:opacity-40">
+                        💚 {inv.items.name}
+                        {inv.items.effect_value > 0 && <span>+{inv.items.effect_value}%</span>}
+                        <span className="opacity-50">×{inv.quantity}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Action buttons */}
+      {/* ── ACTION BUTTONS ─────────────────────────────────── */}
       {!result && (
-        <div className="grid grid-cols-4 gap-2">
-          <button
-            onClick={handleCatch}
-            disabled={loading}
-            className="relative bg-[#E85D2F] text-white font-bold py-4 rounded-xl text-sm disabled:opacity-50"
-          >
-            🎯 CATTURA
+        <div className="grid grid-cols-4 gap-2 px-3 pb-3">
+          <button onClick={handleCatch} disabled={loading}
+            className="relative bg-[#E85D2F] text-white font-bold py-4 rounded-xl text-sm disabled:opacity-50 flex flex-col items-center gap-0.5">
+            <span>🎯</span>
+            <span className="text-xs">CATTURA</span>
             {(state.catchBonus > 0 || selectedReteId) && (
-              <div className="text-xs text-[#F7C841]">
+              <span className="text-[10px] text-[#F7C841]">
                 +{Math.round((state.catchBonus + (reteItems.find(i => i.id === selectedReteId)?.items.effect_value ?? 0) / 100) * 100)}%
-              </div>
+              </span>
             )}
           </button>
-          <button
-            onClick={handleFight}
+          <button id="wc-fight-btn" onClick={handleFight}
             disabled={loading || state.turns >= 5}
-            className="bg-[#7B4DB8] text-white font-bold py-4 rounded-xl text-sm disabled:opacity-50"
-          >
-            ⚔️ LOTTA
-            <div className="text-xs text-white/70">{state.turns}/5</div>
+            className="bg-[#7B4DB8] text-white font-bold py-4 rounded-xl text-sm disabled:opacity-50 flex flex-col items-center gap-0.5">
+            <span>⚔️</span>
+            <span className="text-xs">LOTTA</span>
+            <span className="text-[10px] text-white/50">{state.turns}/5</span>
           </button>
           {hasItems && (
-            <button
-              onClick={() => setShowItems(v => !v)}
-              className={`font-bold py-4 rounded-xl text-sm transition-all border ${
+            <button onClick={() => setShowItems(v => !v)}
+              className={`font-bold py-4 rounded-xl text-sm transition-all border flex flex-col items-center gap-0.5 ${
                 showItems || selectedReteId || selectedBattagliaId
                   ? 'bg-[#F7C841]/20 text-[#F7C841] border-[#F7C841]/40'
                   : 'bg-white/5 text-white/60 border-white/10'
-              }`}
-            >
-              🎒 {selectedReteId || selectedBattagliaId ? '1 item' : 'OGGETTI'}
+              }`}>
+              <span>🎒</span>
+              <span className="text-xs">{selectedReteId || selectedBattagliaId ? '1 selz.' : 'OGGETTI'}</span>
             </button>
           )}
-          <button
-            onClick={handleFlee}
-            className={`bg-white/10 text-white font-bold py-4 rounded-xl text-sm ${hasItems ? '' : 'col-span-2'}`}
-          >
-            🏃 FUGGI
+          <button onClick={handleFlee}
+            className={`bg-white/8 text-white font-bold py-4 rounded-xl text-sm flex flex-col items-center gap-0.5 ${hasItems ? '' : 'col-span-2'}`}>
+            <span>🏃</span>
+            <span className="text-xs">FUGGI</span>
           </button>
         </div>
       )}

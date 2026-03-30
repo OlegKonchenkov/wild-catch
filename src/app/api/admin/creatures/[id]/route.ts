@@ -29,7 +29,7 @@ export async function PATCH(
 
   const { id } = await params
   const body = await request.json()
-  const { name, description, rarity, element, hp, atk, def: defVal, evolution_of } = body
+  const { name, description, rarity, element, hp, atk, def: defVal, evolution_of, session_id, catch_difficulty } = body
 
   if (name !== undefined && (typeof name !== 'string' || name.trim() === '')) {
     return NextResponse.json({ error: 'Il nome non può essere vuoto' }, { status: 400 })
@@ -56,6 +56,11 @@ export async function PATCH(
     const v = validateInt(defVal, 0); if (v === null) return NextResponse.json({ error: 'def deve essere un intero >= 0' }, { status: 400 }); updates.def = v
   }
   if (evolution_of !== undefined) updates.evolution_of = evolution_of
+  if (session_id !== undefined) updates.session_id = session_id ?? null
+  if (catch_difficulty !== undefined) {
+    const v = validateInt(catch_difficulty, 1)
+    if (v !== null && v <= 5) updates.catch_difficulty = v
+  }
 
   const admin = createAdminClient()
   const { data, error } = await admin.from('creatures').update(updates).eq('id', id).select().single()
