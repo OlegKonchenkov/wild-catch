@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -84,11 +85,98 @@ export async function POST(request: Request) {
     }
 
     case 'boss': {
-      // Trigger boss encounter
+      // Build boss lineup from payload
+      // Supports: { creatures: [{creature_id, level_override}] } (3-creature boss)
+      // or legacy: { creature_id, level_override } (single-creature boss)
+      const admin = createAdminClient()
+      const bossCreatureEntries: Array<{ creature_id: string; level_override?: number }> =
+        Array.isArray(payload.creatures) && payload.creatures.length > 0
+          ? payload.creatures.slice(0, 3)
+          : payload.creature_id
+            ? [{ creature_id: payload.creature_id, level_override: payload.level_override }]
+            : []
+
+      if (bossCreatureEntries.length === 0) {
+        result = { ...result, error: 'Boss non configurato' }
+        break
+      }
+
+      // Fetch creature data for each boss slot
+      const creatureIds = bossCreatureEntries.map(e => e.creature_id)
+      const { data: creaturesData } = await admin
+        .from('creatures')
+        .select('id, name, element, hp, atk, image_url, sprite_url')
+        .in('id', creatureIds)
+
+      const crMap: Record<string, any> = Object.fromEntries(
+        (creaturesData ?? []).map((c: any) => [c.id, c])
+      )
+
+      const bossLineup = bossCreatureEntries.map((entry, i) => {
+        const cr = crMap[entry.creature_id]
+        if (!cr) return null
+        const lvl = entry.level_override ?? 1
+        const scaledHp  = Math.round(cr.hp  * lvl)
+        const scaledAtk = Math.round(cr.atk * lvl)
+        return {
+          slot: i,
+          creature_id: cr.id,
+          name: cr.name,
+          element: cr.element,
+          atk: scaledAtk,
+          max_hp: scaledHp,
+          current_hp: scaledHp,
+          fainted: false,
+          image_url: cr.image_url ?? '',
+          sprite_url: cr.sprite_url ?? '',
+        }
+      }).filter(Boolean)
+
+      if (bossLineup.length === 0) {
+        result = { ...result, error: 'Creature boss non trovate' }
+        break
+      }
+
+      // Check if this player already has an active boss fight for this QR
+      const { data: existingFight } = await admin
+        .from('boss_fights')
+        .select('id, status')
+        .eq('user_id', user.id)
+        .eq('qr_code_id', qrId)
+        .in('status', ['selecting', 'active'])
+        .maybeSingle()
+
+      let bossFightId: string
+      if (existingFight) {
+        bossFightId = existingFight.id
+      } else {
+        const { data: newFight, error: fightErr } = await admin
+          .from('boss_fights')
+          .insert({
+            user_id: user.id,
+            session_id: sessionId,
+            qr_code_id: qrId,
+            boss_lineup: bossLineup,
+            player_lineup: [],
+            boss_active_slot: 0,
+            player_active_slot: 0,
+            status: 'selecting',
+            reward: payload.reward ?? { gold: 100, exp: 50 },
+          })
+          .select('id')
+          .single()
+
+        if (fightErr || !newFight) {
+          result = { ...result, error: 'Errore creazione boss fight' }
+          break
+        }
+        bossFightId = newFight.id
+      }
+
       result = {
         ...result,
-        creatureId: payload.creature_id,
-        levelOverride: payload.level_override,
+        bossFightId,
+        bossName: bossLineup[0]?.name ?? 'Capo Palestra',
       }
       break
     }

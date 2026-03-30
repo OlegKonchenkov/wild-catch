@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Mission } from '@/lib/types'
 import dynamic from 'next/dynamic'
@@ -32,9 +33,11 @@ interface ScanResult {
   chapterOrder?: number
   creatureId?: string
   eventType?: string
+  bossFightId?: string
+  bossName?: string
 }
 
-function ScanResultCard({ result, onClose }: { result: ScanResult; onClose: () => void }) {
+function ScanResultCard({ result, onClose, onBossFight }: { result: ScanResult; onClose: () => void; onBossFight?: (id: string) => void }) {
   const isError = !!result.error || !result.success
 
   function resultContent() {
@@ -84,10 +87,18 @@ function ScanResultCard({ result, onClose }: { result: ScanResult; onClose: () =
         )
       case 'boss':
         return (
-          <div className="text-center space-y-2">
+          <div className="text-center space-y-3">
             <span className="text-5xl block">💀</span>
-            <p className="text-white font-bold">Boss incontrato!</p>
-            <p className="text-white/50 text-sm">Preparati a combattere!</p>
+            <p className="text-white font-bold">Capo Palestra!</p>
+            <p className="text-white/50 text-sm">{result.bossName ?? 'Un potente boss'} ti sfida!</p>
+            {result.bossFightId && onBossFight && (
+              <button
+                onClick={() => { onClose(); onBossFight(result.bossFightId!) }}
+                className="w-full bg-red-500 text-white font-extrabold py-3 rounded-xl text-sm mt-2"
+              >
+                ⚔️ Vai alla battaglia →
+              </button>
+            )}
           </div>
         )
       case 'evento':
@@ -117,14 +128,21 @@ function ScanResultCard({ result, onClose }: { result: ScanResult; onClose: () =
           : 'bg-[#0d1e2e] border-[#3A9DBC]/30'
       }`}>
         {resultContent()}
-        <button
-          onClick={onClose}
-          className={`w-full mt-5 py-3 rounded-xl font-bold text-sm ${
-            isError ? 'bg-red-500/20 text-red-400' : 'bg-[#3A9DBC] text-white'
-          }`}
-        >
-          {isError ? 'Riprova' : 'Ottimo! 🎉'}
-        </button>
+        {result.type !== 'boss' && (
+          <button
+            onClick={onClose}
+            className={`w-full mt-5 py-3 rounded-xl font-bold text-sm ${
+              isError ? 'bg-red-500/20 text-red-400' : 'bg-[#3A9DBC] text-white'
+            }`}
+          >
+            {isError ? 'Riprova' : 'Ottimo! 🎉'}
+          </button>
+        )}
+        {result.type === 'boss' && !result.bossFightId && (
+          <button onClick={onClose} className="w-full mt-5 py-3 rounded-xl font-bold text-sm bg-white/10 text-white/50">
+            Chiudi
+          </button>
+        )}
       </div>
     </div>
   )
@@ -283,6 +301,7 @@ function ProgressRing({ pct, color, size = 36 }: { pct: number; color: string; s
 
 /* ── Page ────────────────────────────────────── */
 export default function MissionsPage() {
+  const router = useRouter()
   const [missions, setMissions]       = useState<Mission[]>([])
   const [playerMissions, setPlayerMissions] = useState<PlayerMissionData[]>([])
   const [loading, setLoading]         = useState(true)
@@ -503,7 +522,14 @@ export default function MissionsPage() {
 
       {/* Scan result */}
       {scanResult && (
-        <ScanResultCard result={scanResult} onClose={() => setScanResult(null)} />
+        <ScanResultCard
+          result={scanResult}
+          onClose={() => setScanResult(null)}
+          onBossFight={(bossFightId) => {
+            setScanResult(null)
+            router.push(`/game/boss/${bossFightId}`)
+          }}
+        />
       )}
 
       {/* Mission detail modal */}
