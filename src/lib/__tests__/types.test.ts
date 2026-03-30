@@ -8,6 +8,7 @@ describe('types', () => {
       element: 'fiamma', rarity: 'comune', hp: 60, atk: 40, def: 30,
       min_level: 1, image_url: '', sprite_url: '', lottie_url: null,
       spawn_weight: 10, evolution_of: null,
+      catch_difficulty: 1, session_id: null,
     }
     expect(c.element).toBe('fiamma')
   })

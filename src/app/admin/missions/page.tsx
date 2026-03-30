@@ -260,7 +260,7 @@ export default function AdminMissions() {
     setForm({
       title: m.title, description: m.description, type: m.type, target: m.target,
       target_count: m.target_count, reward_gold: m.reward_gold, reward_exp: m.reward_exp,
-      chapter_order: m.chapter_order, is_required: m.is_required,
+      chapter_order: m.chapter_order, is_required: m.is_required, for_all_sessions: false,
     })
     setFormError(''); setPanel(m)
   }

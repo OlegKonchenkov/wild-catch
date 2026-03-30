@@ -10,6 +10,8 @@ const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; c
   esca:      { icon: '🍖', label: 'Esca',       hint: 'Attira creature rare nelle vicinanze', color: '#34D399' },
   uovo:      { icon: '🥚', label: 'Uovo',       hint: 'Incuba una nuova creatura casuale',    color: '#C084FC' },
   battaglia: { icon: '⚔️', label: 'Battaglia', hint: 'Potenzia ATK in duello',               color: '#FBBF24' },
+  pozione:   { icon: '🧪', label: 'Pozione',   hint: 'Neutralizza debolezza elementale',     color: '#F472B6' },
+  cura:      { icon: '💊', label: 'Cura',       hint: 'Ripristina HP creatura in battaglia',  color: '#34D399' },
 }
 
 interface InventoryRow {
