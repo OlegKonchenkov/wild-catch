@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     target: creature.name,
     userId: user.id,
     sessionId: encounter.session_id,
-  }).catch(() => {})
+  }).then(undefined, () => {})
 
   // Save game event for bell history
   const { createAdminClient } = await import('@/lib/supabase/admin')
@@ -156,7 +156,7 @@ export async function POST(request: Request) {
       element: creature.element,
       evolved: evolvedTriggered,
     },
-  }).catch(() => {})
+  }).then(undefined, () => {})
 
   return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, scoreGain, levelUp })
 }

@@ -36,14 +36,14 @@ export async function POST(request: Request) {
       .update({ status: 'ended', winner_id: oppUserId, ended_at: new Date().toISOString() })
       .eq('id', duelId)
     await awardDuelResults(supabase, duel.session_id, oppUserId!, user.id)
-    incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel.session_id }).catch(() => {})
+    incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel.session_id }).then(undefined, () => {})
     // Game events on surrender
     const { createAdminClient: adminClientFactory } = await import('@/lib/supabase/admin')
     const adminSurrender = adminClientFactory()
     adminSurrender.from('player_game_events').insert([
       { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: user.id } },
       { user_id: user.id,    session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: oppUserId } },
-    ]).catch(() => {})
+    ]).then(undefined, () => {})
     return NextResponse.json({ ended: true, winnerId: oppUserId })
   }
 
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
     const levelUps = await awardDuelResults(supabase, duel.session_id, user.id, oppUserId!)
     myLevelUp = levelUps.winnerLevelUp
     // Track duel missions for the winner (fire-and-forget)
-    incrementMissionProgress({ type: 'duel', userId: user.id, sessionId: duel.session_id }).catch(() => {})
+    incrementMissionProgress({ type: 'duel', userId: user.id, sessionId: duel.session_id }).then(undefined, () => {})
     // Save game events for bell history
     const { createAdminClient } = await import('@/lib/supabase/admin')
     const adminClient = createAdminClient()
@@ -172,7 +172,7 @@ export async function POST(request: Request) {
       { user_id: user.id,    session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId } },
       { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: user.id } },
     ]
-    adminClient.from('player_game_events').insert(eventsToInsert).catch(() => {})
+    adminClient.from('player_game_events').insert(eventsToInsert).then(undefined, () => {})
   }
 
   // ── Broadcast ──────────────────────────────────────────────────────────────

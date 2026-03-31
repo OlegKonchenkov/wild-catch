@@ -107,7 +107,7 @@ export async function POST(request: Request, { params }: Params) {
     adminSurr.from('player_game_events').insert({
       user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
       payload: { fight_id: id },
-    }).catch(() => {})
+    }).then(undefined, () => {})
     return NextResponse.json({ surrendered: true })
   }
 
@@ -218,7 +218,7 @@ export async function POST(request: Request, { params }: Params) {
       createAdminClient().from('player_game_events').insert({
         user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
         payload: { fight_id: id },
-      }).catch(() => {})
+      }).then(undefined, () => {})
     }
 
     // ── Grant reward on win ──────────────────────────────────────────────
@@ -256,7 +256,7 @@ export async function POST(request: Request, { params }: Params) {
       admin.from('player_game_events').insert({
         user_id: user.id, session_id: fight.session_id, type: 'boss_won',
         payload: { fight_id: id, gold: goldReward, exp: reward?.exp ?? 50 },
-      }).catch(() => {})
+      }).then(undefined, () => {})
 
       // Item reward
       if (reward?.item_id) {

@@ -85,7 +85,7 @@ export async function incrementMissionProgress({
         session_id: sessionId,
         type: 'mission_completed',
         payload: { mission_id: mission.id },
-      }).catch(() => {})
+      }).then(undefined, () => {})
     }
   }
 }
