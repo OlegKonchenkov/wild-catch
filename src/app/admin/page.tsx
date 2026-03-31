@@ -107,14 +107,13 @@ const RARITY_COLOR: Record<string, string> = {
 function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
   if (detail === 'catches') {
     const creature = row.creatures as any
-    const player = row.player_sessions?.profiles as any
     return (
       <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-base">🎯</span>
           <div className="min-w-0">
             <p className="text-sm font-medium text-white truncate">{creature?.name ?? '?'}</p>
-            <p className="text-xs text-white/40">{player?.nickname ?? row.player_sessions?.user_id?.slice(0, 8)}</p>
+            <p className="text-xs text-white/40">{row.nickname ?? '—'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -125,7 +124,7 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
             }}>{creature.rarity}</span>
           )}
           <span className="text-[10px] text-white/30">
-            {new Date(row.caught_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+            {new Date(row.resolved_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
           </span>
         </div>
       </div>
@@ -133,24 +132,24 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
   }
   if (detail === 'encounters') {
     const creature = row.creatures as any
-    const player = row.player_sessions?.profiles as any
     const statusColor: Record<string, string> = { caught: '#34d399', fled: '#ef4444', active: '#F7C841' }
+    const statusLabel: Record<string, string> = { caught: 'catturata', fled: 'fuggita', active: 'in corso' }
     return (
       <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-base">⚔️</span>
           <div className="min-w-0">
             <p className="text-sm font-medium text-white truncate">{creature?.name ?? '?'}</p>
-            <p className="text-xs text-white/40">{player?.nickname ?? row.player_sessions?.user_id?.slice(0, 8)}</p>
+            <p className="text-xs text-white/40">{row.nickname ?? '—'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
             color: statusColor[row.status] ?? '#94a3b8',
             background: `${statusColor[row.status] ?? '#94a3b8'}20`,
-          }}>{row.status}</span>
+          }}>{statusLabel[row.status] ?? row.status}</span>
           <span className="text-[10px] text-white/30">
-            {new Date(row.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+            {new Date(row.started_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
           </span>
         </div>
       </div>
@@ -158,14 +157,17 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
   }
   if (detail === 'duels') {
     const statusColor: Record<string, string> = { active: '#F7C841', completed: '#34d399', cancelled: '#ef4444' }
+    const statusLabel: Record<string, string> = { active: 'in corso', completed: 'completato', cancelled: 'annullato' }
     return (
       <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-base">🥊</span>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-white truncate">Duello</p>
+            <p className="text-sm font-medium text-white truncate">
+              {row.challenger_nick ?? '?'} vs {row.opponent_nick ?? '?'}
+            </p>
             <p className="text-xs text-white/40">
-              {row.winner_id ? `Vincitore: ${row.winner_id.slice(0, 8)}…` : 'In corso'}
+              {row.winner_nick ? `Vincitore: ${row.winner_nick}` : 'In corso'}
             </p>
           </div>
         </div>
@@ -173,9 +175,9 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
             color: statusColor[row.status] ?? '#94a3b8',
             background: `${statusColor[row.status] ?? '#94a3b8'}20`,
-          }}>{row.status}</span>
+          }}>{statusLabel[row.status] ?? row.status}</span>
           <span className="text-[10px] text-white/30">
-            {new Date(row.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+            {new Date(row.started_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
           </span>
         </div>
       </div>
@@ -183,6 +185,7 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
   }
   if (detail === 'bosses') {
     const statusColor: Record<string, string> = { won: '#34d399', lost: '#ef4444', active: '#F7C841' }
+    const statusLabel: Record<string, string> = { won: 'vinto', lost: 'perso', active: 'in corso' }
     return (
       <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -190,7 +193,7 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
           <div className="min-w-0">
             <p className="text-sm font-medium text-white truncate">Boss Fight</p>
             <p className="text-xs text-white/40">
-              {Array.isArray(row.boss_lineup) ? `${row.boss_lineup.length} boss` : '—'}
+              {row.nickname ?? '—'}{Array.isArray(row.boss_lineup) ? ` · ${row.boss_lineup.length} boss` : ''}
             </p>
           </div>
         </div>
@@ -198,7 +201,7 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
             color: statusColor[row.status] ?? '#94a3b8',
             background: `${statusColor[row.status] ?? '#94a3b8'}20`,
-          }}>{row.status}</span>
+          }}>{statusLabel[row.status] ?? row.status}</span>
           <span className="text-[10px] text-white/30">
             {new Date(row.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
           </span>
