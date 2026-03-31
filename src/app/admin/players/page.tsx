@@ -25,6 +25,9 @@ export default function PlayersPage() {
   const [loadingPlayers, setLoadingPlayers] = useState(false)
   const [items, setItems]               = useState<any[]>([])
 
+  // Player detail modal
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
+
   // Notify — shared state for both "all" and single-player
   const [notifyTarget, setNotifyTarget] = useState<NotifyTarget | null>(null)
   const [notifyTitle, setNotifyTitle]   = useState('')
@@ -358,12 +361,15 @@ export default function PlayersPage() {
                   <th className="text-center px-3 py-3 font-semibold">EXP</th>
                   <th className="text-center px-3 py-3 font-semibold">Punteggio</th>
                   <th className="text-center px-3 py-3 font-semibold">Oro</th>
-                  <th className="text-center px-3 py-3 font-semibold">Azioni</th>
                 </tr>
               </thead>
               <tbody>
                 {players.map((p, i) => (
-                  <tr key={p.userId} className={`border-b border-white/5 hover:bg-white/3 transition-colors ${i === 0 ? 'text-[#FFD700]' : 'text-white'}`}>
+                  <tr
+                    key={p.userId}
+                    onClick={() => setSelectedPlayer(p)}
+                    className={`border-b border-white/5 hover:bg-white/5 active:bg-white/8 cursor-pointer transition-colors ${i === 0 ? 'text-[#FFD700]' : 'text-white'}`}
+                  >
                     <td className="px-4 py-3">
                       <div>
                         {p.nickname && <p className="font-bold text-sm">{p.nickname}</p>}
@@ -374,38 +380,6 @@ export default function PlayersPage() {
                     <td className="text-center px-3 py-3">{p.exp}</td>
                     <td className="text-center px-3 py-3 font-bold">{p.score}</td>
                     <td className="text-center px-3 py-3">{p.gold}</td>
-                    <td className="text-center px-3 py-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => openNotifyPlayer(p)}
-                          className="text-[#3A9DBC]/60 hover:text-[#3A9DBC] text-lg transition-colors"
-                          title={`Invia notifica a ${p.nickname || p.email}`}
-                        >
-                          📢
-                        </button>
-                        <button
-                          onClick={() => openGrant(p)}
-                          className="text-[#D4A96A]/60 hover:text-[#D4A96A] text-lg transition-colors"
-                          title={`Assegna risorse a ${p.nickname || p.email}`}
-                        >
-                          🎁
-                        </button>
-                        <button
-                          onClick={() => openInventory(p)}
-                          className="text-[#34d399]/60 hover:text-[#34d399] text-lg transition-colors"
-                          title={`Inventario di ${p.nickname || p.email}`}
-                        >
-                          🎒
-                        </button>
-                        <button
-                          onClick={() => openQrScan(p)}
-                          className="text-[#a78bfa]/60 hover:text-[#a78bfa] text-lg transition-colors"
-                          title={`Scansiona QR per ${p.nickname || p.email}`}
-                        >
-                          📷
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -413,9 +387,77 @@ export default function PlayersPage() {
           </div>
         )}
         {players.length > 0 && (
-          <p className="text-white/25 text-xs px-4 py-2">{players.length} giocatori · aggiornamento in tempo reale</p>
+          <p className="text-white/25 text-xs px-4 py-2">{players.length} giocatori · clicca su un giocatore per le azioni · aggiornamento in tempo reale</p>
         )}
       </div>
+
+      {/* Player detail modal */}
+      {selectedPlayer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) setSelectedPlayer(null) }}>
+          <div className="bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <p className="text-lg font-bold text-white">
+                  {selectedPlayer.nickname || selectedPlayer.email || selectedPlayer.userId.slice(0, 12)}
+                </p>
+                {selectedPlayer.nickname && (
+                  <p className="text-xs text-white/40 font-mono mt-0.5">{selectedPlayer.email}</p>
+                )}
+              </div>
+              <button onClick={() => setSelectedPlayer(null)} className="text-white/40 hover:text-white text-xl leading-none ml-4">✕</button>
+            </div>
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-4 gap-2 mb-5">
+              {[
+                { label: 'Livello', value: selectedPlayer.level, color: 'text-[#F7C841]' },
+                { label: 'EXP',     value: selectedPlayer.exp,   color: 'text-white' },
+                { label: 'Score',   value: selectedPlayer.score, color: 'text-[#3A9DBC]' },
+                { label: 'Oro 🪙',  value: selectedPlayer.gold,  color: 'text-[#D4A96A]' },
+              ].map(s => (
+                <div key={s.label} className="bg-white/5 border border-white/8 rounded-xl px-2 py-2.5 text-center">
+                  <p className={`text-base font-bold ${s.color}`}>{s.value}</p>
+                  <p className="text-[10px] text-white/35 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Action buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { setSelectedPlayer(null); openNotifyPlayer(selectedPlayer) }}
+                className="flex flex-col items-center gap-1.5 bg-[#3A9DBC]/10 hover:bg-[#3A9DBC]/20 border border-[#3A9DBC]/25 text-[#3A9DBC] rounded-xl py-3.5 px-3 transition-colors"
+              >
+                <span className="text-2xl">📢</span>
+                <span className="text-xs font-semibold">Notifica</span>
+              </button>
+              <button
+                onClick={() => { setSelectedPlayer(null); openGrant(selectedPlayer) }}
+                className="flex flex-col items-center gap-1.5 bg-[#D4A96A]/10 hover:bg-[#D4A96A]/20 border border-[#D4A96A]/25 text-[#D4A96A] rounded-xl py-3.5 px-3 transition-colors"
+              >
+                <span className="text-2xl">🎁</span>
+                <span className="text-xs font-semibold">Assegna risorse</span>
+              </button>
+              <button
+                onClick={() => { setSelectedPlayer(null); openInventory(selectedPlayer) }}
+                className="flex flex-col items-center gap-1.5 bg-[#34d399]/10 hover:bg-[#34d399]/20 border border-[#34d399]/25 text-[#34d399] rounded-xl py-3.5 px-3 transition-colors"
+              >
+                <span className="text-2xl">🎒</span>
+                <span className="text-xs font-semibold">Inventario</span>
+              </button>
+              <button
+                onClick={() => { setSelectedPlayer(null); openQrScan(selectedPlayer) }}
+                className="flex flex-col items-center gap-1.5 bg-[#a78bfa]/10 hover:bg-[#a78bfa]/20 border border-[#a78bfa]/25 text-[#a78bfa] rounded-xl py-3.5 px-3 transition-colors"
+              >
+                <span className="text-2xl">📷</span>
+                <span className="text-xs font-semibold">Scansiona QR</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Grant resources modal */}
       {grantTarget && (
