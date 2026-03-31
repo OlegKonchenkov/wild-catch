@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AdminListSkeleton } from '@/components/admin/AdminLoading'
 
-type ItemType = 'rete' | 'esca' | 'uovo' | 'battaglia' | 'pozione' | 'cura'
+type ItemType = 'rete' | 'esca' | 'uovo' | 'battaglia' | 'pozione' | 'cura' | 'custom'
 type EggRarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario'
 
 interface Item {
@@ -18,6 +18,7 @@ interface Item {
   egg_rarity?: string | null
   steps_required?: number | null
   is_redeemable?: boolean
+  in_shop?: boolean
   reward?: { gold?: number; exp?: number; bonus_items?: Array<{ item_id: string; quantity: number }> }
 }
 
@@ -57,8 +58,8 @@ const TYPE_META: Record<ItemType, TypeMeta> = {
   battaglia: {
     icon: '⚔️', label: 'Battaglia (ATK)',
     hint: 'Potenzia i danni inflitti in combattimento. Attivabile durante i duelli PvP o scontri con creature.',
-    effectLabel: 'Bonus danni (flat)',
-    effectHint: 'Es. 5 = +5 danni per attacco · 10 = +10 danni',
+    effectLabel: 'Bonus danni (%)',
+    effectHint: 'Es. 10 = +10% danni · 25 = +25% danni',
     effectStep: '1', effectMin: 0, effectMax: 200,
   },
   pozione: {
@@ -75,6 +76,13 @@ const TYPE_META: Record<ItemType, TypeMeta> = {
     effectHint: 'Es. 15 = +15 HP · 30 = +30 HP · 50 = +50 HP',
     effectStep: '1', effectMin: 1, effectMax: 500,
   },
+  custom: {
+    icon: '🎁', label: 'Oggetto custom',
+    hint: 'Oggetto speciale creato dall\'admin. Può essere riscattato tramite QR code. Sempre is_redeemable = true.',
+    effectLabel: '—',
+    effectHint: '',
+    effectStep: '1', effectMin: 0, effectMax: 0,
+  },
 }
 
 const EGG_RARITIES: EggRarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario']
@@ -87,7 +95,7 @@ const EMPTY_FORM = {
   name: '', type: 'rete' as ItemType, effect_value: 0,
   description: '', shop_price: 0, image_url: '',
   session_id: '', egg_rarity: 'comune' as EggRarity, steps_required: 0,
-  is_redeemable: false,
+  is_redeemable: false, in_shop: true,
   reward_gold: 0, reward_exp: 0,
   reward_items: [] as Array<{ item_id: string; quantity: number }>,
 }
@@ -103,6 +111,24 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 const cls = 'w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm placeholder:text-white/25'
+
+function Toggle({ checked, onChange, label, sub }: { checked: boolean; onChange: () => void; label: string; sub?: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-xs font-semibold text-white/70">{label}</p>
+        {sub && <p className="text-xs text-white/30 mt-0.5">{sub}</p>}
+      </div>
+      <button
+        type="button"
+        onClick={onChange}
+        className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${checked ? 'bg-[#34d399]' : 'bg-white/15'}`}
+      >
+        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${checked ? 'left-[22px]' : 'left-0.5'}`} />
+      </button>
+    </div>
+  )
+}
 
 function ImageUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
   const [uploading, setUploading] = useState(false)
@@ -189,6 +215,7 @@ export default function ItemsPage() {
       egg_rarity: (item.egg_rarity as EggRarity) ?? 'comune',
       steps_required: item.steps_required ?? 0,
       is_redeemable: item.is_redeemable ?? false,
+      in_shop: item.in_shop ?? true,
       reward_gold: item.reward?.gold ?? 0,
       reward_exp: item.reward?.exp ?? 0,
       reward_items: item.reward?.bonus_items ?? [],
@@ -200,20 +227,35 @@ export default function ItemsPage() {
 
   async function handleSave() {
     if (!form.name.trim()) { setError('Nome obbligatorio'); return }
+    if (form.type === 'custom' && !form.description.trim()) { setError('Descrizione obbligatoria per oggetti custom'); return }
+    if (form.type === 'custom' && !form.image_url.trim()) { setError('Immagine obbligatoria per oggetti custom'); return }
     setSaving(true); setError('')
     const isEdit = panel !== null && panel !== 'new'
     const payload: Record<string, unknown> = {
-      name: form.name, type: form.type, effect_value: form.effect_value,
-      description: form.description, shop_price: form.shop_price,
+      name: form.name, type: form.type,
+      description: form.description,
       image_url: form.image_url || null,
       session_id: form.session_id || null,
-      is_redeemable: form.is_redeemable,
-      reward: form.is_redeemable ? {
+    }
+
+    if (form.type === 'custom') {
+      payload.in_shop = form.in_shop
+      payload.shop_price = form.in_shop ? Number(form.shop_price) || 0 : 0
+      payload.is_redeemable = true
+      payload.effect_value = 0
+      payload.reward = {
         gold: Number(form.reward_gold) || 0,
         exp: Number(form.reward_exp) || 0,
         bonus_items: form.reward_items.filter(ri => ri.item_id),
-      } : {},
+      }
+    } else {
+      payload.effect_value = form.effect_value
+      payload.shop_price = form.shop_price
+      payload.is_redeemable = false
+      payload.in_shop = true
+      payload.reward = {}
     }
+
     if (form.type === 'uovo') {
       payload.egg_rarity = form.egg_rarity
       payload.steps_required = Number(form.steps_required) || 0
@@ -255,6 +297,7 @@ export default function ItemsPage() {
 
   const meta = TYPE_META[form.type]
   const sessionName = (sid: string | null) => sessions.find(s => s.id === sid)?.name ?? null
+  const isCustom = form.type === 'custom'
 
   return (
     <div className="max-w-3xl">
@@ -309,7 +352,14 @@ export default function ItemsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-bold text-white text-sm">{item.name}</p>
                     <span className="text-xs bg-white/10 text-white/50 px-2 py-0.5 rounded-full">{tmeta.label}</span>
-                    <span className="text-xs text-[#F7C841]">🪙 {item.shop_price}</span>
+                    {item.type !== 'custom' && (
+                      <span className="text-xs text-[#F7C841]">🪙 {item.shop_price}</span>
+                    )}
+                    {item.type === 'custom' && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${item.in_shop ? 'bg-[#F7C841]/15 text-[#F7C841]/80' : 'bg-white/8 text-white/40'}`}>
+                        {item.in_shop ? `🪙 ${item.shop_price}` : '🔒 Solo admin'}
+                      </span>
+                    )}
                     {sname && (
                       <span className="text-xs bg-[#3A9DBC]/15 text-[#3A9DBC]/80 px-2 py-0.5 rounded-full">
                         🎯 {sname}
@@ -320,15 +370,17 @@ export default function ItemsPage() {
                     )}
                   </div>
                   <p className="text-xs text-white/45 mt-0.5 truncate">{item.description || '—'}</p>
-                  <p className="text-xs text-white/30 mt-0.5">
-                    {tmeta.effectLabel}: <span className="text-white/50">{item.effect_value}</span>
-                    {item.type === 'uovo' && item.egg_rarity && (
-                      <span className="ml-2 text-white/30">· {EGG_RARITY_LABEL[item.egg_rarity as EggRarity] ?? item.egg_rarity}</span>
-                    )}
-                    {item.type === 'uovo' && (item.steps_required ?? 0) > 0 && (
-                      <span className="ml-2 text-white/30">· {item.steps_required} passi</span>
-                    )}
-                  </p>
+                  {item.type !== 'custom' && (
+                    <p className="text-xs text-white/30 mt-0.5">
+                      {tmeta.effectLabel}: <span className="text-white/50">{item.effect_value}</span>
+                      {item.type === 'uovo' && item.egg_rarity && (
+                        <span className="ml-2 text-white/30">· {EGG_RARITY_LABEL[item.egg_rarity as EggRarity] ?? item.egg_rarity}</span>
+                      )}
+                      {item.type === 'uovo' && (item.steps_required ?? 0) > 0 && (
+                        <span className="ml-2 text-white/30">· {item.steps_required} passi</span>
+                      )}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button onClick={() => openEdit(item)}
@@ -377,78 +429,41 @@ export default function ItemsPage() {
                 <p className="text-xs text-white/30 mt-1.5 leading-relaxed">{meta.hint}</p>
               </div>
 
-              <Field label={meta.effectLabel} hint={meta.effectHint}>
-                <input type="number" className={cls} value={form.effect_value}
-                  step={meta.effectStep} min={meta.effectMin} max={meta.effectMax}
-                  onChange={e => setForm(f => ({ ...f, effect_value: +e.target.value }))} />
-              </Field>
+              {/* ── Custom type fields ─────────────────────── */}
+              {isCustom && (
+                <div className="bg-[#3A9DBC]/5 border border-[#3A9DBC]/20 rounded-xl p-3 space-y-4">
+                  <p className="text-xs text-[#3A9DBC]/80 font-semibold">🎁 Configurazione oggetto custom</p>
 
-              {/* Egg-specific fields */}
-              {form.type === 'uovo' && (
-                <div className="bg-[#F7C841]/5 border border-[#F7C841]/20 rounded-xl p-3 space-y-3">
-                  <p className="text-xs text-[#F7C841]/70 font-semibold">🥚 Configurazione uovo</p>
-                  <Field label="Rarità uovo"
-                    hint="Determina il pool di creature ottenibili — uovo comune → solo comuni; uovo leggendario → maggiori probabilità di rare">
-                    <select className={cls} value={form.egg_rarity}
-                      onChange={e => setForm(f => ({ ...f, egg_rarity: e.target.value as EggRarity }))}>
-                      {EGG_RARITIES.map(r => (
-                        <option key={r} value={r}>{EGG_RARITY_LABEL[r]}</option>
-                      ))}
-                    </select>
+                  <Field label="Descrizione *" hint="Mostrata al giocatore nello zaino e al momento del riscatto">
+                    <textarea className={cls} rows={2} value={form.description}
+                      onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                      placeholder="es. Coupon per una consumazione gratuita..." />
                   </Field>
-                  <Field label="Passi di incubazione"
-                    hint="Il giocatore deve percorrere questo numero di passi dal momento del ritiro prima di poter schiudere. 0 = schiusura immediata.">
-                    <input type="number" className={cls} value={form.steps_required}
-                      step={50} min={0}
-                      onChange={e => setForm(f => ({ ...f, steps_required: +e.target.value }))} />
+
+                  <Field label="Immagine *" hint="Obbligatoria per gli oggetti custom — carica o incolla URL">
+                    <ImageUpload value={form.image_url}
+                      onChange={url => setForm(f => ({ ...f, image_url: url }))} />
                   </Field>
-                </div>
-              )}
 
-              <Field label="Descrizione" hint="Testo mostrato al giocatore nello zaino e nel negozio">
-                <textarea className={cls} rows={2} value={form.description}
-                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="es. Una rete resistente che aumenta le probabilità di cattura..." />
-              </Field>
-
-              <Field label="Prezzo negozio 🪙" hint="0 = non in vendita nel negozio">
-                <input type="number" className={cls} value={form.shop_price} min={0}
-                  onChange={e => setForm(f => ({ ...f, shop_price: +e.target.value }))} />
-              </Field>
-
-              <Field label="Immagine / icona personalizzata"
-                hint="Sostituisce l'icona di default. Puoi incollare un URL o caricare un file (max 5 MB).">
-                <ImageUpload value={form.image_url}
-                  onChange={url => setForm(f => ({ ...f, image_url: url }))} />
-              </Field>
-
-              <Field label="Disponibile in"
-                hint="Lascia vuoto per renderlo disponibile in tutte le sessioni">
-                <select className={cls} value={form.session_id}
-                  onChange={e => setForm(f => ({ ...f, session_id: e.target.value }))}>
-                  <option value="">🌐 Tutte le sessioni</option>
-                  {sessions.map(s => <option key={s.id} value={s.id}>🎯 {s.name}</option>)}
-                </select>
-              </Field>
-
-              {/* Redeemable */}
-              <div className="bg-white/3 border border-white/10 rounded-xl p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-white/70">✅ Oggetto riscattabile</p>
-                    <p className="text-xs text-white/30 mt-0.5">L&apos;admin può validarlo dallo zaino del giocatore per consumarlo e assegnare la ricompensa</p>
+                  <div className="bg-white/3 border border-white/10 rounded-xl p-3 space-y-3">
+                    <Toggle
+                      checked={form.in_shop}
+                      onChange={() => setForm(f => ({ ...f, in_shop: !f.in_shop }))}
+                      label="Disponibile in negozio"
+                      sub="Se disattivato, l'oggetto può essere assegnato solo dall'admin"
+                    />
+                    {form.in_shop && (
+                      <Field label="Prezzo negozio 🪙">
+                        <input type="number" className={cls} value={form.shop_price} min={0}
+                          onChange={e => setForm(f => ({ ...f, shop_price: +e.target.value }))} />
+                      </Field>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, is_redeemable: !f.is_redeemable }))}
-                    className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${form.is_redeemable ? 'bg-[#34d399]' : 'bg-white/15'}`}
-                  >
-                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${form.is_redeemable ? 'left-[22px]' : 'left-0.5'}`} />
-                  </button>
-                </div>
-                {form.is_redeemable && (
-                  <div className="space-y-3 pt-1 border-t border-white/10">
-                    <p className="text-xs text-white/40 font-semibold">Ricompensa al riscatto:</p>
+
+                  {/* Redeemable rewards — always visible for custom */}
+                  <div className="bg-white/3 border border-white/10 rounded-xl p-3 space-y-3">
+                    <p className="text-xs font-semibold text-white/70">✅ Ricompensa al riscatto QR</p>
+                    <p className="text-xs text-white/30">Risorse assegnate al giocatore quando l&apos;admin valida l&apos;oggetto tramite scansione QR</p>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-xs text-white/50 mb-1">💰 Oro</label>
@@ -474,7 +489,7 @@ export default function ItemsPage() {
                             className="flex-1 bg-[#0F1F2E] border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs"
                           >
                             <option value="">— Seleziona —</option>
-                            {items.map(it => <option key={it.id} value={it.id}>{it.name}</option>)}
+                            {items.filter(it => it.type !== 'custom').map(it => <option key={it.id} value={it.id}>{it.name}</option>)}
                           </select>
                           <input type="number" min={1} value={ri.quantity}
                             onChange={e => setForm(f => {
@@ -494,8 +509,67 @@ export default function ItemsPage() {
                       </button>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* ── Non-custom type fields ─────────────────── */}
+              {!isCustom && (
+                <>
+                  <Field label={meta.effectLabel} hint={meta.effectHint}>
+                    <input type="number" className={cls} value={form.effect_value}
+                      step={meta.effectStep} min={meta.effectMin} max={meta.effectMax}
+                      onChange={e => setForm(f => ({ ...f, effect_value: +e.target.value }))} />
+                  </Field>
+
+                  {/* Egg-specific fields */}
+                  {form.type === 'uovo' && (
+                    <div className="bg-[#F7C841]/5 border border-[#F7C841]/20 rounded-xl p-3 space-y-3">
+                      <p className="text-xs text-[#F7C841]/70 font-semibold">🥚 Configurazione uovo</p>
+                      <Field label="Rarità uovo"
+                        hint="Determina il pool di creature ottenibili — uovo comune → solo comuni; uovo leggendario → maggiori probabilità di rare">
+                        <select className={cls} value={form.egg_rarity}
+                          onChange={e => setForm(f => ({ ...f, egg_rarity: e.target.value as EggRarity }))}>
+                          {EGG_RARITIES.map(r => (
+                            <option key={r} value={r}>{EGG_RARITY_LABEL[r]}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Passi di incubazione"
+                        hint="Il giocatore deve percorrere questo numero di passi dal momento del ritiro prima di poter schiudere. 0 = schiusura immediata.">
+                        <input type="number" className={cls} value={form.steps_required}
+                          step={50} min={0}
+                          onChange={e => setForm(f => ({ ...f, steps_required: +e.target.value }))} />
+                      </Field>
+                    </div>
+                  )}
+
+                  <Field label="Descrizione" hint="Testo mostrato al giocatore nello zaino e nel negozio">
+                    <textarea className={cls} rows={2} value={form.description}
+                      onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                      placeholder="es. Una rete resistente che aumenta le probabilità di cattura..." />
+                  </Field>
+
+                  <Field label="Prezzo negozio 🪙" hint="0 = non in vendita nel negozio">
+                    <input type="number" className={cls} value={form.shop_price} min={0}
+                      onChange={e => setForm(f => ({ ...f, shop_price: +e.target.value }))} />
+                  </Field>
+
+                  <Field label="Immagine / icona personalizzata"
+                    hint="Sostituisce l'icona di default. Puoi incollare un URL o caricare un file (max 5 MB).">
+                    <ImageUpload value={form.image_url}
+                      onChange={url => setForm(f => ({ ...f, image_url: url }))} />
+                  </Field>
+                </>
+              )}
+
+              <Field label="Disponibile in"
+                hint="Lascia vuoto per renderlo disponibile in tutte le sessioni">
+                <select className={cls} value={form.session_id}
+                  onChange={e => setForm(f => ({ ...f, session_id: e.target.value }))}>
+                  <option value="">🌐 Tutte le sessioni</option>
+                  {sessions.map(s => <option key={s.id} value={s.id}>🎯 {s.name}</option>)}
+                </select>
+              </Field>
 
               {error && (
                 <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {error}</p>

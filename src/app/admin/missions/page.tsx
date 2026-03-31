@@ -13,13 +13,14 @@ interface Mission {
   target_count: number
   reward_gold: number
   reward_exp: number
+  reward_items: Array<{ item_id: string; quantity: number }>
   is_required: boolean
   session_id: string | null
 }
 
-interface Creature { id: string; name: string; rarity: string; element: string }
-interface Item     { id: string; name: string; type: string }
-interface QRCode   { id: string; label: string; type: string }
+interface Creature  { id: string; name: string; rarity: string; element: string }
+interface Item      { id: string; name: string; type: string }
+interface QRCode    { id: string; label: string; type: string }
 
 /* ── Mission types ────────────────────────────── */
 const MISSION_TYPES = [
@@ -171,6 +172,7 @@ const cls = 'w-full bg-white/10 text-white border border-white/20 rounded-lg px-
 const EMPTY_FORM = {
   title: '', description: '', type: 'cattura', target: '',
   target_count: 1, reward_gold: 50, reward_exp: 100,
+  reward_items: [] as Array<{ item_id: string; quantity: number }>,
   chapter_order: 1, is_required: false, scope_session_id: '',
 }
 
@@ -264,6 +266,7 @@ export default function AdminMissions() {
     setForm({
       title: m.title, description: m.description, type: m.type, target: m.target,
       target_count: m.target_count, reward_gold: m.reward_gold, reward_exp: m.reward_exp,
+      reward_items: m.reward_items ?? [],
       chapter_order: m.chapter_order, is_required: m.is_required,
       scope_session_id: m.session_id ?? '',
     })
@@ -278,16 +281,17 @@ export default function AdminMissions() {
     setSaving(true); setFormError('')
     const isEdit = panel !== null && panel !== 'new'
 
-    const { scope_session_id, ...formFields } = form as any
+    const { scope_session_id, reward_items, ...formFields } = form as any
     const sessionIdToSave = scope_session_id || null
+    const rewardItems = (reward_items ?? []).filter((ri: any) => ri.item_id)
     if (isEdit) {
       const { error } = await supabase.from('missions')
-        .update({ ...formFields, session_id: sessionIdToSave })
+        .update({ ...formFields, session_id: sessionIdToSave, reward_items: rewardItems })
         .eq('id', (panel as Mission).id)
       if (error) { setFormError(error.message); setSaving(false); return }
     } else {
       const { error } = await supabase.from('missions')
-        .insert({ ...formFields, session_id: sessionIdToSave })
+        .insert({ ...formFields, session_id: sessionIdToSave, reward_items: rewardItems })
       if (error) { setFormError(error.message); setSaving(false); return }
     }
 
@@ -448,6 +452,41 @@ export default function AdminMissions() {
                   <input type="number" className={cls} value={form.reward_exp} min={0}
                     onChange={e => setForm(f => ({ ...f, reward_exp: +e.target.value }))} />
                 </Field>
+              </div>
+
+              {/* Reward items */}
+              <div className="bg-white/3 border border-white/10 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-semibold text-white/60">🎒 Oggetti in ricompensa</p>
+                {(form as any).reward_items?.map((ri: { item_id: string; quantity: number }, i: number) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <select
+                      value={ri.item_id}
+                      onChange={e => setForm(f => {
+                        const arr = [...(f as any).reward_items]; arr[i] = { ...arr[i], item_id: e.target.value }
+                        return { ...f, reward_items: arr } as any
+                      })}
+                      className="flex-1 bg-[#0F1F2E] border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs"
+                    >
+                      <option value="">— Seleziona oggetto —</option>
+                      {items.map((it: Item) => <option key={it.id} value={it.id}>{it.name} ({it.type})</option>)}
+                    </select>
+                    <input type="number" min={1} value={ri.quantity}
+                      onChange={e => setForm(f => {
+                        const arr = [...(f as any).reward_items]; arr[i] = { ...arr[i], quantity: Math.max(1, +e.target.value) }
+                        return { ...f, reward_items: arr } as any
+                      })}
+                      className="w-14 bg-white/10 border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs text-center"
+                    />
+                    <button type="button"
+                      onClick={() => setForm(f => ({ ...f, reward_items: (f as any).reward_items.filter((_: any, j: number) => j !== i) } as any))}
+                      className="text-red-400/60 hover:text-red-400 text-sm px-1">×</button>
+                  </div>
+                ))}
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, reward_items: [...((f as any).reward_items ?? []), { item_id: '', quantity: 1 }] } as any))}
+                  className="text-xs text-[#3A9DBC] font-semibold hover:text-[#5AB5D0]">
+                  + Aggiungi oggetto
+                </button>
               </div>
 
               <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer select-none">

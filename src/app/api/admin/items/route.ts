@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-const VALID_TYPES = ['rete', 'esca', 'uovo', 'battaglia', 'pozione', 'cura'] as const
+const VALID_TYPES = ['rete', 'esca', 'uovo', 'battaglia', 'pozione', 'cura', 'custom'] as const
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { name, type, effect_value, description, shop_price, session_id, image_url, egg_rarity, steps_required, is_redeemable, reward } = body
+  const { name, type, effect_value, description, shop_price, session_id, image_url, egg_rarity, steps_required, is_redeemable, reward, in_shop } = body
 
   if (!name?.trim()) return NextResponse.json({ error: 'Nome obbligatorio' }, { status: 400 })
   if (!VALID_TYPES.includes(type)) return NextResponse.json({ error: 'Tipo non valido' }, { status: 400 })
@@ -40,13 +40,14 @@ export async function POST(request: Request) {
   const insertData: Record<string, unknown> = {
     name: name.trim(),
     type,
-    effect_value: Number(effect_value) || 0,
+    effect_value: type === 'custom' ? 0 : (Number(effect_value) || 0),
     description: description?.trim() ?? '',
-    shop_price: Number(shop_price) || 0,
+    shop_price: type === 'custom' ? (in_shop ? Number(shop_price) || 0 : 0) : (Number(shop_price) || 0),
     session_id: session_id ?? null,
     image_url: image_url ?? null,
-    is_redeemable: is_redeemable ?? false,
+    is_redeemable: type === 'custom' ? true : (is_redeemable ?? false),
     reward: reward ?? {},
+    in_shop: type === 'custom' ? (in_shop ?? true) : true,
   }
   if (type === 'uovo') {
     insertData.egg_rarity = egg_rarity ?? 'comune'
@@ -65,7 +66,7 @@ export async function PUT(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { id, name, type, effect_value, description, shop_price, session_id, image_url, egg_rarity, steps_required, is_redeemable, reward } = body
+  const { id, name, type, effect_value, description, shop_price, session_id, image_url, egg_rarity, steps_required, is_redeemable, reward, in_shop } = body
 
   if (!id) return NextResponse.json({ error: 'ID obbligatorio' }, { status: 400 })
   if (!name?.trim()) return NextResponse.json({ error: 'Nome obbligatorio' }, { status: 400 })
@@ -75,13 +76,14 @@ export async function PUT(request: Request) {
   const updateData: Record<string, unknown> = {
     name: name.trim(),
     type,
-    effect_value: Number(effect_value) || 0,
+    effect_value: type === 'custom' ? 0 : (Number(effect_value) || 0),
     description: description?.trim() ?? '',
-    shop_price: Number(shop_price) || 0,
+    shop_price: type === 'custom' ? (in_shop ? Number(shop_price) || 0 : 0) : (Number(shop_price) || 0),
     session_id: session_id !== undefined ? (session_id ?? null) : undefined,
     image_url: image_url !== undefined ? (image_url ?? null) : undefined,
-    is_redeemable: is_redeemable ?? false,
+    is_redeemable: type === 'custom' ? true : (is_redeemable ?? false),
     reward: reward ?? {},
+    in_shop: type === 'custom' ? (in_shop ?? true) : true,
   }
   if (type === 'uovo') {
     updateData.egg_rarity = egg_rarity ?? 'comune'

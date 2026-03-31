@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AdminInlineSpinner, AdminTableSkeleton } from '@/components/admin/AdminLoading'
 
@@ -47,6 +47,15 @@ export default function PlayersPage() {
   const [grantQty, setGrantQty]         = useState(1)
   const [grantLoading, setGrantLoading] = useState(false)
   const [grantFeedback, setGrantFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // QR scan
+  const [qrScanTarget, setQrScanTarget] = useState<{ userId: string; label: string } | null>(null)
+  const [qrScanning, setQrScanning]     = useState(false)
+  const [qrScanResult, setQrScanResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const scanLoopRef = useRef<number | null>(null)
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -204,6 +213,88 @@ export default function PlayersPage() {
     setRedeemingId(null)
   }
 
+  function openQrScan(p: Player) {
+    setQrScanTarget({ userId: p.userId, label: p.nickname || p.email || p.userId.slice(0, 8) })
+    setQrScanResult(null)
+    setQrScanning(false)
+  }
+
+  const stopCamera = useCallback(() => {
+    if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current)
+    scanLoopRef.current = null
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+  }, [])
+
+  async function startCamera() {
+    setQrScanning(true); setQrScanResult(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+      }
+      scanFrame()
+    } catch {
+      setQrScanResult({ type: 'error', text: 'Accesso alla fotocamera negato' })
+      setQrScanning(false)
+    }
+  }
+
+  function scanFrame() {
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas || !streamRef.current) return
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(video, 0, 0)
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      import('jsqr').then(({ default: jsQR }) => {
+        const code = jsQR(imageData.data, imageData.width, imageData.height)
+        if (code) {
+          stopCamera()
+          setQrScanning(false)
+          handleQrDecoded(code.data)
+          return
+        }
+        scanLoopRef.current = requestAnimationFrame(scanFrame)
+      })
+    } else {
+      scanLoopRef.current = requestAnimationFrame(scanFrame)
+    }
+  }
+
+  async function handleQrDecoded(content: string) {
+    if (!qrScanTarget || !selectedId) return
+    setQrScanResult(null)
+    const res = await fetch('/api/admin/players/redeem-qr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: qrScanTarget.userId, sessionId: selectedId, qrContent: content }),
+    })
+    const d = await res.json()
+    if (res.ok) {
+      const r = d.reward
+      const parts = []
+      if (r?.gold) parts.push(`+${r.gold} 💰`)
+      if (r?.exp) parts.push(`+${r.exp} ⭐`)
+      if (r?.bonus_items?.length) parts.push(`+${r.bonus_items.length} oggetti 🎒`)
+      setQrScanResult({ type: 'success', text: `✅ "${d.itemName}" riscattato! ${parts.join(' · ') || 'Nessuna ricompensa'}` })
+    } else {
+      setQrScanResult({ type: 'error', text: d.error ?? 'Errore durante il riscatto' })
+    }
+  }
+
+  function closeQrScan() {
+    stopCamera()
+    setQrScanTarget(null); setQrScanResult(null); setQrScanning(false)
+  }
+
   return (
     <div className="max-w-4xl">
       <h1 className="text-2xl font-bold mb-4">👥 Giocatori</h1>
@@ -292,6 +383,13 @@ export default function PlayersPage() {
                           title={`Inventario di ${p.nickname || p.email}`}
                         >
                           🎒
+                        </button>
+                        <button
+                          onClick={() => openQrScan(p)}
+                          className="text-[#a78bfa]/60 hover:text-[#a78bfa] text-lg transition-colors"
+                          title={`Scansiona QR per ${p.nickname || p.email}`}
+                        >
+                          📷
                         </button>
                       </div>
                     </td>
@@ -483,6 +581,89 @@ export default function PlayersPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Scan modal */}
+      {qrScanTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) closeQrScan() }}>
+          <div className="bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">📷 Scansiona QR</h2>
+                <p className="text-xs text-white/40 mt-0.5">
+                  Per: <span className="text-[#a78bfa] font-semibold">{qrScanTarget.label}</span>
+                </p>
+              </div>
+              <button onClick={closeQrScan} className="text-white/40 hover:text-white text-xl leading-none">✕</button>
+            </div>
+
+            {qrScanResult ? (
+              <div className="space-y-4">
+                <div className={`text-sm font-medium px-4 py-3 rounded-xl border text-center ${
+                  qrScanResult.type === 'success'
+                    ? 'bg-[#34d399]/10 text-[#34d399] border-[#34d399]/20'
+                    : 'bg-red-400/10 text-red-400 border-red-400/20'
+                }`}>
+                  {qrScanResult.text}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setQrScanResult(null) }}
+                    className="flex-1 bg-white/5 border border-white/10 text-white/60 font-semibold py-2.5 rounded-xl text-sm">
+                    Scansiona ancora
+                  </button>
+                  <button onClick={closeQrScan}
+                    className="flex-1 bg-[#a78bfa] text-white font-bold py-2.5 rounded-xl text-sm">
+                    Chiudi
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-white/40 text-center">
+                  Punta la fotocamera su un QR code di tipo <strong className="text-white/60">oggetto custom</strong>
+                </p>
+
+                {qrScanning ? (
+                  <div className="relative rounded-xl overflow-hidden bg-black aspect-square">
+                    <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+                    <canvas ref={canvasRef} className="hidden" />
+                    {/* Scanning overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-48 h-48 border-2 border-[#a78bfa] rounded-xl opacity-70" />
+                    </div>
+                    <div className="absolute bottom-3 left-0 right-0 text-center">
+                      <span className="text-xs text-white/60 bg-black/50 px-3 py-1 rounded-full">Scansione in corso...</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white/3 border border-white/10 rounded-xl p-6 text-center">
+                    <p className="text-4xl mb-2">📷</p>
+                    <p className="text-xs text-white/40">Fotocamera non attiva</p>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  {!qrScanning ? (
+                    <button onClick={startCamera}
+                      className="flex-1 bg-[#a78bfa] text-white font-bold py-2.5 rounded-xl text-sm">
+                      Avvia fotocamera
+                    </button>
+                  ) : (
+                    <button onClick={() => { stopCamera(); setQrScanning(false) }}
+                      className="flex-1 bg-white/10 border border-white/20 text-white/60 font-semibold py-2.5 rounded-xl text-sm">
+                      Ferma
+                    </button>
+                  )}
+                  <button onClick={closeQrScan}
+                    className="flex-1 bg-white/5 border border-white/10 text-white/40 font-semibold py-2.5 rounded-xl text-sm">
+                    Annulla
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

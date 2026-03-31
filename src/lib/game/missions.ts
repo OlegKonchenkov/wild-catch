@@ -7,6 +7,7 @@ interface MissionRow {
   reward_gold: number
   reward_exp: number
   reward_item_id: string | null
+  reward_items: Array<{ item_id: string; quantity: number }> | null
 }
 
 /**
@@ -32,7 +33,7 @@ export async function incrementMissionProgress({
   // Load matching missions for this session and type (include global missions with null session_id)
   const { data: missions } = await admin
     .from('missions')
-    .select('id, target, target_count, reward_gold, reward_exp, reward_item_id')
+    .select('id, target, target_count, reward_gold, reward_exp, reward_item_id, reward_items')
     .or(`session_id.eq.${sessionId},session_id.is.null`)
     .eq('type', type)
 
@@ -119,23 +120,35 @@ async function grantMissionReward(
     }
   }
 
+  // Legacy single item reward
+  const itemsToGrant: Array<{ item_id: string; quantity: number }> = []
   if (mission.reward_item_id) {
+    itemsToGrant.push({ item_id: mission.reward_item_id, quantity: 1 })
+  }
+  // New multi-item rewards
+  if (Array.isArray(mission.reward_items)) {
+    for (const ri of mission.reward_items) {
+      if (ri.item_id) itemsToGrant.push(ri)
+    }
+  }
+
+  for (const ri of itemsToGrant) {
     const { data: existing } = await admin.from('player_inventory')
       .select('id, quantity')
       .eq('user_id', userId)
       .eq('session_id', sessionId)
-      .eq('item_id', mission.reward_item_id)
+      .eq('item_id', ri.item_id)
       .maybeSingle()
     if (existing) {
       await admin.from('player_inventory')
-        .update({ quantity: (existing as any).quantity + 1 })
+        .update({ quantity: (existing as any).quantity + ri.quantity })
         .eq('id', (existing as any).id)
     } else {
       await admin.from('player_inventory').insert({
         user_id: userId,
         session_id: sessionId,
-        item_id: mission.reward_item_id,
-        quantity: 1,
+        item_id: ri.item_id,
+        quantity: ri.quantity,
       })
     }
   }
