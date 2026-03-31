@@ -7,6 +7,38 @@ import { RARITY_COLORS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS }
 import type { Creature, PlayerCreature, Element } from '@/lib/types'
 
 const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario']
+
+function getVideoEmbed(url: string): { type: 'iframe'; src: string } | { type: 'video'; src: string } | null {
+  try {
+    const u = new URL(url)
+    // YouTube watch
+    if ((u.hostname === 'www.youtube.com' || u.hostname === 'youtube.com') && u.searchParams.get('v')) {
+      return { type: 'iframe', src: `https://www.youtube.com/embed/${u.searchParams.get('v')}` }
+    }
+    // YouTube short URL
+    if (u.hostname === 'youtu.be') {
+      const id = u.pathname.slice(1).split('?')[0]
+      return { type: 'iframe', src: `https://www.youtube.com/embed/${id}` }
+    }
+    // YouTube embed already
+    if ((u.hostname === 'www.youtube.com' || u.hostname === 'youtube.com') && u.pathname.startsWith('/embed/')) {
+      return { type: 'iframe', src: url }
+    }
+    // Vimeo
+    if (u.hostname === 'vimeo.com' || u.hostname === 'www.vimeo.com') {
+      const id = u.pathname.split('/').filter(Boolean).pop()
+      if (id) return { type: 'iframe', src: `https://player.vimeo.com/video/${id}` }
+    }
+    // Direct video file
+    if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(url)) {
+      return { type: 'video', src: url }
+    }
+    // Fallback: try iframe
+    return { type: 'iframe', src: url }
+  } catch {
+    return null
+  }
+}
 const MYSTERY_HINTS: Record<string, string> = {
   fiamma:    'Percepisci calore nelle vicinanze...',
   adriatico: 'Senti il profumo del mare...',
@@ -731,20 +763,28 @@ export default function BestiaryPage() {
                               <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{creature.enigma_description}</p>
                             )}
                             {creature.enigma_image_url && (
-                              <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                                <Image src={creature.enigma_image_url} alt="Enigma" fill className="object-cover" sizes="320px" />
-                              </div>
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={creature.enigma_image_url} alt="Enigma"
+                                className="w-full rounded-xl object-cover max-h-48" />
                             )}
-                            {creature.enigma_video_url && (
-                              <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                                <iframe
-                                  src={creature.enigma_video_url}
-                                  className="w-full h-full"
-                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                  allowFullScreen
-                                />
-                              </div>
-                            )}
+                            {creature.enigma_video_url && (() => {
+                              const embed = getVideoEmbed(creature.enigma_video_url)
+                              if (!embed) return null
+                              return (
+                                <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                                  {embed.type === 'iframe' ? (
+                                    <iframe
+                                      src={embed.src}
+                                      className="absolute inset-0 w-full h-full"
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                      allowFullScreen
+                                    />
+                                  ) : (
+                                    <video src={embed.src} controls className="absolute inset-0 w-full h-full" />
+                                  )}
+                                </div>
+                              )
+                            })()}
                           </div>
                         </motion.div>
                       )}

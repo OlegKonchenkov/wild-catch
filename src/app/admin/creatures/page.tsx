@@ -76,6 +76,10 @@ export default function CreaturesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [enigmaOpen, setEnigmaOpen] = useState(false)
+  const [enigmaImgUploading, setEnigmaImgUploading] = useState(false)
+  const [enigmaImgError, setEnigmaImgError] = useState<string | null>(null)
+  const enigmaFileRef = useRef<HTMLInputElement>(null)
+
   const [filter, setFilter] = useState<ElementType | 'all'>('all')
   const [search, setSearch] = useState('')
   const [sessions, setSessions] = useState<{ id: string; name: string }[]>([])
@@ -195,6 +199,19 @@ export default function CreaturesPage() {
       else { setImageMode('preview'); await loadCreatures() }
     } catch { setArtworkError('Errore di rete') }
     finally { setArtworkLoading(false) }
+  }
+
+  async function handleEnigmaImageUpload(file: File) {
+    setEnigmaImgUploading(true); setEnigmaImgError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd })
+      const d = await res.json()
+      if (!res.ok) { setEnigmaImgError(d.error ?? 'Errore upload'); return }
+      setFormData(f => ({ ...f, enigma_image_url: d.url } as any))
+    } catch { setEnigmaImgError('Errore di rete') }
+    finally { setEnigmaImgUploading(false) }
   }
 
   const editingCreature = panel !== 'none' && panel !== 'new'
@@ -528,10 +545,26 @@ export default function CreaturesPage() {
                           </div>
                           <div>
                             <label className="text-xs text-white/40 block mb-1">Immagine (URL o carica)</label>
-                            <input type="text" value={(formData as any).enigma_image_url}
-                              onChange={e => setFormData(f => ({ ...f, enigma_image_url: e.target.value } as any))}
-                              placeholder="https://..."
-                              className="w-full bg-white/5 text-white text-xs border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50" />
+                            <div className="flex gap-2">
+                              <input type="text" value={(formData as any).enigma_image_url}
+                                onChange={e => { setFormData(f => ({ ...f, enigma_image_url: e.target.value } as any)); setEnigmaImgError(null) }}
+                                placeholder="https://..."
+                                className="flex-1 bg-white/5 text-white text-xs border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50 min-w-0" />
+                              <button type="button"
+                                onClick={() => enigmaFileRef.current?.click()}
+                                disabled={enigmaImgUploading}
+                                className="shrink-0 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors disabled:opacity-40">
+                                {enigmaImgUploading ? '⏳' : '📁'}
+                              </button>
+                            </div>
+                            <input ref={enigmaFileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                              className="hidden"
+                              onChange={e => { if (e.target.files?.[0]) handleEnigmaImageUpload(e.target.files[0]); e.target.value = '' }} />
+                            {enigmaImgError && <p className="text-xs text-red-400 mt-1">{enigmaImgError}</p>}
+                            {(formData as any).enigma_image_url && !enigmaImgUploading && (
+                              <img src={(formData as any).enigma_image_url} alt="preview"
+                                className="mt-2 w-full h-24 object-cover rounded-lg opacity-70" />
+                            )}
                           </div>
                           <div>
                             <label className="text-xs text-white/40 block mb-1">Video (URL)</label>
