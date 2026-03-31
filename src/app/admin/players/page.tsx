@@ -38,6 +38,7 @@ export default function PlayersPage() {
   const [inventoryLoading, setInventoryLoading] = useState(false)
   const [redeemingId, setRedeemingId] = useState<string | null>(null)
   const [inventoryFeedback, setInventoryFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [removeQtyMap, setRemoveQtyMap] = useState<Record<string, number>>({})
 
   // Grant resources
   const [grantTarget, setGrantTarget]   = useState<GrantTarget | null>(null)
@@ -164,6 +165,7 @@ export default function PlayersPage() {
     setInventoryTarget({ userId: p.userId, label: p.nickname || p.email || p.userId.slice(0, 8) })
     setInventory([])
     setInventoryFeedback(null)
+    setRemoveQtyMap({})
     setInventoryLoading(true)
     const res = await fetch(`/api/admin/players/inventory?userId=${p.userId}&sessionId=${selectedId}`)
     const d = await res.json()
@@ -171,16 +173,27 @@ export default function PlayersPage() {
     setInventoryLoading(false)
   }
 
-  async function handleRemoveItem(inventoryId: string) {
-    if (!confirm('Rimuovere questo oggetto dall\'inventario?')) return
+  async function handleRemoveItem(inventoryId: string, maxQty: number) {
+    const qty = removeQtyMap[inventoryId] ?? 1
+    const removing = Math.min(qty, maxQty)
+    const all = removing >= maxQty
+    if (!confirm(all
+      ? 'Rimuovere tutte le copie di questo oggetto?'
+      : `Rimuovere ${removing} cop${removing === 1 ? 'ia' : 'ie'} di questo oggetto?`
+    )) return
     const res = await fetch('/api/admin/players/inventory', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inventoryId }),
+      body: JSON.stringify({ inventoryId, quantity: removing }),
     })
     if (res.ok) {
-      setInventory(prev => prev.filter(i => i.id !== inventoryId))
-      setInventoryFeedback({ type: 'success', text: 'Oggetto rimosso.' })
+      setInventory(prev => prev.map(i => {
+        if (i.id !== inventoryId) return i
+        const newQty = i.quantity - removing
+        return newQty <= 0 ? null : { ...i, quantity: newQty }
+      }).filter(Boolean))
+      setRemoveQtyMap(prev => { const n = { ...prev }; delete n[inventoryId]; return n })
+      setInventoryFeedback({ type: 'success', text: `Rimoss${removing === 1 ? 'a 1 copia' : `e ${removing} copie`}.` })
     }
   }
 
@@ -567,8 +580,22 @@ export default function PlayersPage() {
                               {redeemingId === inv.id ? '…' : '✅ Valida'}
                             </button>
                           )}
+                          {inv.quantity > 1 && (
+                            <input
+                              type="number"
+                              min={1}
+                              max={inv.quantity}
+                              value={removeQtyMap[inv.id] ?? 1}
+                              onChange={e => setRemoveQtyMap(prev => ({
+                                ...prev,
+                                [inv.id]: Math.min(Math.max(1, +e.target.value), inv.quantity),
+                              }))}
+                              className="w-12 bg-white/10 border border-white/15 rounded-lg px-1.5 py-1 text-white text-xs text-center"
+                              title="Quantità da rimuovere"
+                            />
+                          )}
                           <button
-                            onClick={() => handleRemoveItem(inv.id)}
+                            onClick={() => handleRemoveItem(inv.id, inv.quantity)}
                             className="text-red-400/50 hover:text-red-400 text-sm px-1.5 py-1 rounded transition-colors"
                             title="Rimuovi dall'inventario"
                           >
