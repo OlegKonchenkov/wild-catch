@@ -31,20 +31,26 @@ export async function POST(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { name, type, effect_value, description, shop_price, session_id } = body
+  const { name, type, effect_value, description, shop_price, session_id, image_url, egg_rarity, steps_required } = body
 
   if (!name?.trim()) return NextResponse.json({ error: 'Nome obbligatorio' }, { status: 400 })
   if (!VALID_TYPES.includes(type)) return NextResponse.json({ error: 'Tipo non valido' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { data, error } = await admin.from('items').insert({
+  const insertData: Record<string, unknown> = {
     name: name.trim(),
     type,
     effect_value: Number(effect_value) || 0,
     description: description?.trim() ?? '',
     shop_price: Number(shop_price) || 0,
     session_id: session_id ?? null,
-  }).select().single()
+    image_url: image_url ?? null,
+  }
+  if (type === 'uovo') {
+    insertData.egg_rarity = egg_rarity ?? 'comune'
+    insertData.steps_required = Number(steps_required) || 0
+  }
+  const { data, error } = await admin.from('items').insert(insertData).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ item: data })
@@ -57,21 +63,27 @@ export async function PUT(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { id, name, type, effect_value, description, shop_price, session_id } = body
+  const { id, name, type, effect_value, description, shop_price, session_id, image_url, egg_rarity, steps_required } = body
 
   if (!id) return NextResponse.json({ error: 'ID obbligatorio' }, { status: 400 })
   if (!name?.trim()) return NextResponse.json({ error: 'Nome obbligatorio' }, { status: 400 })
   if (!VALID_TYPES.includes(type)) return NextResponse.json({ error: 'Tipo non valido' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { data, error } = await admin.from('items').update({
+  const updateData: Record<string, unknown> = {
     name: name.trim(),
     type,
     effect_value: Number(effect_value) || 0,
     description: description?.trim() ?? '',
     shop_price: Number(shop_price) || 0,
     session_id: session_id !== undefined ? (session_id ?? null) : undefined,
-  }).eq('id', id).select().single()
+    image_url: image_url !== undefined ? (image_url ?? null) : undefined,
+  }
+  if (type === 'uovo') {
+    updateData.egg_rarity = egg_rarity ?? 'comune'
+    updateData.steps_required = Number(steps_required) || 0
+  }
+  const { data, error } = await admin.from('items').update(updateData).eq('id', id).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ item: data })

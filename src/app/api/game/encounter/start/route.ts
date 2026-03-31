@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { selectCreatureForEncounter } from '@/lib/game/rng'
 
 export async function POST(request: Request) {
@@ -40,8 +41,16 @@ export async function POST(request: Request) {
 
   if (!creatures?.length) return NextResponse.json({ error: 'Nessuna creatura disponibile' }, { status: 500 })
 
+  // Load optional per-session spawn config
+  const admin = createAdminClient()
+  const { data: spawnCfg } = await admin
+    .from('session_spawn_config')
+    .select('non_comune_bonus, raro_bonus, epico_bonus, leggendario_bonus')
+    .eq('session_id', sessionId)
+    .maybeSingle()
+
   // RNG creature selection — server-side only
-  const selected = selectCreatureForEncounter(creatures, playerSession.level)
+  const selected = selectCreatureForEncounter(creatures, playerSession.level, spawnCfg ?? undefined)
   if (!selected) return NextResponse.json({ error: 'Nessuna creatura idonea' }, { status: 500 })
 
   // Get full creature data

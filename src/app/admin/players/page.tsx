@@ -273,11 +273,18 @@ export default function PlayersPage() {
                 <div>
                   <label className="block text-xs font-semibold text-white/50 mb-1">
                     {grantType === 'gold' ? 'Quantità oro' : 'Quantità EXP'}
+                    <span className="ml-1 font-normal text-white/30">(negativo = rimuovi)</span>
                   </label>
-                  <input type="number" min={1} value={grantAmount}
+                  <input type="number" value={grantAmount}
                     onChange={e => setGrantAmount(Number(e.target.value))}
                     className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2"
                   />
+                  {grantAmount < 0 && (
+                    <p className="text-amber-400/70 text-xs mt-1">
+                      ⚠ Verranno rimossi {Math.abs(grantAmount)} {grantType === 'gold' ? 'oro' : 'EXP'}
+                      {grantType === 'gold' ? ' · non può scendere sotto 0' : ''}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -320,10 +327,14 @@ export default function PlayersPage() {
                 </button>
                 <button
                   onClick={sendGrant}
-                  disabled={grantLoading || (grantType === 'item' && !grantItemId)}
-                  className="flex-1 bg-[#D4A96A] text-[#0F1F2E] font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
+                  disabled={grantLoading || (grantType === 'item' && !grantItemId) || (grantType !== 'item' && grantAmount === 0)}
+                  className={`flex-1 font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 ${
+                    grantType !== 'item' && grantAmount < 0
+                      ? 'bg-red-500 text-white'
+                      : 'bg-[#D4A96A] text-[#0F1F2E]'
+                  }`}
                 >
-                  {grantLoading ? 'Invio...' : 'Assegna'}
+                  {grantLoading ? 'Invio...' : (grantType !== 'item' && grantAmount < 0) ? '🗑 Rimuovi' : '🎁 Assegna'}
                 </button>
               </div>
             </div>

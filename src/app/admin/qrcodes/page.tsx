@@ -152,7 +152,7 @@ function payloadToFields(type: QRCodeType, payload: any): Fields {
         image_url: String(p.image_url ?? ''),
       }
     case 'uovo':
-      return { egg_rarity: String(p.egg_rarity ?? 'comune') }
+      return { egg_rarity: String(p.egg_rarity ?? 'comune'), steps_required: asNumber(p.steps_required, 0) }
     case 'boss':
       return {
         creature_id: String(p.creature_id ?? ''),
@@ -250,7 +250,7 @@ function defaultFields(t: QRCodeType): Fields {
   switch (t) {
     case 'oggetto': return { item_id: '', quantity: 1 }
     case 'indizio': return { chapter_order: 1, text: '', image_url: '' }
-    case 'uovo':    return { egg_rarity: 'comune' }
+    case 'uovo':    return { egg_rarity: 'comune', steps_required: 0 }
     case 'boss':    return { creature_id: '', level_override: 10 }
     case 'evento':  return { event_type: 'bonus_exp', multiplier: 2, duration_minutes: 10 }
   }
@@ -260,7 +260,7 @@ function buildPayload(t: QRCodeType, f: Fields): any {
   switch (t) {
     case 'oggetto': return { item_id: f.item_id, quantity: Number(f.quantity) }
     case 'indizio': return { chapter_order: Number(f.chapter_order), text: f.text, image_url: f.image_url || null }
-    case 'uovo':    return { egg_rarity: f.egg_rarity, creature_pool: [] }
+    case 'uovo':    return { egg_rarity: f.egg_rarity, steps_required: Number(f.steps_required ?? 0) }
     case 'boss':    return { creature_id: f.creature_id, level_override: Number(f.level_override) }
     case 'evento':  return { event_type: f.event_type, effect: { multiplier: Number(f.multiplier), duration_minutes: Number(f.duration_minutes) } }
   }
@@ -723,14 +723,27 @@ export default function QRCodesPage() {
                 )}
 
                 {type === 'uovo' && (
-                  <Field label="Rarità dell'uovo" hint="Determina la rarità delle creature ottenibili dall'uovo">
-                    <select value={String(fields.egg_rarity)} onChange={e => setField('egg_rarity', e.target.value)} className={cls}>
-                      <option value="comune">⚪ Comune</option>
-                      <option value="raro">🔵 Raro</option>
-                      <option value="epico">🟣 Epico</option>
-                      <option value="leggendario">🟡 Leggendario</option>
-                    </select>
-                  </Field>
+                  <>
+                    <Field label="Rarità dell'uovo" hint="Determina il pool di creature ottenibili dalla schiusura">
+                      <select value={String(fields.egg_rarity)} onChange={e => setField('egg_rarity', e.target.value)} className={cls}>
+                        <option value="comune">⚪ Comune</option>
+                        <option value="non_comune">🟢 Non Comune</option>
+                        <option value="raro">🔵 Raro</option>
+                        <option value="epico">🟣 Epico</option>
+                        <option value="leggendario">🟡 Leggendario</option>
+                      </select>
+                    </Field>
+                    <Field label="Passi richiesti" hint="Numero di passi da percorrere prima di poter schiudere l'uovo (0 = immediato)">
+                      <input
+                        type="number"
+                        min={0}
+                        step={50}
+                        value={fields.steps_required ?? 0}
+                        onChange={e => setField('steps_required', +e.target.value)}
+                        className={cls}
+                      />
+                    </Field>
+                  </>
                 )}
 
                 {type === 'boss' && (

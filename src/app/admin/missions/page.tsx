@@ -14,6 +14,7 @@ interface Mission {
   reward_gold: number
   reward_exp: number
   is_required: boolean
+  session_id: string | null
 }
 
 interface Creature { id: string; name: string; rarity: string; element: string }
@@ -170,7 +171,7 @@ const cls = 'w-full bg-white/10 text-white border border-white/20 rounded-lg px-
 const EMPTY_FORM = {
   title: '', description: '', type: 'cattura', target: '',
   target_count: 1, reward_gold: 50, reward_exp: 100,
-  chapter_order: 1, is_required: false, for_all_sessions: false,
+  chapter_order: 1, is_required: false, scope_session_id: '',
 }
 
 /* ── Page ────────────────────────────────────── */
@@ -260,7 +261,8 @@ export default function AdminMissions() {
     setForm({
       title: m.title, description: m.description, type: m.type, target: m.target,
       target_count: m.target_count, reward_gold: m.reward_gold, reward_exp: m.reward_exp,
-      chapter_order: m.chapter_order, is_required: m.is_required, for_all_sessions: false,
+      chapter_order: m.chapter_order, is_required: m.is_required,
+      scope_session_id: m.session_id ?? '',
     })
     setFormError(''); setPanel(m)
   }
@@ -273,13 +275,16 @@ export default function AdminMissions() {
     setSaving(true); setFormError('')
     const isEdit = panel !== null && panel !== 'new'
 
-    const { for_all_sessions, ...formFields } = form as any
+    const { scope_session_id, ...formFields } = form as any
+    const sessionIdToSave = scope_session_id || null
     if (isEdit) {
-      const { error } = await supabase.from('missions').update({ ...formFields }).eq('id', (panel as Mission).id)
+      const { error } = await supabase.from('missions')
+        .update({ ...formFields, session_id: sessionIdToSave })
+        .eq('id', (panel as Mission).id)
       if (error) { setFormError(error.message); setSaving(false); return }
     } else {
-      const scopeSessionId = for_all_sessions ? null : selectedId
-      const { error } = await supabase.from('missions').insert({ ...formFields, session_id: scopeSessionId })
+      const { error } = await supabase.from('missions')
+        .insert({ ...formFields, session_id: sessionIdToSave })
       if (error) { setFormError(error.message); setSaving(false); return }
     }
 
@@ -450,16 +455,15 @@ export default function AdminMissions() {
                 </span>
               </label>
 
-              {panel === 'new' && (
-                <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer select-none">
-                  <input type="checkbox" checked={(form as any).for_all_sessions}
-                    onChange={e => setForm(f => ({ ...f, for_all_sessions: e.target.checked } as any))} />
-                  <span>
-                    <strong>🌐 Tutte le sessioni</strong>
-                    <span className="text-white/40 ml-1">— visibile in ogni sessione, non solo quella selezionata</span>
-                  </span>
-                </label>
-              )}
+              <div>
+                <label className="block text-xs font-semibold text-white/60 mb-1">Disponibile in</label>
+                <p className="text-xs text-white/30 mb-1.5">Lascia vuoto per renderla visibile in tutte le sessioni</p>
+                <select className={cls} value={(form as any).scope_session_id}
+                  onChange={e => setForm(f => ({ ...f, scope_session_id: e.target.value } as any))}>
+                  <option value="">🌐 Tutte le sessioni</option>
+                  {sessions.map(s => <option key={s.id} value={s.id}>🎯 {s.name}</option>)}
+                </select>
+              </div>
 
               {formError && (
                 <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {formError}</p>

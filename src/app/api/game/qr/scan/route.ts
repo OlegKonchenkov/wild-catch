@@ -80,8 +80,28 @@ export async function POST(request: Request) {
     }
 
     case 'uovo': {
-      // Give egg item to player — resolved later via distance/encounters
-      result = { ...result, eggRarity: payload.egg_rarity }
+      // Create a player_egg record that hatches after steps_required steps
+      const eggRarity = payload.egg_rarity ?? 'comune'
+      const stepsRequired = payload.steps_required ?? 0
+
+      // Read current steps_walked for this player in this session
+      const { data: ps } = await supabase
+        .from('player_sessions')
+        .select('steps_walked')
+        .eq('user_id', user.id)
+        .eq('session_id', sessionId)
+        .single()
+      const stepsAtPickup = (ps as any)?.steps_walked ?? 0
+
+      await supabase.from('player_eggs').insert({
+        user_id: user.id,
+        session_id: sessionId,
+        egg_rarity: eggRarity,
+        steps_required: stepsRequired,
+        steps_at_pickup: stepsAtPickup,
+      })
+
+      result = { ...result, eggRarity, stepsRequired }
       break
     }
 

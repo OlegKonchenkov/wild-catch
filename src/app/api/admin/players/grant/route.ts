@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   if (type === 'gold') {
     const goldAmount = Number(amount)
-    if (!goldAmount || goldAmount < 1) return NextResponse.json({ error: 'Importo non valido' }, { status: 400 })
+    if (!goldAmount || goldAmount === 0) return NextResponse.json({ error: 'Importo non valido' }, { status: 400 })
     const { data: ps } = await admin
       .from('player_sessions')
       .select('gold')
@@ -36,18 +36,19 @@ export async function POST(request: Request) {
       .eq('session_id', sessionId)
       .single()
     if (!ps) return NextResponse.json({ error: 'Giocatore non trovato' }, { status: 404 })
+    const newGold = Math.max(0, (ps.gold ?? 0) + goldAmount)
     const { error } = await admin
       .from('player_sessions')
-      .update({ gold: (ps.gold ?? 0) + goldAmount })
+      .update({ gold: newGold })
       .eq('user_id', userId)
       .eq('session_id', sessionId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ granted: true, type, amount: goldAmount })
+    return NextResponse.json({ granted: true, type, amount: goldAmount, newValue: newGold })
   }
 
   if (type === 'exp') {
     const expAmount = Number(amount)
-    if (!expAmount || expAmount < 1) return NextResponse.json({ error: 'XP non valido' }, { status: 400 })
+    if (!expAmount || expAmount === 0) return NextResponse.json({ error: 'XP non valido' }, { status: 400 })
     const { data: rpcData, error } = await admin.rpc('increment_player_stats', {
       p_user_id: userId,
       p_session_id: sessionId,

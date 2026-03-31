@@ -33,9 +33,14 @@ export async function PUT(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { level, gold, item_id, item_qty, description } = body
+  const { level, gold, item_id, item_qty, description, bonus_items } = body
 
   if (!level || level < 1) return NextResponse.json({ error: 'Livello non valido' }, { status: 400 })
+
+  // bonus_items is the source of truth; item_id/item_qty kept for backward compat
+  const effectiveBonus: { item_id: string; quantity: number }[] = Array.isArray(bonus_items)
+    ? bonus_items.filter((bi: any) => bi.item_id)
+    : (item_id ? [{ item_id, quantity: Number(item_qty) || 1 }] : [])
 
   const admin = createAdminClient()
   const { data, error } = await admin
@@ -43,8 +48,9 @@ export async function PUT(request: Request) {
     .upsert({
       level: Number(level),
       gold: Number(gold) || 0,
-      item_id: item_id || null,
-      item_qty: Number(item_qty) || 1,
+      item_id: effectiveBonus[0]?.item_id ?? null,
+      item_qty: effectiveBonus[0]?.quantity ?? 1,
+      bonus_items: effectiveBonus,
       description: description?.trim() ?? '',
     }, { onConflict: 'level' })
     .select()
