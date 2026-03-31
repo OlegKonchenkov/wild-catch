@@ -1,5 +1,5 @@
 'use client'
-import { motion } from 'framer-motion'
+import { motion, type TargetAndTransition } from 'framer-motion'
 import Image from 'next/image'
 
 type AnimState = 'idle' | 'attack' | 'damage' | 'catch' | 'flee' | 'victory'
@@ -35,7 +35,7 @@ const RARITY_ALPHA: Record<string, number> = {
   leggendario: 0.82,
 }
 
-const ANIM_VARIANTS: Record<AnimState, object> = {
+const ANIM_VARIANTS: Record<AnimState, TargetAndTransition> = {
   idle: {
     y: [0, -8, 0],
     transition: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
