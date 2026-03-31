@@ -156,7 +156,7 @@ export async function POST(request: Request) {
       element: creature.element,
       evolved: evolvedTriggered,
     },
-  }).then(() => {}).catch(() => {})
+  }).catch(() => {})
 
   return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, scoreGain, levelUp })
 }

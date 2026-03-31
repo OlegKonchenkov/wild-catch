@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     adminSurrender.from('player_game_events').insert([
       { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: user.id } },
       { user_id: user.id,    session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: oppUserId } },
-    ]).then(() => {}).catch(() => {})
+    ]).catch(() => {})
     return NextResponse.json({ ended: true, winnerId: oppUserId })
   }
 
@@ -172,7 +172,7 @@ export async function POST(request: Request) {
       { user_id: user.id,    session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId } },
       { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: user.id } },
     ]
-    adminClient.from('player_game_events').insert(eventsToInsert).then(() => {}).catch(() => {})
+    adminClient.from('player_game_events').insert(eventsToInsert).catch(() => {})
   }
 
   // ── Broadcast ──────────────────────────────────────────────────────────────
