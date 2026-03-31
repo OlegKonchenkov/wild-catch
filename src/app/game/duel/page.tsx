@@ -189,15 +189,12 @@ export default function DuelLobbyPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="flex-none px-4 pt-4 pb-2">
-        <p className="text-xs text-[#E85D2F] font-bold tracking-widest uppercase mb-0.5">Arena 3v3</p>
-        <h1 className="text-xl font-extrabold text-white">Duelli</h1>
-      </div>
-
-      {/* Tab switcher */}
-      <div className="flex-none px-4 pb-3">
-        <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+      {/* Header + tabs — single compact row */}
+      <div className="flex-none px-4 pt-3 pb-2 flex items-center gap-3">
+        <h1 className="text-base font-extrabold text-white shrink-0 flex items-center gap-1.5">
+          <span className="text-[#E85D2F]">⚔️</span> Duelli
+        </h1>
+        <div className="flex flex-1 gap-1 bg-white/5 rounded-xl p-1">
           {(['arena', 'storico'] as const).map(tab => (
             <button
               key={tab}
@@ -285,30 +282,32 @@ export default function DuelLobbyPage() {
           {lineup.map((cr, i) => {
             const color = cr ? RARITY_COLORS[cr.rarity] : null
             return (
-              <button
+              <motion.button
                 key={i}
                 onClick={() => cr && removeSlot(i)}
+                whileTap={cr ? { scale: 0.95 } : {}}
                 className="flex-1 rounded-2xl transition-all overflow-hidden"
                 style={{
-                  background: color ? `${color}18` : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${color ? color + '50' : 'rgba(255,255,255,0.08)'}`,
-                  minHeight: 76,
+                  background: color ? `${color}20` : 'rgba(255,255,255,0.04)',
+                  border: `2px solid ${color ? color + '60' : 'rgba(255,255,255,0.08)'}`,
+                  boxShadow: color ? `0 0 16px ${color}25` : 'none',
+                  minHeight: 88,
                 }}
               >
                 {cr ? (
-                  <div className="flex flex-col items-center py-1.5 gap-0.5">
-                    <span className="text-[8px] font-bold text-white/30 uppercase tracking-widest">#{i + 1}</span>
-                    <CreatureSprite imageUrl={cr.image_url} name={cr.name} animState="idle" size={42} />
-                    <span className="text-[9px] text-white/60 truncate w-full text-center px-1 leading-tight">{cr.name}</span>
-                    <span className="text-[8px] text-white/25 font-mono">HP {cr.hp}</span>
+                  <div className="flex flex-col items-center py-2 gap-0.5">
+                    <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: color + 'aa' }}>#{i + 1}</span>
+                    <CreatureSprite imageUrl={cr.image_url} name={cr.name} animState="idle" size={46} />
+                    <span className="text-[9px] text-white/70 truncate w-full text-center px-1 leading-tight font-semibold">{cr.name}</span>
+                    <span className="text-[8px] text-white/30 font-mono">HP {cr.hp}</span>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-[76px] gap-1">
+                  <div className="flex flex-col items-center justify-center h-[88px] gap-1">
                     <span className="text-2xl text-white/10">+</span>
                     <span className="text-[9px] text-white/20">Slot {i + 1}</span>
                   </div>
                 )}
-              </button>
+              </motion.button>
             )
           })}
         </div>
@@ -350,7 +349,7 @@ export default function DuelLobbyPage() {
                     cursor: canAdd || inLineup ? 'pointer' : 'default',
                   }}
                 >
-                  <CreatureSprite imageUrl={cr.image_url} name={cr.name} animState="idle" size={44} />
+                  <CreatureSprite imageUrl={cr.image_url} name={cr.name} animState="idle" size={48} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-white truncate">{cr.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
@@ -378,43 +377,43 @@ export default function DuelLobbyPage() {
       </div>
 
       {/* Connect section */}
-      <div className="flex-none px-4 pb-4 pt-2 space-y-2 border-t border-white/8">
+      <div className="flex-none px-4 pb-3 pt-2 space-y-2 border-t border-white/8">
         <button
           onClick={() => connect()}
           disabled={!lineupFull || loading}
-          className="w-full rounded-2xl py-4 font-extrabold text-white text-base disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-transform"
+          className="w-full rounded-2xl py-3 font-extrabold text-white text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
           style={{
             background: lineupFull ? 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)' : 'rgba(255,255,255,0.06)',
-            boxShadow: lineupFull && !loading ? '0 4px 20px rgba(232,93,47,0.4)' : 'none',
+            boxShadow: lineupFull && !loading ? '0 4px 18px rgba(232,93,47,0.4)' : 'none',
           }}
         >
           {loading && !joinCode ? (
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
           ) : (
             <span className="flex items-center justify-center gap-2">⚔️ Crea Sfida</span>
           )}
         </button>
 
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-white/10" />
-          <span className="text-white/25 text-xs">oppure unisciti con codice</span>
-          <div className="flex-1 h-px bg-white/10" />
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-px bg-white/8" />
+          <span className="text-white/20 text-[10px]">o unisciti con codice</span>
+          <div className="flex-1 h-px bg-white/8" />
         </div>
 
-        <div className="space-y-2">
+        <div className="flex gap-2">
           <input
             value={joinCode}
             onChange={e => { setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 4)); setError(null) }}
-            placeholder="A B C D"
+            placeholder="ABCD"
             maxLength={4}
             autoCapitalize="characters"
             inputMode="text"
-            className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white font-mono text-xl text-center tracking-[0.5em] placeholder-white/15 focus:outline-none focus:border-[#3A9DBC] transition-colors"
+            className="flex-1 bg-white/5 border border-white/15 rounded-xl px-3 py-2.5 text-white font-mono text-lg text-center tracking-[0.4em] placeholder-white/15 focus:outline-none focus:border-[#3A9DBC] transition-colors"
           />
           <button
             onClick={() => connect(joinCode)}
             disabled={joinCode.length < 4 || !lineupFull || loading}
-            className="w-full py-3 rounded-xl font-bold text-sm disabled:opacity-35 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
+            className="shrink-0 px-5 py-2.5 rounded-xl font-bold text-sm disabled:opacity-35 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
             style={{
               background: joinCode.length === 4 && lineupFull ? 'linear-gradient(135deg, #3A9DBC 0%, #2a7a99 100%)' : 'rgba(255,255,255,0.05)',
               color: joinCode.length === 4 && lineupFull ? 'white' : 'rgba(255,255,255,0.3)',
@@ -422,7 +421,7 @@ export default function DuelLobbyPage() {
             }}
           >
             {loading && joinCode.length === 4 ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : 'Entra'}
           </button>
         </div>
