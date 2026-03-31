@@ -9,10 +9,33 @@ interface Props {
   name: string
   animState?: AnimState
   size?: number
+  /** Element slug — enables element-colored glow on image + aura */
+  element?: string
+  /** Rarity slug — scales aura intensity */
+  rarity?: string
+  /** Show atmospheric aura + floor shadow (large display contexts) */
+  showAura?: boolean
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ANIM_VARIANTS: Record<AnimState, any> = {
+// Vivid accent color per element (used for drop-shadow + aura)
+const ELEMENT_GLOW: Record<string, string> = {
+  fiamma:    '#FF5520',
+  adriatico: '#00C4E8',
+  bosco:     '#2ECC6A',
+  terra:     '#D4A060',
+  armonia:   '#B060F8',
+}
+
+// Alpha (0-1) for the aura background — rarer = more intense
+const RARITY_ALPHA: Record<string, number> = {
+  comune:      0.22,
+  non_comune:  0.34,
+  raro:        0.48,
+  epico:       0.62,
+  leggendario: 0.82,
+}
+
+const ANIM_VARIANTS: Record<AnimState, object> = {
   idle: {
     y: [0, -8, 0],
     transition: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
@@ -43,7 +66,117 @@ const ANIM_VARIANTS: Record<AnimState, any> = {
   },
 }
 
-export default function CreatureSprite({ imageUrl, name, animState = 'idle', size = 200 }: Props) {
+function toHex2(n: number) {
+  return Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0')
+}
+
+export default function CreatureSprite({
+  imageUrl, name, animState = 'idle', size = 200, element, rarity, showAura,
+}: Props) {
+  const glowColor = element ? (ELEMENT_GLOW[element] ?? '#3A9DBC') : null
+  const auraAlpha = rarity ? (RARITY_ALPHA[rarity] ?? 0.25) : 0.25
+
+  // CSS drop-shadow: element-tinted when element known, generic dark otherwise
+  const dropShadow = glowColor
+    ? [
+        `drop-shadow(0 ${Math.round(size * 0.055)}px ${Math.round(size * 0.12)}px ${glowColor}99)`,
+        `drop-shadow(0 0 ${Math.round(size * 0.08)}px ${glowColor}66)`,
+      ].join(' ')
+    : 'drop-shadow(0 4px 16px rgba(0,0,0,0.75))'
+
+  const spriteNode = imageUrl ? (
+    <Image
+      src={imageUrl}
+      alt={name}
+      width={size}
+      height={size}
+      className="object-contain"
+      style={{ filter: dropShadow }}
+      priority
+    />
+  ) : (
+    <div
+      className="rounded-full flex items-center justify-center text-5xl"
+      style={{
+        width: size, height: size,
+        background: glowColor ? `${glowColor}22` : 'rgba(255,255,255,0.08)',
+      }}
+    >
+      🐾
+    </div>
+  )
+
+  // ── Aura mode (large battle / bestiary detail) ─────────────────────────────
+  if (showAura && glowColor) {
+    const auraHex = toHex2(auraAlpha * 255)
+    const auraFaint = toHex2(auraAlpha * 0.35 * 255)
+    const shadowR = Math.round(size * 0.5)
+    const shadowH = Math.max(6, Math.round(size * 0.055))
+
+    return (
+      <div
+        className="relative flex items-center justify-center"
+        style={{ width: size, height: size }}
+      >
+        {/* Outer bloom — large blurred circle */}
+        <motion.div
+          className="absolute pointer-events-none"
+          style={{
+            inset: '-18%',
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${glowColor}${auraHex} 0%, ${glowColor}${auraFaint} 45%, transparent 70%)`,
+            filter: 'blur(14px)',
+          }}
+          animate={{ opacity: [0.55, 1, 0.55], scale: [0.88, 1.12, 0.88] }}
+          transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        {/* Inner crisp ring — sharp glow closest to sprite */}
+        <motion.div
+          className="absolute pointer-events-none"
+          style={{
+            inset: '8%',
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${glowColor}${toHex2(auraAlpha * 0.55 * 255)} 0%, transparent 65%)`,
+          }}
+          animate={{ opacity: [0.4, 0.9, 0.4] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
+        />
+
+        {/* Floor shadow — ellipse beneath, sync with float */}
+        <motion.div
+          className="absolute pointer-events-none"
+          style={{
+            bottom: -shadowH,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: shadowR,
+            height: shadowH,
+            borderRadius: '50%',
+            background: glowColor,
+            filter: `blur(${Math.max(4, Math.round(size * 0.04))}px)`,
+            opacity: 0,
+          }}
+          animate={{
+            opacity: [0.22, 0.38, 0.22],
+            scaleX: [0.82, 1.18, 0.82],
+          }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        {/* The sprite — floats on top of everything */}
+        <motion.div
+          className="absolute inset-0 flex items-center justify-center z-10"
+          animate={ANIM_VARIANTS[animState]}
+          key={animState}
+        >
+          {spriteNode}
+        </motion.div>
+      </div>
+    )
+  }
+
+  // ── Default (backward-compatible, enhanced drop shadow when element passed) ─
   return (
     <motion.div
       className="relative flex items-center justify-center"
@@ -51,23 +184,7 @@ export default function CreatureSprite({ imageUrl, name, animState = 'idle', siz
       animate={ANIM_VARIANTS[animState]}
       key={animState}
     >
-      {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={name}
-          width={size}
-          height={size}
-          className="object-contain drop-shadow-2xl"
-          priority
-        />
-      ) : (
-        <div
-          className="rounded-full bg-white/10 flex items-center justify-center text-5xl"
-          style={{ width: size, height: size }}
-        >
-          🐾
-        </div>
-      )}
+      {spriteNode}
     </motion.div>
   )
 }

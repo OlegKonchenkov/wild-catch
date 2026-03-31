@@ -286,19 +286,28 @@ export default function DuelLobbyPage() {
                 key={i}
                 onClick={() => cr && removeSlot(i)}
                 whileTap={cr ? { scale: 0.95 } : {}}
-                className="flex-1 rounded-2xl transition-all overflow-hidden"
+                className="flex-1 rounded-2xl transition-all overflow-hidden relative"
                 style={{
-                  background: color ? `${color}20` : 'rgba(255,255,255,0.04)',
-                  border: `2px solid ${color ? color + '60' : 'rgba(255,255,255,0.08)'}`,
-                  boxShadow: color ? `0 0 16px ${color}25` : 'none',
+                  background: color
+                    ? `radial-gradient(circle at 50% 40%, ${color}28 0%, ${color}0e 60%, transparent 100%)`
+                    : 'rgba(255,255,255,0.04)',
+                  border: `2px solid ${color ? color + '70' : 'rgba(255,255,255,0.08)'}`,
+                  boxShadow: color ? `0 0 20px ${color}30, inset 0 0 12px ${color}10` : 'none',
                   minHeight: 88,
                 }}
               >
                 {cr ? (
                   <div className="flex flex-col items-center py-2 gap-0.5">
                     <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: color + 'aa' }}>#{i + 1}</span>
-                    <CreatureSprite imageUrl={cr.image_url} name={cr.name} animState="idle" size={46} />
-                    <span className="text-[9px] text-white/70 truncate w-full text-center px-1 leading-tight font-semibold">{cr.name}</span>
+                    <CreatureSprite
+                      imageUrl={cr.image_url}
+                      name={cr.name}
+                      animState="idle"
+                      size={46}
+                      element={cr.element}
+                      rarity={cr.rarity}
+                    />
+                    <span className="text-[9px] text-white/75 truncate w-full text-center px-1 leading-tight font-semibold">{cr.name}</span>
                     <span className="text-[8px] text-white/30 font-mono">HP {cr.hp}</span>
                   </div>
                 ) : (
@@ -349,7 +358,24 @@ export default function DuelLobbyPage() {
                     cursor: canAdd || inLineup ? 'pointer' : 'default',
                   }}
                 >
-                  <CreatureSprite imageUrl={cr.image_url} name={cr.name} animState="idle" size={48} />
+                  <div
+                    className="shrink-0 rounded-xl overflow-hidden flex items-center justify-center"
+                    style={{
+                      width: 52, height: 52,
+                      background: `radial-gradient(circle at 50% 55%, ${rarityColor}20 0%, ${rarityColor}08 70%, transparent 100%)`,
+                      border: `1.5px solid ${inLineup ? rarityColor + '70' : rarityColor + '25'}`,
+                      boxShadow: inLineup ? `0 0 10px ${rarityColor}35` : 'none',
+                    }}
+                  >
+                    <CreatureSprite
+                      imageUrl={cr.image_url}
+                      name={cr.name}
+                      animState="idle"
+                      size={44}
+                      element={cr.element}
+                      rarity={cr.rarity}
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-white truncate">{cr.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">

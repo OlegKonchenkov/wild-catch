@@ -343,19 +343,23 @@ export default function EncounterPage() {
         {/* Wild sprite — top-right area */}
         <motion.div
           className="absolute top-2 right-4"
-          animate={animState === 'damage' ? { x: [-6, 6, -4, 4, 0] } :
-                   animState === 'flee'   ? { x: [0, 60], opacity: [1, 0] } :
-                   animState === 'catch'  ? { scale: [1, 0.8, 0.6, 0.1], opacity: [1, 1, 0.8, 0] } :
-                   { y: [0, -4, 0] }}
-          transition={animState === 'idle'
-            ? { duration: 2.5, repeat: Infinity, ease: 'easeInOut' }
-            : { duration: 0.5 }}
+          initial={{ x: 50, opacity: 0, scale: 0.85 }}
+          animate={
+            animState === 'damage' ? { x: [-6, 6, -4, 4, 0], opacity: 1, scale: 1 } :
+            animState === 'flee'   ? { x: [0, 80], opacity: [1, 0], scale: 1 } :
+            animState === 'catch'  ? { scale: [1, 0.8, 0.6, 0.1], opacity: [1, 1, 0.8, 0] } :
+            { x: 0, opacity: 1, scale: 1 }
+          }
+          transition={animState === 'idle' ? { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] } : { duration: 0.5 }}
         >
           <CreatureSprite
             imageUrl={state.creature.image_url ?? ''}
             name={state.creature.name ?? ''}
-            animState="idle"
+            animState={animState === 'damage' ? 'idle' : animState as any}
             size={130}
+            element={state.creature.element}
+            rarity={state.creature.rarity}
+            showAura
           />
         </motion.div>
 

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { RARITY_COLORS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
 import type { Creature, PlayerCreature, Element } from '@/lib/types'
+import CreatureSprite from '@/components/creature/CreatureSprite'
 
 const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario']
 
@@ -642,21 +643,29 @@ export default function BestiaryPage() {
               <div className="px-6 pt-2">
                 {/* Image */}
                 <div className="flex justify-center mb-4">
-                  <div className="relative w-36 h-36">
-                    {creature.image_url ? (
-                      <>
-                        <Image src={creature.image_url} alt={caught ? creature.name : '???'}
-                          fill className={`object-contain ${caught ? '' : 'silhouette-soft'}`} sizes="144px" />
-                        {!caught && (
+                  {caught ? (
+                    <CreatureSprite
+                      imageUrl={creature.image_url ?? ''}
+                      name={creature.name}
+                      animState="idle"
+                      size={164}
+                      element={creature.element}
+                      rarity={creature.rarity}
+                      showAura
+                    />
+                  ) : (
+                    <div className="relative w-36 h-36">
+                      {creature.image_url ? (
+                        <>
+                          <Image src={creature.image_url} alt="???"
+                            fill className="object-contain silhouette-soft" sizes="144px" />
                           <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#0F1F2E]/30 via-[#0F1F2E]/20 to-[#0F1F2E]/50" />
-                        )}
-                      </>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-6xl opacity-20">
-                        {caught ? ELEMENT_EMOJI[creature.element] : '?'}
-                      </div>
-                    )}
-                  </div>
+                        </>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-6xl opacity-20">?</div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {caught ? (

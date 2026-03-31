@@ -383,7 +383,15 @@ export default function DuelPage() {
               transition={{ duration: 0.3 }}
             >
               {oppActiveCr
-                ? <CreatureSprite imageUrl={oppActiveCr.image_url} name={oppActiveCr.name} animState={oppAnimState} size={100} />
+                ? <CreatureSprite
+                    imageUrl={oppActiveCr.image_url}
+                    name={oppActiveCr.name}
+                    animState={oppAnimState}
+                    size={100}
+                    element={oppActiveCr.element}
+                    rarity={oppActiveCr.rarity}
+                    showAura
+                  />
                 : <div className="w-[100px] h-[100px] rounded-full bg-white/5 animate-pulse" />
               }
             </motion.div>
@@ -473,7 +481,15 @@ export default function DuelPage() {
               transition={{ duration: 0.3 }}
             >
               {myActiveCr
-                ? <CreatureSprite imageUrl={myActiveCr.image_url} name={myActiveCr.name} animState={animState} size={120} />
+                ? <CreatureSprite
+                    imageUrl={myActiveCr.image_url}
+                    name={myActiveCr.name}
+                    animState={animState}
+                    size={120}
+                    element={myActiveCr.element}
+                    rarity={myActiveCr.rarity}
+                    showAura
+                  />
                 : <div className="w-[120px] h-[120px] rounded-full bg-white/5 animate-pulse" />
               }
             </motion.div>
