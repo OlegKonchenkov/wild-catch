@@ -30,6 +30,13 @@ interface LevelUpInfo {
   goldReward: number
 }
 
+interface NotifPopup {
+  type: 'admin_notify' | 'item_redeemed'
+  title: string
+  message: string
+  icon?: string
+}
+
 export default function GameShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
@@ -43,12 +50,19 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const [sessionEnded, setSessionEnded] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
   const [levelUpInfo, setLevelUpInfo]   = useState<LevelUpInfo | null>(null)
+  const [notifPopup, setNotifPopup] = useState<NotifPopup | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [showNotifPanel, setShowNotifPanel] = useState(false)
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [notifLoading, setNotifLoading] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const initRef = useRef(false)
 
   function loadSessionData(sid: string) {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setStatsLoading(false); return }
+      setUserId(user.id)
       Promise.all([
         supabase.from('player_sessions')
           .select('gold, level, exp')
@@ -150,6 +164,117 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('wc:refresh-stats', onRefresh)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load notification history + unread count
+  const loadNotifications = (uid: string) => {
+    const sid = localStorage.getItem('current_session_id')
+    if (!sid) return
+    supabase
+      .from('player_notifications')
+      .select('*')
+      .eq('user_id', uid)
+      .eq('session_id', sid)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (data) {
+          setNotifications(data)
+          setUnreadCount(data.filter(n => !n.read).length)
+        }
+      })
+  }
+
+  const openNotifPanel = () => {
+    setShowNotifPanel(true)
+    if (userId) {
+      setNotifLoading(true)
+      const sid = localStorage.getItem('current_session_id')
+      if (sid) {
+        supabase
+          .from('player_notifications')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('session_id', sid)
+          .order('created_at', { ascending: false })
+          .limit(50)
+          .then(({ data }) => {
+            if (data) setNotifications(data)
+            setNotifLoading(false)
+            // Mark all as read
+            supabase
+              .from('player_notifications')
+              .update({ read: true })
+              .eq('user_id', userId)
+              .eq('session_id', sid)
+              .eq('read', false)
+              .then(() => setUnreadCount(0))
+          })
+      } else {
+        setNotifLoading(false)
+      }
+    }
+  }
+
+  // Player notifications realtime subscription
+  useEffect(() => {
+    if (!userId) return
+    const sid = localStorage.getItem('current_session_id')
+    if (!sid) return
+    // Initial load
+    loadNotifications(userId)
+    const channel = supabase
+      .channel(`player-notifications:${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'player_notifications',
+        filter: `user_id=eq.${userId}`,
+      }, (payload) => {
+        const row = payload.new as any
+        // Add to list
+        setNotifications(prev => [row, ...prev])
+        setUnreadCount(prev => prev + 1)
+        // Show popup
+        if (row.type === 'item_redeemed') {
+          const r = row.payload?.reward ?? {}
+          const parts: string[] = []
+          if (r.gold) parts.push(`+${r.gold} 💰`)
+          if (r.exp) parts.push(`+${r.exp} ⭐`)
+          setNotifPopup({
+            type: 'item_redeemed',
+            title: `✅ "${row.payload?.item_name}" riscattato!`,
+            message: parts.length > 0 ? `Ricompensa: ${parts.join(' · ')}` : 'Oggetto consumato.',
+            icon: '✅',
+          })
+          setTimeout(() => setNotifPopup(null), 6000)
+        } else {
+          setNotifPopup({
+            type: 'admin_notify',
+            title: row.payload?.title ?? 'Messaggio',
+            message: row.payload?.message ?? '',
+            icon: '📢',
+          })
+          setTimeout(() => setNotifPopup(null), 6000)
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [userId, supabase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime: user-specific broadcast (admin_notify direct)
+  useEffect(() => {
+    if (!userId) return
+    const channel = supabase
+      .channel(`shell:user:${userId}`)
+      .on('broadcast', { event: 'admin_notify' }, ({ payload }) => {
+        if (payload?.title) {
+          setNotifPopup({ type: 'admin_notify', title: payload.title, message: payload.message ?? '', icon: '📢' })
+          setTimeout(() => setNotifPopup(null), 6000)
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [userId, supabase])
+
   // Show level-up notification
   useEffect(() => {
     function onLevelUp(e: Event) {
@@ -171,6 +296,12 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     const channel = supabase
       .channel(`shell:session:${sid}`)
       .on('broadcast', { event: 'session_ended' }, () => setSessionEnded(true))
+      .on('broadcast', { event: 'admin_notify' }, ({ payload }) => {
+        if (payload?.title) {
+          setNotifPopup({ type: 'admin_notify', title: payload.title, message: payload.message ?? '', icon: '📢' })
+          setTimeout(() => setNotifPopup(null), 6000)
+        }
+      })
       .on('broadcast', { event: 'session_duration_updated' }, ({ payload }) => {
         if (payload?.endAt) setEndAt(payload.endAt)
       })
@@ -216,12 +347,26 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
           }
         </div>
 
-        {/* Timer */}
-        <div className={`text-sm font-mono ${
-          timer.isCritical ? 'text-red-400 animate-pulse' :
-          timer.isWarning  ? 'text-amber-400' : 'text-[#E85D2F]'
-        }`}>
-          ⏱ {timer.formatted || '--:--'}
+        {/* Timer + bell */}
+        <div className="flex items-center gap-2">
+          <div className={`text-sm font-mono ${
+            timer.isCritical ? 'text-red-400 animate-pulse' :
+            timer.isWarning  ? 'text-amber-400' : 'text-[#E85D2F]'
+          }`}>
+            ⏱ {timer.formatted || '--:--'}
+          </div>
+          <button
+            onClick={openNotifPanel}
+            className="relative p-1 text-white/50 hover:text-white transition-colors"
+            aria-label="Notifiche"
+          >
+            <span className="text-xl">🔔</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
@@ -352,6 +497,112 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                 Tocca per continuare
               </motion.p>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Notification history panel */}
+      <AnimatePresence>
+        {showNotifPanel && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9980] bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowNotifPanel(false)}
+          >
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="absolute right-0 top-0 bottom-0 w-[min(100%,360px)] bg-[#0D1E2E] border-l border-white/10 flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/10 flex-shrink-0">
+                <div>
+                  <h2 className="font-bold text-white text-base">🔔 Notifiche</h2>
+                  {notifications.length > 0 && (
+                    <p className="text-[11px] text-white/40 mt-0.5">{notifications.length} messaggi</p>
+                  )}
+                </div>
+                <button onClick={() => setShowNotifPanel(false)} className="text-white/40 hover:text-white text-xl">✕</button>
+              </div>
+              {/* List */}
+              <div className="flex-1 overflow-y-auto py-2">
+                {notifLoading ? (
+                  <div className="space-y-2 px-4 pt-2">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />
+                    ))}
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-3 text-white/30">
+                    <span className="text-5xl">🔕</span>
+                    <p className="text-sm">Nessuna notifica</p>
+                  </div>
+                ) : (
+                  notifications.map(n => {
+                    const isRedeemed = n.type === 'item_redeemed'
+                    const icon = isRedeemed ? '✅' : '📢'
+                    const title = isRedeemed
+                      ? `"${n.payload?.item_name}" riscattato`
+                      : (n.payload?.title ?? 'Messaggio')
+                    const body = isRedeemed
+                      ? (() => {
+                          const r = n.payload?.reward ?? {}
+                          const p: string[] = []
+                          if (r.gold) p.push(`+${r.gold} 💰`)
+                          if (r.exp) p.push(`+${r.exp} ⭐`)
+                          return p.length > 0 ? `Ricompensa: ${p.join(' · ')}` : ''
+                        })()
+                      : (n.payload?.message ?? '')
+                    const time = new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+                    return (
+                      <div key={n.id}
+                        className={`flex gap-3 px-4 py-3 border-b border-white/5 ${n.read ? 'opacity-60' : ''}`}>
+                        <span className="text-xl shrink-0 mt-0.5">{icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-medium text-white leading-snug">{title}</p>
+                            <span className="text-[10px] text-white/30 shrink-0 mt-0.5">{time}</span>
+                          </div>
+                          {body && <p className="text-xs text-white/50 mt-0.5">{body}</p>}
+                        </div>
+                        {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-[#3A9DBC] shrink-0 mt-2" />}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Admin/system notification popup */}
+      <AnimatePresence>
+        {notifPopup && (
+          <motion.div
+            initial={{ opacity: 0, y: -60 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -60 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="fixed top-4 left-4 right-4 z-[9990] pointer-events-auto"
+            onClick={() => setNotifPopup(null)}
+          >
+            <div className="bg-[#0F1F2E]/95 border border-[#3A9DBC]/40 rounded-2xl px-4 py-3 shadow-2xl backdrop-blur-sm flex items-start gap-3"
+              style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(58,157,188,0.2)' }}>
+              <span className="text-2xl shrink-0 mt-0.5">{notifPopup.icon ?? '📢'}</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-white text-sm leading-tight">{notifPopup.title}</p>
+                {notifPopup.message && (
+                  <p className="text-white/60 text-xs mt-0.5 leading-relaxed">{notifPopup.message}</p>
+                )}
+              </div>
+              <button className="text-white/30 hover:text-white text-lg leading-none shrink-0 mt-0.5">✕</button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

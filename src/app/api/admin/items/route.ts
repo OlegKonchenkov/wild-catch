@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { name, type, effect_value, description, shop_price, session_id, image_url, egg_rarity, steps_required } = body
+  const { name, type, effect_value, description, shop_price, session_id, image_url, egg_rarity, steps_required, is_redeemable, reward } = body
 
   if (!name?.trim()) return NextResponse.json({ error: 'Nome obbligatorio' }, { status: 400 })
   if (!VALID_TYPES.includes(type)) return NextResponse.json({ error: 'Tipo non valido' }, { status: 400 })
@@ -45,6 +45,8 @@ export async function POST(request: Request) {
     shop_price: Number(shop_price) || 0,
     session_id: session_id ?? null,
     image_url: image_url ?? null,
+    is_redeemable: is_redeemable ?? false,
+    reward: reward ?? {},
   }
   if (type === 'uovo') {
     insertData.egg_rarity = egg_rarity ?? 'comune'
@@ -63,7 +65,7 @@ export async function PUT(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { id, name, type, effect_value, description, shop_price, session_id, image_url, egg_rarity, steps_required } = body
+  const { id, name, type, effect_value, description, shop_price, session_id, image_url, egg_rarity, steps_required, is_redeemable, reward } = body
 
   if (!id) return NextResponse.json({ error: 'ID obbligatorio' }, { status: 400 })
   if (!name?.trim()) return NextResponse.json({ error: 'Nome obbligatorio' }, { status: 400 })
@@ -78,6 +80,8 @@ export async function PUT(request: Request) {
     shop_price: Number(shop_price) || 0,
     session_id: session_id !== undefined ? (session_id ?? null) : undefined,
     image_url: image_url !== undefined ? (image_url ?? null) : undefined,
+    is_redeemable: is_redeemable ?? false,
+    reward: reward ?? {},
   }
   if (type === 'uovo') {
     updateData.egg_rarity = egg_rarity ?? 'comune'

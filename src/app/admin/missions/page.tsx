@@ -177,7 +177,7 @@ const EMPTY_FORM = {
 /* ── Page ────────────────────────────────────── */
 export default function AdminMissions() {
   const [sessions, setSessions]   = useState<any[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string>('')
   const [missions, setMissions]   = useState<Mission[]>([])
   const [loadingSessions, setLoadingSessions] = useState(true)
   const [loadingMissions, setLoadingMissions] = useState(false)
@@ -198,18 +198,21 @@ export default function AdminMissions() {
   /* ── Load sessions ── */
   useEffect(() => {
     supabase.from('sessions').select('id, name, status').order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) } })
+      .then(({ data }) => { if (data) setSessions(data) })
       .then(() => setLoadingSessions(false), () => setLoadingSessions(false))
   }, [supabase])
 
   /* ── Load missions when session changes ── */
   function loadMissions(sid: string) {
     setLoadingMissions(true)
-    supabase.from('missions').select('*').eq('session_id', sid).order('chapter_order')
+    const query = sid
+      ? supabase.from('missions').select('*').eq('session_id', sid).order('chapter_order')
+      : supabase.from('missions').select('*').order('chapter_order')
+    query
       .then(({ data }) => { if (data) setMissions(data as Mission[]) })
       .then(() => setLoadingMissions(false), () => setLoadingMissions(false))
   }
-  useEffect(() => { if (selectedId) loadMissions(selectedId) }, [selectedId])
+  useEffect(() => { loadMissions(selectedId) }, [selectedId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Load reference data for selects ── */
   useEffect(() => {
@@ -218,8 +221,8 @@ export default function AdminMissions() {
   }, [])
 
   useEffect(() => {
-    if (!selectedId) return
-    fetch(`/api/admin/qrcodes?sessionId=${selectedId}`)
+    const sid = selectedId || 'all'
+    fetch(`/api/admin/qrcodes?sessionId=${sid}`)
       .then(r => r.json()).then(d => setQrCodes(d.qrCodes ?? []))
   }, [selectedId])
 
@@ -271,7 +274,7 @@ export default function AdminMissions() {
 
   /* ── Save ── */
   async function handleSave() {
-    if (!selectedId || !form.title.trim()) { setFormError('Titolo obbligatorio'); return }
+    if (!form.title.trim()) { setFormError('Titolo obbligatorio'); return }
     setSaving(true); setFormError('')
     const isEdit = panel !== null && panel !== 'new'
 
@@ -304,7 +307,7 @@ export default function AdminMissions() {
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">🎯 Missioni</h1>
-        <button onClick={openNew} disabled={!selectedId}
+        <button onClick={openNew}
           className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50">
           + Nuova missione
         </button>
@@ -316,6 +319,7 @@ export default function AdminMissions() {
         <select value={selectedId ?? ''} onChange={e => setSelectedId(e.target.value)}
           disabled={loadingSessions}
           className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 disabled:opacity-50">
+          <option value="">📋 Tutte le sessioni</option>
           {sessions.map(s => <option key={s.id} value={s.id}>{s.name} ({s.status})</option>)}
         </select>
         {loadingSessions && (

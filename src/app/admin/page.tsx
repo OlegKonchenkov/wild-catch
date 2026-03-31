@@ -8,7 +8,10 @@ interface Stats {
   endAt: string | null; startAt: string | null; durationMinutes: number | null
   playerCount: number; encounterTotal: number; caughtCount: number
   duelCount: number; activeDuels: number
+  bossCount: number; bossWins: number
 }
+
+type DetailType = 'catches' | 'encounters' | 'duels' | 'bosses'
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Bozza', ready: 'Pronta', active: 'Attiva', ended: 'Terminata',
@@ -44,18 +47,11 @@ function LiveTimer({ stats }: { stats: Stats }) {
     function tick() {
       const end = resolveEndAt(stats)
       if (!end) { setDisplay('--:--'); setPct(100); return }
-
       const now = Date.now()
       const remaining = end.getTime() - now
-
-      if (remaining <= 0) {
-        setDisplay('Terminata'); setPct(0); setUrgent(false); return
-      }
-
+      if (remaining <= 0) { setDisplay('Terminata'); setPct(0); setUrgent(false); return }
       setDisplay(formatDuration(remaining))
       setUrgent(remaining < 5 * 60 * 1000)
-
-      // Progress from start to end
       if (stats.startAt) {
         const total = end.getTime() - new Date(stats.startAt).getTime()
         const elapsed = now - new Date(stats.startAt).getTime()
@@ -78,7 +74,6 @@ function LiveTimer({ stats }: { stats: Stats }) {
       <p className={`text-4xl font-mono font-bold tracking-tight ${urgent ? 'text-red-400' : 'text-[#34d399]'}`}>
         {display}
       </p>
-      {/* Progress bar */}
       <div className="mt-3 h-1.5 rounded-full bg-white/10 overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-1000 ${urgent ? 'bg-red-400' : 'bg-[#34d399]'}`}
@@ -97,6 +92,164 @@ function LiveTimer({ stats }: { stats: Stats }) {
   )
 }
 
+const DETAIL_CONFIG: Record<DetailType, { title: string; icon: string; emptyLabel: string }> = {
+  catches:    { title: 'Catture',           icon: '🎯', emptyLabel: 'Nessuna cattura ancora' },
+  encounters: { title: 'Incontri',          icon: '⚔️', emptyLabel: 'Nessun incontro ancora' },
+  duels:      { title: 'Duelli',            icon: '🥊', emptyLabel: 'Nessun duello ancora' },
+  bosses:     { title: 'Incontri Boss',     icon: '👑', emptyLabel: 'Nessun boss affrontato' },
+}
+
+const RARITY_COLOR: Record<string, string> = {
+  comune: '#94a3b8', non_comune: '#34d399', raro: '#3A9DBC',
+  epico: '#7B4DB8', leggendario: '#F7C841',
+}
+
+function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
+  if (detail === 'catches') {
+    const creature = row.creatures as any
+    const player = row.player_sessions?.profiles as any
+    return (
+      <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base">🎯</span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white truncate">{creature?.name ?? '?'}</p>
+            <p className="text-xs text-white/40">{player?.nickname ?? row.player_sessions?.user_id?.slice(0, 8)}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {creature?.rarity && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
+              color: RARITY_COLOR[creature.rarity] ?? '#94a3b8',
+              background: `${RARITY_COLOR[creature.rarity] ?? '#94a3b8'}20`,
+            }}>{creature.rarity}</span>
+          )}
+          <span className="text-[10px] text-white/30">
+            {new Date(row.caught_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      </div>
+    )
+  }
+  if (detail === 'encounters') {
+    const creature = row.creatures as any
+    const player = row.player_sessions?.profiles as any
+    const statusColor: Record<string, string> = { caught: '#34d399', fled: '#ef4444', active: '#F7C841' }
+    return (
+      <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base">⚔️</span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white truncate">{creature?.name ?? '?'}</p>
+            <p className="text-xs text-white/40">{player?.nickname ?? row.player_sessions?.user_id?.slice(0, 8)}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
+            color: statusColor[row.status] ?? '#94a3b8',
+            background: `${statusColor[row.status] ?? '#94a3b8'}20`,
+          }}>{row.status}</span>
+          <span className="text-[10px] text-white/30">
+            {new Date(row.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      </div>
+    )
+  }
+  if (detail === 'duels') {
+    const statusColor: Record<string, string> = { active: '#F7C841', completed: '#34d399', cancelled: '#ef4444' }
+    return (
+      <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base">🥊</span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white truncate">Duello</p>
+            <p className="text-xs text-white/40">
+              {row.winner_id ? `Vincitore: ${row.winner_id.slice(0, 8)}…` : 'In corso'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
+            color: statusColor[row.status] ?? '#94a3b8',
+            background: `${statusColor[row.status] ?? '#94a3b8'}20`,
+          }}>{row.status}</span>
+          <span className="text-[10px] text-white/30">
+            {new Date(row.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      </div>
+    )
+  }
+  if (detail === 'bosses') {
+    const statusColor: Record<string, string> = { won: '#34d399', lost: '#ef4444', active: '#F7C841' }
+    return (
+      <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base">👑</span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white truncate">Boss Fight</p>
+            <p className="text-xs text-white/40">
+              {Array.isArray(row.boss_lineup) ? `${row.boss_lineup.length} boss` : '—'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
+            color: statusColor[row.status] ?? '#94a3b8',
+            background: `${statusColor[row.status] ?? '#94a3b8'}20`,
+          }}>{row.status}</span>
+          <span className="text-[10px] text-white/30">
+            {new Date(row.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      </div>
+    )
+  }
+  return null
+}
+
+function DetailModal({ detail, sessionId, onClose }: {
+  detail: DetailType; sessionId: string; onClose: () => void
+}) {
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const cfg = DETAIL_CONFIG[detail]
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/admin/dashboard?sessionId=${sessionId}&detail=${detail}`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setRows(d.rows ?? []))
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false))
+  }, [detail, sessionId])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#0D1E2E] border border-white/15 rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+          <h2 className="text-base font-bold text-white">{cfg.icon} {cfg.title}</h2>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-white/40">{rows.length} risultati</span>
+            <button onClick={onClose} className="text-white/40 hover:text-white text-xl leading-none">✕</button>
+          </div>
+        </div>
+        <div className="px-5 overflow-y-auto flex-1 py-2">
+          {loading ? (
+            <AdminListSkeleton rows={6} itemClassName="h-10" />
+          ) : rows.length === 0 ? (
+            <p className="text-white/40 text-sm text-center py-8">{cfg.emptyLabel}</p>
+          ) : (
+            rows.map((row, i) => <DetailRow key={row.id ?? i} detail={detail} row={row} />)
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminDashboard() {
   const [sessions, setSessions] = useState<any[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -105,6 +258,7 @@ export default function AdminDashboard() {
   const [loadingStats, setLoadingStats] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notifText, setNotifText] = useState('')
+  const [activeDetail, setActiveDetail] = useState<DetailType | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   const loadSessions = () =>
@@ -140,7 +294,7 @@ export default function AdminDashboard() {
     await fetch('/api/admin/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: selectedId, title: 'Annuncio', body: notifText }),
+      body: JSON.stringify({ sessionId: selectedId, title: 'Annuncio', message: notifText }),
     })
     setNotifText('')
   }
@@ -152,7 +306,6 @@ export default function AdminDashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: selectedId }),
     })
-    // Re-fetch stats immediately — realtime channel aggiorna sessions dropdown
     fetch(`/api/admin/dashboard?sessionId=${selectedId}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setStats(data) })
@@ -217,28 +370,39 @@ export default function AdminDashboard() {
             <span className="text-white/40 text-xs">{stats.sessionName}</span>
           </div>
 
-          {/* Live timer — only for active sessions */}
+          {/* Live timer */}
           <LiveTimer stats={stats} />
 
-          {/* Stats grid */}
+          {/* Stats grid — clickable */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            {[
-              { label: 'Giocatori', value: stats.playerCount, color: '#3A9DBC', icon: '👤' },
-              { label: 'Catture', value: stats.caughtCount, color: '#34d399', icon: '🎯' },
-              { label: 'Incontri', value: stats.encounterTotal, color: '#E85D2F', icon: '⚔️' },
-              { label: 'Duelli', value: stats.duelCount, color: '#7B4DB8', icon: '🥊' },
-            ].map(({ label, value, color, icon }) => (
-              <div key={label} className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+            {([
+              { label: 'Giocatori', value: stats.playerCount, color: '#3A9DBC', icon: '👤', detail: null },
+              { label: 'Catture', value: stats.caughtCount, color: '#34d399', icon: '🎯', detail: 'catches' as DetailType },
+              { label: 'Incontri', value: stats.encounterTotal, color: '#E85D2F', icon: '⚔️', detail: 'encounters' as DetailType },
+              { label: 'Duelli', value: stats.duelCount, color: '#7B4DB8', icon: '🥊', detail: 'duels' as DetailType },
+              { label: 'Boss Fight', value: stats.bossCount, color: '#F7C841', icon: '👑', detail: 'bosses' as DetailType },
+            ] as const).map(({ label, value, color, icon, detail }) => (
+              <div
+                key={label}
+                onClick={() => detail && selectedId && setActiveDetail(detail)}
+                className={`bg-white/5 border border-white/10 rounded-xl p-4 text-center transition-colors ${
+                  detail ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-95' : ''
+                }`}
+              >
                 <p className="text-2xl mb-1">{icon}</p>
                 <p className="text-3xl font-bold" style={{ color }}>{value}</p>
                 <p className="text-xs text-white/50 mt-1">{label}</p>
+                {detail && <p className="text-[9px] text-white/20 mt-0.5">Tocca per dettagli</p>}
               </div>
             ))}
           </div>
 
           {/* Secondary stats row */}
           <div className="grid grid-cols-2 gap-3 mb-5">
-            <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex items-center justify-between">
+            <div
+              onClick={() => selectedId && setActiveDetail('catches')}
+              className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-colors"
+            >
               <div>
                 <p className="text-xs text-white/50">Tasso cattura</p>
                 <p className="text-xl font-bold text-[#34d399] mt-0.5">
@@ -255,6 +419,20 @@ export default function AdminDashboard() {
               <span className="text-2xl opacity-40">⚡</span>
             </div>
           </div>
+
+          {/* Boss secondary stat */}
+          {stats.bossCount > 0 && (
+            <div
+              onClick={() => selectedId && setActiveDetail('bosses')}
+              className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex items-center justify-between mb-5 cursor-pointer hover:bg-white/10 transition-colors"
+            >
+              <div>
+                <p className="text-xs text-white/50">Boss sconfitti</p>
+                <p className="text-xl font-bold text-[#F7C841] mt-0.5">{stats.bossWins} / {stats.bossCount}</p>
+              </div>
+              <span className="text-2xl opacity-40">👑</span>
+            </div>
+          )}
 
           {/* Quick actions */}
           <div className="space-y-3">
@@ -280,6 +458,15 @@ export default function AdminDashboard() {
             )}
           </div>
         </>
+      )}
+
+      {/* Detail modal */}
+      {activeDetail && selectedId && (
+        <DetailModal
+          detail={activeDetail}
+          sessionId={selectedId}
+          onClose={() => setActiveDetail(null)}
+        />
       )}
     </div>
   )

@@ -73,6 +73,7 @@ export default function CreaturesPage() {
   const [filter, setFilter] = useState<ElementType | 'all'>('all')
   const [search, setSearch] = useState('')
   const [sessions, setSessions] = useState<{ id: string; name: string }[]>([])
+  const [sessionFilter, setSessionFilter] = useState<string>('')
 
   useEffect(() => {
     supabase.from('sessions').select('id, name').order('created_at', { ascending: false })
@@ -190,6 +191,8 @@ export default function CreaturesPage() {
   const filtered = creatures.filter(c => {
     if (filter !== 'all' && c.element !== filter) return false
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false
+    if (sessionFilter === '__null__' && c.session_id !== null) return false
+    if (sessionFilter && sessionFilter !== '__null__' && c.session_id !== sessionFilter) return false
     return true
   })
 
@@ -225,84 +228,90 @@ export default function CreaturesPage() {
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm mb-4">{error}</div>
         )}
 
-        <div className="flex gap-6">
-          {/* LEFT: Grid */}
-          <div className="flex-1 min-w-0">
-            {/* Filters */}
-            <div className="flex gap-2 mb-4 flex-wrap">
-              <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Cerca..." className="bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-1.5 w-36 focus:outline-none focus:border-[#3A9DBC]/50" />
-              {(['all', ...ELEMENTS] as const).map(el => (
-                <button key={el} onClick={() => setFilter(el)}
-                  className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${filter === el ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/50 hover:text-white hover:bg-white/10'}`}>
-                  {el === 'all' ? 'Tutti' : `${ELEMENT_META[el].emoji} ${ELEMENT_META[el].label}`}
-                </button>
-              ))}
-            </div>
-
-            {loading ? (
-              <AdminListSkeleton rows={8} itemClassName="h-44" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" />
-            ) : filtered.length === 0 ? (
-              <div className="text-white/30 text-center py-16 text-sm">Nessuna creatura trovata</div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {filtered.map(c => {
-                  const rm = RARITY_META[c.rarity]
-                  const em = ELEMENT_META[c.element]
-                  const isActive = panel === c.id
-                  return (
-                    <div key={c.id} onClick={() => isActive ? closePanel() : openEdit(c)}
-                      className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all select-none group
-                        ${isActive ? 'ring-2 ring-[#3A9DBC] shadow-lg shadow-[#3A9DBC]/20' : 'hover:scale-[1.02] hover:shadow-lg'}`}
-                      style={{ background: `linear-gradient(145deg, #0D1E2E, #0A1520)`, boxShadow: isActive ? `0 0 20px ${rm.glow}` : undefined }}>
-
-                      {/* Rarity accent line */}
-                      <div className="h-0.5 w-full" style={{ background: rm.color }} />
-
-                      {/* Image area */}
-                      <div className="relative h-28 img-placeholder flex items-center justify-center overflow-hidden">
-                        {c.image_url ? (
-                          <Image src={c.image_url} alt={c.name} fill className="object-cover"
-                            sizes="200px" onError={() => {}} />
-                        ) : (
-                          <div className="text-4xl opacity-30 group-hover:opacity-50 transition-opacity"
-                            style={{ filter: 'saturate(0)' }}>🐾</div>
-                        )}
-                        {/* Element badge */}
-                        <div className="absolute top-1.5 right-1.5 text-xs px-1.5 py-0.5 rounded-md font-semibold backdrop-blur-sm"
-                          style={{ background: em.bg, color: 'rgba(255,255,255,0.85)' }}>
-                          {em.emoji}
-                        </div>
-                      </div>
-
-                      {/* Info */}
-                      <div className="px-3 py-2.5">
-                        <p className="font-bold text-sm text-white truncate">{c.name}</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-xs font-semibold" style={{ color: rm.color }}>{rm.label}</span>
-                          <span className="stat-mono text-xs text-white/30">{c.hp}hp</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+        {/* Grid */}
+        <div>
+          {/* Filters */}
+          <div className="flex gap-2 mb-4 flex-wrap items-center">
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Cerca..." className="bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-1.5 w-36 focus:outline-none focus:border-[#3A9DBC]/50" />
+            <select value={sessionFilter} onChange={e => setSessionFilter(e.target.value)}
+              className="bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#3A9DBC]/50">
+              <option value="">📋 Tutte le sessioni</option>
+              <option value="__null__">🌐 Globali</option>
+              {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            {(['all', ...ELEMENTS] as const).map(el => (
+              <button key={el} onClick={() => setFilter(el)}
+                className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${filter === el ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/50 hover:text-white hover:bg-white/10'}`}>
+                {el === 'all' ? 'Tutti' : `${ELEMENT_META[el].emoji} ${ELEMENT_META[el].label}`}
+              </button>
+            ))}
           </div>
 
-          {/* RIGHT: Edit/Create Panel */}
-          {panel !== 'none' && (
-            <div className="w-80 shrink-0 panel-enter">
-              <div className="bg-[#0D1E2E] border border-white/10 rounded-2xl overflow-hidden sticky top-0">
-                {/* Panel header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                  <h2 className="font-bold text-sm">
-                    {panel === 'new' ? '+ Nuova Creatura' : `Modifica: ${editingCreature?.name ?? ''}`}
-                  </h2>
-                  <button onClick={closePanel} className="text-white/30 hover:text-white text-lg leading-none">✕</button>
-                </div>
+          {loading ? (
+            <AdminListSkeleton rows={8} itemClassName="h-44" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" />
+          ) : filtered.length === 0 ? (
+            <div className="text-white/30 text-center py-16 text-sm">Nessuna creatura trovata</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {filtered.map(c => {
+                const rm = RARITY_META[c.rarity]
+                const em = ELEMENT_META[c.element]
+                const isActive = panel === c.id
+                return (
+                  <div key={c.id} onClick={() => isActive ? closePanel() : openEdit(c)}
+                    className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all select-none group
+                      ${isActive ? 'ring-2 ring-[#3A9DBC] shadow-lg shadow-[#3A9DBC]/20' : 'hover:scale-[1.02] hover:shadow-lg'}`}
+                    style={{ background: `linear-gradient(145deg, #0D1E2E, #0A1520)`, boxShadow: isActive ? `0 0 20px ${rm.glow}` : undefined }}>
 
-                <div className="p-4 overflow-y-auto max-h-[calc(100vh-160px)]">
+                    {/* Rarity accent line */}
+                    <div className="h-0.5 w-full" style={{ background: rm.color }} />
+
+                    {/* Image area */}
+                    <div className="relative h-28 img-placeholder flex items-center justify-center overflow-hidden">
+                      {c.image_url ? (
+                        <Image src={c.image_url} alt={c.name} fill className="object-cover"
+                          sizes="200px" onError={() => {}} />
+                      ) : (
+                        <div className="text-4xl opacity-30 group-hover:opacity-50 transition-opacity"
+                          style={{ filter: 'saturate(0)' }}>🐾</div>
+                      )}
+                      {/* Element badge */}
+                      <div className="absolute top-1.5 right-1.5 text-xs px-1.5 py-0.5 rounded-md font-semibold backdrop-blur-sm"
+                        style={{ background: em.bg, color: 'rgba(255,255,255,0.85)' }}>
+                        {em.emoji}
+                      </div>
+                    </div>
+
+                    {/* Info */}
+                    <div className="px-3 py-2.5">
+                      <p className="font-bold text-sm text-white truncate">{c.name}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-xs font-semibold" style={{ color: rm.color }}>{rm.label}</span>
+                        <span className="stat-mono text-xs text-white/30">{c.hp}hp</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Edit/Create Modal Overlay */}
+        {panel !== 'none' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm panel-enter"
+            onClick={e => { if (e.target === e.currentTarget) closePanel() }}>
+            <div className="bg-[#0D1E2E] border border-white/15 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Panel header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 shrink-0">
+                <h2 className="font-bold text-base text-white">
+                  {panel === 'new' ? '+ Nuova Creatura' : `✏️ Modifica: ${editingCreature?.name ?? ''}`}
+                </h2>
+                <button onClick={closePanel} className="text-white/40 hover:text-white text-xl leading-none">✕</button>
+              </div>
+
+                <div className="p-5 overflow-y-auto flex-1">
                   {/* Image section */}
                   <div className="mb-4">
                     <div className="relative h-36 bg-[#07111B] rounded-xl overflow-hidden mb-2 flex items-center justify-center">
@@ -493,11 +502,10 @@ export default function CreaturesPage() {
                       </button>
                     </div>
                   </form>
-                </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </>
   )

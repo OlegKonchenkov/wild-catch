@@ -261,7 +261,7 @@ export default function DuelLobbyPage() {
           <div className="flex-1 h-px bg-white/10" />
         </div>
 
-        <div className="flex gap-2">
+        <div className="space-y-2">
           <input
             value={joinCode}
             onChange={e => { setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 4)); setError(null) }}
@@ -269,12 +269,12 @@ export default function DuelLobbyPage() {
             maxLength={4}
             autoCapitalize="characters"
             inputMode="text"
-            className="flex-1 bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white font-mono text-xl text-center tracking-[0.5em] placeholder-white/15 focus:outline-none focus:border-[#3A9DBC] transition-colors"
+            className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white font-mono text-xl text-center tracking-[0.5em] placeholder-white/15 focus:outline-none focus:border-[#3A9DBC] transition-colors"
           />
           <button
             onClick={() => connect(joinCode)}
             disabled={joinCode.length < 4 || !lineupFull || loading}
-            className="px-5 py-3 rounded-xl font-bold text-sm disabled:opacity-35 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
+            className="w-full py-3 rounded-xl font-bold text-sm disabled:opacity-35 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
             style={{
               background: joinCode.length === 4 && lineupFull ? 'linear-gradient(135deg, #3A9DBC 0%, #2a7a99 100%)' : 'rgba(255,255,255,0.05)',
               color: joinCode.length === 4 && lineupFull ? 'white' : 'rgba(255,255,255,0.3)',

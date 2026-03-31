@@ -318,7 +318,7 @@ export default function MissionsPage() {
 
     async function load() {
       const [missRes, pmRes, userRes] = await Promise.all([
-        supabase.from('missions').select('*').eq('session_id', sessionId).order('chapter_order'),
+        supabase.from('missions').select('*').or(`session_id.eq.${sessionId},session_id.is.null`).order('chapter_order'),
         supabase.auth.getUser(),
         Promise.resolve(null), // placeholder
       ])

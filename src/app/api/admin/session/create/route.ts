@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   if (!isAdmin) return NextResponse.json({ error: 'Non autorizzato' }, { status: 403 })
 
   const body = await request.json()
-  const { name, narrativeConfig, areaBounds, durationMinutes } = body
+  const { name, narrativeConfig, areaBounds, durationMinutes, starterKit } = body
 
   const { data, error } = await supabase
     .from('sessions')
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
       area_bounds: areaBounds,
       duration_minutes: durationMinutes,
       status: 'draft',
+      starter_kit: Array.isArray(starterKit) && starterKit.length > 0 ? starterKit : null,
     })
     .select()
     .single()

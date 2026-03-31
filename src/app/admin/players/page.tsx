@@ -32,6 +32,13 @@ export default function PlayersPage() {
   const [notifyLoading, setNotifyLoading] = useState(false)
   const [feedback, setFeedback]         = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Inventory
+  const [inventoryTarget, setInventoryTarget] = useState<{ userId: string; label: string } | null>(null)
+  const [inventory, setInventory] = useState<any[]>([])
+  const [inventoryLoading, setInventoryLoading] = useState(false)
+  const [redeemingId, setRedeemingId] = useState<string | null>(null)
+  const [inventoryFeedback, setInventoryFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   // Grant resources
   const [grantTarget, setGrantTarget]   = useState<GrantTarget | null>(null)
   const [grantType, setGrantType]       = useState<'gold' | 'exp' | 'item'>('gold')
@@ -144,6 +151,59 @@ export default function PlayersPage() {
     setGrantLoading(false)
   }
 
+  async function openInventory(p: Player) {
+    setInventoryTarget({ userId: p.userId, label: p.nickname || p.email || p.userId.slice(0, 8) })
+    setInventory([])
+    setInventoryFeedback(null)
+    setInventoryLoading(true)
+    const res = await fetch(`/api/admin/players/inventory?userId=${p.userId}&sessionId=${selectedId}`)
+    const d = await res.json()
+    setInventory(d.inventory ?? [])
+    setInventoryLoading(false)
+  }
+
+  async function handleRemoveItem(inventoryId: string) {
+    if (!confirm('Rimuovere questo oggetto dall\'inventario?')) return
+    const res = await fetch('/api/admin/players/inventory', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inventoryId }),
+    })
+    if (res.ok) {
+      setInventory(prev => prev.filter(i => i.id !== inventoryId))
+      setInventoryFeedback({ type: 'success', text: 'Oggetto rimosso.' })
+    }
+  }
+
+  async function handleRedeemItem(inventoryId: string, itemName: string) {
+    if (!inventoryTarget) return
+    if (!confirm(`Validare e consumare "${itemName}" per ${inventoryTarget.label}?`)) return
+    setRedeemingId(inventoryId)
+    setInventoryFeedback(null)
+    const res = await fetch('/api/admin/players/redeem-item', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: inventoryTarget.userId, sessionId: selectedId, inventoryId }),
+    })
+    const d = await res.json()
+    if (res.ok) {
+      setInventory(prev => {
+        const row = prev.find(i => i.id === inventoryId)
+        if (!row) return prev
+        if (row.quantity <= 1) return prev.filter(i => i.id !== inventoryId)
+        return prev.map(i => i.id === inventoryId ? { ...i, quantity: i.quantity - 1 } : i)
+      })
+      const reward = d.reward
+      const parts = []
+      if (reward?.gold) parts.push(`+${reward.gold} 💰`)
+      if (reward?.exp) parts.push(`+${reward.exp} ⭐`)
+      setInventoryFeedback({ type: 'success', text: `✅ "${d.itemName}" riscattato! Ricompensa: ${parts.join(' · ') || 'nessuna'}` })
+    } else {
+      setInventoryFeedback({ type: 'error', text: d.error ?? 'Errore' })
+    }
+    setRedeemingId(null)
+  }
+
   return (
     <div className="max-w-4xl">
       <h1 className="text-2xl font-bold mb-4">👥 Giocatori</h1>
@@ -225,6 +285,13 @@ export default function PlayersPage() {
                           title={`Assegna risorse a ${p.nickname || p.email}`}
                         >
                           🎁
+                        </button>
+                        <button
+                          onClick={() => openInventory(p)}
+                          className="text-[#34d399]/60 hover:text-[#34d399] text-lg transition-colors"
+                          title={`Inventario di ${p.nickname || p.email}`}
+                        >
+                          🎒
                         </button>
                       </div>
                     </td>
@@ -337,6 +404,84 @@ export default function PlayersPage() {
                   {grantLoading ? 'Invio...' : (grantType !== 'item' && grantAmount < 0) ? '🗑 Rimuovi' : '🎁 Assegna'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inventory modal */}
+      {inventoryTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) setInventoryTarget(null) }}>
+          <div className="bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-white">🎒 Inventario</h2>
+                <p className="text-xs text-white/40 mt-0.5">
+                  <span className="text-[#34d399] font-semibold">{inventoryTarget.label}</span>
+                </p>
+              </div>
+              <button onClick={() => setInventoryTarget(null)} className="text-white/40 hover:text-white text-xl leading-none">✕</button>
+            </div>
+
+            {inventoryFeedback && (
+              <p className={`text-sm font-medium px-3 py-2 rounded-lg mb-3 shrink-0 ${
+                inventoryFeedback.type === 'success'
+                  ? 'bg-[#34d399]/10 text-[#34d399] border border-[#34d399]/20'
+                  : 'bg-red-400/10 text-red-400 border border-red-400/20'
+              }`}>
+                {inventoryFeedback.text}
+              </p>
+            )}
+
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {inventoryLoading ? (
+                <div className="space-y-2">
+                  {[1,2,3].map(i => <div key={i} className="h-12 rounded-xl bg-white/5 animate-pulse" />)}
+                </div>
+              ) : inventory.length === 0 ? (
+                <p className="text-white/40 text-sm text-center py-8">Inventario vuoto</p>
+              ) : (
+                <div className="space-y-2">
+                  {inventory.map((inv: any) => {
+                    const item = inv.items
+                    const isRedeemable = item?.is_redeemable
+                    return (
+                      <div key={inv.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${
+                        isRedeemable ? 'bg-[#34d399]/5 border-[#34d399]/20' : 'bg-white/3 border-white/8'
+                      }`}>
+                        {item?.image_url ? (
+                          <img src={item.image_url} alt="" className="w-8 h-8 object-contain rounded" />
+                        ) : (
+                          <span className="text-xl w-8 text-center">🎒</span>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{item?.name ?? '—'}</p>
+                          <p className="text-xs text-white/40">{item?.type} · ×{inv.quantity}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isRedeemable && (
+                            <button
+                              onClick={() => handleRedeemItem(inv.id, item.name)}
+                              disabled={redeemingId === inv.id}
+                              className="bg-[#34d399]/20 text-[#34d399] border border-[#34d399]/30 text-xs font-bold px-2.5 py-1.5 rounded-lg hover:bg-[#34d399]/30 disabled:opacity-40 transition-colors"
+                            >
+                              {redeemingId === inv.id ? '…' : '✅ Valida'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemoveItem(inv.id)}
+                            className="text-red-400/50 hover:text-red-400 text-sm px-1.5 py-1 rounded transition-colors"
+                            title="Rimuovi dall'inventario"
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

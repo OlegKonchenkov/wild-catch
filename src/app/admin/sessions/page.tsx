@@ -70,7 +70,7 @@ function SessionTimeInfo({ session }: { session: { status: string; start_at: str
 
 const MapPicker = dynamic(() => import('@/components/admin/MapPicker'), { ssr: false })
 
-type WizardStep = 1 | 2 | 3 | 4
+type WizardStep = 1 | 2 | 3 | 4 | 5
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Bozza', ready: 'Pronta', active: 'Attiva', ended: 'Terminata',
@@ -132,6 +132,8 @@ export default function SessionsPage() {
   const [villainName, setVillainName]     = useState('')
   const [areaBounds, setAreaBounds]       = useState<Bounds | null>(null)
   const [durationMinutes, setDurationMinutes] = useState(120)
+  const [wizardStarterKit, setWizardStarterKit] = useState<Array<{ item_id: string; quantity: number }>>([])
+
 
   const loadSessions = () =>
     supabase.from('sessions').select('*').order('created_at', { ascending: false })
@@ -247,12 +249,13 @@ export default function SessionsPage() {
         narrativeConfig: { story_title: storyTitle, intro_text: introText, villain_name: villainName, chapters: [] },
         areaBounds,
         durationMinutes,
+        starterKit: wizardStarterKit,
       }),
     })
     const data = await res.json()
     if (res.ok) {
       setCreatedId(data.sessionId)
-      setStep(4)
+      setStep(5)
       await loadSessions()
     }
     setCreateLoading(false)
@@ -261,6 +264,7 @@ export default function SessionsPage() {
   function resetWizard() {
     setStep(1); setCreatedId(null); setSessionName(''); setStoryTitle(''); setIntroText('')
     setVillainName(''); setAreaBounds(null); setDurationMinutes(120); setShowCreate(false)
+    setWizardStarterKit([])
   }
 
   /* ── Render ─────────────────────────────────────────────── */
@@ -294,17 +298,38 @@ export default function SessionsPage() {
             {/* Card header */}
             <div className="flex items-start gap-3 p-4">
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-white truncate">{s.name}</p>
-                <p className="text-xs text-white/40 mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                  <span>{s.duration_minutes} min</span>
-                  <span>·</span>
-                  <span className={STATUS_COLOR[s.status] ?? 'text-white/40'}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-bold text-white">{s.name}</p>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                    s.status === 'active' ? 'bg-[#34d399]/15 text-[#34d399]' :
+                    s.status === 'ready'  ? 'bg-[#F7C841]/15 text-[#F7C841]' :
+                    s.status === 'ended'  ? 'bg-white/8 text-white/30' :
+                    'bg-white/5 text-white/35'
+                  }`}>
                     {STATUS_LABEL[s.status] ?? s.status}
                   </span>
-                  <span>·</span>
-                  <span>{s.area_bounds ? '🗺 Area definita' : '⚠️ Nessuna area'}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                  <span className="text-xs text-white/40 flex items-center gap-1">
+                    ⏱ <span>{s.duration_minutes} min</span>
+                  </span>
+                  <span className="text-xs text-white/40 flex items-center gap-1">
+                    {s.area_bounds ? '🗺 Area definita' : '⚠️ Nessuna area'}
+                  </span>
+                  {Array.isArray(s.starter_kit) && s.starter_kit.length > 0 && (
+                    <span className="text-xs text-white/40 flex items-center gap-1">
+                      🎒 {s.starter_kit.length} oggetti kit
+                    </span>
+                  )}
+                  {s.narrative_config?.story_title && (
+                    <span className="text-xs text-white/35 italic truncate max-w-[160px]">
+                      📖 {s.narrative_config.story_title}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1">
                   <SessionTimeInfo session={s} />
-                </p>
+                </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                 {s.status === 'draft' && (
@@ -509,14 +534,14 @@ export default function SessionsPage() {
 
           {/* Progress bar */}
           <div className="flex gap-2 mb-5">
-            {([1, 2, 3, 4] as WizardStep[]).map(n => (
+            {([1, 2, 3, 4, 5] as WizardStep[]).map(n => (
               <div key={n} className={`h-1.5 flex-1 rounded-full transition-colors ${step >= n ? 'bg-[#3A9DBC]' : 'bg-white/10'}`} />
             ))}
           </div>
 
           {step === 1 && (
             <div className="space-y-3">
-              <p className="text-xs text-white/40 mb-2">Step 1 di 4 — Nome e Narrativa</p>
+              <p className="text-xs text-white/40 mb-2">Step 1 di 5 — Nome e Narrativa</p>
               <div>
                 <label className="block text-xs text-white/50 mb-1 font-semibold">Nome evento <span className="text-red-400">*</span></label>
                 <input value={sessionName} onChange={e => setSessionName(e.target.value)}
@@ -550,7 +575,7 @@ export default function SessionsPage() {
 
           {step === 2 && (
             <div className="space-y-3">
-              <p className="text-xs text-white/40 mb-2">Step 2 di 4 — Area geografica e Durata</p>
+              <p className="text-xs text-white/40 mb-2">Step 2 di 5 — Area geografica e Durata</p>
               <MapPicker key="create" onBoundsChange={setAreaBounds} initialBounds={areaBounds} />
               <div>
                 <label className="block text-xs text-white/50 mb-1 font-semibold">Durata evento (30–480 minuti)</label>
@@ -560,7 +585,14 @@ export default function SessionsPage() {
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setStep(1)} className="flex-1 bg-white/8 text-white font-bold py-3 rounded-xl text-sm hover:bg-white/12 transition-colors">← Indietro</button>
-                <button onClick={() => setStep(3)} disabled={!areaBounds}
+                <button onClick={() => {
+                  setStep(3)
+                  if (allItems.length === 0) {
+                    supabase.from('items').select('id, name, type').order('type').then(({ data }) => {
+                      if (data) setAllItems(data as Item[])
+                    })
+                  }
+                }} disabled={!areaBounds}
                   className="flex-1 bg-[#3A9DBC] text-white font-bold py-3 rounded-xl text-sm disabled:opacity-50">Avanti →</button>
               </div>
             </div>
@@ -568,28 +600,79 @@ export default function SessionsPage() {
 
           {step === 3 && (
             <div className="space-y-3">
-              <p className="text-xs text-white/40 mb-2">Step 3 di 4 — Creature</p>
-              <div className="bg-white/4 border border-white/10 rounded-xl p-4 text-sm text-white/60 leading-relaxed">
-                Le creature vengono dal catalogo globale. Puoi configurare spawn e rarità dalla sezione <strong className="text-white/80">Creature</strong> dopo aver creato la sessione.
-              </div>
-              <div className="flex gap-2">
+              <p className="text-xs text-white/40 mb-2">Step 3 di 5 — Kit iniziale giocatori</p>
+              <p className="text-xs text-white/40 leading-relaxed">
+                Oggetti ricevuti automaticamente al momento del join. Se vuoto, verrà distribuita la Rete Base ×5.
+              </p>
+              {wizardStarterKit.map((entry, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <select
+                    value={entry.item_id}
+                    onChange={e => setWizardStarterKit(kit => {
+                      const next = [...kit]; next[i] = { ...next[i], item_id: e.target.value }; return next
+                    })}
+                    className="flex-1 bg-[#0F1F2E] border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-[#3A9DBC]"
+                  >
+                    <option value="">— Seleziona —</option>
+                    {allItems.map(it => (
+                      <option key={it.id} value={it.id}>{it.name} ({it.type})</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number" min={1} max={99}
+                    value={entry.quantity}
+                    onChange={e => setWizardStarterKit(kit => {
+                      const next = [...kit]; next[i] = { ...next[i], quantity: Math.max(1, +e.target.value) }; return next
+                    })}
+                    className="w-16 bg-white/10 border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none focus:border-[#3A9DBC]"
+                  />
+                  <button
+                    onClick={() => setWizardStarterKit(kit => kit.filter((_, j) => j !== i))}
+                    className="text-red-400/60 hover:text-red-400 text-sm px-1"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => setWizardStarterKit(kit => [...kit, { item_id: allItems[0]?.id ?? '', quantity: 1 }])}
+                disabled={allItems.length === 0}
+                className="text-xs text-[#3A9DBC] hover:text-[#5AB5D0] disabled:text-white/20 font-semibold"
+              >
+                + Aggiungi oggetto
+              </button>
+              <div className="flex gap-2 pt-1">
                 <button onClick={() => setStep(2)} className="flex-1 bg-white/8 text-white font-bold py-3 rounded-xl text-sm hover:bg-white/12 transition-colors">← Indietro</button>
                 <button onClick={() => setStep(4)} className="flex-1 bg-[#3A9DBC] text-white font-bold py-3 rounded-xl text-sm">Avanti →</button>
               </div>
             </div>
           )}
 
-          {step === 4 && !createdId && (
+          {step === 4 && (
             <div className="space-y-3">
-              <p className="text-xs text-white/40 mb-2">Step 4 di 4 — Riepilogo</p>
+              <p className="text-xs text-white/40 mb-2">Step 4 di 5 — Creature</p>
+              <div className="bg-white/4 border border-white/10 rounded-xl p-4 text-sm text-white/60 leading-relaxed">
+                Le creature vengono dal catalogo globale. Puoi configurare spawn e rarità dalla sezione <strong className="text-white/80">Creature</strong> dopo aver creato la sessione.
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setStep(3)} className="flex-1 bg-white/8 text-white font-bold py-3 rounded-xl text-sm hover:bg-white/12 transition-colors">← Indietro</button>
+                <button onClick={() => setStep(5)} className="flex-1 bg-[#3A9DBC] text-white font-bold py-3 rounded-xl text-sm">Avanti →</button>
+              </div>
+            </div>
+          )}
+
+          {step === 5 && !createdId && (
+            <div className="space-y-3">
+              <p className="text-xs text-white/40 mb-2">Step 5 di 5 — Riepilogo</p>
               <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-2 text-sm">
                 <p><span className="text-white/50">Nome:</span> <span className="text-white font-semibold">{sessionName}</span></p>
                 <p><span className="text-white/50">Storia:</span> <span className="text-white">{storyTitle || '—'}</span></p>
                 <p><span className="text-white/50">Durata:</span> <span className="text-white">{durationMinutes} min</span></p>
                 <p><span className="text-white/50">Area:</span> <span className={areaBounds ? 'text-[#34d399]' : 'text-amber-400'}>{areaBounds ? '✅ Definita' : '⚠️ Non definita'}</span></p>
+                <p><span className="text-white/50">Kit iniziale:</span> <span className="text-white">{wizardStarterKit.length > 0 ? `${wizardStarterKit.length} oggetti` : 'default (Rete Base ×5)'}</span></p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setStep(3)} className="flex-1 bg-white/8 text-white font-bold py-3 rounded-xl text-sm hover:bg-white/12 transition-colors">← Indietro</button>
+                <button onClick={() => setStep(4)} className="flex-1 bg-white/8 text-white font-bold py-3 rounded-xl text-sm hover:bg-white/12 transition-colors">← Indietro</button>
                 <button onClick={createSession} disabled={createLoading}
                   className="flex-1 bg-[#34d399] text-[#0F1F2E] font-bold py-3 rounded-xl text-sm disabled:opacity-50">
                   {createLoading ? 'Creazione…' : '✅ Crea sessione'}
@@ -598,7 +681,7 @@ export default function SessionsPage() {
             </div>
           )}
 
-          {step === 4 && createdId && (
+          {step === 5 && createdId && (
             <div className="space-y-3 text-center py-4">
               <p className="text-3xl">🎉</p>
               <p className="text-[#34d399] font-bold text-lg">Sessione creata!</p>

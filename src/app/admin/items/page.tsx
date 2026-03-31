@@ -17,6 +17,8 @@ interface Item {
   session_id: string | null
   egg_rarity?: string | null
   steps_required?: number | null
+  is_redeemable?: boolean
+  reward?: { gold?: number; exp?: number; bonus_items?: Array<{ item_id: string; quantity: number }> }
 }
 
 interface TypeMeta {
@@ -85,6 +87,9 @@ const EMPTY_FORM = {
   name: '', type: 'rete' as ItemType, effect_value: 0,
   description: '', shop_price: 0, image_url: '',
   session_id: '', egg_rarity: 'comune' as EggRarity, steps_required: 0,
+  is_redeemable: false,
+  reward_gold: 0, reward_exp: 0,
+  reward_items: [] as Array<{ item_id: string; quantity: number }>,
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -153,6 +158,7 @@ export default function ItemsPage() {
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [sessionFilter, setSessionFilter] = useState<string>('')
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -182,6 +188,10 @@ export default function ItemsPage() {
       session_id: item.session_id ?? '',
       egg_rarity: (item.egg_rarity as EggRarity) ?? 'comune',
       steps_required: item.steps_required ?? 0,
+      is_redeemable: item.is_redeemable ?? false,
+      reward_gold: item.reward?.gold ?? 0,
+      reward_exp: item.reward?.exp ?? 0,
+      reward_items: item.reward?.bonus_items ?? [],
     })
     setError(''); setPanel(item)
   }
@@ -197,6 +207,12 @@ export default function ItemsPage() {
       description: form.description, shop_price: form.shop_price,
       image_url: form.image_url || null,
       session_id: form.session_id || null,
+      is_redeemable: form.is_redeemable,
+      reward: form.is_redeemable ? {
+        gold: Number(form.reward_gold) || 0,
+        exp: Number(form.reward_exp) || 0,
+        bonus_items: form.reward_items.filter(ri => ri.item_id),
+      } : {},
     }
     if (form.type === 'uovo') {
       payload.egg_rarity = form.egg_rarity
@@ -233,7 +249,8 @@ export default function ItemsPage() {
   const filtered = items.filter(it => {
     const matchType = typeFilter === 'all' || it.type === typeFilter
     const matchSearch = !filter || it.name.toLowerCase().includes(filter.toLowerCase()) || it.description.toLowerCase().includes(filter.toLowerCase())
-    return matchType && matchSearch
+    const matchSession = sessionFilter === '' || (sessionFilter === '__null__' ? it.session_id === null : it.session_id === sessionFilter)
+    return matchType && matchSearch && matchSession
   })
 
   const meta = TYPE_META[form.type]
@@ -260,6 +277,12 @@ export default function ItemsPage() {
           {(Object.keys(TYPE_META) as ItemType[]).map(t => (
             <option key={t} value={t}>{TYPE_META[t].icon} {TYPE_META[t].label}</option>
           ))}
+        </select>
+        <select value={sessionFilter} onChange={e => setSessionFilter(e.target.value)}
+          className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm">
+          <option value="">📋 Tutte le sessioni</option>
+          <option value="__null__">🌐 Globali (nessuna sessione)</option>
+          {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
 
@@ -291,6 +314,9 @@ export default function ItemsPage() {
                       <span className="text-xs bg-[#3A9DBC]/15 text-[#3A9DBC]/80 px-2 py-0.5 rounded-full">
                         🎯 {sname}
                       </span>
+                    )}
+                    {item.is_redeemable && (
+                      <span className="text-xs bg-[#34d399]/15 text-[#34d399]/80 px-2 py-0.5 rounded-full">✅ Riscattabile</span>
                     )}
                   </div>
                   <p className="text-xs text-white/45 mt-0.5 truncate">{item.description || '—'}</p>
@@ -404,6 +430,72 @@ export default function ItemsPage() {
                   {sessions.map(s => <option key={s.id} value={s.id}>🎯 {s.name}</option>)}
                 </select>
               </Field>
+
+              {/* Redeemable */}
+              <div className="bg-white/3 border border-white/10 rounded-xl p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-white/70">✅ Oggetto riscattabile</p>
+                    <p className="text-xs text-white/30 mt-0.5">L&apos;admin può validarlo dallo zaino del giocatore per consumarlo e assegnare la ricompensa</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, is_redeemable: !f.is_redeemable }))}
+                    className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${form.is_redeemable ? 'bg-[#34d399]' : 'bg-white/15'}`}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${form.is_redeemable ? 'left-[22px]' : 'left-0.5'}`} />
+                  </button>
+                </div>
+                {form.is_redeemable && (
+                  <div className="space-y-3 pt-1 border-t border-white/10">
+                    <p className="text-xs text-white/40 font-semibold">Ricompensa al riscatto:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs text-white/50 mb-1">💰 Oro</label>
+                        <input type="number" min={0} className={cls} value={form.reward_gold}
+                          onChange={e => setForm(f => ({ ...f, reward_gold: +e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-white/50 mb-1">⭐ EXP</label>
+                        <input type="number" min={0} className={cls} value={form.reward_exp}
+                          onChange={e => setForm(f => ({ ...f, reward_exp: +e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-white/50">🎒 Oggetti bonus</p>
+                      {form.reward_items.map((ri, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <select
+                            value={ri.item_id}
+                            onChange={e => setForm(f => {
+                              const arr = [...f.reward_items]; arr[i] = { ...arr[i], item_id: e.target.value }
+                              return { ...f, reward_items: arr }
+                            })}
+                            className="flex-1 bg-[#0F1F2E] border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs"
+                          >
+                            <option value="">— Seleziona —</option>
+                            {items.map(it => <option key={it.id} value={it.id}>{it.name}</option>)}
+                          </select>
+                          <input type="number" min={1} value={ri.quantity}
+                            onChange={e => setForm(f => {
+                              const arr = [...f.reward_items]; arr[i] = { ...arr[i], quantity: Math.max(1, +e.target.value) }
+                              return { ...f, reward_items: arr }
+                            })}
+                            className="w-14 bg-white/10 border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs text-center"
+                          />
+                          <button type="button" onClick={() => setForm(f => ({ ...f, reward_items: f.reward_items.filter((_, j) => j !== i) }))}
+                            className="text-red-400/60 hover:text-red-400 text-sm px-1">×</button>
+                        </div>
+                      ))}
+                      <button type="button"
+                        onClick={() => setForm(f => ({ ...f, reward_items: [...f.reward_items, { item_id: '', quantity: 1 }] }))}
+                        className="text-xs text-[#3A9DBC] font-semibold hover:text-[#5AB5D0]">
+                        + Aggiungi oggetto
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {error && (
                 <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {error}</p>
