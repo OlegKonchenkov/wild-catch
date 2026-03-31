@@ -15,12 +15,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
   }
 
-  // Get QR code
+  // Get QR code — also matches global QRs (null session_id)
   const { data: qr } = await supabase
     .from('qr_codes')
     .select('*')
     .eq('id', qrId)
-    .eq('session_id', sessionId)
+    .or(`session_id.eq.${sessionId},session_id.is.null`)
     .single()
 
   if (!qr) return NextResponse.json({ error: 'QR code non valido' }, { status: 404 })
@@ -28,6 +28,20 @@ export async function POST(request: Request) {
   // Check uses remaining
   if (qr.uses_remaining !== null && qr.uses_remaining <= 0) {
     return NextResponse.json({ error: 'QR code esaurito' }, { status: 410 })
+  }
+
+  // Per-user enforcement: each user can scan this QR at most once
+  if (qr.unique_per_user) {
+    const { data: existingScan } = await supabase
+      .from('qr_scan_log')
+      .select('id')
+      .eq('qr_id', qrId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (existingScan) {
+      return NextResponse.json({ error: 'Hai già riscattato questo QR', alreadyScanned: true }, { status: 409 })
+    }
+    await supabase.from('qr_scan_log').insert({ qr_id: qrId, user_id: user.id, session_id: sessionId })
   }
 
   // Decrement uses

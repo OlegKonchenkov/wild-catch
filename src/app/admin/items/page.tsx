@@ -47,9 +47,9 @@ const TYPE_META: Record<ItemType, TypeMeta> = {
   },
   uovo: {
     icon: '🥚', label: 'Uovo',
-    hint: 'Si schiude automaticamente dopo aver percorso X passi dalla raccolta (0 = istantaneo).',
-    effectLabel: 'Livello minimo creatura (0 = qualsiasi)',
-    effectHint: 'La rarità dell\'uovo determina il pool di creature possibili alla schiusura.',
+    hint: 'Si schiude dopo aver percorso i passi di incubazione impostati (0 = istantaneo al ritiro).',
+    effectLabel: 'Livello minimo giocatore richiesto',
+    effectHint: 'Il giocatore deve essere almeno a questo livello per poter schiudere l\'uovo. 0 = nessun requisito.',
     effectStep: '1', effectMin: 0, effectMax: 50,
   },
   battaglia: {
@@ -361,7 +361,8 @@ export default function ItemsPage() {
               {form.type === 'uovo' && (
                 <div className="bg-[#F7C841]/5 border border-[#F7C841]/20 rounded-xl p-3 space-y-3">
                   <p className="text-xs text-[#F7C841]/70 font-semibold">🥚 Configurazione uovo</p>
-                  <Field label="Rarità uovo" hint="Determina il pool di creature che possono schiudersi">
+                  <Field label="Rarità uovo"
+                    hint="Determina il pool di creature ottenibili — uovo comune → solo comuni; uovo leggendario → maggiori probabilità di rare">
                     <select className={cls} value={form.egg_rarity}
                       onChange={e => setForm(f => ({ ...f, egg_rarity: e.target.value as EggRarity }))}>
                       {EGG_RARITIES.map(r => (
@@ -369,7 +370,8 @@ export default function ItemsPage() {
                       ))}
                     </select>
                   </Field>
-                  <Field label="Passi per schiudere" hint="0 = schiusura istantanea al ritiro dell'uovo via QR">
+                  <Field label="Passi di incubazione"
+                    hint="Il giocatore deve percorrere questo numero di passi dal momento del ritiro prima di poter schiudere. 0 = schiusura immediata.">
                     <input type="number" className={cls} value={form.steps_required}
                       step={50} min={0}
                       onChange={e => setForm(f => ({ ...f, steps_required: +e.target.value }))} />

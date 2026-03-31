@@ -17,8 +17,8 @@ export async function POST(request: Request) {
   const auth = await requireAdmin(supabase)
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
-  const { sessionId, type, payload, usesRemaining, label } = await request.json()
-  if (!sessionId || !type || !payload) {
+  const { sessionId, type, payload, usesRemaining, label, uniquePerUser } = await request.json()
+  if (!type || !payload) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
   }
   if (!VALID_TYPES.includes(type)) {
@@ -27,7 +27,12 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
   const { data, error } = await admin.from('qr_codes').insert({
-    session_id: sessionId, type, payload, uses_remaining: usesRemaining ?? null, label,
+    session_id: sessionId ?? null,
+    type,
+    payload,
+    uses_remaining: usesRemaining ?? null,
+    label,
+    unique_per_user: uniquePerUser ?? false,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -41,11 +46,13 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const sessionId = searchParams.get('sessionId')
-  if (!sessionId) return NextResponse.json({ error: 'sessionId richiesto' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { data } = await admin.from('qr_codes').select('*')
-    .eq('session_id', sessionId).order('created_at', { ascending: false })
+  let query = admin.from('qr_codes').select('*').order('created_at', { ascending: false })
+  if (sessionId && sessionId !== 'all') {
+    query = query.eq('session_id', sessionId)
+  }
+  const { data } = await query
   return NextResponse.json({ qrCodes: data ?? [] })
 }
 
@@ -54,7 +61,7 @@ export async function PATCH(request: Request) {
   const auth = await requireAdmin(supabase)
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
-  const { qrId, type, payload, usesRemaining, label } = await request.json()
+  const { qrId, type, payload, usesRemaining, label, uniquePerUser, sessionId } = await request.json()
   if (!qrId || !type || !payload) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
   }
@@ -63,14 +70,18 @@ export async function PATCH(request: Request) {
   }
 
   const admin = createAdminClient()
+  const updatePayload: Record<string, unknown> = {
+    type,
+    payload,
+    uses_remaining: usesRemaining ?? null,
+    label: label ?? '',
+    unique_per_user: uniquePerUser ?? false,
+  }
+  if (sessionId !== undefined) updatePayload.session_id = sessionId ?? null
+
   const { data, error } = await admin
     .from('qr_codes')
-    .update({
-      type,
-      payload,
-      uses_remaining: usesRemaining ?? null,
-      label: label ?? '',
-    })
+    .update(updatePayload)
     .eq('id', qrId)
     .select()
     .single()

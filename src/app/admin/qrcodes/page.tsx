@@ -67,12 +67,12 @@ function SearchSelect({
 }
 
 /* ── Per-type field definitions ─────────────── */
-const TYPE_INFO: Record<QRCodeType, { label: string; icon: string; description: string }> = {
-  oggetto: { label: 'Oggetto',        icon: '🎁', description: 'Il giocatore ottiene un oggetto dallo zaino.' },
-  indizio: { label: 'Indizio',        icon: '🔍', description: 'Il giocatore riceve un testo/immagine narrativo.' },
-  uovo:    { label: 'Uovo creatura',  icon: '🥚', description: 'Il giocatore ottiene un uovo da schiudere.' },
-  boss:    { label: 'Boss',           icon: '💀', description: 'Il giocatore affronta una creatura boss.' },
-  evento:  { label: 'Evento speciale',icon: '⚡',  description: 'Attiva un bonus temporaneo per il giocatore.' },
+const TYPE_INFO: Record<QRCodeType, { label: string; icon: string; description: string; color?: string }> = {
+  oggetto: { label: 'Oggetto',           icon: '🎁', description: 'Il giocatore ottiene un oggetto nello zaino.' },
+  indizio: { label: 'Indizio',           icon: '🔍', description: 'Il giocatore riceve un testo/immagine narrativo.' },
+  uovo:    { label: 'Uovo',              icon: '🥚', description: 'Il giocatore ottiene un uovo da incubare e schiudere.' },
+  boss:    { label: 'Capo Palestra',     icon: '👑', description: 'Avvia uno scontro speciale 3v3 contro il Capo Palestra.', color: '#F7C841' },
+  evento:  { label: 'Evento speciale',   icon: '⚡', description: 'Attiva un bonus temporaneo per il giocatore.' },
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -94,7 +94,6 @@ function IconEye({ className = 'w-4 h-4' }: { className?: string }) {
     </svg>
   )
 }
-
 function IconDownload({ className = 'w-4 h-4' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
@@ -102,7 +101,6 @@ function IconDownload({ className = 'w-4 h-4' }: { className?: string }) {
     </svg>
   )
 }
-
 function IconShare({ className = 'w-4 h-4' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
@@ -110,7 +108,6 @@ function IconShare({ className = 'w-4 h-4' }: { className?: string }) {
     </svg>
   )
 }
-
 function IconEdit({ className = 'w-4 h-4' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
@@ -119,7 +116,6 @@ function IconEdit({ className = 'w-4 h-4' }: { className?: string }) {
     </svg>
   )
 }
-
 function IconTrash({ className = 'w-4 h-4' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
@@ -140,30 +136,71 @@ function formatDateTime(value: string | null | undefined): string {
   return d.toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+/* ── Default payload fields per type ─────────── */
+type Fields = Record<string, string | number>
+
+function defaultFields(t: QRCodeType): Fields {
+  switch (t) {
+    case 'oggetto': return { item_id: '', quantity: 1 }
+    case 'indizio': return { chapter_order: 1, text: '', image_url: '' }
+    case 'uovo':    return { egg_rarity: 'comune', steps_required: 0 }
+    case 'boss':    return {
+      boss_c1: '', boss_lv1: 10,
+      boss_c2: '', boss_lv2: 10,
+      boss_c3: '', boss_lv3: 10,
+      reward_gold: 200, reward_exp: 100,
+    }
+    case 'evento':  return { event_type: 'bonus_exp', multiplier: 2, duration_minutes: 10 }
+  }
+}
+
 function payloadToFields(type: QRCodeType, payload: any): Fields {
   const p = payload ?? {}
   switch (type) {
     case 'oggetto':
       return { item_id: String(p.item_id ?? ''), quantity: asNumber(p.quantity, 1) }
     case 'indizio':
-      return {
-        chapter_order: asNumber(p.chapter_order, 1),
-        text: String(p.text ?? ''),
-        image_url: String(p.image_url ?? ''),
-      }
+      return { chapter_order: asNumber(p.chapter_order, 1), text: String(p.text ?? ''), image_url: String(p.image_url ?? '') }
     case 'uovo':
       return { egg_rarity: String(p.egg_rarity ?? 'comune'), steps_required: asNumber(p.steps_required, 0) }
-    case 'boss':
+    case 'boss': {
+      // Support both legacy {creature_id, level_override} and new {creatures:[...]}
+      const creatures: any[] = Array.isArray(p.creatures)
+        ? p.creatures
+        : p.creature_id ? [{ creature_id: p.creature_id, level_override: p.level_override }] : []
       return {
-        creature_id: String(p.creature_id ?? ''),
-        level_override: asNumber(p.level_override, 10),
+        boss_c1: creatures[0]?.creature_id ?? '',
+        boss_lv1: asNumber(creatures[0]?.level_override, 10),
+        boss_c2: creatures[1]?.creature_id ?? '',
+        boss_lv2: asNumber(creatures[1]?.level_override, 10),
+        boss_c3: creatures[2]?.creature_id ?? '',
+        boss_lv3: asNumber(creatures[2]?.level_override, 10),
+        reward_gold: asNumber(p.reward?.gold, 200),
+        reward_exp: asNumber(p.reward?.exp, 100),
       }
+    }
     case 'evento':
+      return { event_type: String(p.event_type ?? 'bonus_exp'), multiplier: asNumber(p.effect?.multiplier, 2), duration_minutes: asNumber(p.effect?.duration_minutes, 10) }
+  }
+}
+
+function buildPayload(t: QRCodeType, f: Fields): any {
+  switch (t) {
+    case 'oggetto': return { item_id: f.item_id, quantity: Number(f.quantity) }
+    case 'indizio': return { chapter_order: Number(f.chapter_order), text: f.text, image_url: f.image_url || null }
+    case 'uovo':    return { egg_rarity: f.egg_rarity, steps_required: Number(f.steps_required ?? 0) }
+    case 'boss': {
+      const creatures = [
+        { creature_id: f.boss_c1, level_override: Number(f.boss_lv1) },
+        { creature_id: f.boss_c2, level_override: Number(f.boss_lv2) },
+        { creature_id: f.boss_c3, level_override: Number(f.boss_lv3) },
+      ].filter(c => c.creature_id)
       return {
-        event_type: String(p.event_type ?? 'bonus_exp'),
-        multiplier: asNumber(p.effect?.multiplier, 2),
-        duration_minutes: asNumber(p.effect?.duration_minutes, 10),
+        creatures,
+        reward: { gold: Number(f.reward_gold), exp: Number(f.reward_exp) },
       }
+    }
+    case 'evento':  return { event_type: f.event_type, effect: { multiplier: Number(f.multiplier), duration_minutes: Number(f.duration_minutes) } }
   }
 }
 
@@ -181,89 +218,54 @@ function getQrDescription(qr: any, items: any[], creatures: any[]): string {
   switch (qr.type as QRCodeType) {
     case 'oggetto': {
       const item = items.find(i => i.id === payload.item_id)
-      const itemName = item?.name ?? 'Oggetto sconosciuto'
-      const qty = asNumber(payload.quantity, 1)
-      return `${itemName} ×${qty}`
+      return `${item?.name ?? 'Oggetto'} ×${asNumber(payload.quantity, 1)}`
     }
     case 'indizio': {
-      const chapter = asNumber(payload.chapter_order, 1)
       const text = String(payload.text ?? '').trim()
-      return text ? `Capitolo ${chapter}: ${text}` : `Indizio capitolo ${chapter}`
+      return text ? `Cap. ${asNumber(payload.chapter_order, 1)}: ${text.slice(0, 50)}` : `Indizio capitolo ${asNumber(payload.chapter_order, 1)}`
     }
     case 'uovo':
-      return `Uovo rarità ${String(payload.egg_rarity ?? 'comune')}`
+      return `Uovo ${String(payload.egg_rarity ?? 'comune')}${payload.steps_required > 0 ? ` · ${payload.steps_required} passi` : ' · immediato'}`
     case 'boss': {
-      const creature = creatures.find(c => c.id === payload.creature_id)
-      const creatureName = creature?.name ?? 'Creatura sconosciuta'
-      const level = asNumber(payload.level_override, 10)
-      return `${creatureName} livello ${level}`
+      const creatureList: any[] = Array.isArray(payload.creatures)
+        ? payload.creatures
+        : payload.creature_id ? [{ creature_id: payload.creature_id }] : []
+      const names = creatureList
+        .map(e => creatures.find(c => c.id === e.creature_id)?.name ?? '?')
+        .filter(Boolean)
+        .join(', ')
+      return names ? `Squadra: ${names}` : 'Boss non configurato'
     }
     case 'evento': {
-      const eventType = getEventTypeLabel(String(payload.event_type ?? 'bonus_exp'))
-      const multiplier = asNumber(payload.effect?.multiplier, 2)
-      const minutes = asNumber(payload.effect?.duration_minutes, 10)
-      return `${eventType} ×${multiplier} per ${minutes} min`
+      return `${getEventTypeLabel(String(payload.event_type ?? 'bonus_exp'))} ×${asNumber(payload.effect?.multiplier, 2)} · ${asNumber(payload.effect?.duration_minutes, 10)} min`
     }
     default:
       return TYPE_INFO[qr.type as QRCodeType]?.description ?? 'QR speciale'
   }
 }
 
-function getQrDetails(qr: any, items: any[], creatures: any[]) {
+function getQrDetails(qr: any, items: any[], creatures: any[], sessions: any[]) {
   const payload = qr.payload ?? {}
+  const sessionName = sessions.find(s => s.id === qr.session_id)?.name
   const details: { label: string; value: string }[] = [
     { label: 'Etichetta', value: qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || 'QR' },
     { label: 'Tipo', value: TYPE_INFO[qr.type as QRCodeType]?.label ?? qr.type },
+    { label: 'Sessione', value: sessionName ? `🎯 ${sessionName}` : '🌐 Tutte le sessioni' },
     { label: 'Descrizione', value: getQrDescription(qr, items, creatures) },
     {
       label: 'Utilizzi',
-      value: qr.uses_remaining === null
-        ? 'Illimitati'
-        : qr.uses_remaining === 0
-          ? 'Esaurito'
-          : `${qr.uses_remaining} rimanenti`,
+      value: qr.uses_remaining === null ? 'Illimitati' : qr.uses_remaining === 0 ? 'Esaurito' : `${qr.uses_remaining} rimanenti`,
     },
+    { label: 'Riscatto', value: qr.unique_per_user ? '🔒 1 per utente' : '♾ Multiplo' },
     { label: 'Creato il', value: formatDateTime(qr.created_at) },
   ]
 
-  switch (qr.type as QRCodeType) {
-    case 'indizio':
-      if (payload.image_url) details.push({ label: 'Immagine', value: 'Presente' })
-      break
-    case 'uovo':
-      if (payload.egg_rarity) details.push({ label: 'Rarità', value: String(payload.egg_rarity) })
-      break
-    case 'evento':
-      details.push({ label: 'Evento', value: getEventTypeLabel(String(payload.event_type ?? 'bonus_exp')) })
-      break
-    default:
-      break
+  if (qr.type === 'boss') {
+    const reward = payload.reward
+    if (reward) details.push({ label: 'Ricompensa vittoria', value: `💰 ${reward.gold} oro · ✨ ${reward.exp} EXP` })
   }
 
   return details
-}
-
-/* ── Default payload fields per type ─────────── */
-type Fields = Record<string, string | number>
-
-function defaultFields(t: QRCodeType): Fields {
-  switch (t) {
-    case 'oggetto': return { item_id: '', quantity: 1 }
-    case 'indizio': return { chapter_order: 1, text: '', image_url: '' }
-    case 'uovo':    return { egg_rarity: 'comune', steps_required: 0 }
-    case 'boss':    return { creature_id: '', level_override: 10 }
-    case 'evento':  return { event_type: 'bonus_exp', multiplier: 2, duration_minutes: 10 }
-  }
-}
-
-function buildPayload(t: QRCodeType, f: Fields): any {
-  switch (t) {
-    case 'oggetto': return { item_id: f.item_id, quantity: Number(f.quantity) }
-    case 'indizio': return { chapter_order: Number(f.chapter_order), text: f.text, image_url: f.image_url || null }
-    case 'uovo':    return { egg_rarity: f.egg_rarity, steps_required: Number(f.steps_required ?? 0) }
-    case 'boss':    return { creature_id: f.creature_id, level_override: Number(f.level_override) }
-    case 'evento':  return { event_type: f.event_type, effect: { multiplier: Number(f.multiplier), duration_minutes: Number(f.duration_minutes) } }
-  }
 }
 
 /* ── QR Preview Modal ────────────────────────── */
@@ -278,13 +280,13 @@ function QRModal({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const info = TYPE_INFO[qr.type as QRCodeType]
+  const isBoss = qr.type === 'boss'
 
   useEffect(() => {
     if (!canvasRef.current) return
     import('qrcode').then(QRCode => {
       QRCode.toCanvas(canvasRef.current!, qr.id, {
-        width: 220,
-        margin: 2,
+        width: 220, margin: 2,
         color: { dark: '#0F1F2E', light: '#ffffff' },
       })
     })
@@ -294,25 +296,25 @@ function QRModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70" />
       <div
-        className="relative bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto"
+        className={`relative bg-[#0d1e2e] border rounded-2xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto ${isBoss ? 'border-[#F7C841]/40' : 'border-white/20'}`}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center gap-2 mb-4">
           <span className="text-2xl">{info?.icon ?? '📷'}</span>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-white truncate">{qr.label || info?.label || qr.type}</p>
-            <p className="text-xs text-white/40">{info?.label} · {info?.description}</p>
+            <p className="text-xs text-white/40">{info?.description}</p>
           </div>
+          {qr.unique_per_user && (
+            <span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">🔒 1/utente</span>
+          )}
           <button onClick={onClose} className="text-white/40 hover:text-white text-xl leading-none ml-1">✕</button>
         </div>
 
-        {/* QR canvas */}
         <div className="flex justify-center bg-white rounded-xl p-3 mb-4">
           <canvas ref={canvasRef} />
         </div>
 
-        {/* Meta */}
         <div className="space-y-2 mb-4">
           {details.map(detail => (
             <div key={detail.label} className="flex justify-between items-start gap-4 text-xs">
@@ -323,20 +325,10 @@ function QRModal({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={onShare}
-            aria-label="Condividi QR"
-            title="Condividi"
-            className="inline-flex items-center justify-center bg-white/10 text-white w-full h-10 rounded-xl hover:bg-white/15 transition-colors"
-          >
+          <button onClick={onShare} className="inline-flex items-center justify-center bg-white/10 text-white w-full h-10 rounded-xl hover:bg-white/15 transition-colors">
             <IconShare />
           </button>
-          <button
-            onClick={onDownload}
-            aria-label="Scarica QR PNG"
-            title="Scarica PNG"
-            className="inline-flex items-center justify-center bg-[#3A9DBC] text-white w-full h-10 rounded-xl hover:brightness-110 transition-all"
-          >
+          <button onClick={onDownload} className="inline-flex items-center justify-center bg-[#3A9DBC] text-white w-full h-10 rounded-xl hover:brightness-110 transition-all">
             <IconDownload />
           </button>
         </div>
@@ -347,49 +339,54 @@ function QRModal({
 
 /* ── Page ────────────────────────────────────── */
 export default function QRCodesPage() {
-  const [sessions, setSessions]         = useState<any[]>([])
-  const [selectedId, setSelectedId]     = useState('')
-  const [qrCodes, setQrCodes]           = useState<any[]>([])
-  const [previewQr, setPreviewQr]       = useState<any | null>(null)
+  const [sessions, setSessions]               = useState<any[]>([])
+  const [selectedId, setSelectedId]           = useState('all')
+  const [qrCodes, setQrCodes]                 = useState<any[]>([])
+  const [previewQr, setPreviewQr]             = useState<any | null>(null)
   const [loadingSessions, setLoadingSessions] = useState(true)
   const [loadingQrCodes, setLoadingQrCodes]   = useState(false)
-  const [editorOpen, setEditorOpen]     = useState(false)
-  const [editingQrId, setEditingQrId]   = useState<string | null>(null)
+  const [editorOpen, setEditorOpen]           = useState(false)
+  const [editingQrId, setEditingQrId]         = useState<string | null>(null)
 
-  // Reference data for selects
-  const [creatures, setCreatures]       = useState<any[]>([])
-  const [items, setItems]               = useState<any[]>([])
+  const [creatures, setCreatures] = useState<any[]>([])
+  const [items, setItems]         = useState<any[]>([])
 
-  const [type, setType]                 = useState<QRCodeType>('oggetto')
-  const [label, setLabel]               = useState('')
-  const [fields, setFields]             = useState<Fields>(defaultFields('oggetto'))
+  const [type, setType]               = useState<QRCodeType>('oggetto')
+  const [label, setLabel]             = useState('')
+  const [fields, setFields]           = useState<Fields>(defaultFields('oggetto'))
   const [usesRemaining, setUsesRemaining] = useState<number | null>(null)
-  const [creating, setCreating]         = useState(false)
-  const [error, setError]               = useState('')
-  const [actionMsg, setActionMsg]       = useState<{ ok: boolean; text: string } | null>(null)
+  // scope: '' = current session, 'global' = all sessions
+  const [scopeSessionId, setScopeSessionId] = useState<string>('')
+  const [uniquePerUser, setUniquePerUser]   = useState(false)
+  const [creating, setCreating]     = useState(false)
+  const [error, setError]           = useState('')
+  const [actionMsg, setActionMsg]   = useState<{ ok: boolean; text: string } | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     supabase.from('sessions').select('id, name')
-      .then(({ data }) => {
-        if (data) { setSessions(data); if (data[0]) setSelectedId(data[0].id) }
-      })
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setSessions(data) })
       .then(() => setLoadingSessions(false), () => setLoadingSessions(false))
-    // Load creatures and items for selects
     fetch('/api/admin/creatures').then(r => r.json()).then(d => setCreatures(d.creatures ?? []))
     fetch('/api/admin/items').then(r => r.json()).then(d => setItems(d.items ?? []))
   }, [supabase])
 
   useEffect(() => {
-    if (!selectedId) return
     setLoadingQrCodes(true)
-    fetch(`/api/admin/qrcodes?sessionId=${selectedId}`)
+    const qs = selectedId !== 'all' ? `?sessionId=${selectedId}` : '?sessionId=all'
+    fetch(`/api/admin/qrcodes${qs}`)
       .then(r => r.json()).then(d => setQrCodes(d.qrCodes ?? []))
       .finally(() => setLoadingQrCodes(false))
   }, [selectedId])
 
   function handleTypeChange(t: QRCodeType) {
-    setType(t); setFields(defaultFields(t)); setError('')
+    setType(t)
+    setFields(defaultFields(t))
+    setError('')
+    // Boss: auto-enforce 1 per user
+    if (t === 'boss') setUniquePerUser(true)
+    else setUniquePerUser(false)
   }
 
   function setField(key: string, val: string | number) {
@@ -402,18 +399,16 @@ export default function QRCodesPage() {
     setLabel('')
     setFields(defaultFields('oggetto'))
     setUsesRemaining(null)
+    setScopeSessionId(selectedId !== 'all' ? selectedId : sessions[0]?.id ?? '')
+    setUniquePerUser(false)
     setError('')
     setEditorOpen(true)
   }
 
-  function clearEditor(nextType: QRCodeType = 'oggetto') {
-    setEditingQrId(null)
-    setType(nextType)
-    setLabel('')
-    setFields(defaultFields(nextType))
-    setUsesRemaining(null)
-    setError('')
-    setEditorOpen(false)
+  function clearEditor() {
+    setEditingQrId(null); setType('oggetto'); setLabel('')
+    setFields(defaultFields('oggetto')); setUsesRemaining(null)
+    setUniquePerUser(false); setError(''); setEditorOpen(false)
   }
 
   function startEditing(qr: any) {
@@ -423,35 +418,42 @@ export default function QRCodesPage() {
     setType(qrType)
     setLabel(String(qr.label ?? ''))
     setUsesRemaining(typeof qr.uses_remaining === 'number' ? qr.uses_remaining : null)
+    setScopeSessionId(qr.session_id ?? '')
+    setUniquePerUser(qr.unique_per_user ?? (qrType === 'boss'))
     setFields(payloadToFields(qrType, qr.payload ?? {}))
     setError('')
     setEditorOpen(true)
   }
 
   async function saveQR() {
-    setError('')
-    setCreating(true)
+    setError(''); setCreating(true)
     const isEditing = !!editingQrId
+    const body: Record<string, unknown> = {
+      type,
+      payload: buildPayload(type, fields),
+      usesRemaining,
+      label,
+      uniquePerUser: type === 'boss' ? true : uniquePerUser,
+      sessionId: scopeSessionId || null,
+    }
+    if (isEditing) body.qrId = editingQrId
+
     const res = await fetch('/api/admin/qrcodes', {
       method: isEditing ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(
-        isEditing
-          ? { qrId: editingQrId, type, payload: buildPayload(type, fields), usesRemaining, label }
-          : { sessionId: selectedId, type, payload: buildPayload(type, fields), usesRemaining, label },
-      ),
+      body: JSON.stringify(body),
     })
     const data = await res.json()
     setCreating(false)
     if (res.ok) {
       if (isEditing) {
-        setQrCodes(prev => prev.map(qr => (qr.id === editingQrId ? data.qrCode : qr)))
-        setActionMsg({ ok: true, text: 'QR aggiornato correttamente' })
+        setQrCodes(prev => prev.map(qr => qr.id === editingQrId ? data.qrCode : qr))
+        setActionMsg({ ok: true, text: 'QR aggiornato' })
       } else {
         setQrCodes(prev => [data.qrCode, ...prev])
-        setActionMsg({ ok: true, text: 'QR creato correttamente' })
+        setActionMsg({ ok: true, text: 'QR creato' })
       }
-      clearEditor('oggetto')
+      clearEditor()
       setTimeout(() => setActionMsg(null), 2400)
     } else {
       setError(data.error ?? (isEditing ? 'Errore nel salvataggio' : 'Errore nella creazione'))
@@ -461,67 +463,20 @@ export default function QRCodesPage() {
   async function deleteQR(qr: any) {
     const ok = window.confirm(`Eliminare definitivamente il QR "${qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || 'senza etichetta'}"?`)
     if (!ok) return
-
     const res = await fetch('/api/admin/qrcodes', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ qrId: qr.id }),
     })
     const data = await res.json()
-
     if (!res.ok) {
       setActionMsg({ ok: false, text: data.error ?? 'Eliminazione non riuscita' })
-      setTimeout(() => setActionMsg(null), 2400)
-      return
+      setTimeout(() => setActionMsg(null), 2400); return
     }
-
     setQrCodes(prev => prev.filter(row => row.id !== qr.id))
     if (previewQr?.id === qr.id) setPreviewQr(null)
-    if (editingQrId === qr.id) clearEditor('oggetto')
+    if (editingQrId === qr.id) clearEditor()
     setActionMsg({ ok: true, text: 'QR eliminato' })
     setTimeout(() => setActionMsg(null), 2400)
-  }
-
-  function getQrActionLabel(qr: any) {
-    return qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || 'QR'
-  }
-
-  function getQrDescriptionForUi(qr: any) {
-    return getQrDescription(qr, items, creatures)
-  }
-
-  function getPreviewDetails(qr: any) {
-    return getQrDetails(qr, items, creatures)
-  }
-
-  function getShareText(qr: any) {
-    const title = getQrActionLabel(qr)
-    const description = getQrDescriptionForUi(qr)
-    return `${title}\n${description}`
-  }
-
-  function getDownloadName(qrId: string, qrLabel: string) {
-    const safeLabel = qrLabel?.trim() ? qrLabel.trim() : qrId
-    return `qr_${safeLabel}`.replace(/\s+/g, '_')
-  }
-
-  async function handleShare(qr: any) {
-    const title = getQrActionLabel(qr)
-    const text = getShareText(qr)
-    try {
-      if (navigator.share) {
-        await navigator.share({ title, text })
-        setActionMsg({ ok: true, text: 'QR condiviso' })
-      } else {
-        const copied = await copyText(text)
-        setActionMsg({ ok: copied, text: copied ? 'Condivisione non disponibile: descrizione copiata' : 'Condivisione non riuscita' })
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
-      setActionMsg({ ok: false, text: 'Condivisione non riuscita' })
-    } finally {
-      setTimeout(() => setActionMsg(null), 2600)
-    }
   }
 
   async function downloadQR(qrId: string, qrLabel: string) {
@@ -529,116 +484,123 @@ export default function QRCodesPage() {
     const canvas = document.createElement('canvas')
     await QRCode.toCanvas(canvas, qrId, { width: 300 })
     const link = document.createElement('a')
-    link.download = `${getDownloadName(qrId, qrLabel)}.png`
-    link.href = canvas.toDataURL()
-    link.click()
+    link.download = `qr_${(qrLabel || qrId).replace(/\s+/g, '_')}.png`
+    link.href = canvas.toDataURL(); link.click()
     setActionMsg({ ok: true, text: 'QR scaricato in PNG' })
     setTimeout(() => setActionMsg(null), 2400)
   }
 
-  async function copyText(text: string) {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text)
-      return true
+  async function handleShare(qr: any) {
+    const title = qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || 'QR'
+    const text = getQrDescription(qr, items, creatures)
+    try {
+      if (navigator.share) { await navigator.share({ title, text }) }
+      else {
+        const ok = await copyText(text)
+        setActionMsg({ ok, text: ok ? 'Testo copiato' : 'Condivisione non riuscita' })
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+    } finally {
+      setTimeout(() => setActionMsg(null), 2600)
     }
-    const ta = document.createElement('textarea')
-    ta.value = text
-    ta.style.position = 'fixed'
-    ta.style.left = '-9999px'
-    document.body.appendChild(ta)
-    ta.select()
-    const ok = document.execCommand('copy')
-    document.body.removeChild(ta)
-    return ok
   }
 
-  // Build select options
+  async function copyText(text: string) {
+    if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true }
+    const ta = document.createElement('textarea')
+    ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px'
+    document.body.appendChild(ta); ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta); return ok
+  }
+
   const creatureOptions = creatures.map(c => ({ value: c.id, label: c.name, sub: `${c.rarity} · ${c.element}` }))
   const itemOptions     = items.map(i => ({ value: i.id, label: i.name, sub: i.type }))
-
   const info = TYPE_INFO[type]
+  const isBossType = type === 'boss'
+
+  const sessionName = (sid: string | null) => sessions.find(s => s.id === sid)?.name ?? null
 
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between gap-3 mb-4">
         <h1 className="text-2xl font-bold">📷 QR Codes</h1>
-        <button
-          onClick={openNewEditor}
-          disabled={!selectedId}
-          className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50"
-        >
+        <button onClick={openNewEditor}
+          className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-lg text-sm">
           + Nuovo QR Code
         </button>
       </div>
+
       {actionMsg && (
-        <p className={`mb-4 text-sm rounded-lg px-3 py-2 border ${
-          actionMsg.ok
-            ? 'text-[#34d399] bg-[#34d399]/10 border-[#34d399]/30'
-            : 'text-red-400 bg-red-400/10 border-red-400/30'
-        }`}>
+        <p className={`mb-4 text-sm rounded-lg px-3 py-2 border ${actionMsg.ok ? 'text-[#34d399] bg-[#34d399]/10 border-[#34d399]/30' : 'text-red-400 bg-red-400/10 border-red-400/30'}`}>
           {actionMsg.text}
         </p>
       )}
 
-      {/* Session selector */}
+      {/* Session selector — includes "all sessions" option */}
       <div className="mb-4">
-        <label className="block text-xs text-white/50 mb-1">Sessione</label>
+        <label className="block text-xs text-white/50 mb-1">Visualizza sessione</label>
         <select value={selectedId} onChange={e => setSelectedId(e.target.value)}
           disabled={loadingSessions}
           className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 disabled:opacity-50">
+          <option value="all">📋 Tutte le sessioni</option>
           {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        {loadingSessions && (
-          <div className="mt-2">
-            <AdminInlineSpinner label="Caricamento sessioni..." />
-          </div>
-        )}
+        {loadingSessions && <div className="mt-2"><AdminInlineSpinner label="Caricamento sessioni..." /></div>}
       </div>
 
       {/* QR list */}
       <div className="space-y-2">
-        {loadingQrCodes && qrCodes.length === 0 && (
-          <AdminListSkeleton rows={5} itemClassName="h-[78px]" />
+        {loadingQrCodes && qrCodes.length === 0 && <AdminListSkeleton rows={5} itemClassName="h-[78px]" />}
+        {!loadingQrCodes && qrCodes.length === 0 && (
+          <p className="text-white/30 text-sm">Nessun QR code trovato.</p>
         )}
-        {!loadingQrCodes && qrCodes.length === 0 && <p className="text-white/30 text-sm">Nessun QR code per questa sessione.</p>}
         {qrCodes.map(qr => {
-          const description = getQrDescriptionForUi(qr)
+          const typeInfo = TYPE_INFO[qr.type as QRCodeType]
+          const description = getQrDescription(qr, items, creatures)
+          const isBoss = qr.type === 'boss'
+          const sname = sessionName(qr.session_id)
           return (
-            <div
-              key={qr.id}
+            <div key={qr.id}
               onClick={() => setPreviewQr(qr)}
-              className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-3 cursor-pointer hover:bg-white/8 transition-colors"
-              title="Apri anteprima QR"
-            >
-              <span className="text-2xl">{TYPE_INFO[qr.type as QRCodeType]?.icon ?? '📷'}</span>
+              className={`flex items-center gap-3 border rounded-xl p-3 cursor-pointer hover:bg-white/8 transition-colors ${
+                isBoss
+                  ? 'bg-[#F7C841]/5 border-[#F7C841]/25 hover:bg-[#F7C841]/8'
+                  : 'bg-white/5 border-white/10'
+              }`}>
+              <span className="text-2xl shrink-0">{typeInfo?.icon ?? '📷'}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-bold">{getQrActionLabel(qr)}</p>
-                <p className="text-xs text-white/45 truncate">{description}</p>
-                <p className="text-xs text-white/40">{qr.uses_remaining === null ? '∞ usi illimitati' : `${qr.uses_remaining} usi rimanenti`}</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className={`text-sm font-bold ${isBoss ? 'text-[#F7C841]' : 'text-white'}`}>
+                    {qr.label || typeInfo?.label || qr.type}
+                  </p>
+                  {qr.unique_per_user && (
+                    <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-semibold">🔒 1/utente</span>
+                  )}
+                  {sname && selectedId === 'all' && (
+                    <span className="text-[10px] bg-[#3A9DBC]/15 text-[#3A9DBC]/80 border border-[#3A9DBC]/20 px-1.5 py-0.5 rounded-full">🎯 {sname}</span>
+                  )}
+                  {!qr.session_id && (
+                    <span className="text-[10px] bg-white/8 text-white/40 border border-white/10 px-1.5 py-0.5 rounded-full">🌐 Globale</span>
+                  )}
+                </div>
+                <p className="text-xs text-white/45 truncate mt-0.5">{description}</p>
+                <p className="text-xs text-white/30 mt-0.5">
+                  {qr.uses_remaining === null ? '∞ illimitati' : `${qr.uses_remaining} usi rimanenti`}
+                </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setPreviewQr(qr) }}
-                  aria-label="Apri preview QR"
-                  title="Preview"
-                  className="inline-flex items-center justify-center bg-white/10 text-white/80 w-9 h-9 rounded-lg hover:bg-white/15 transition-colors"
-                >
+                <button onClick={e => { e.stopPropagation(); setPreviewQr(qr) }}
+                  className="inline-flex items-center justify-center bg-white/10 text-white/80 w-9 h-9 rounded-lg hover:bg-white/15 transition-colors">
                   <IconEye />
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); startEditing(qr) }}
-                  aria-label="Modifica QR"
-                  title="Modifica"
-                  className="inline-flex items-center justify-center bg-white/10 text-white/80 w-9 h-9 rounded-lg hover:bg-white/15 transition-colors"
-                >
+                <button onClick={e => { e.stopPropagation(); startEditing(qr) }}
+                  className="inline-flex items-center justify-center bg-white/10 text-white/80 w-9 h-9 rounded-lg hover:bg-white/15 transition-colors">
                   <IconEdit />
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteQR(qr) }}
-                  aria-label="Elimina QR"
-                  title="Elimina"
-                  className="inline-flex items-center justify-center bg-red-500/20 text-red-300 w-9 h-9 rounded-lg hover:bg-red-500/30 transition-colors"
-                >
+                <button onClick={e => { e.stopPropagation(); deleteQR(qr) }}
+                  className="inline-flex items-center justify-center bg-red-500/20 text-red-300 w-9 h-9 rounded-lg hover:bg-red-500/30 transition-colors">
                   <IconTrash />
                 </button>
               </div>
@@ -647,17 +609,16 @@ export default function QRCodesPage() {
         })}
       </div>
 
+      {/* Editor modal */}
       {editorOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={e => { if (e.target === e.currentTarget) clearEditor('oggetto') }}
-        >
-          <div className="bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 w-full max-w-xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) clearEditor() }}>
+          <div className={`bg-[#0d1e2e] border rounded-2xl p-6 w-full max-w-xl shadow-2xl max-h-[90vh] overflow-y-auto ${isBossType ? 'border-[#F7C841]/30' : 'border-white/20'}`}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold text-white">
                 {editingQrId ? '✏️ Modifica QR Code' : '+ Nuovo QR Code'}
               </h2>
-              <button onClick={() => clearEditor('oggetto')} className="text-white/40 hover:text-white text-xl leading-none">✕</button>
+              <button onClick={clearEditor} className="text-white/40 hover:text-white text-xl leading-none">✕</button>
             </div>
 
             <div className="space-y-4">
@@ -667,7 +628,11 @@ export default function QRCodesPage() {
                   {(Object.keys(TYPE_INFO) as QRCodeType[]).map(t => (
                     <button key={t} onClick={() => handleTypeChange(t)}
                       className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border text-xs font-semibold transition-colors ${
-                        type === t ? 'bg-[#3A9DBC]/20 border-[#3A9DBC] text-[#3A9DBC]' : 'bg-white/5 border-white/10 text-white/50 hover:border-white/30'
+                        type === t
+                          ? t === 'boss'
+                            ? 'bg-[#F7C841]/20 border-[#F7C841] text-[#F7C841]'
+                            : 'bg-[#3A9DBC]/20 border-[#3A9DBC] text-[#3A9DBC]'
+                          : 'bg-white/5 border-white/10 text-white/50 hover:border-white/30'
                       }`}>
                       <span className="text-xl">{TYPE_INFO[t].icon}</span>
                       {TYPE_INFO[t].label}
@@ -677,10 +642,22 @@ export default function QRCodesPage() {
                 <p className="text-xs text-white/35 mt-2 italic">{info.description}</p>
               </Field>
 
+              {/* Boss banner */}
+              {isBossType && (
+                <div className="bg-[#F7C841]/8 border border-[#F7C841]/25 rounded-xl px-4 py-3">
+                  <p className="text-[#F7C841] text-xs font-semibold">👑 QR Capo Palestra</p>
+                  <p className="text-white/50 text-xs mt-1 leading-relaxed">
+                    Configura la squadra del boss (fino a 3 creature) e la ricompensa per i giocatori che la sconfiggono.
+                    Questo QR è automaticamente riscattabile <strong className="text-white/70">1 sola volta per giocatore</strong>.
+                  </p>
+                </div>
+              )}
+
               {/* Label */}
-              <Field label="Etichetta QR" hint="Nome visivo per riconoscere questo QR nell'elenco (es. 'Stazione A')">
+              <Field label="Etichetta QR" hint="Nome visivo per riconoscerlo nell'elenco (es. 'Stazione A', 'Capo Palestra Arena')">
                 <input value={label} onChange={e => setLabel(e.target.value)}
-                  placeholder="es. Stazione A" className={cls} autoFocus />
+                  placeholder={isBossType ? 'es. Capo Palestra — Arena Sud' : 'es. Stazione A'}
+                  className={cls} autoFocus />
               </Field>
 
               {/* Dynamic fields per type */}
@@ -689,15 +666,10 @@ export default function QRCodesPage() {
 
                 {type === 'oggetto' && (
                   <>
-                    <Field label="Oggetto da consegnare" hint="Seleziona l'oggetto che il giocatore riceverà scansionando questo QR">
-                      <SearchSelect
-                        options={itemOptions}
-                        value={String(fields.item_id)}
-                        onChange={v => setField('item_id', v)}
-                        placeholder="Seleziona oggetto..."
-                      />
+                    <Field label="Oggetto da consegnare" hint="Seleziona l'oggetto che il giocatore riceverà">
+                      <SearchSelect options={itemOptions} value={String(fields.item_id)} onChange={v => setField('item_id', v)} placeholder="Seleziona oggetto..." />
                     </Field>
-                    <Field label="Quantità" hint="Quanti oggetti riceve il giocatore">
+                    <Field label="Quantità">
                       <input type="number" value={fields.quantity} min={1} onChange={e => setField('quantity', +e.target.value)} className={cls} />
                     </Field>
                   </>
@@ -708,17 +680,12 @@ export default function QRCodesPage() {
                     <Field label="Capitolo di riferimento" hint="A quale missione/capitolo appartiene questo indizio">
                       <input type="number" value={fields.chapter_order} min={1} onChange={e => setField('chapter_order', +e.target.value)} className={cls} />
                     </Field>
-                    <Field label="Testo dell'indizio" hint="Il messaggio narrativo mostrato al giocatore">
+                    <Field label="Testo dell'indizio">
                       <textarea value={String(fields.text)} onChange={e => setField('text', e.target.value)}
                         rows={3} className={cls + ' resize-none'} placeholder="es. Il segreto si nasconde tra le rovine al tramonto..." />
                     </Field>
-                    <ImageInput
-                      label="Immagine (opzionale)"
-                      hint="Immagine mostrata insieme al testo dell'indizio"
-                      value={String(fields.image_url)}
-                      onChange={v => setField('image_url', v)}
-                      optional
-                    />
+                    <ImageInput label="Immagine (opzionale)" hint="Mostrata insieme al testo"
+                      value={String(fields.image_url)} onChange={v => setField('image_url', v)} optional />
                   </>
                 )}
 
@@ -733,38 +700,54 @@ export default function QRCodesPage() {
                         <option value="leggendario">🟡 Leggendario</option>
                       </select>
                     </Field>
-                    <Field label="Passi richiesti" hint="Numero di passi da percorrere prima di poter schiudere l'uovo (0 = immediato)">
-                      <input
-                        type="number"
-                        min={0}
-                        step={50}
-                        value={fields.steps_required ?? 0}
-                        onChange={e => setField('steps_required', +e.target.value)}
-                        className={cls}
-                      />
+                    <Field label="Passi di incubazione" hint="Quanti passi il giocatore deve percorrere dal ritiro dell'uovo prima di poterlo schiudere. 0 = immediato.">
+                      <input type="number" min={0} step={50} value={fields.steps_required ?? 0}
+                        onChange={e => setField('steps_required', +e.target.value)} className={cls} />
                     </Field>
                   </>
                 )}
 
                 {type === 'boss' && (
                   <>
-                    <Field label="Creatura boss" hint="Seleziona la creatura che apparirà come boss da scansionare">
-                      <SearchSelect
-                        options={creatureOptions}
-                        value={String(fields.creature_id)}
-                        onChange={v => setField('creature_id', v)}
-                        placeholder="Seleziona creatura..."
-                      />
-                    </Field>
-                    <Field label="Livello del boss" hint="Livello con cui la creatura appare come boss (più alto = più difficile)">
-                      <input type="number" value={fields.level_override} min={1} onChange={e => setField('level_override', +e.target.value)} className={cls} />
-                    </Field>
+                    {/* 3 creature slots */}
+                    {([1, 2, 3] as const).map(slot => (
+                      <div key={slot} className="bg-white/3 border border-white/8 rounded-xl p-3 space-y-2">
+                        <p className="text-xs font-semibold text-[#F7C841]/70">Slot {slot}{slot === 1 ? ' (obbligatorio)' : ' (opzionale)'}</p>
+                        <Field label="Creatura boss">
+                          <SearchSelect
+                            options={creatureOptions}
+                            value={String(fields[`boss_c${slot}`])}
+                            onChange={v => setField(`boss_c${slot}`, v)}
+                            placeholder={slot === 1 ? 'Seleziona creatura…' : 'Vuoto = non usato'}
+                          />
+                        </Field>
+                        <Field label="Livello" hint="Moltiplica HP e ATK della creatura per questo valore">
+                          <input type="number" value={fields[`boss_lv${slot}`]} min={1} max={50}
+                            onChange={e => setField(`boss_lv${slot}`, +e.target.value)} className={cls} />
+                        </Field>
+                      </div>
+                    ))}
+
+                    {/* Reward */}
+                    <div className="bg-[#34d399]/5 border border-[#34d399]/20 rounded-xl p-3">
+                      <p className="text-xs font-semibold text-[#34d399]/70 mb-3">🏆 Ricompensa vittoria</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Oro 💰">
+                          <input type="number" value={fields.reward_gold} min={0}
+                            onChange={e => setField('reward_gold', +e.target.value)} className={cls} />
+                        </Field>
+                        <Field label="EXP ✨">
+                          <input type="number" value={fields.reward_exp} min={0}
+                            onChange={e => setField('reward_exp', +e.target.value)} className={cls} />
+                        </Field>
+                      </div>
+                    </div>
                   </>
                 )}
 
                 {type === 'evento' && (
                   <>
-                    <Field label="Tipo di bonus" hint="Quale effetto si attiva quando il giocatore scansiona">
+                    <Field label="Tipo di bonus">
                       <select value={String(fields.event_type)} onChange={e => setField('event_type', e.target.value)} className={cls}>
                         <option value="bonus_exp">✨ Moltiplicatore EXP</option>
                         <option value="spawn_rate_boost">🐾 Aumento spawn creature</option>
@@ -774,32 +757,68 @@ export default function QRCodesPage() {
                     <Field label="Moltiplicatore" hint="es. 2 = doppio effetto, 3 = triplo">
                       <input type="number" value={fields.multiplier} min={1} step={0.5} onChange={e => setField('multiplier', +e.target.value)} className={cls} />
                     </Field>
-                    <Field label="Durata (minuti)" hint="Per quanti minuti rimane attivo il bonus">
+                    <Field label="Durata (minuti)">
                       <input type="number" value={fields.duration_minutes} min={1} onChange={e => setField('duration_minutes', +e.target.value)} className={cls} />
                     </Field>
                   </>
                 )}
               </div>
 
-              {/* Uses remaining */}
-              <Field label="Utilizzi massimi" hint="Lascia vuoto per utilizzi illimitati. Utile per QR esclusivi (es. 1 solo uso).">
-                <input type="number" placeholder="∞ illimitati" min={1}
-                  value={usesRemaining ?? ''}
-                  onChange={e => setUsesRemaining(e.target.value ? +e.target.value : null)}
-                  className="w-40 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm" />
-              </Field>
+              {/* Scope & limits section */}
+              <div className="border-t border-white/10 pt-4 space-y-3">
+                <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">Impostazioni</p>
+
+                <Field label="Disponibile in" hint="Lascia vuoto per renderlo utilizzabile in tutte le sessioni">
+                  <select className={cls} value={scopeSessionId}
+                    onChange={e => setScopeSessionId(e.target.value)}>
+                    <option value="">🌐 Tutte le sessioni</option>
+                    {sessions.map(s => <option key={s.id} value={s.id}>🎯 {s.name}</option>)}
+                  </select>
+                </Field>
+
+                <Field label="Utilizzi massimi" hint="Lascia vuoto per utilizzi illimitati.">
+                  <input type="number" placeholder="∞ illimitati" min={1}
+                    value={usesRemaining ?? ''}
+                    onChange={e => setUsesRemaining(e.target.value ? +e.target.value : null)}
+                    className="w-40 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm" />
+                </Field>
+
+                {/* unique_per_user toggle — locked ON for boss */}
+                <div className={`flex items-start gap-3 rounded-xl px-3 py-2.5 border ${
+                  uniquePerUser || isBossType
+                    ? 'bg-amber-500/8 border-amber-500/25'
+                    : 'bg-white/3 border-white/8'
+                }`}>
+                  <input
+                    type="checkbox"
+                    id="unique_per_user"
+                    checked={isBossType || uniquePerUser}
+                    disabled={isBossType}
+                    onChange={e => setUniquePerUser(e.target.checked)}
+                    className="mt-0.5 accent-amber-400"
+                  />
+                  <label htmlFor="unique_per_user" className="text-sm cursor-pointer select-none">
+                    <span className={`font-semibold ${isBossType ? 'text-amber-400' : 'text-white/80'}`}>
+                      🔒 Riscattabile 1 sola volta per utente
+                    </span>
+                    <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
+                      {isBossType
+                        ? 'Obbligatorio per i boss: ogni giocatore può affrontarlo una sola volta.'
+                        : 'Ogni utente può scansionare questo QR una sola volta, indipendentemente dagli utilizzi totali.'}
+                    </p>
+                  </label>
+                </div>
+              </div>
 
               {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {error}</p>}
 
               <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => clearEditor('oggetto')}
-                  className="flex-1 bg-white/5 border border-white/10 text-white/60 font-semibold py-2.5 rounded-xl text-sm"
-                >
+                <button onClick={clearEditor}
+                  className="flex-1 bg-white/5 border border-white/10 text-white/60 font-semibold py-2.5 rounded-xl text-sm">
                   Annulla
                 </button>
-                <button onClick={saveQR} disabled={creating || !selectedId}
-                  className="flex-1 bg-[#E85D2F] text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50">
+                <button onClick={saveQR} disabled={creating}
+                  className={`flex-1 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 ${isBossType ? 'bg-[#F7C841] text-[#0d1e2e]' : 'bg-[#E85D2F] text-white'}`}>
                   {creating
                     ? (editingQrId ? 'Salvataggio...' : 'Creazione...')
                     : (editingQrId ? 'Salva modifiche' : 'Crea QR Code')}
@@ -813,7 +832,7 @@ export default function QRCodesPage() {
       {previewQr && (
         <QRModal
           qr={previewQr}
-          details={getPreviewDetails(previewQr)}
+          details={getQrDetails(previewQr, items, creatures, sessions)}
           onClose={() => setPreviewQr(null)}
           onDownload={() => downloadQR(previewQr.id, previewQr.label)}
           onShare={() => handleShare(previewQr)}
@@ -822,4 +841,3 @@ export default function QRCodesPage() {
     </div>
   )
 }
-
