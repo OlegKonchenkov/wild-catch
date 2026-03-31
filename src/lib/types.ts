@@ -31,6 +31,10 @@ export interface Creature {
   evolution_of: string | null
   catch_difficulty: number
   session_id: string | null
+  enigma_title: string | null
+  enigma_description: string | null
+  enigma_image_url: string | null
+  enigma_video_url: string | null
 }
 
 export interface Session {

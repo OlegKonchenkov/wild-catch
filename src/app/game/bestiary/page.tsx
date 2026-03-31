@@ -26,6 +26,7 @@ export default function BestiaryPage() {
   const [search, setSearch]                 = useState('')
   const [showFilters, setShowFilters]       = useState(false)
   const [showWeakness, setShowWeakness]     = useState(false)
+  const [showEnigma, setShowEnigma]         = useState(false)
   const [loading, setLoading]               = useState(true)
   const [selectedPcId, setSelectedPcId]     = useState<string | null>(null)
   const supabase   = useMemo(() => createClient(), [])
@@ -501,7 +502,7 @@ export default function BestiaryPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.02 }}
                 whileTap={{ scale: 0.93 }}
-                onClick={() => setSelected({ creature, pc })}
+                onClick={() => { setSelected({ creature, pc }); setShowEnigma(false) }}
                 className={`relative rounded-2xl overflow-hidden cursor-pointer border transition-all
                   ${caught && pc?.id === selectedPcId
                     ? 'wc-active-card border-2'
@@ -698,6 +699,56 @@ export default function BestiaryPage() {
                         </button>
                       )}
                     </div>
+
+                    {/* Enigma button */}
+                    <button
+                      onClick={() => setShowEnigma(v => !v)}
+                      disabled={!creature.enigma_title && !creature.enigma_description}
+                      className={`w-full font-bold py-3 rounded-xl text-sm transition-all
+                        ${creature.enigma_title || creature.enigma_description
+                          ? 'bg-[#4A1D7A]/60 border border-[#7B4DB8]/50 text-[#C084FC] hover:bg-[#4A1D7A]/90'
+                          : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'}`}>
+                      🧩 Frammento Enigma
+                      {(creature.enigma_title || creature.enigma_description) && (
+                        <span className="ml-2 text-white/40 text-xs">{showEnigma ? '▲' : '▼'}</span>
+                      )}
+                    </button>
+
+                    {/* Enigma reveal */}
+                    <AnimatePresence>
+                      {showEnigma && (creature.enigma_title || creature.enigma_description) && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.25 }}
+                          className="overflow-hidden">
+                          <div className="bg-[#1A0D2E] border border-[#7B4DB8]/30 rounded-2xl p-4 space-y-3">
+                            {creature.enigma_title && (
+                              <h4 className="text-sm font-bold text-[#C084FC]">{creature.enigma_title}</h4>
+                            )}
+                            {creature.enigma_description && (
+                              <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{creature.enigma_description}</p>
+                            )}
+                            {creature.enigma_image_url && (
+                              <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                                <Image src={creature.enigma_image_url} alt="Enigma" fill className="object-cover" sizes="320px" />
+                              </div>
+                            )}
+                            {creature.enigma_video_url && (
+                              <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                                <iframe
+                                  src={creature.enigma_video_url}
+                                  className="w-full h-full"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </>
                 ) : (
                   /* ── NOT CAUGHT: mystery view ── */

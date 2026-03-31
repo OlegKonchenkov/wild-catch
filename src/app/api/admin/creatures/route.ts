@@ -36,7 +36,8 @@ export async function POST(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const body = await request.json()
-  const { name, description, rarity, element, hp, atk, def: defVal, evolution_of, session_id, catch_difficulty } = body
+  const { name, description, rarity, element, hp, atk, def: defVal, evolution_of, session_id, catch_difficulty,
+    enigma_title, enigma_description, enigma_image_url, enigma_video_url } = body
 
   if (!name || typeof name !== 'string' || name.trim() === '') {
     return NextResponse.json({ error: 'Il nome è obbligatorio' }, { status: 400 })
@@ -68,6 +69,10 @@ export async function POST(request: Request) {
     evolution_of: evolution_of ?? null,
     session_id: session_id ?? null,
     catch_difficulty: diffVal ?? 1,
+    enigma_title: enigma_title ?? null,
+    enigma_description: enigma_description ?? null,
+    enigma_image_url: enigma_image_url ?? null,
+    enigma_video_url: enigma_video_url ?? null,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
