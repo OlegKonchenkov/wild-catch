@@ -41,6 +41,11 @@ export async function POST(request: Request) {
 
   if (itemType === 'esca') {
     const activatedUntil = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    await supabase
+      .from('player_sessions')
+      .update({ esca_active_until: activatedUntil })
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId)
     return NextResponse.json({
       used: true,
       type: 'esca',

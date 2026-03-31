@@ -23,6 +23,33 @@ export async function POST(request: Request) {
 
   if (!playerSession) return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
 
+  // Block encounters if session is not active
+  const { data: session } = await supabase
+    .from('sessions')
+    .select('status, area_bounds')
+    .eq('id', sessionId)
+    .single()
+
+  if (!session || session.status !== 'active') {
+    return NextResponse.json({ error: 'Sessione non attiva' }, { status: 403 })
+  }
+
+  // Block if player is out of bounds (use last stored position)
+  if (session.area_bounds) {
+    const { data: posRow } = await supabase
+      .from('player_sessions')
+      .select('last_position')
+      .eq('id', playerSession.id)
+      .single()
+    const rawPos = posRow?.last_position as { x: number; y: number } | null
+    if (rawPos) {
+      const { isWithinBounds } = await import('@/lib/game/anti-cheat')
+      const bounds = session.area_bounds as { north: number; south: number; east: number; west: number }
+      const inBounds = isWithinBounds({ lat: rawPos.y, lng: rawPos.x }, bounds)
+      if (!inBounds) return NextResponse.json({ error: 'Fuori dall\'area di gioco' }, { status: 403 })
+    }
+  }
+
   // Check no active encounter already
   const { data: existing } = await supabase
     .from('encounters')

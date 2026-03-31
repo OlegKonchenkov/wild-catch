@@ -59,6 +59,7 @@ export default function DuelPage() {
 
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
+  const duelStatusRef      = useRef<string | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   // Load duel + lineups + role
@@ -72,6 +73,7 @@ export default function DuelPage() {
 
       if (!duelData) return
       setDuel(duelData)
+      duelStatusRef.current = duelData.status
       if (!realtimeUpdatedRef.current) setWaiting(duelData.status === 'waiting')
 
       const { data: { user } } = await supabase.auth.getUser()
@@ -164,6 +166,7 @@ export default function DuelPage() {
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${id}` },
         ({ new: updated }) => {
+          duelStatusRef.current = updated.status
           if (updated.status === 'ended') {
             supabase.auth.getUser().then(({ data: { user } }) => {
               setResult(updated.winner_id === user?.id ? 'won' : 'lost')
@@ -180,7 +183,18 @@ export default function DuelPage() {
         })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+      // Cancel the duel if player leaves while still waiting
+      if (duelStatusRef.current === 'waiting') {
+        fetch('/api/game/duel/connect', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ duelId: id }),
+          keepalive: true,
+        }).catch(() => {})
+      }
+    }
   }, [id, supabase])
 
   // Auto-surrender when all my creatures faint

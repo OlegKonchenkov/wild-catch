@@ -7,6 +7,76 @@ import type { Rarity, Element } from '@/lib/types'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { motion, AnimatePresence } from 'framer-motion'
 
+interface HistoryEntry {
+  id: string
+  type: 'duel' | 'boss'
+  date: string
+  result: 'won' | 'lost' | 'unknown'
+  label: string
+  detail?: string
+}
+
+function useHistory(supabase: ReturnType<typeof createClient>) {
+  const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      const sessionId = localStorage.getItem('current_session_id')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !sessionId) { setLoading(false); return }
+
+      const [duelsRes, bossRes] = await Promise.all([
+        supabase
+          .from('duels')
+          .select('id, status, winner_id, challenger_id, opponent_id, started_at, ended_at, room_code')
+          .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
+          .eq('session_id', sessionId)
+          .in('status', ['ended', 'cancelled'])
+          .order('ended_at', { ascending: false })
+          .limit(30),
+        supabase
+          .from('boss_fights')
+          .select('id, status, reward_claimed, started_at, ended_at, boss_lineup')
+          .eq('user_id', user.id)
+          .eq('session_id', sessionId)
+          .in('status', ['won', 'lost'])
+          .order('ended_at', { ascending: false })
+          .limit(20),
+      ])
+
+      const duelEntries: HistoryEntry[] = (duelsRes.data ?? []).map((d: any) => ({
+        id: d.id,
+        type: 'duel',
+        date: d.ended_at ?? d.started_at ?? '',
+        result: d.status === 'ended' ? (d.winner_id === user.id ? 'won' : 'lost') : 'unknown',
+        label: `Duello · ${d.room_code ?? '—'}`,
+        detail: d.status === 'cancelled' ? 'Annullato' : d.winner_id === user.id ? 'Vittoria' : 'Sconfitta',
+      }))
+
+      const bossEntries: HistoryEntry[] = (bossRes.data ?? []).map((b: any) => {
+        const bossName = b.boss_lineup?.[0]?.name ?? 'Boss'
+        return {
+          id: b.id,
+          type: 'boss',
+          date: b.ended_at ?? b.started_at ?? '',
+          result: b.status === 'won' ? 'won' : 'lost',
+          label: `👑 ${bossName}`,
+          detail: b.status === 'won' ? 'Vittoria' : 'Sconfitta',
+        }
+      })
+
+      const combined = [...duelEntries, ...bossEntries]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      setHistory(combined)
+      setLoading(false)
+    }
+    load()
+  }, [supabase])
+
+  return { history, loading }
+}
+
 interface SquadCreature {
   playerCreatureId: string
   name: string
@@ -20,6 +90,7 @@ interface SquadCreature {
 export default function DuelLobbyPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const [activeTab, setActiveTab] = useState<'arena' | 'storico'>('arena')
   const [creatures, setCreatures] = useState<SquadCreature[]>([])
   const [lineup, setLineup] = useState<(SquadCreature | null)[]>([null, null, null])
   const [noCreatures, setNoCreatures] = useState(false)
@@ -27,6 +98,7 @@ export default function DuelLobbyPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingCreatures, setLoadingCreatures] = useState(true)
+  const { history, loading: historyLoading } = useHistory(supabase)
 
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
@@ -115,29 +187,97 @@ export default function DuelLobbyPage() {
 
   const lineupFull = lineup.every(c => c !== null)
 
-  if (noCreatures) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center">
-        <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 200 }}>
-          <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-2 mx-auto text-4xl">⚔️</div>
-        </motion.div>
-        <p className="text-white font-bold text-lg">Nessuna creatura disponibile</p>
-        <p className="text-white/50 text-sm leading-relaxed">Cattura almeno 3 creature prima di sfidare qualcuno.</p>
-        <button onClick={() => router.push('/game/map')}
-          className="bg-[#3A9DBC] text-white font-bold py-3 px-6 rounded-xl cursor-pointer active:scale-95 transition-transform">
-          Vai alla Mappa
-        </button>
-      </div>
-    )
-  }
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex-none px-4 pt-4 pb-2">
         <p className="text-xs text-[#E85D2F] font-bold tracking-widest uppercase mb-0.5">Arena 3v3</p>
-        <h1 className="text-xl font-extrabold text-white">Seleziona la tua squadra</h1>
+        <h1 className="text-xl font-extrabold text-white">Duelli</h1>
       </div>
+
+      {/* Tab switcher */}
+      <div className="flex-none px-4 pb-3">
+        <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+          {(['arena', 'storico'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all capitalize"
+              style={{
+                background: activeTab === tab ? 'rgba(232,93,47,0.9)' : 'transparent',
+                color: activeTab === tab ? 'white' : 'rgba(255,255,255,0.4)',
+              }}
+            >
+              {tab === 'arena' ? '⚔️ Arena' : '📜 Storico'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Storico tab */}
+      {activeTab === 'storico' && (
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
+          {historyLoading ? (
+            <div className="space-y-2">
+              {[1,2,3,4].map(i => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)}
+            </div>
+          ) : history.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-white/30 pt-16">
+              <span className="text-5xl">📜</span>
+              <p className="text-sm">Nessun duello disputato</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {history.map(entry => {
+                const isBoss = entry.type === 'boss'
+                const isWon  = entry.result === 'won'
+                const isLost = entry.result === 'lost'
+                const time   = entry.date ? new Date(entry.date).toLocaleString('it-IT', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center gap-3 px-3 py-3 rounded-xl"
+                    style={{
+                      background: isWon ? 'rgba(52,211,153,0.08)' : isLost ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${isWon ? 'rgba(52,211,153,0.25)' : isLost ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.08)'}`,
+                    }}
+                  >
+                    <span className="text-2xl shrink-0">{isBoss ? '👑' : '⚔️'}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{entry.label}</p>
+                      <p className="text-[11px] text-white/40 mt-0.5">{time}</p>
+                    </div>
+                    <span
+                      className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0"
+                      style={{
+                        background: isWon ? 'rgba(52,211,153,0.15)' : isLost ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.08)',
+                        color: isWon ? '#34D399' : isLost ? '#F87171' : 'rgba(255,255,255,0.3)',
+                      }}
+                    >
+                      {entry.detail}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Arena tab content */}
+      {activeTab === 'arena' && (<>
+
+      {noCreatures ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+          <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-2 mx-auto text-4xl">⚔️</div>
+          <p className="text-white font-bold text-lg">Nessuna creatura disponibile</p>
+          <p className="text-white/50 text-sm leading-relaxed">Cattura almeno 3 creature prima di sfidare qualcuno.</p>
+          <button onClick={() => router.push('/game/map')}
+            className="bg-[#3A9DBC] text-white font-bold py-3 px-6 rounded-xl cursor-pointer active:scale-95 transition-transform">
+            Vai alla Mappa
+          </button>
+        </div>
+      ) : (<>
 
       {/* Lineup slots — top 3 */}
       <div className="flex-none px-4 pb-3">
@@ -298,6 +438,8 @@ export default function DuelLobbyPage() {
           )}
         </AnimatePresence>
       </div>
+      </>)}
+      </>)}
     </div>
   )
 }

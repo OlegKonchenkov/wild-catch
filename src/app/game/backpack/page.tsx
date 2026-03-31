@@ -286,6 +286,7 @@ export default function BackpackPage() {
         ).filter(r => r.quantity > 0))
         if (data.activatedUntil) {
           localStorage.setItem('esca_active_until', data.activatedUntil)
+          window.dispatchEvent(new CustomEvent('wc:esca-activated', { detail: { until: data.activatedUntil } }))
         }
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       } else {

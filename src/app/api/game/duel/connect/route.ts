@@ -136,3 +136,24 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ duelId: duel.id, role: 'challenger', roomCode: code })
 }
+
+// ── DELETE: cancel a waiting duel ─────────────────────────────────────────────
+export async function DELETE(request: Request) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+
+  const body = await request.json().catch(() => ({}))
+  const { duelId } = body as { duelId?: string }
+
+  if (!duelId) return NextResponse.json({ error: 'duelId richiesto' }, { status: 400 })
+
+  await supabase
+    .from('duels')
+    .update({ status: 'cancelled', ended_at: new Date().toISOString() })
+    .eq('id', duelId)
+    .eq('challenger_id', user.id)
+    .eq('status', 'waiting')
+
+  return NextResponse.json({ cancelled: true })
+}

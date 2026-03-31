@@ -29,11 +29,11 @@ export async function incrementMissionProgress({
 }) {
   const admin = createAdminClient()
 
-  // Load matching missions for this session and type
+  // Load matching missions for this session and type (include global missions with null session_id)
   const { data: missions } = await admin
     .from('missions')
     .select('id, target, target_count, reward_gold, reward_exp, reward_item_id')
-    .eq('session_id', sessionId)
+    .or(`session_id.eq.${sessionId},session_id.is.null`)
     .eq('type', type)
 
   if (!missions?.length) return
@@ -79,6 +79,13 @@ export async function incrementMissionProgress({
 
     if (justCompleted) {
       await grantMissionReward(mission, userId, sessionId, admin)
+      // Game event for bell history
+      admin.from('player_game_events').insert({
+        user_id: userId,
+        session_id: sessionId,
+        type: 'mission_completed',
+        payload: { mission_id: mission.id },
+      }).then(() => {}).catch(() => {})
     }
   }
 }

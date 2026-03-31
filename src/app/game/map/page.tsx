@@ -17,6 +17,7 @@ function MapPageInner() {
   const [inBounds, setInBounds] = useState(true)
   const [sessionEnded, setSessionEnded] = useState(false)
   const [sessionRestarted, setSessionRestarted] = useState(false)
+  const [escaActiveUntil, setEscaActiveUntil] = useState<Date | null>(null)
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
@@ -34,6 +35,21 @@ function MapPageInner() {
       localStorage.setItem('current_session_id', sid)
       supabase.from('sessions').select('*').eq('id', sid).single()
         .then(({ data }) => { if (data) setSession(data as unknown as Session) })
+      // Load esca status
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return
+        supabase.from('player_sessions')
+          .select('esca_active_until')
+          .eq('user_id', user.id)
+          .eq('session_id', sid)
+          .single()
+          .then(({ data }) => {
+            if (data?.esca_active_until) {
+              const d = new Date(data.esca_active_until)
+              if (d > new Date()) setEscaActiveUntil(d)
+            }
+          })
+      })
     }
 
     // ?restored=<sid> from auth callback OR history re-entry from home page
@@ -154,6 +170,25 @@ function MapPageInner() {
     return () => clearTimeout(timeout)
   }, [sessionId, triggerEncounter])
 
+  // Listen for esca activation from backpack
+  useEffect(() => {
+    function onEscaActivated(e: Event) {
+      const until = (e as CustomEvent<{ until: string }>).detail?.until
+      if (until) setEscaActiveUntil(new Date(until))
+    }
+    window.addEventListener('wc:esca-activated', onEscaActivated)
+    return () => window.removeEventListener('wc:esca-activated', onEscaActivated)
+  }, [])
+
+  // Clear esca indicator when it expires
+  useEffect(() => {
+    if (!escaActiveUntil) return
+    const ms = escaActiveUntil.getTime() - Date.now()
+    if (ms <= 0) { setEscaActiveUntil(null); return }
+    const t = setTimeout(() => setEscaActiveUntil(null), ms)
+    return () => clearTimeout(t)
+  }, [escaActiveUntil])
+
   // Realtime broadcast: session_ended / session_restarted from admin
   useEffect(() => {
     if (!sessionId) return
@@ -212,6 +247,14 @@ function MapPageInner() {
       {!inBounds && (
         <div className="absolute top-2 left-2 right-2 bg-red-900/90 text-red-200 text-sm px-3 py-2 rounded-lg z-[900] text-center">
           🚫 Sei fuori dall'area di gioco — torna nella zona indicata!
+        </div>
+      )}
+
+      {/* Esca active indicator */}
+      {escaActiveUntil && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-[#34D399]/20 border border-[#34D399]/40 text-[#34D399] text-xs px-3 py-1.5 rounded-full z-[900] flex items-center gap-1.5 backdrop-blur-sm whitespace-nowrap">
+          <span>🪱</span>
+          <span className="font-semibold">Esca attiva</span>
         </div>
       )}
 

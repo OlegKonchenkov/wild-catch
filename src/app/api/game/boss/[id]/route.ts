@@ -103,6 +103,11 @@ export async function POST(request: Request, { params }: Params) {
       .from('boss_fights')
       .update({ status: 'lost', ended_at: new Date().toISOString() })
       .eq('id', id)
+    const adminSurr = createAdminClient()
+    adminSurr.from('player_game_events').insert({
+      user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
+      payload: { fight_id: id },
+    }).then(() => {}).catch(() => {})
     return NextResponse.json({ surrendered: true })
   }
 
@@ -208,6 +213,14 @@ export async function POST(request: Request, { params }: Params) {
       ...(newStatus !== 'active' ? { ended_at: new Date().toISOString() } : {}),
     }).eq('id', id)
 
+    // ── Game event on loss ───────────────────────────────────────────────
+    if (allPlayerFainted) {
+      createAdminClient().from('player_game_events').insert({
+        user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
+        payload: { fight_id: id },
+      }).then(() => {}).catch(() => {})
+    }
+
     // ── Grant reward on win ──────────────────────────────────────────────
     let levelUp: { newLevel: number; goldReward: number } | null = null
     if (won && !fight.reward_claimed) {
@@ -238,6 +251,12 @@ export async function POST(request: Request, { params }: Params) {
             .eq('user_id', user.id).eq('session_id', fight.session_id)
         }
       }
+
+      // Game event
+      admin.from('player_game_events').insert({
+        user_id: user.id, session_id: fight.session_id, type: 'boss_won',
+        payload: { fight_id: id, gold: goldReward, exp: reward?.exp ?? 50 },
+      }).then(() => {}).catch(() => {})
 
       // Item reward
       if (reward?.item_id) {

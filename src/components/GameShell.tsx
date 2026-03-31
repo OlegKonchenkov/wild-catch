@@ -37,6 +37,34 @@ interface NotifPopup {
   icon?: string
 }
 
+function formatGameEvent(ev: any): { icon: string; title: string; body: string } {
+  const p = ev.payload ?? {}
+  switch (ev.type) {
+    case 'catch':
+      return {
+        icon: '🎯',
+        title: `Catturato: ${p.creature_name ?? 'creatura'}`,
+        body: [p.rarity, p.evolved ? 'evoluto!' : ''].filter(Boolean).join(' · '),
+      }
+    case 'duel_won':
+      return { icon: '🏆', title: 'Duello vinto!', body: '' }
+    case 'duel_lost':
+      return { icon: '💀', title: 'Duello perso', body: '' }
+    case 'boss_won':
+      return {
+        icon: '👑',
+        title: 'Boss sconfitto!',
+        body: p.gold ? `+${p.gold} 💰 · +${p.exp ?? 0} ⭐` : '',
+      }
+    case 'boss_lost':
+      return { icon: '💀', title: 'Sconfitto dal boss', body: '' }
+    case 'mission_completed':
+      return { icon: '✅', title: 'Missione completata!', body: '' }
+    default:
+      return { icon: '🎮', title: ev.type, body: '' }
+  }
+}
+
 export default function GameShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
@@ -53,9 +81,12 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const [notifPopup, setNotifPopup] = useState<NotifPopup | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [showNotifPanel, setShowNotifPanel] = useState(false)
+  const [notifTab, setNotifTab] = useState<'messaggi' | 'eventi'>('messaggi')
   const [notifications, setNotifications] = useState<any[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [gameEvents, setGameEvents] = useState<any[]>([])
+  const [eventsLoading, setEventsLoading] = useState(false)
 
   const initRef = useRef(false)
 
@@ -214,6 +245,24 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Load game events
+  const loadGameEvents = (uid: string) => {
+    const sid = localStorage.getItem('current_session_id')
+    if (!sid) return
+    setEventsLoading(true)
+    supabase
+      .from('player_game_events')
+      .select('*')
+      .eq('user_id', uid)
+      .eq('session_id', sid)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (data) setGameEvents(data)
+        setEventsLoading(false)
+      })
+  }
+
   // Player notifications realtime subscription
   useEffect(() => {
     if (!userId) return
@@ -221,6 +270,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     if (!sid) return
     // Initial load
     loadNotifications(userId)
+    loadGameEvents(userId)
     const channel = supabase
       .channel(`player-notifications:${userId}`)
       .on('postgres_changes', {
@@ -257,7 +307,24 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         }
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+
+    // Game events realtime
+    const eventsChannel = supabase
+      .channel(`player-game-events:${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'player_game_events',
+        filter: `user_id=eq.${userId}`,
+      }, (payload) => {
+        setGameEvents(prev => [payload.new, ...prev])
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+      supabase.removeChannel(eventsChannel)
+    }
   }, [userId, supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime: user-specific broadcast (admin_notify direct)
@@ -521,61 +588,106 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/10 flex-shrink-0">
-                <div>
-                  <h2 className="font-bold text-white text-base">🔔 Notifiche</h2>
-                  {notifications.length > 0 && (
-                    <p className="text-[11px] text-white/40 mt-0.5">{notifications.length} messaggi</p>
-                  )}
-                </div>
+                <h2 className="font-bold text-white text-base">🔔 Notifiche</h2>
                 <button onClick={() => setShowNotifPanel(false)} className="text-white/40 hover:text-white text-xl">✕</button>
               </div>
-              {/* List */}
-              <div className="flex-1 overflow-y-auto py-2">
-                {notifLoading ? (
-                  <div className="space-y-2 px-4 pt-2">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />
-                    ))}
-                  </div>
-                ) : notifications.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full gap-3 text-white/30">
-                    <span className="text-5xl">🔕</span>
-                    <p className="text-sm">Nessuna notifica</p>
-                  </div>
-                ) : (
-                  notifications.map(n => {
-                    const isRedeemed = n.type === 'item_redeemed'
-                    const icon = isRedeemed ? '✅' : '📢'
-                    const title = isRedeemed
-                      ? `"${n.payload?.item_name}" riscattato`
-                      : (n.payload?.title ?? 'Messaggio')
-                    const body = isRedeemed
-                      ? (() => {
-                          const r = n.payload?.reward ?? {}
-                          const p: string[] = []
-                          if (r.gold) p.push(`+${r.gold} 💰`)
-                          if (r.exp) p.push(`+${r.exp} ⭐`)
-                          return p.length > 0 ? `Ricompensa: ${p.join(' · ')}` : ''
-                        })()
-                      : (n.payload?.message ?? '')
-                    const time = new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
-                    return (
-                      <div key={n.id}
-                        className={`flex gap-3 px-4 py-3 border-b border-white/5 ${n.read ? 'opacity-60' : ''}`}>
-                        <span className="text-xl shrink-0 mt-0.5">{icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-medium text-white leading-snug">{title}</p>
-                            <span className="text-[10px] text-white/30 shrink-0 mt-0.5">{time}</span>
-                          </div>
-                          {body && <p className="text-xs text-white/50 mt-0.5">{body}</p>}
-                        </div>
-                        {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-[#3A9DBC] shrink-0 mt-2" />}
-                      </div>
-                    )
-                  })
-                )}
+              {/* Tabs */}
+              <div className="flex-none px-4 py-2 border-b border-white/8">
+                <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+                  {(['messaggi', 'eventi'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setNotifTab(tab)}
+                      className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
+                      style={{
+                        background: notifTab === tab ? 'rgba(58,157,188,0.8)' : 'transparent',
+                        color: notifTab === tab ? 'white' : 'rgba(255,255,255,0.4)',
+                      }}
+                    >
+                      {tab === 'messaggi' ? '📢 Messaggi' : '🎮 Gioco'}
+                    </button>
+                  ))}
+                </div>
               </div>
+              {/* Messaggi list */}
+              {notifTab === 'messaggi' && (
+                <div className="flex-1 overflow-y-auto py-2">
+                  {notifLoading ? (
+                    <div className="space-y-2 px-4 pt-2">
+                      {[...Array(4)].map((_, i) => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)}
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-3 text-white/30">
+                      <span className="text-5xl">🔕</span>
+                      <p className="text-sm">Nessun messaggio</p>
+                    </div>
+                  ) : (
+                    notifications.map(n => {
+                      const isRedeemed = n.type === 'item_redeemed'
+                      const icon = isRedeemed ? '✅' : '📢'
+                      const title = isRedeemed
+                        ? `"${n.payload?.item_name}" riscattato`
+                        : (n.payload?.title ?? 'Messaggio')
+                      const body = isRedeemed
+                        ? (() => {
+                            const r = n.payload?.reward ?? {}
+                            const p: string[] = []
+                            if (r.gold) p.push(`+${r.gold} 💰`)
+                            if (r.exp) p.push(`+${r.exp} ⭐`)
+                            return p.length > 0 ? `Ricompensa: ${p.join(' · ')}` : ''
+                          })()
+                        : (n.payload?.message ?? '')
+                      const time = new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+                      return (
+                        <div key={n.id}
+                          className={`flex gap-3 px-4 py-3 border-b border-white/5 ${n.read ? 'opacity-60' : ''}`}>
+                          <span className="text-xl shrink-0 mt-0.5">{icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm font-medium text-white leading-snug">{title}</p>
+                              <span className="text-[10px] text-white/30 shrink-0 mt-0.5">{time}</span>
+                            </div>
+                            {body && <p className="text-xs text-white/50 mt-0.5">{body}</p>}
+                          </div>
+                          {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-[#3A9DBC] shrink-0 mt-2" />}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+              {/* Gioco eventi list */}
+              {notifTab === 'eventi' && (
+                <div className="flex-1 overflow-y-auto py-2">
+                  {eventsLoading ? (
+                    <div className="space-y-2 px-4 pt-2">
+                      {[...Array(4)].map((_, i) => <div key={i} className="h-12 rounded-xl bg-white/5 animate-pulse" />)}
+                    </div>
+                  ) : gameEvents.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-3 text-white/30">
+                      <span className="text-5xl">🎮</span>
+                      <p className="text-sm">Nessun evento di gioco</p>
+                    </div>
+                  ) : (
+                    gameEvents.map((ev: any) => {
+                      const { icon, title, body } = formatGameEvent(ev)
+                      const time = new Date(ev.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+                      return (
+                        <div key={ev.id} className="flex gap-3 px-4 py-3 border-b border-white/5">
+                          <span className="text-xl shrink-0 mt-0.5">{icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm font-medium text-white leading-snug">{title}</p>
+                              <span className="text-[10px] text-white/30 shrink-0 mt-0.5">{time}</span>
+                            </div>
+                            {body && <p className="text-xs text-white/50 mt-0.5">{body}</p>}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
