@@ -22,6 +22,9 @@ export default function BestiaryPage() {
   const [message, setMessage]               = useState('')
   const [filter, setFilter]                 = useState<'all' | 'caught' | 'missing'>('all')
   const [rarityFilter, setRarityFilter]     = useState<string>('all')
+  const [elementFilter, setElementFilter]   = useState<string>('all')
+  const [search, setSearch]                 = useState('')
+  const [showFilters, setShowFilters]       = useState(false)
   const [showWeakness, setShowWeakness]     = useState(false)
   const [loading, setLoading]               = useState(true)
   const [selectedPcId, setSelectedPcId]     = useState<string | null>(null)
@@ -160,10 +163,21 @@ export default function BestiaryPage() {
   }
 
   const caughtCount = playerCreatures.length
+  const activeFilterCount = (filter !== 'all' ? 1 : 0) + (rarityFilter !== 'all' ? 1 : 0) + (elementFilter !== 'all' ? 1 : 0)
+
+  function resetFilters() {
+    setFilter('all'); setRarityFilter('all'); setElementFilter('all'); setSearch('')
+  }
+
   const filtered = creatures.filter(c => {
-    if (filter === 'caught')  { if (!getPc(c.id)) return false }
-    if (filter === 'missing') { if (getPc(c.id))  return false }
+    if (filter === 'caught'  && !getPc(c.id)) return false
+    if (filter === 'missing' &&  getPc(c.id)) return false
     if (rarityFilter !== 'all' && c.rarity !== rarityFilter) return false
+    if (elementFilter !== 'all' && c.element !== elementFilter) return false
+    if (search) {
+      const q = search.toLowerCase()
+      if (!c.name.toLowerCase().includes(q) && !c.element.toLowerCase().includes(q)) return false
+    }
     return true
   })
 
@@ -267,58 +281,172 @@ export default function BestiaryPage() {
       `}</style>
 
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#0A1520]/95 backdrop-blur-sm px-4 pt-4 pb-3 border-b border-white/5">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-white">Bestiario</h1>
-              <button onClick={() => setShowWeakness(true)}
-                className="w-6 h-6 rounded-full bg-white/10 text-white/50 text-xs font-bold hover:bg-white/20 hover:text-white flex items-center justify-center">
-                ?
-              </button>
-            </div>
-            <p className="text-xs text-white/40 mt-0.5">
-              <span className="text-[#3A9DBC] font-semibold">{caughtCount}</span>
-              <span className="text-white/30"> / {creatures.length} scoperti</span>
-            </p>
+      <div className="sticky top-0 z-10 bg-[#0A1520]/96 backdrop-blur-md px-4 pt-3 pb-2.5 border-b border-white/5">
+
+        {/* Row 1: title + progress */}
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-white tracking-tight">Bestiario</h1>
+            <button
+              onClick={() => setShowWeakness(true)}
+              aria-label="Forze e debolezze"
+              className="w-5 h-5 rounded-full bg-white/8 border border-white/10 text-white/35 text-[10px] font-bold flex items-center justify-center active:bg-white/15"
+            >
+              ?
+            </button>
           </div>
-          {/* Progress bar */}
-          <div className="w-24">
-            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-[#3A9DBC] to-[#34D399] rounded-full transition-all"
-                style={{ width: `${creatures.length ? (caughtCount / creatures.length) * 100 : 0}%` }} />
-            </div>
-            <p className="text-right text-xs text-white/30 mt-0.5">
-              {creatures.length ? Math.round((caughtCount / creatures.length) * 100) : 0}%
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-white/40">
+              <span className="text-[#3A9DBC] font-bold">{caughtCount}</span>
+              <span className="text-white/25">/{creatures.length}</span>
             </p>
+            {/* Mini progress ring-style bar */}
+            <div className="w-16 h-1 bg-white/8 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full rounded-full"
+                style={{ background: 'linear-gradient(90deg, #3A9DBC, #34D399)' }}
+                initial={{ width: 0 }}
+                animate={{ width: `${creatures.length ? (caughtCount / creatures.length) * 100 : 0}%` }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex gap-1.5 mb-2">
-          {([['all', 'Tutti'], ['caught', '✓ Catturati'], ['missing', '? Mancanti']] as const).map(([v, l]) => (
-            <button key={v} onClick={() => setFilter(v)}
-              className={`flex-1 text-xs py-1.5 rounded-lg font-semibold transition-all ${
-                filter === v ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/40 hover:text-white/70'
-              }`}>
-              {l}
-            </button>
-          ))}
+        {/* Row 2: search + filter toggle */}
+        <div className="flex gap-2 items-center">
+          {/* Search bar */}
+          <div className="relative flex-1">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none"
+              fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Cerca per nome o elemento…"
+              className="w-full bg-white/6 border border-white/8 rounded-xl pl-8 pr-7 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#3A9DBC]/50 focus:bg-white/8 transition-all"
+            />
+            <AnimatePresence>
+              {search && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.7 }}
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/35 hover:text-white/70 cursor-pointer"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Filter toggle button */}
+          <motion.button
+            onClick={() => setShowFilters(f => !f)}
+            whileTap={{ scale: 0.93 }}
+            className="relative flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-bold cursor-pointer transition-colors shrink-0"
+            style={{
+              background: showFilters || activeFilterCount > 0 ? 'rgba(58,157,188,0.18)' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${showFilters || activeFilterCount > 0 ? 'rgba(58,157,188,0.45)' : 'rgba(255,255,255,0.09)'}`,
+              color: showFilters || activeFilterCount > 0 ? '#3A9DBC' : 'rgba(255,255,255,0.45)',
+            }}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+            </svg>
+            <span>Filtri</span>
+            <AnimatePresence>
+              {activeFilterCount > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#3A9DBC] text-white text-[9px] font-black flex items-center justify-center"
+                >
+                  {activeFilterCount}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
         </div>
-        {/* Rarità filter */}
-        <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none">
-          {(['all', 'comune', 'non_comune', 'raro', 'epico', 'leggendario'] as const).map(r => (
-            <button key={r} onClick={() => setRarityFilter(r)}
-              className={`shrink-0 text-[10px] px-2 py-1 rounded-md font-semibold transition-all ${
-                rarityFilter === r
-                  ? 'bg-white/20 text-white'
-                  : 'bg-white/5 text-white/30 hover:text-white/60'
-              }`}
-              style={rarityFilter === r && r !== 'all' ? { color: RARITY_COLORS[r] } : {}}>
-              {r === 'all' ? 'Tutte ★' : RARITY_LABELS[r]}
-            </button>
-          ))}
-        </div>
+
+        {/* Collapsible filter panel */}
+        <AnimatePresence initial={false}>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="pt-3 space-y-2">
+                {/* Status tabs */}
+                <div className="flex gap-1.5">
+                  {([['all', 'Tutti'], ['caught', 'Catturati'], ['missing', 'Mancanti']] as const).map(([v, l]) => (
+                    <button key={v} onClick={() => setFilter(v)}
+                      className="flex-1 text-xs py-1.5 rounded-lg font-semibold transition-all cursor-pointer"
+                      style={{
+                        background: filter === v ? '#3A9DBC' : 'rgba(255,255,255,0.05)',
+                        color: filter === v ? 'white' : 'rgba(255,255,255,0.38)',
+                      }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Rarity chips */}
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+                  {(['all', 'comune', 'non_comune', 'raro', 'epico', 'leggendario'] as const).map(r => {
+                    const active = rarityFilter === r
+                    const color = r !== 'all' ? RARITY_COLORS[r] : null
+                    return (
+                      <button key={r} onClick={() => setRarityFilter(r)}
+                        className="shrink-0 text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer"
+                        style={{
+                          background: active ? (color ? `${color}22` : 'rgba(255,255,255,0.13)') : 'rgba(255,255,255,0.04)',
+                          color: active ? (color ?? 'white') : 'rgba(255,255,255,0.28)',
+                          border: `1px solid ${active ? (color ? `${color}50` : 'rgba(255,255,255,0.25)') : 'rgba(255,255,255,0.07)'}`,
+                        }}>
+                        {r === 'all' ? '★ Rarità' : RARITY_LABELS[r]}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Element chips */}
+                <div className="flex gap-1.5">
+                  {(['all', 'fiamma', 'adriatico', 'bosco', 'terra', 'armonia'] as const).map(el => {
+                    const active = elementFilter === el
+                    const emoji = el !== 'all' ? ELEM_META[el]?.emoji : null
+                    return (
+                      <button key={el} onClick={() => setElementFilter(el)}
+                        className="flex-1 text-[10px] py-1 rounded-lg font-semibold transition-all cursor-pointer"
+                        style={{
+                          background: active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                          color: active ? 'white' : 'rgba(255,255,255,0.28)',
+                          border: `1px solid ${active ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.06)'}`,
+                        }}>
+                        {el === 'all' ? 'Elem.' : emoji}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Reset link — only when filters active */}
+                {activeFilterCount > 0 && (
+                  <button onClick={resetFilters}
+                    className="w-full text-[10px] text-white/30 hover:text-white/60 text-center cursor-pointer py-0.5 transition-colors">
+                    Reimposta filtri
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="px-4 py-4">
@@ -342,7 +470,25 @@ export default function BestiaryPage() {
           </div>
         )}
 
-        {!loading && <div className="grid grid-cols-3 gap-2 pb-24">
+        {!loading && filtered.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-20 gap-3"
+          >
+            <svg className="w-10 h-10 text-white/15" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <p className="text-sm text-white/30 font-medium">Nessuna creatura trovata</p>
+            <button
+              onClick={resetFilters}
+              className="text-xs text-[#3A9DBC]/70 hover:text-[#3A9DBC] transition-colors mt-1 cursor-pointer"
+            >
+              Reimposta filtri
+            </button>
+          </motion.div>
+        )}
+
+        {!loading && filtered.length > 0 && <div className="grid grid-cols-3 gap-2 pb-24">
           {filtered.map((creature, i) => {
             const pc = getPc(creature.id)
             const caught = !!pc
@@ -437,6 +583,7 @@ export default function BestiaryPage() {
       </div>
 
       {/* Detail bottom sheet */}
+
       <AnimatePresence>
         {selected && (() => {
           const { creature, pc } = selected
