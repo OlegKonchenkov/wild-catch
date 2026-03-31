@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
 import { AdminListSkeleton } from '@/components/admin/AdminLoading'
@@ -80,7 +81,9 @@ export default function CreaturesPage() {
   const [enigmaImgError, setEnigmaImgError] = useState<string | null>(null)
   const enigmaFileRef = useRef<HTMLInputElement>(null)
 
+  const [showFilters, setShowFilters] = useState(false)
   const [filter, setFilter] = useState<ElementType | 'all'>('all')
+  const [rarityFilter, setRarityFilter] = useState<Rarity | 'all'>('all')
   const [search, setSearch] = useState('')
   const [sessions, setSessions] = useState<{ id: string; name: string }[]>([])
   const [sessionFilter, setSessionFilter] = useState<string>('')
@@ -217,8 +220,13 @@ export default function CreaturesPage() {
   const editingCreature = panel !== 'none' && panel !== 'new'
     ? creatures.find(c => c.id === panel) ?? null : null
 
+  const activeFilterCount = [
+    filter !== 'all', rarityFilter !== 'all', !!sessionFilter
+  ].filter(Boolean).length
+
   const filtered = creatures.filter(c => {
     if (filter !== 'all' && c.element !== filter) return false
+    if (rarityFilter !== 'all' && c.rarity !== rarityFilter) return false
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false
     if (sessionFilter === '__null__' && c.session_id !== null) return false
     if (sessionFilter && sessionFilter !== '__null__' && c.session_id !== sessionFilter) return false
@@ -259,23 +267,104 @@ export default function CreaturesPage() {
 
         {/* Grid */}
         <div>
-          {/* Filters */}
-          <div className="flex gap-2 mb-4 flex-wrap items-center">
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Cerca..." className="bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-1.5 w-36 focus:outline-none focus:border-[#3A9DBC]/50" />
-            <select value={sessionFilter} onChange={e => setSessionFilter(e.target.value)}
-              className="bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#3A9DBC]/50">
-              <option value="">📋 Tutte le sessioni</option>
-              <option value="__null__">🌐 Globali</option>
-              {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            {(['all', ...ELEMENTS] as const).map(el => (
-              <button key={el} onClick={() => setFilter(el)}
-                className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${filter === el ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/50 hover:text-white hover:bg-white/10'}`}>
-                {el === 'all' ? 'Tutti' : `${ELEMENT_META[el].emoji} ${ELEMENT_META[el].label}`}
-              </button>
-            ))}
+          {/* Filter bar */}
+          <div className="flex gap-2 mb-3 items-center">
+            <div className="relative flex-1">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Cerca per nome…"
+                className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl pl-8 pr-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50 transition-colors" />
+            </div>
+
+            {/* Filtri toggle */}
+            <motion.button
+              onClick={() => setShowFilters(f => !f)}
+              whileTap={{ scale: 0.93 }}
+              className="relative flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-bold cursor-pointer transition-colors shrink-0"
+              style={{
+                background: showFilters || activeFilterCount > 0 ? 'rgba(58,157,188,0.18)' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${showFilters || activeFilterCount > 0 ? 'rgba(58,157,188,0.45)' : 'rgba(255,255,255,0.09)'}`,
+                color: showFilters || activeFilterCount > 0 ? '#3A9DBC' : 'rgba(255,255,255,0.45)',
+              }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+              </svg>
+              <span>Filtri</span>
+              <AnimatePresence>
+                {activeFilterCount > 0 && (
+                  <motion.span
+                    initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#3A9DBC] text-white text-[9px] font-black flex items-center justify-center"
+                  >
+                    {activeFilterCount}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
           </div>
+
+          {/* Collapsible filter panel */}
+          <AnimatePresence initial={false}>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                className="overflow-hidden"
+              >
+                <div className="pb-3 space-y-2">
+                  {/* Session filter */}
+                  <select value={sessionFilter} onChange={e => setSessionFilter(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 text-white text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50">
+                    <option value="">📋 Tutte le sessioni</option>
+                    <option value="__null__">🌐 Globali</option>
+                    {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+
+                  {/* Element chips */}
+                  <div className="flex gap-1.5 flex-wrap">
+                    {(['all', ...ELEMENTS] as const).map(el => (
+                      <button key={el} onClick={() => setFilter(el)}
+                        className="text-xs px-2.5 py-1 rounded-lg font-semibold transition-all"
+                        style={{
+                          background: filter === el ? 'rgba(58,157,188,0.2)' : 'rgba(255,255,255,0.05)',
+                          color: filter === el ? '#3A9DBC' : 'rgba(255,255,255,0.38)',
+                          border: `1px solid ${filter === el ? 'rgba(58,157,188,0.45)' : 'rgba(255,255,255,0.07)'}`,
+                        }}>
+                        {el === 'all' ? '🌐 Elem.' : `${ELEMENT_META[el].emoji} ${ELEMENT_META[el].label}`}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Rarity chips */}
+                  <div className="flex gap-1.5 flex-wrap">
+                    {(['all', ...RARITIES] as const).map(r => (
+                      <button key={r} onClick={() => setRarityFilter(r)}
+                        className="text-xs px-2.5 py-1 rounded-lg font-semibold transition-all"
+                        style={{
+                          background: rarityFilter === r ? `${RARITY_META[r === 'all' ? 'comune' : r].color}22` : 'rgba(255,255,255,0.05)',
+                          color: rarityFilter === r ? (r === 'all' ? 'white' : RARITY_META[r].color) : 'rgba(255,255,255,0.38)',
+                          border: `1px solid ${rarityFilter === r ? (r === 'all' ? 'rgba(255,255,255,0.25)' : `${RARITY_META[r].color}50`) : 'rgba(255,255,255,0.07)'}`,
+                        }}>
+                        {r === 'all' ? '★ Rarità' : RARITY_META[r].label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {activeFilterCount > 0 && (
+                    <button onClick={() => { setFilter('all'); setRarityFilter('all'); setSessionFilter('') }}
+                      className="w-full text-[10px] text-white/30 hover:text-white/60 text-center cursor-pointer py-0.5 transition-colors">
+                      Reimposta filtri
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {loading ? (
             <AdminListSkeleton rows={8} itemClassName="h-44" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" />
