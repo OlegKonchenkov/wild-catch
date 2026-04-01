@@ -285,6 +285,7 @@ const workflowSteps = [
   { icon: '✅', text: 'Verifica l\'area mappa (trascina i marker per adattarla al venue)' },
   { icon: '✅', text: 'Genera N codici invito (uno per partecipante) ed esporta i QR da stampare' },
   { icon: '✅', text: 'Verifica che le creature abbiano artwork (genera con AI se mancante)' },
+  { icon: '✅', text: 'Opzionale: aggiungi Frammenti Enigma alle creature per contenuti segreti post-cattura' },
   { icon: '✅', text: 'Configura oggetti nel negozio — imposta prezzi e effect_value per ogni tipo' },
   { icon: '✅', text: 'Crea 3–5 missioni bilanciate — includi almeno una di tipo QR e una di tipo walk' },
   { icon: '✅', text: 'Crea i QR code di gioco: oggetti, uova (con steps_required), boss fight, indizi' },
@@ -574,6 +575,37 @@ export default function AdminGuidePage() {
                 'Tab ✨ AI — genera artwork con prompt descrittivo (Low $0.01 · Medium $0.04 · High $0.17)',
                 'min_level determina il livello minimo richiesto per far apparire la creatura negli spawn',
               ]} />
+
+              <SubHeader>Filtri e ricerca</SubHeader>
+              <Prose>
+                Usa il pannello filtri (pulsante <Code>Filtri</Code> in alto) per trovare rapidamente
+                le creature per elemento, rarità o sessione assegnata. Il badge numerico indica quanti
+                filtri sono attivi.
+              </Prose>
+
+              <SubHeader>Frammenti Enigma</SubHeader>
+              <Prose>
+                Ogni creatura può avere un <strong style={{ color: '#C084FC' }}>Frammento Enigma</strong> opzionale:
+                un contenuto segreto (testo, immagine o video) che il giocatore sblocca dopo averla catturata.
+                Nel modulo di modifica espandi la sezione <Code>🧩 Enigma</Code>.
+              </Prose>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', margin: '0.5rem 0' }}>
+                {[
+                  { field: 'enigma_title',       color: '#C084FC', desc: 'Titolo del frammento — appare come intestazione del reveal' },
+                  { field: 'enigma_description',  color: '#C084FC', desc: 'Testo del frammento — lore, indizio o segreto narrativo' },
+                  { field: 'enigma_image_url',    color: '#3A9DBC', desc: 'URL immagine o carica direttamente con il pulsante 📁' },
+                  { field: 'enigma_video_url',    color: '#E85D2F', desc: 'URL YouTube, Vimeo o video diretto (mp4/webm) — viene embeddato nel reveal' },
+                ].map(({ field, color, desc }) => (
+                  <div key={field} style={{ background: `${color}0a`, border: `1px solid ${color}25`, borderRadius: '8px', padding: '0.55rem 0.85rem', display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+                    <Badge label={field} color={color} />
+                    <span style={{ color: '#94a3b8', fontSize: '0.83rem', lineHeight: 1.5 }}>{desc}</span>
+                  </div>
+                ))}
+              </div>
+              <Callout type="tip">
+                Lascia tutti i campi enigma vuoti se non vuoi associare un frammento a quella creatura.
+                Il pulsante 🧩 nell&rsquo;app sarà automaticamente disattivato per i giocatori.
+              </Callout>
             </section>
 
             <Divider />

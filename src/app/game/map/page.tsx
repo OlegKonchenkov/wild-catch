@@ -109,10 +109,10 @@ function MapPageInner() {
     const sid = sessionIdRef.current
     if (!sid || sessionEndedRef.current) return
 
-    // Skip inaccurate fixes — they would store wrong coordinates in the DB
-    // and trigger false "fuori dall'area" warnings. The map marker still
-    // updates from useGPS state regardless of this server-call filter.
-    if (pos.accuracy > 100) return
+    // Skip very inaccurate fixes — the map marker still updates from useGPS
+    // state regardless. The server applies its own tighter check for step counting.
+    // 200m threshold (was 100m) — typical mobile GPS reports 50-150m accuracy.
+    if (pos.accuracy > 200) return
 
     const now = Date.now()
     const res = await fetch('/api/game/position', {
@@ -160,9 +160,14 @@ function MapPageInner() {
         const now = Date.now()
         if (now - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS) {
           lastEncounterRef.current = now
-          await triggerEncounter('timer')
+          try {
+            await triggerEncounter('timer')
+          } catch {
+            // network error — reset cooldown so the next timer tick can retry
+            lastEncounterRef.current = 0
+          }
         }
-        scheduleTimerEncounter()
+        scheduleTimerEncounter()  // always reschedule, regardless of errors
       }, delay)
     }
     scheduleTimerEncounter()

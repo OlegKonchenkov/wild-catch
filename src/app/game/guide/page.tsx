@@ -361,6 +361,7 @@ function TipChips() {
     { text: 'Abbassa gli HP della creatura selvatica prima di lanciare la rete — le chance aumentano', color: '#3A9DBC' },
     { text: 'Cammina per far schiudere le uova — ogni passo conta anche se non incontri creature!', color: '#C084FC' },
     { text: 'Completa le missioni QR e di cattura per guadagnare monete extra da spendere nel negozio', color: '#FBBF24' },
+    { text: 'Dopo una cattura apri il Bestiario e cerca il pulsante 🧩 — alcune creature nascondono frammenti enigma segreti!', color: '#C084FC' },
   ]
   return (
     <div className="flex flex-col gap-2 mt-3">
@@ -484,6 +485,38 @@ function buildSections(): Section[] {
           </p>
           <p className="text-white/60 text-xs mt-2">5 rarità in ordine crescente:</p>
           <RarityBadges />
+        </div>
+      ),
+    },
+    {
+      id: 'enigmi',
+      icon: '🧩',
+      title: 'Frammenti Enigma',
+      accent: '#C084FC',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            Alcune creature nascondono un <span className="text-[#C084FC] font-bold">Frammento Enigma</span> —
+            un indizio, un segreto o un dettaglio speciale sbloccato dopo la cattura.
+            Trovalo nel Bestiario toccando la creatura e premendo il pulsante viola 🧩.
+          </p>
+          <div className="mt-3 space-y-2 text-xs">
+            {[
+              { icon: '🐾', text: 'Cattura la creatura — solo le creature nel tuo bestiario svelano l\'enigma' },
+              { icon: '📖', text: 'Vai nel Bestiario → tocca la creatura → premi "🧩 Frammento Enigma"' },
+              { icon: '✨', text: 'L\'enigma si rivela con un\'animazione: titolo, testo, immagine o video' },
+              { icon: '🔒', text: 'Il pulsante è disattivato se la creatura non ha un enigma assegnato dall\'admin' },
+            ].map(row => (
+              <div key={row.text} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
+                <span className="flex-shrink-0">{row.icon}</span>
+                <span className="text-white/70 leading-relaxed">{row.text}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 rounded-xl border border-[#C084FC]/20 bg-[#C084FC]/5 px-3 py-2 text-xs text-[#C084FC]/80">
+            🧩 Non tutte le creature hanno un enigma — l&apos;organizzatore decide quali creature
+            portano frammenti e cosa contengono.
+          </div>
         </div>
       ),
     },
@@ -634,28 +667,34 @@ function buildSections(): Section[] {
     {
       id: 'profilo',
       icon: '🏆',
-      title: 'Profilo & Classifica',
+      title: 'Profilo & Sessioni',
       accent: '#F7C841',
       content: (
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
-            Il tuo profilo mostra EXP, livello e creature catturate. La classifica globale mostra
-            tutti i giocatori ordinati per EXP. Scala la vetta!
+            Il tuo profilo mostra tutte le sessioni a cui hai partecipato. Selezionane una per
+            vedere le tue statistiche dettagliate: EXP, livello, creature catturate, oro e duelli vinti.
           </p>
-          <div className="mt-3 space-y-1.5">
+          <div className="mt-3 space-y-2 text-xs">
             {[
-              { rank: '🥇', name: 'MarcoA.',   exp: '4320 EXP' },
-              { rank: '🥈', name: 'Giulia_B',  exp: '3870 EXP' },
-              { rank: '🥉', name: 'FerdiP',    exp: '3200 EXP' },
-              { rank: '#4', name: 'Tu',         exp: '2740 EXP', isYou: true },
-            ].map(p => (
-              <div key={p.name}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 ${p.isYou ? 'bg-[#F7C841]/15 border border-[#F7C841]/40' : 'bg-white/5 border border-white/10'}`}>
-                <span className="w-8 text-center text-sm font-bold">{p.rank}</span>
-                <span className={`flex-1 text-sm ${p.isYou ? 'text-[#F7C841] font-bold' : 'text-white/80'}`}>{p.name}</span>
-                <span className="text-xs text-[#F7C841]">{p.exp}</span>
+              { icon: '🎮', label: 'Scegli sessione',     desc: 'Tocca una sessione per vederne le stats — quella attiva è marcata con un bordo verde',    color: '#34D399' },
+              { icon: '📊', label: 'Stats per sessione',   desc: 'EXP · Livello · Posizione classifica · Creature · Oro · Duelli vinti/giocati',            color: '#F7C841' },
+              { icon: '⚡', label: 'Entra in sessione',    desc: 'Dopo aver selezionato una sessione attiva, premi il pulsante per iniziare a giocare',      color: '#3A9DBC' },
+              { icon: '🏅', label: 'Classifica live',      desc: 'La classifica sotto le stats mostra la posizione di tutti i giocatori della sessione',     color: '#C084FC' },
+            ].map(row => (
+              <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2"
+                style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
+                <span className="text-base flex-shrink-0">{row.icon}</span>
+                <div>
+                  <span className="font-bold text-white/90">{row.label}</span>
+                  <span className="text-white/45"> — {row.desc}</span>
+                </div>
               </div>
             ))}
+          </div>
+          <div className="mt-3 rounded-xl border border-[#F7C841]/20 bg-[#F7C841]/5 px-3 py-2 text-xs text-[#F7C841]/80">
+            💡 Puoi partecipare a più sessioni nel tempo — ogni sessione ha le sue statistiche indipendenti.
+            I totali in alto (EXP tot, creature, vittorie) sommano tutti gli eventi.
           </div>
         </div>
       ),

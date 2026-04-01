@@ -50,10 +50,19 @@ export async function POST(request: Request) {
     }
   }
 
+  // Auto-expire encounters older than 3 minutes (player dismissed popup without entering)
+  await supabase
+    .from('encounters')
+    .update({ status: 'fled' })
+    .eq('user_id', user.id)
+    .eq('session_id', sessionId)
+    .eq('status', 'active')
+    .lt('created_at', new Date(Date.now() - 3 * 60 * 1000).toISOString())
+
   // Check no active encounter already
   const { data: existing } = await supabase
     .from('encounters')
-    .select('id')
+    .select('id, created_at')
     .eq('user_id', user.id)
     .eq('session_id', sessionId)
     .eq('status', 'active')
