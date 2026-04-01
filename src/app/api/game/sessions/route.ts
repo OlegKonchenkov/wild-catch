@@ -59,7 +59,7 @@ export async function GET() {
   // 4. Build response, active sessions first then by start_at desc
   const sessions = playerSessions
     .map(ps => {
-      const sess = ps.sessions as { id: string; name: string; status: string; start_at: string | null; end_at: string | null } | null
+      const sess = ps.sessions as unknown as { id: string; name: string; status: string; start_at: string | null; end_at: string | null } | null
       return {
         id: ps.session_id,
         name: sess?.name ?? 'Sessione',
