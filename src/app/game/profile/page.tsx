@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, Suspense } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -70,7 +70,6 @@ function ProfileContent() {
   const [loadingBoard, setLoadingBoard]       = useState(false)
   const [error, setError]               = useState<string | null>(null)
 
-  const router      = useRouter()
   const searchParams = useSearchParams()
   const sessionEnded = searchParams.get('ended') === '1'
 
