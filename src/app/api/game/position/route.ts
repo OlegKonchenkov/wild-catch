@@ -80,9 +80,14 @@ export async function POST(request: Request) {
     })
     .eq('id', playerSession.id)
 
-  // Walk mission progress: update whenever steps change
+  // Walk mission progress + egg hatching: update whenever steps change
+  let eggsHatched: Array<{ name: string; rarity: string; element: string }> = []
   if (stepsIncrement > 0 && session.status === 'active') {
-    await updateWalkMissions(sessionId, user.id, newStepsWalked, supabase)
+    const [, hatched] = await Promise.all([
+      updateWalkMissions(sessionId, user.id, newStepsWalked, supabase),
+      checkAndHatchEggs(sessionId, user.id, newStepsWalked, supabase),
+    ])
+    eggsHatched = hatched
   }
 
   // Encounter trigger: only when in bounds, session active, moved ≥5m, good accuracy
@@ -93,7 +98,7 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status, stepsWalked: newStepsWalked, distanceMoved })
+  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status, stepsWalked: newStepsWalked, distanceMoved, eggsHatched })
 }
 
 async function updateWalkMissions(
@@ -211,4 +216,99 @@ async function grantMissionReward(
           })
       : Promise.resolve(),
   ])
+}
+
+// Rarity pool for egg hatching (mirrors eggs/[id]/route.ts)
+const EGG_RARITY_POOLS: Record<string, Array<{ rarity: string; weight: number }>> = {
+  comune:      [{ rarity: 'comune', weight: 1 }],
+  non_comune:  [{ rarity: 'comune', weight: 70 }, { rarity: 'non_comune', weight: 30 }],
+  raro:        [{ rarity: 'comune', weight: 50 }, { rarity: 'non_comune', weight: 30 }, { rarity: 'raro',       weight: 20 }],
+  epico:       [{ rarity: 'comune', weight: 40 }, { rarity: 'non_comune', weight: 30 }, { rarity: 'raro',       weight: 20 }, { rarity: 'epico',      weight: 10 }],
+  leggendario: [{ rarity: 'comune', weight: 35 }, { rarity: 'non_comune', weight: 25 }, { rarity: 'raro',       weight: 20 }, { rarity: 'epico',      weight: 15 }, { rarity: 'leggendario', weight: 5 }],
+}
+
+function pickEggRarity(eggRarity: string): string {
+  const pool = EGG_RARITY_POOLS[eggRarity] ?? EGG_RARITY_POOLS['comune']
+  const total = pool.reduce((s, e) => s + e.weight, 0)
+  let roll = Math.random() * total
+  for (const entry of pool) {
+    roll -= entry.weight
+    if (roll <= 0) return entry.rarity
+  }
+  return pool[pool.length - 1].rarity
+}
+
+async function checkAndHatchEggs(
+  sessionId: string,
+  userId: string,
+  stepsWalked: number,
+  supabase: any,
+): Promise<Array<{ name: string; rarity: string; element: string }>> {
+  const { data: eggs } = await supabase
+    .from('player_eggs')
+    .select('id, egg_rarity, steps_required, steps_at_pickup')
+    .eq('user_id', userId)
+    .eq('session_id', sessionId)
+    .is('hatched_at', null)
+
+  if (!eggs?.length) return []
+
+  const readyEggs = (eggs as any[]).filter(egg =>
+    egg.steps_required === 0 || (stepsWalked - egg.steps_at_pickup) >= egg.steps_required
+  )
+  if (!readyEggs.length) return []
+
+  const hatched: Array<{ name: string; rarity: string; element: string }> = []
+
+  for (const egg of readyEggs) {
+    const targetRarity = pickEggRarity(egg.egg_rarity)
+
+    const { data: candidates } = await supabase
+      .from('creatures')
+      .select('id, name, rarity, element')
+      .eq('rarity', targetRarity)
+      .limit(100)
+
+    let pool: any[] = candidates ?? []
+    if (!pool.length) {
+      const { data: fallback } = await supabase
+        .from('creatures').select('id, name, rarity, element').eq('rarity', 'comune').limit(50)
+      pool = fallback ?? []
+    }
+    if (!pool.length) continue
+
+    const picked = pool[Math.floor(Math.random() * pool.length)]
+
+    // Add to collection or increment duplicates
+    const { data: existing } = await supabase
+      .from('player_creatures')
+      .select('id, duplicates_count')
+      .eq('user_id', userId)
+      .eq('creature_id', picked.id)
+      .eq('session_id', sessionId)
+      .maybeSingle()
+
+    if (existing) {
+      await supabase
+        .from('player_creatures')
+        .update({ duplicates_count: existing.duplicates_count + 1 })
+        .eq('id', existing.id)
+    } else {
+      await supabase.from('player_creatures').insert({
+        user_id: userId,
+        creature_id: picked.id,
+        session_id: sessionId,
+        duplicates_count: 1,
+      })
+    }
+
+    await supabase
+      .from('player_eggs')
+      .update({ hatched_at: new Date().toISOString(), hatched_creature_id: picked.id })
+      .eq('id', egg.id)
+
+    hatched.push({ name: picked.name, rarity: picked.rarity, element: picked.element })
+  }
+
+  return hatched
 }

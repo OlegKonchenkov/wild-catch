@@ -22,6 +22,7 @@ function MapPageInner() {
   const [escaActiveUntil, setEscaActiveUntil] = useState<Date | null>(null)
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
+  const [hatchedCreature, setHatchedCreature] = useState<{ name: string; rarity: string } | null>(null)
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
@@ -147,6 +148,12 @@ function MapPageInner() {
     // Update step counter from server's authoritative value
     if (typeof data.stepsWalked === 'number') {
       setStepsWalked(data.stepsWalked)
+    }
+
+    // Show hatch notification for the first egg that hatched (auto-hatched server-side)
+    if (data.eggsHatched?.length > 0) {
+      setHatchedCreature(data.eggsHatched[0])
+      setTimeout(() => setHatchedCreature(null), 5000)
     }
 
     // Accumulate distance for walk-based encounter trigger
@@ -309,6 +316,17 @@ function MapPageInner() {
         <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-[#34D399]/20 border border-[#34D399]/40 text-[#34D399] text-xs px-3 py-1.5 rounded-full z-[900] flex items-center gap-1.5 backdrop-blur-sm whitespace-nowrap">
           <span>🪱</span>
           <span className="font-semibold">Esca attiva</span>
+        </div>
+      )}
+
+      {/* Egg hatched notification */}
+      {hatchedCreature && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-[#C084FC]/20 border border-[#C084FC]/40 text-[#E9D5FF] text-sm px-4 py-2.5 rounded-2xl z-[900] flex items-center gap-2 backdrop-blur-sm whitespace-nowrap shadow-lg">
+          <span className="text-lg">🥚</span>
+          <div>
+            <div className="font-bold leading-tight">Uovo schiuso!</div>
+            <div className="text-xs text-[#C084FC]">{hatchedCreature.name} · {hatchedCreature.rarity}</div>
+          </div>
         </div>
       )}
 
