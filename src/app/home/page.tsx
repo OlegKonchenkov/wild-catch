@@ -4,23 +4,21 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 
-interface SessionHistory {
-  session_id: string
+interface SessionStats {
+  id: string
+  name: string
+  status: string
+  start_at: string | null
+  end_at: string | null
   exp: number
-  joined_at: string
-  sessions: { name: string; status: string; start_at: string | null } | null
+  gold: number
+  level: number
+  creatures_caught: number
+  duel_wins: number
+  duel_total: number
 }
 
 /* ─── tiny helpers ─────────────────────────────── */
-function Stat({ val, label, icon }: { val: number | string; label: string; icon: string }) {
-  return (
-    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '14px 12px', textAlign: 'center' }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 2 }}>{val}</div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{icon} {label}</div>
-    </div>
-  )
-}
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ padding: '24px 20px 0' }}>
@@ -40,6 +38,22 @@ function Card({ children, accent }: { children: React.ReactNode; accent?: string
   )
 }
 
+function StatCell({ val, label, color }: { val: number | string; label: string; color?: string }) {
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 10px', textAlign: 'center' }}>
+      <div style={{ fontSize: 20, fontWeight: 800, color: color ?? '#fff', marginBottom: 2 }}>{val}</div>
+      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+    </div>
+  )
+}
+
+function statusMeta(status: string) {
+  if (status === 'active') return { label: 'In corso', color: '#34D399', icon: '🟢' }
+  if (status === 'ready')  return { label: 'In attesa', color: '#F7C841', icon: '🟡' }
+  if (status === 'ended')  return { label: 'Terminata', color: 'rgba(255,255,255,0.25)', icon: '🏁' }
+  return { label: status, color: 'rgba(255,255,255,0.25)', icon: '⚪' }
+}
+
 /* ─── main ─────────────────────────────────────── */
 function HomeLobby() {
   const supabase = useMemo(() => createClient(), [])
@@ -49,9 +63,8 @@ function HomeLobby() {
   const [loading, setLoading]     = useState(true)
   const [user, setUser]           = useState<User | null>(null)
   const [nickname, setNickname]   = useState<string | null>(null)
-  const [activeSession, setActiveSession] = useState<{ id: string; name: string } | null>(null)
-  const [history, setHistory]     = useState<SessionHistory[]>([])
-  const [totalCreatures, setTotalCreatures] = useState(0)
+  const [sessions, setSessions]   = useState<SessionStats[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   // Invite code form
   const [code, setCode]           = useState(searchParams.get('code') ?? '')
@@ -82,16 +95,18 @@ function HomeLobby() {
     })
   }, [supabase, router])
 
-  async function loadData(userId: string) {
-    // Phase 1 — profile + restore in parallel (both independent)
-    const [profileRes, restoreRes] = await Promise.all([
+  async function loadData(_userId: string) {
+    // Phase 1 — profile + restore + sessions all in parallel
+    const [profileRes, restoreRes, sessionsRes] = await Promise.all([
       fetch('/api/profile'),
       fetch('/api/auth/restore'),
+      fetch('/api/game/sessions'),
     ])
 
-    const [profile, restore] = await Promise.all([
+    const [profile, restore, sessData] = await Promise.all([
       profileRes.ok ? profileRes.json() : Promise.resolve({}),
       restoreRes.json(),
+      sessionsRes.ok ? sessionsRes.json() : Promise.resolve({ sessions: [] }),
     ])
 
     if (profile.nickname !== undefined) {
@@ -102,30 +117,15 @@ function HomeLobby() {
     const { sessionId } = restore as { sessionId: string | null }
     if (sessionId) localStorage.setItem('current_session_id', sessionId)
 
-    // Phase 2 — session name + history + creature count all in parallel
-    await Promise.all([
-      // Session name (only if we have a sessionId)
-      sessionId
-        ? supabase.from('sessions').select('name').eq('id', sessionId).single()
-            .then(({ data: s }) => setActiveSession({ id: sessionId, name: s?.name ?? 'Evento' }))
-        : Promise.resolve(),
+    const loaded: SessionStats[] = sessData.sessions ?? []
+    setSessions(loaded)
 
-      // Session history
-      supabase
-        .from('player_sessions')
-        .select('session_id, exp, joined_at, sessions(name, status, start_at)')
-        .eq('user_id', userId)
-        .order('joined_at', { ascending: false })
-        .limit(10)
-        .then(({ data: ps }) => { if (ps) setHistory(ps as unknown as SessionHistory[]) }),
-
-      // Total creatures
-      supabase
-        .from('player_creatures')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .then(({ count }) => setTotalCreatures(count ?? 0)),
-    ])
+    // Auto-select: prefer active, then the restored session, then the first one
+    if (loaded.length > 0) {
+      const active = loaded.find(s => s.status === 'active')
+      const restored = sessionId ? loaded.find(s => s.id === sessionId) : null
+      setSelectedId(active?.id ?? restored?.id ?? null)
+    }
 
     setLoading(false)
   }
@@ -144,7 +144,6 @@ function HomeLobby() {
 
   async function handleJoin() {
     if (!code || code.length < 4 || !gdpr || joining) return
-    // Require nickname before joining
     if (!nickname) { setJoinError('Imposta prima il tuo nickname (vedi sopra)'); return }
     setJoining(true); setJoinError('')
     const res = await fetch('/api/auth/join', {
@@ -186,13 +185,19 @@ function HomeLobby() {
     router.replace('/')
   }
 
+  function enterSession(sess: SessionStats) {
+    localStorage.setItem('current_session_id', sess.id)
+    window.location.href = `/game/map?restored=${sess.id}`
+  }
+
   const googleName  = user?.user_metadata?.full_name ?? user?.email ?? 'Giocatore'
   const displayName = nickname ?? googleName.split(' ')[0]
   const avatarUrl   = user?.user_metadata?.avatar_url
   const initials    = displayName.slice(0, 2).toUpperCase()
-  const sessionsPlayed = history.length
-  const totalExp       = history.reduce((s, ps) => s + (ps.exp ?? 0), 0)
   const needsNickname  = nickname === null || nickname === ''
+
+  const selected = sessions.find(s => s.id === selectedId) ?? null
+  const isPlayable = selected && (selected.status === 'active' || selected.status === 'ready')
 
   if (loading) {
     return (
@@ -249,7 +254,7 @@ function HomeLobby() {
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: "'Cinzel', serif", fontSize: 20, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.06em', marginBottom: 8 }}>
-            🌿 WildCatch
+            WildCatch
           </div>
           <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }} className="wc-dots">
             <span /><span /><span />
@@ -318,27 +323,29 @@ function HomeLobby() {
         .accordion-body { padding: 0 18px 18px; border-top: 1px solid rgba(255,255,255,0.06); }
         .chevron { color: rgba(255,255,255,0.3); transition: transform 0.2s; font-style: normal; }
         .chevron.open { transform: rotate(180deg); }
-        .hi-item {
-          display: flex; align-items: center; gap: 12px;
-          background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
-        }
-        .hi-icon {
-          width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
-          background: rgba(58,157,188,0.1); border: 1px solid rgba(58,157,188,0.2);
-          display: flex; align-items: center; justify-content: center; font-size: 16px;
-        }
         .danger-zone {
           background: rgba(232,93,47,0.06); border: 1px solid rgba(232,93,47,0.2);
           border-radius: 12px; padding: 16px;
         }
+        .sess-card {
+          width: 100%; text-align: left;
+          background: rgba(255,255,255,0.03); border: 1.5px solid rgba(255,255,255,0.07);
+          border-radius: 14px; padding: 13px 14px; margin-bottom: 8px;
+          cursor: pointer; transition: border-color 0.18s, background 0.18s;
+          display: flex; align-items: center; gap: 12;
+          font-family: 'DM Sans', sans-serif;
+        }
+        .sess-card:hover { border-color: rgba(58,188,168,0.3); background: rgba(58,188,168,0.04); }
+        .sess-card.selected { border-color: #3ABCA8; background: rgba(58,188,168,0.07); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        .fade-in { animation: fadeIn 0.22s ease forwards; }
       `}</style>
 
       <div style={{ minHeight: '100svh', width: '100%', background: 'linear-gradient(160deg, #0D1E2E 0%, #0A1520 60%)', maxWidth: 480, margin: '0 auto', paddingBottom: 48 }}>
 
         {/* ── Top bar ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ fontFamily: "'Cinzel', serif", fontSize: 18, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.04em' }}>🌿 WildCatch</span>
+          <span style={{ fontFamily: "'Cinzel', serif", fontSize: 18, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.04em' }}>WildCatch</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
               onClick={() => { setShowSettings(v => !v); setSettingMsg(null); setEditingNickInline(false) }}
@@ -353,7 +360,7 @@ function HomeLobby() {
         {/* ── Welcome ── */}
         <div style={{ padding: '24px 20px 0' }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
-            Ciao, {displayName} 👋
+            Ciao, {displayName}
           </div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>
             {user?.email}
@@ -407,13 +414,6 @@ function HomeLobby() {
             )}
           </div>
         )}
-
-        {/* ── Stats ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: '20px 20px 0' }}>
-          <Stat val={totalCreatures} label="Creature" icon="🐾" />
-          <Stat val={sessionsPlayed} label="Sessioni"  icon="🎮" />
-          <Stat val={totalExp}       label="EXP tot"   icon="⚡" />
-        </div>
 
         {/* ── Nickname prompt (one-time) ── */}
         {needsNickname && !showSettings && (
@@ -511,25 +511,101 @@ function HomeLobby() {
           </Section>
         )}
 
-        {/* ── Active session ── */}
-        {activeSession && (
-          <Section title="Evento in corso">
-            <Card accent="#3ABCA8">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '16px 18px' }}>
-                <div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Sessione attiva</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{activeSession.name}</div>
-                </div>
-                <button
-                  onClick={() => router.push('/game/map')}
-                  style={{ background: '#3ABCA8', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, padding: '10px 16px', borderRadius: 10, whiteSpace: 'nowrap', boxShadow: '0 2px 12px rgba(58,188,168,0.3)', transition: 'opacity 0.2s' }}
-                >
-                  ▶ Continua
-                </button>
+        {/* ── Sessions ── */}
+        <Section title="Le tue sessioni">
+          {sessions.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: '20px 0' }}>
+              Nessuna sessione ancora.<br />Partecipa al tuo primo evento!
+            </div>
+          ) : (
+            <>
+              {/* Session selector cards */}
+              <div>
+                {sessions.map(sess => {
+                  const sm = statusMeta(sess.status)
+                  const dateStr = sess.start_at
+                    ? new Date(sess.start_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
+                    : '—'
+                  const isSelected = sess.id === selectedId
+                  return (
+                    <button
+                      key={sess.id}
+                      className={`sess-card${isSelected ? ' selected' : ''}`}
+                      style={{ gap: 12 }}
+                      onClick={() => setSelectedId(isSelected ? null : sess.id)}
+                    >
+                      {/* Status dot */}
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: sm.color, flexShrink: 0, boxShadow: sess.status === 'active' ? `0 0 8px ${sm.color}` : 'none' }} />
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sess.name}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                          {dateStr} · <span style={{ color: sm.color }}>{sm.label}</span>
+                        </div>
+                      </div>
+                      {/* Quick stats */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#F7C841' }}>⚡ {sess.exp}</span>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Lv {sess.level}</span>
+                      </div>
+                      {/* Chevron */}
+                      <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, transform: isSelected ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>›</span>
+                    </button>
+                  )
+                })}
               </div>
-            </Card>
-          </Section>
-        )}
+
+              {/* Expanded stats for selected session */}
+              {selected && (
+                <div className="fade-in" style={{ marginTop: 4, marginBottom: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(58,188,168,0.2)', borderRadius: 16, overflow: 'hidden' }}>
+                  {/* Header */}
+                  <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.04em' }}>{selected.name}</div>
+                    {selected.end_at && (
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                        Terminata il {new Date(selected.end_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 6-stat grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: '12px 12px 4px' }}>
+                    <StatCell val={selected.exp}             label="EXP"      color="#F7C841" />
+                    <StatCell val={`Lv ${selected.level}`}  label="Livello"   color="#C084FC" />
+                    <StatCell val={selected.gold}           label="Oro"       color="#F59E0B" />
+                    <StatCell val={selected.creatures_caught} label="Creature" color="#34D399" />
+                    <StatCell val={selected.duel_total}     label="Duelli"    color="#60A5FA" />
+                    <StatCell
+                      val={selected.duel_total > 0 ? `${Math.round((selected.duel_wins / selected.duel_total) * 100)}%` : '—'}
+                      label="Win rate"
+                      color="#F472B6"
+                    />
+                  </div>
+
+                  {/* Rank label */}
+                  <div style={{ padding: '8px 12px 12px' }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
+                      {selected.duel_total > 0 && `${selected.duel_wins} vittorie su ${selected.duel_total} duelli`}
+                    </div>
+                  </div>
+
+                  {/* Enter session CTA */}
+                  {isPlayable && (
+                    <div style={{ padding: '0 12px 14px' }}>
+                      <button
+                        className="btn btn-teal"
+                        style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.03em', padding: '14px 16px', boxShadow: '0 4px 20px rgba(58,188,168,0.35)' }}
+                        onClick={() => enterSession(selected)}
+                      >
+                        {selected.status === 'active' ? '▶ Entra nella sessione' : '▶ Rientra nella sessione'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </Section>
 
         {/* ── Join event ── */}
         <Section title="Partecipa a un evento">
@@ -588,71 +664,6 @@ function HomeLobby() {
           </Card>
         </Section>
 
-        {/* ── Session history ── */}
-        <Section title="Storico sessioni">
-          {history.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: '20px 0' }}>
-              Nessuna sessione ancora.<br />Partecipa al tuo primo evento!
-            </div>
-          ) : (
-            <div>
-              {history.map(ps => {
-                const status     = Array.isArray(ps.sessions) ? (ps.sessions[0] as any)?.status : ps.sessions?.status
-                const sessName   = Array.isArray(ps.sessions) ? (ps.sessions[0] as any)?.name   : ps.sessions?.name
-                const sessStart  = Array.isArray(ps.sessions) ? (ps.sessions[0] as any)?.start_at : ps.sessions?.start_at
-                const isPlayable = status === 'active' || status === 'ready'
-                const isEnded    = status === 'ended'
-                const isClickable = isPlayable || isEnded
-                const dateStr = sessStart
-                  ? new Date(sessStart).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
-                  : new Date(ps.joined_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
-                const statusLabel = isEnded ? 'Terminata' : status === 'active' ? 'In corso' : status === 'ready' ? 'In attesa' : status ?? '—'
-                const statusColor = status === 'active' ? '#34D399' : status === 'ready' ? '#F7C841' : 'rgba(255,255,255,0.25)'
-
-                function enterSession() {
-                  // Pass session_id in URL so map page reads it even if localStorage
-                  // is cleared by a concurrent loadData call during navigation
-                  router.push(`/game/map?restored=${ps.session_id}`)
-                }
-
-                const inner = (
-                  <>
-                    <div className="hi-icon">{isEnded ? '🏁' : '🎮'}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{sessName ?? 'Sessione'}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-                        {dateStr} · <span style={{ color: statusColor }}>{statusLabel}</span>
-                      </div>
-                    </div>
-                    {isPlayable ? (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#3ABCA8' }}>▶</span>
-                    ) : isEnded ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#F7C841' }}>⚡ {ps.exp ?? 0}</span>
-                        <span style={{ fontSize: 10, color: '#C084FC', fontWeight: 600 }}>👁 Vedi</span>
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#F7C841' }}>⚡ {ps.exp ?? 0}</span>
-                    )}
-                  </>
-                )
-
-                return isClickable ? (
-                  <button
-                    key={ps.session_id}
-                    className="hi-item"
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', textAlign: 'left' }}
-                    onClick={enterSession}
-                  >
-                    {inner}
-                  </button>
-                ) : (
-                  <div key={ps.session_id} className="hi-item">{inner}</div>
-                )
-              })}
-            </div>
-          )}
-        </Section>
       </div>
     </>
   )
