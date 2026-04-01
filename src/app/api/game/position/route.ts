@@ -62,7 +62,8 @@ export async function POST(request: Request) {
     : true
 
   const distanceMoved = prevPos ? haversineDistance(prevPos, currentPos) : 0
-  const goodAccuracy = (accuracy ?? 200) < 150
+  // Relaxed to 200m — mobile GPS in open air often reports 80-200m accuracy
+  const goodAccuracy = (accuracy ?? 200) < 200
 
   // Step accumulation: only when in bounds, good accuracy, moved between 0.5m and 500m
   // (500m cap prevents teleport from appearing as steps)
@@ -84,15 +85,15 @@ export async function POST(request: Request) {
     await updateWalkMissions(sessionId, user.id, newStepsWalked, supabase)
   }
 
-  // Encounter trigger: only when in bounds, session active, moved ≥10m, good accuracy
+  // Encounter trigger: only when in bounds, session active, moved ≥5m, good accuracy
   let triggerEncounter = false
   if (inBounds && session.status === 'active') {
-    if (goodAccuracy && distanceMoved >= 10) {
-      triggerEncounter = Math.random() < 0.25  // 25% per ≥10 m step
+    if (goodAccuracy && distanceMoved >= 5) {
+      triggerEncounter = Math.random() < 0.30  // 30% per ≥5 m step
     }
   }
 
-  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status })
+  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status, stepsWalked: newStepsWalked, distanceMoved })
 }
 
 async function updateWalkMissions(

@@ -10,6 +10,8 @@ import type { Session } from '@/lib/types'
 const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false })
 
 const ENCOUNTER_COOLDOWN_MS = 30000  // 30s between encounters
+// Cumulative distance that, when exceeded, probabilistically triggers a walk-based encounter
+const WALK_ENCOUNTER_DIST_M = 25  // trigger after accumulating ~25 m
 
 function MapPageInner() {
   const [session, setSession] = useState<Session | null>(null)
@@ -18,12 +20,16 @@ function MapPageInner() {
   const [sessionEnded, setSessionEnded] = useState(false)
   const [sessionRestarted, setSessionRestarted] = useState(false)
   const [escaActiveUntil, setEscaActiveUntil] = useState<Date | null>(null)
+  const [stepsWalked, setStepsWalked] = useState(0)
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
   const [pendingEncounter, setPendingEncounter] = useState<{ encounterId: string; creature: { name: string; element: string; rarity: string } } | null>(null)
   const lastEncounterRef = useRef(0)
   const sessionIdRef = useRef<string | null>(null)
+  // Tracks metres walked since the last encounter attempt — resets after each attempt
+  const cumDistRef = useRef(0)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
@@ -89,6 +95,7 @@ function MapPageInner() {
     })
     const data = await res.json()
     if (data.encounterId && data.creature) {
+      cumDistRef.current = 0  // reset walk accumulator after a successful encounter
       sessionStorage.setItem(`encounter_${data.encounterId}`, JSON.stringify({
         encounterId: data.encounterId,
         creature: data.creature,
@@ -109,10 +116,12 @@ function MapPageInner() {
     const sid = sessionIdRef.current
     if (!sid || sessionEndedRef.current) return
 
-    // Skip very inaccurate fixes — the map marker still updates from useGPS
-    // state regardless. The server applies its own tighter check for step counting.
-    // 200m threshold (was 100m) — typical mobile GPS reports 50-150m accuracy.
-    if (pos.accuracy > 200) return
+    // Update accuracy display regardless of whether we send to server
+    setGpsAccuracy(Math.round(pos.accuracy))
+
+    // Skip very inaccurate fixes for server calls (map marker still updates from useGPS).
+    // 300m is generous — on poor GPS we still want step counting to work.
+    if (pos.accuracy > 300) return
 
     const now = Date.now()
     const res = await fetch('/api/game/position', {
@@ -125,19 +134,39 @@ function MapPageInner() {
     const data = await res.json()
 
     if (data.sessionEnded) {
-      // Session over — stop future GPS calls, show read-only banner (no redirect)
       sessionEndedRef.current = true
       setSessionEnded(true)
       return
     }
 
-    // Only update inBounds from responses that include it (valid position calls)
     if (data.inBounds !== undefined) {
       setInBounds(data.inBounds)
       inBoundsRef.current = data.inBounds
     }
 
-    if (data.triggerEncounter && now - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS) {
+    // Update step counter from server's authoritative value
+    if (typeof data.stepsWalked === 'number') {
+      setStepsWalked(data.stepsWalked)
+    }
+
+    // Accumulate distance for walk-based encounter trigger
+    if (typeof data.distanceMoved === 'number' && data.distanceMoved > 0 && data.distanceMoved < 500) {
+      cumDistRef.current += data.distanceMoved
+    }
+
+    const cooldownPassed = now - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS
+
+    // GPS-based trigger (single update moved ≥ 5 m, 30% chance)
+    if (data.triggerEncounter && cooldownPassed) {
+      lastEncounterRef.current = now
+      cumDistRef.current = 0
+      await triggerEncounter('gps')
+      return
+    }
+
+    // Walk-accumulation trigger: fired after WALK_ENCOUNTER_DIST_M metres since last attempt
+    if (cumDistRef.current >= WALK_ENCOUNTER_DIST_M && cooldownPassed) {
+      cumDistRef.current = 0
       lastEncounterRef.current = now
       await triggerEncounter('gps')
     }
@@ -149,7 +178,7 @@ function MapPageInner() {
   useEffect(() => {
     const sid = sessionIdRef.current
     if (!sid) return
-    const minMs = 60000, maxMs = 180000
+    const minMs = 45000, maxMs = 90000   // 45–90 s (was 60–180 s)
     let timeout: ReturnType<typeof setTimeout>
 
     function scheduleTimerEncounter() {
@@ -254,6 +283,26 @@ function MapPageInner() {
           🚫 Sei fuori dall'area di gioco — torna nella zona indicata!
         </div>
       )}
+
+      {/* Step counter + GPS accuracy overlay */}
+      <div className="absolute top-2 right-2 z-[900] flex flex-col items-end gap-1.5">
+        <div className="bg-[#0F1F2E]/85 border border-white/10 backdrop-blur-sm rounded-xl px-3 py-2 flex items-center gap-2">
+          <span className="text-sm">👟</span>
+          <div className="flex flex-col items-start leading-none">
+            <span className="text-white font-bold text-sm leading-tight">{stepsWalked.toLocaleString('it-IT')} m</span>
+            <span className="text-white/30 text-[9px] uppercase tracking-wide mt-0.5">Passi sessione</span>
+          </div>
+        </div>
+        {gpsAccuracy !== null && (
+          <div className={`text-[10px] px-2 py-1 rounded-full backdrop-blur-sm border font-medium ${
+            gpsAccuracy <= 20  ? 'bg-[#34D399]/15 border-[#34D399]/30 text-[#34D399]' :
+            gpsAccuracy <= 100 ? 'bg-[#F7C841]/15 border-[#F7C841]/30 text-[#F7C841]' :
+                                 'bg-[#E85D2F]/15 border-[#E85D2F]/30 text-[#E85D2F]'
+          }`}>
+            GPS ±{gpsAccuracy}m
+          </div>
+        )}
+      </div>
 
       {/* Esca active indicator */}
       {escaActiveUntil && (
