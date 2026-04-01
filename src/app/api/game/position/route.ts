@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { isWithinBounds, haversineDistance } from '@/lib/game/anti-cheat'
+import { isWithinBounds, haversineDistance, parsePoint } from '@/lib/game/anti-cheat'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -44,9 +44,8 @@ export async function POST(request: Request) {
 
   const currentPos = { lat, lng }
 
-  // PostGIS POINT serializes as { x: lng, y: lat }
-  const rawPos = playerSession.last_position as { x: number; y: number } | null
-  const prevPos = rawPos ? { lat: rawPos.y, lng: rawPos.x } : null
+  // PostgreSQL POINT columns are returned by PostgREST as the string "(lng,lat)"
+  const prevPos = parsePoint(playerSession.last_position)
 
   // Check within bounds — expand by GPS accuracy so jitter near the border
   // doesn't falsely flag the player as out-of-bounds.

@@ -41,11 +41,11 @@ export async function POST(request: Request) {
       .select('last_position')
       .eq('id', playerSession.id)
       .single()
-    const rawPos = posRow?.last_position as { x: number; y: number } | null
-    if (rawPos) {
-      const { isWithinBounds } = await import('@/lib/game/anti-cheat')
+    const { isWithinBounds, parsePoint } = await import('@/lib/game/anti-cheat')
+    const parsedPos = parsePoint(posRow?.last_position)
+    if (parsedPos) {
       const bounds = session.area_bounds as { north: number; south: number; east: number; west: number }
-      const inBounds = isWithinBounds({ lat: rawPos.y, lng: rawPos.x }, bounds)
+      const inBounds = isWithinBounds(parsedPos, bounds)
       if (!inBounds) return NextResponse.json({ error: 'Fuori dall\'area di gioco' }, { status: 403 })
     }
   }
