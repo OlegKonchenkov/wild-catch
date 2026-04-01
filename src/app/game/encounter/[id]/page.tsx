@@ -29,7 +29,11 @@ export default function EncounterPage() {
 
   const [state, setState] = useState<EncounterState | null>(null)
   const [loadError, setLoadError] = useState(false)
-  const [animState, setAnimState] = useState<'idle' | 'attack' | 'damage' | 'catch' | 'flee'>('idle')
+
+  // Separate animation states for wild creature and player creature
+  const [wildAnim, setWildAnim]     = useState<'idle' | 'damage' | 'catch' | 'flee'>('idle')
+  const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
+
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<'caught' | 'fled' | 'evolved' | null>(null)
@@ -156,12 +160,16 @@ export default function EncounterPage() {
     setShowItems(false)
 
     const activeItemId = selectedPozioneId ?? selectedBattagliaId ?? null
+
+    // Fire API call
     const res = await fetch('/api/game/encounter/fight', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ encounterId: state.encounterId, itemId: activeItemId }),
     })
     const data = await res.json()
+
+    // Consume items immediately
     if (selectedBattagliaId) {
       setBattagliaItems(prev => prev.map(i => i.id === selectedBattagliaId
         ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))
@@ -175,16 +183,18 @@ export default function EncounterPage() {
 
     if (!res.ok) { setMessage(data.error); setLoading(false); return }
 
-    if (data.playerTookDamage) {
-      setAnimState('damage')
-      await new Promise(r => setTimeout(r, 400))
-    }
-    setAnimState('idle')
+    // ── Sequential battle animation ──────────────────────────────────────
+    // 1. Player lunges at wild creature
+    setPlayerAnim('attack')
+    await new Promise(r => setTimeout(r, 350))
+    setPlayerAnim('idle')
 
-    if (data.playerTookDamage && data.wildDamage > 0) {
-      setPlayerHp(prev => prev !== null ? Math.max(0, prev - data.wildDamage) : null)
-    }
+    // 2. Wild creature shakes from the hit
+    setWildAnim('damage')
+    await new Promise(r => setTimeout(r, 380))
+    setWildAnim('idle')
 
+    // Update wild HP after hit animation
     setState(prev => prev ? {
       ...prev,
       wildHp: data.wildHpRemaining,
@@ -193,13 +203,26 @@ export default function EncounterPage() {
     } : null)
 
     if (data.fightResult === 'fled') {
-      setAnimState('flee')
+      setWildAnim('flee')
       setMessage('La creatura è fuggita!')
       setResult('fled')
-    } else if (data.fightResult === 'catchable') {
+      setLoading(false)
+      return
+    }
+
+    if (data.fightResult === 'catchable') {
       setMessage(`HP basso! Bonus cattura +${Math.round(data.catchBonus * 100)}%`)
     } else {
       setMessage(`Danno: ${data.playerDamage} (×${data.elementMultiplier.toFixed(1)})`)
+    }
+
+    // 3. Wild counter-attacks player (if it happened)
+    if (data.playerTookDamage && data.wildDamage > 0) {
+      await new Promise(r => setTimeout(r, 280)) // brief pause before counter
+      setPlayerHp(prev => prev !== null ? Math.max(0, prev - data.wildDamage) : null)
+      setPlayerAnim('damage')
+      await new Promise(r => setTimeout(r, 420))
+      setPlayerAnim('idle')
     }
 
     if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
@@ -226,23 +249,26 @@ export default function EncounterPage() {
     }
 
     if (data.caught) {
-      setAnimState('catch')
-      await new Promise(r => setTimeout(r, 700))
+      // Trigger catch animation — net ring + sprite shrink play together
+      setWildAnim('catch')
+      // Wait long enough for the full dramatic effect (net: 1.4s, creature shrinks at 0.6s)
+      await new Promise(r => setTimeout(r, 1800))
       setResult(data.evolved ? 'evolved' : 'caught')
       setMessage(data.evolved ? '✨ Evoluzione!' : 'Catturato!')
       if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
       window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       window.dispatchEvent(new CustomEvent('wc:refresh-bestiary'))
     } else if (data.fled) {
-      setAnimState('flee')
+      setWildAnim('flee')
       setMessage('La creatura è fuggita...')
       setResult('fled')
     } else {
+      // Catch failed — wild counter-attacks
       if (data.wildDamage > 0) {
         setPlayerHp(prev => prev !== null ? Math.max(0, prev - data.wildDamage) : null)
-        setAnimState('damage')
-        await new Promise(r => setTimeout(r, 400))
-        setAnimState('idle')
+        setPlayerAnim('damage')
+        await new Promise(r => setTimeout(r, 420))
+        setPlayerAnim('idle')
         setMessage(`Cattura fallita! Contrattacco (-${data.wildDamage} HP)`)
       } else {
         setMessage('Cattura fallita! La creatura resiste...')
@@ -313,10 +339,6 @@ export default function EncounterPage() {
   const timerPct = (turnTimer / 45) * 100
   const timerUrgent = turnTimer <= 10
 
-  // Wild sprite only shows catch/flee animations; player sprite handles attack/damage
-  const wildAnimState = animState === 'catch' ? 'catch' : animState === 'flee' ? 'flee' : 'idle'
-  const playerAnimState = animState === 'damage' ? 'damage' : animState === 'attack' ? 'attack' : 'idle'
-
   const hpBarColor = (pct: number) => pct > 50 ? '#34D399' : pct > 25 ? '#FBBF24' : '#EF4444'
 
   return (
@@ -332,7 +354,7 @@ export default function EncounterPage() {
       </div>
 
       {/* ── WILD ZONE (top ~45%) ── */}
-      <div className="relative z-10 flex-1 min-h-0" style={{ flexBasis: '45%', flexGrow: 0, flexShrink: 0 }}>
+      <div className="relative z-10 shrink-0" style={{ height: '43%' }}>
 
         {/* Info card — bottom-left of wild zone */}
         <div className="absolute bottom-3 left-4 z-10" style={{ maxWidth: 'calc(50% + 8px)' }}>
@@ -349,48 +371,33 @@ export default function EncounterPage() {
             }}
           >
             <div className="px-3 pt-2.5 pb-2.5">
-              {/* Name */}
               <p className="font-extrabold text-white text-sm leading-tight truncate mb-1.5 tracking-wide">
                 {state.creature.name}
               </p>
-              {/* Element + rarity badges */}
               <div className="flex items-center gap-1.5 mb-2.5">
-                <span
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{
-                    background: `${wildRarityColor}25`,
-                    border: `1px solid ${wildRarityColor}55`,
-                    color: wildRarityColor,
-                  }}
-                >
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: `${wildRarityColor}25`, border: `1px solid ${wildRarityColor}55`, color: wildRarityColor }}>
                   {state.creature.rarity?.replace('_', ' ')}
                 </span>
                 <span className="text-sm leading-none">{wildElementEmoji}</span>
                 <span className="text-[10px] text-white/40 capitalize">{state.creature.element}</span>
               </div>
-              {/* HP bar */}
               <div className="h-2.5 rounded-full overflow-hidden mb-1" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                <motion.div
-                  className="h-full rounded-full"
+                <motion.div className="h-full rounded-full"
                   animate={{ width: `${hpPercent}%` }}
                   transition={{ duration: 0.5 }}
-                  style={{
-                    background: hpBarColor(hpPercent),
-                    boxShadow: `0 0 8px ${hpBarColor(hpPercent)}80`,
-                  }}
+                  style={{ background: hpBarColor(hpPercent), boxShadow: `0 0 8px ${hpBarColor(hpPercent)}80` }}
                 />
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[9px] font-bold uppercase tracking-wider text-white/30">HP</span>
-                <span className="text-[10px] font-mono font-bold text-white/50">
-                  {state.wildHp}/{state.wildHpMax}
-                </span>
+                <span className="text-[10px] font-mono font-bold text-white/50">{state.wildHp}/{state.wildHpMax}</span>
               </div>
             </div>
           </motion.div>
         </div>
 
-        {/* Wild sprite — top-right of wild zone */}
+        {/* Wild sprite — top-right */}
         <div className="absolute top-3 right-3 z-10">
           <motion.div
             initial={{ x: 60, opacity: 0, scale: 0.8 }}
@@ -398,32 +405,41 @@ export default function EncounterPage() {
             transition={{ duration: 0.55, ease: [0.34, 1.56, 0.64, 1] }}
             className="relative"
           >
-            {/* Net catch ring animation */}
+            {/* Net catch ring — plays when wildAnim === 'catch' */}
             <AnimatePresence>
-              {wildAnimState === 'catch' && (
+              {wildAnim === 'catch' && (
                 <motion.div
                   key="catch-net"
                   className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
                 >
-                  {/* Outer ring */}
+                  {/* Primary contracting ring */}
                   <motion.div
                     className="absolute rounded-full"
                     style={{
                       border: '3px solid rgba(58,157,188,1)',
-                      boxShadow: '0 0 28px rgba(58,157,188,0.9), 0 0 70px rgba(58,157,188,0.5)',
+                      boxShadow: '0 0 30px rgba(58,157,188,0.95), 0 0 80px rgba(58,157,188,0.5)',
                     }}
-                    initial={{ width: 220, height: 220, opacity: 0 }}
-                    animate={{ width: [220, 160, 50, 6], height: [220, 160, 50, 6], opacity: [0, 1, 1, 0] }}
-                    transition={{ duration: 0.65, times: [0, 0.2, 0.78, 1] }}
+                    initial={{ width: 240, height: 240, opacity: 0 }}
+                    animate={{ width: [240, 240, 100, 20, 4], height: [240, 240, 100, 20, 4], opacity: [0, 1, 1, 0.8, 0] }}
+                    transition={{ duration: 1.4, times: [0, 0.12, 0.6, 0.88, 1], ease: 'easeInOut' }}
                   />
                   {/* Inner fill */}
                   <motion.div
                     className="absolute rounded-full"
-                    style={{ background: 'radial-gradient(circle, rgba(58,157,188,0.3) 0%, transparent 70%)' }}
-                    initial={{ width: 220, height: 220, opacity: 0 }}
-                    animate={{ width: [220, 160, 50, 6], height: [220, 160, 50, 6], opacity: [0, 0.9, 0.7, 0] }}
-                    transition={{ duration: 0.65, times: [0, 0.2, 0.78, 1] }}
+                    style={{ background: 'radial-gradient(circle, rgba(58,157,188,0.35) 0%, transparent 70%)' }}
+                    initial={{ width: 240, height: 240, opacity: 0 }}
+                    animate={{ width: [240, 240, 100, 20, 4], height: [240, 240, 100, 20, 4], opacity: [0, 0.9, 0.7, 0.4, 0] }}
+                    transition={{ duration: 1.4, times: [0, 0.12, 0.6, 0.88, 1], ease: 'easeInOut' }}
                   />
+                  {/* Sparkle at the moment of capture */}
+                  <motion.div
+                    className="absolute text-[#3A9DBC] text-2xl font-extrabold"
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={{ opacity: [0, 1, 1, 0], scale: [0, 1.8, 1.5, 0] }}
+                    transition={{ duration: 0.5, delay: 0.75 }}
+                  >
+                    ✦
+                  </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -431,7 +447,7 @@ export default function EncounterPage() {
             <CreatureSprite
               imageUrl={state.creature.image_url ?? ''}
               name={state.creature.name ?? ''}
-              animState={wildAnimState}
+              animState={wildAnim}
               size={150}
               element={state.creature.element as Element}
               rarity={state.creature.rarity as Rarity}
@@ -474,7 +490,7 @@ export default function EncounterPage() {
       </div>
 
       {/* ── PLAYER ZONE (~30%) ── */}
-      <div className="relative z-10 shrink-0" style={{ height: '32%' }}>
+      <div className="relative z-10 shrink-0" style={{ height: '30%' }}>
 
         {/* Player sprite — bottom-left */}
         <div className="absolute bottom-2 left-4 z-10">
@@ -487,15 +503,15 @@ export default function EncounterPage() {
               <CreatureSprite
                 imageUrl={playerCreature.imageUrl}
                 name={playerCreature.name}
-                animState={playerAnimState}
-                size={120}
+                animState={playerAnim}
+                size={115}
                 element={playerCreature.element as Element}
                 rarity={playerCreature.rarity as Rarity}
                 showAura
               />
             </motion.div>
           ) : (
-            <div className="w-[120px] h-[120px] rounded-2xl animate-pulse"
+            <div className="w-[115px] h-[115px] rounded-2xl animate-pulse"
               style={{ background: 'rgba(58,157,188,0.1)', border: '1px solid rgba(58,157,188,0.2)' }} />
           )}
         </div>
@@ -526,21 +542,15 @@ export default function EncounterPage() {
                   <span className="text-[10px] text-white/40 capitalize">{playerCreature.element}</span>
                 </div>
                 <div className="h-2.5 rounded-full overflow-hidden mb-1" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                  <motion.div
-                    className="h-full rounded-full"
+                  <motion.div className="h-full rounded-full"
                     animate={{ width: `${playerHpPercent}%` }}
                     transition={{ duration: 0.5 }}
-                    style={{
-                      background: hpBarColor(playerHpPercent),
-                      boxShadow: `0 0 8px ${hpBarColor(playerHpPercent)}80`,
-                    }}
+                    style={{ background: hpBarColor(playerHpPercent), boxShadow: `0 0 8px ${hpBarColor(playerHpPercent)}80` }}
                   />
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[9px] font-bold uppercase tracking-wider text-white/30">HP</span>
-                  <span className="text-[10px] font-mono font-bold text-white/50">
-                    {playerHp}/{playerCreature.maxHp}
-                  </span>
+                  <span className="text-[10px] font-mono font-bold text-white/50">{playerHp}/{playerCreature.maxHp}</span>
                 </div>
               </div>
             </motion.div>
@@ -672,16 +682,12 @@ export default function EncounterPage() {
         <div className="shrink-0 px-3 pb-3 z-10">
           <div className={`grid gap-2 ${hasItems ? 'grid-cols-4' : 'grid-cols-3'}`}>
 
-            {/* CATTURA */}
             <motion.button
               onClick={handleCatch}
               disabled={loading}
               whileTap={{ scale: 0.94 }}
               className="relative overflow-hidden rounded-2xl py-4 flex flex-col items-center justify-center gap-1 disabled:opacity-50"
-              style={{
-                background: 'linear-gradient(145deg, #E85D2F 0%, #c94a20 100%)',
-                boxShadow: '0 4px 18px rgba(232,93,47,0.4)',
-              }}
+              style={{ background: 'linear-gradient(145deg, #E85D2F 0%, #c94a20 100%)', boxShadow: '0 4px 18px rgba(232,93,47,0.4)' }}
             >
               <span className="text-lg leading-none">🎯</span>
               <span className="text-[11px] font-extrabold text-white tracking-wide">CATTURA</span>
@@ -692,17 +698,13 @@ export default function EncounterPage() {
               )}
             </motion.button>
 
-            {/* LOTTA */}
             <motion.button
               id="wc-fight-btn"
               onClick={handleFight}
               disabled={loading || state.turns >= 5}
               whileTap={{ scale: 0.94 }}
               className="relative overflow-hidden rounded-2xl py-4 flex flex-col items-center justify-center gap-1 disabled:opacity-50"
-              style={{
-                background: 'linear-gradient(145deg, #7B4DB8 0%, #5c3a8c 100%)',
-                boxShadow: '0 4px 18px rgba(123,77,184,0.4)',
-              }}
+              style={{ background: 'linear-gradient(145deg, #7B4DB8 0%, #5c3a8c 100%)', boxShadow: '0 4px 18px rgba(123,77,184,0.4)' }}
             >
               {loading
                 ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -712,17 +714,14 @@ export default function EncounterPage() {
               <span className="text-[9px] text-white/45 font-bold">{state.turns}/5</span>
             </motion.button>
 
-            {/* OGGETTI */}
             {hasItems && (
               <motion.button
                 onClick={() => setShowItems(v => !v)}
                 whileTap={{ scale: 0.94 }}
                 className="rounded-2xl py-4 flex flex-col items-center justify-center gap-1 transition-all"
                 style={{
-                  background: showItems || selectedReteId || selectedBattagliaId
-                    ? 'rgba(247,200,65,0.15)' : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${showItems || selectedReteId || selectedBattagliaId
-                    ? 'rgba(247,200,65,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  background: showItems || selectedReteId || selectedBattagliaId ? 'rgba(247,200,65,0.15)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${showItems || selectedReteId || selectedBattagliaId ? 'rgba(247,200,65,0.4)' : 'rgba(255,255,255,0.1)'}`,
                 }}
               >
                 <span className="text-lg leading-none">🎒</span>
@@ -733,7 +732,6 @@ export default function EncounterPage() {
               </motion.button>
             )}
 
-            {/* FUGGI */}
             <motion.button
               onClick={handleFlee}
               whileTap={{ scale: 0.94 }}

@@ -106,11 +106,11 @@ async function updateWalkMissions(
   stepsWalked: number,
   supabase: any,
 ) {
-  // Load walk missions for this session
+  // Load walk missions for this session (session-scoped OR global)
   const { data: walkMissions } = await supabase
     .from('missions')
     .select('id, target_count, reward_gold, reward_exp, reward_item_id')
-    .eq('session_id', sessionId)
+    .or(`session_id.eq.${sessionId},session_id.is.null`)
     .eq('type', 'walk')
 
   if (!walkMissions?.length) return
