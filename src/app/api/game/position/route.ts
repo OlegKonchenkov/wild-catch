@@ -64,9 +64,9 @@ export async function POST(request: Request) {
   // Relaxed to 200m — mobile GPS in open air often reports 80-200m accuracy
   const goodAccuracy = (accuracy ?? 200) < 200
 
-  // Step accumulation: only when in bounds, good accuracy, moved between 0.5m and 500m
-  // (500m cap prevents teleport from appearing as steps)
-  const validStep = inBounds && goodAccuracy && distanceMoved >= 0.5 && distanceMoved < 500
+  // Step accumulation: only when session is active, in bounds, good accuracy, 0.5–500m moved
+  // (session.status === 'active' ensures steps don't count while waiting in 'ready' state)
+  const validStep = session.status === 'active' && inBounds && goodAccuracy && distanceMoved >= 0.5 && distanceMoved < 500
   const stepsIncrement = validStep ? Math.round(distanceMoved) : 0
   const newStepsWalked = (playerSession.steps_walked ?? 0) + stepsIncrement
 
