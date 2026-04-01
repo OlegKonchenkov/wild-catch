@@ -4,7 +4,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
-import HPBar from '@/components/creature/HPBar'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 
@@ -62,7 +61,6 @@ export default function DuelPage() {
   const duelStatusRef      = useRef<string | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
-  // Load duel + lineups + role
   useEffect(() => {
     async function init() {
       const { data: duelData } = await supabase
@@ -85,7 +83,6 @@ export default function DuelPage() {
 
       if (duelData.status === 'active') setIsMyTurn(role === 'challenger')
 
-      // Load lineups
       const { data: lineups } = await supabase
         .from('duel_lineups')
         .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, image_url))')
@@ -99,7 +96,6 @@ export default function DuelPage() {
         setOppLineup(opp)
       }
 
-      // Load battaglia items
       const sessionId = localStorage.getItem('current_session_id')
       if (sessionId) {
         const { data: inv } = await supabase
@@ -117,7 +113,6 @@ export default function DuelPage() {
 
     init()
 
-    // Realtime: broadcast duel_action
     const channel = supabase
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
@@ -148,7 +143,6 @@ export default function DuelPage() {
         const atkLabel = itemUsed ? '⚔️+🗡️' : '⚔️'
         setLog(prev => [`${atkLabel} ${damage} danno!`, ...prev.slice(0, 3)])
       })
-      // Realtime lineup HP updates
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'duel_lineups', filter: `duel_id=eq.${id}` },
         ({ new: updated }) => {
@@ -185,7 +179,6 @@ export default function DuelPage() {
 
     return () => {
       supabase.removeChannel(channel)
-      // Cancel the duel if player leaves while still waiting
       if (duelStatusRef.current === 'waiting') {
         fetch('/api/game/duel/connect', {
           method: 'DELETE',
@@ -197,7 +190,6 @@ export default function DuelPage() {
     }
   }, [id, supabase])
 
-  // Auto-surrender when all my creatures faint
   useEffect(() => {
     if (myLineup.length === 0 || result || waiting || surrenderedRef.current) return
     const allFainted = myLineup.length > 0 && myLineup.every(l => l.fainted_at !== null)
@@ -253,8 +245,8 @@ export default function DuelPage() {
     })
   }
 
-  const myActive  = myLineup.find(l => l.is_active)
-  const oppActive = oppLineup.find(l => l.is_active)
+  const myActive    = myLineup.find(l => l.is_active)
+  const oppActive   = oppLineup.find(l => l.is_active)
   const myActiveCr  = myActive?.player_creatures?.creatures
   const oppActiveCr = oppActive?.player_creatures?.creatures
   const myHp        = myActive?.current_hp ?? 0
@@ -262,43 +254,52 @@ export default function DuelPage() {
   const oppHp       = oppActive?.current_hp ?? 0
   const oppHpMax    = oppActiveCr?.hp ?? 100
 
-  const turnColor = isMyTurn ? '#34D399' : '#94a3b8'
+  const myHpPct  = Math.max(0, (myHp / myHpMax) * 100)
+  const oppHpPct = Math.max(0, (oppHp / oppHpMax) * 100)
+
+  const hpBarColor = (pct: number) => pct > 50 ? '#34D399' : pct > 25 ? '#FBBF24' : '#EF4444'
+
+  const turnColor = isMyTurn ? '#34D399' : '#64748b'
   const turnLabel = isMyTurn ? 'Il tuo turno' : 'Turno avversario'
+
+  const oppRarityColor = oppActiveCr ? RARITY_COLORS[oppActiveCr.rarity] : '#64748b'
+  const myRarityColor  = myActiveCr  ? RARITY_COLORS[myActiveCr.rarity]  : '#3A9DBC'
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative"
-      style={{ background: 'linear-gradient(180deg, #0a0f1a 0%, #111827 50%, #0a0f1a 100%)' }}>
+      style={{ background: 'linear-gradient(180deg, #060C18 0%, #0D1828 45%, #060C18 100%)' }}>
 
-      {/* Ambient glow */}
+      {/* ── Atmospheric glows ── */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 rounded-full opacity-15 blur-3xl"
-          style={{ background: '#7B4DB8' }} />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-64 h-32 rounded-full opacity-15 blur-3xl"
-          style={{ background: '#E85D2F' }} />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 opacity-20 blur-3xl rounded-full"
+          style={{ background: oppRarityColor }} />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-80 h-40 opacity-18 blur-3xl rounded-full"
+          style={{ background: myRarityColor }} />
       </div>
 
-      {/* Waiting overlay */}
+      {/* ── Waiting overlay ── */}
       <AnimatePresence>
         {waiting && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="absolute inset-0 flex flex-col items-center justify-center z-30"
-            style={{ background: 'rgba(10,15,26,0.95)', backdropFilter: 'blur(8px)' }}
+            style={{ background: 'rgba(6,12,24,0.95)', backdropFilter: 'blur(10px)' }}
           >
             <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
+              animate={{ scale: [1, 1.06, 1] }}
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               className="mb-6"
             >
-              <div className="w-20 h-20 rounded-full border-2 border-[#E85D2F]/40 flex items-center justify-center text-4xl"
-                style={{ boxShadow: '0 0 30px rgba(232,93,47,0.3)' }}>
+              <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl"
+                style={{ border: '2px solid rgba(232,93,47,0.4)', boxShadow: '0 0 30px rgba(232,93,47,0.3)' }}>
                 ⚔️
               </div>
             </motion.div>
             <p className="text-xl font-extrabold text-white mb-1">In attesa...</p>
             <p className="text-white/40 text-sm mb-6">L'avversario sta per entrare</p>
             {duel?.room_code && (
-              <div className="bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-center">
+              <div className="rounded-2xl px-6 py-4 text-center"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <p className="text-white/40 text-xs uppercase tracking-widest mb-1">Codice Stanza</p>
                 <motion.p
                   animate={{ opacity: [1, 0.5, 1] }}
@@ -313,251 +314,313 @@ export default function DuelPage() {
         )}
       </AnimatePresence>
 
-      {/* Result overlay */}
+      {/* ── Result overlay ── */}
       <AnimatePresence>
         {result && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 flex flex-col items-center justify-center z-30"
-            style={{ background: 'rgba(10,15,26,0.96)', backdropFilter: 'blur(12px)' }}
+            className="absolute inset-0 flex flex-col items-center justify-center z-30 px-6"
+            style={{ background: 'rgba(6,12,24,0.96)', backdropFilter: 'blur(14px)' }}
           >
             <motion.div
               initial={{ scale: 0.3, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              className="text-center px-6"
+              className="flex flex-col items-center text-center"
             >
-              <div className="text-6xl mb-4">{result === 'won' ? '🏆' : '💀'}</div>
-              <p className="text-3xl font-extrabold text-white mb-2">
+              <div className="text-7xl mb-5">{result === 'won' ? '🏆' : '💀'}</div>
+              <p className="text-3xl font-extrabold text-white mb-2 tracking-tight">
                 {result === 'won' ? 'Vittoria!' : 'Sconfitta'}
               </p>
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full mb-8"
                 style={{
-                  background: result === 'won' ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.05)',
+                  background: result === 'won' ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)',
                   border: `1px solid ${result === 'won' ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.1)'}`,
                 }}>
-                <span className="text-xl font-extrabold" style={{ color: result === 'won' ? '#34D399' : 'rgba(255,255,255,0.4)' }}>
-                  +{result === 'won' ? '30 EXP · +20 punti' : '0 EXP'}
+                <span className="font-extrabold text-base" style={{ color: result === 'won' ? '#34D399' : 'rgba(255,255,255,0.35)' }}>
+                  {result === 'won' ? '+30 EXP · +20 punti' : '0 EXP'}
                 </span>
               </div>
-              <button
+              <motion.button
                 onClick={() => { window.dispatchEvent(new CustomEvent('wc:refresh-stats')); router.push('/game/map') }}
-                className="w-full py-4 rounded-2xl font-extrabold text-white text-base cursor-pointer active:scale-[0.97] transition-transform"
+                whileTap={{ scale: 0.96 }}
+                className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
                 style={{ background: 'linear-gradient(135deg, #3A9DBC 0%, #2a7a99 100%)', boxShadow: '0 4px 20px rgba(58,157,188,0.35)' }}
               >
                 Torna alla Mappa
-              </button>
+              </motion.button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── OPPONENT SECTION ── */}
-      <div className="flex-none px-4 pt-3 pb-1 relative z-10">
-        {/* Opponent lineup bar */}
-        <LineupBar lineup={oppLineup} label="Avversario" />
-        {/* Opponent active creature HP */}
-        <div className="mt-2">
-          {oppActiveCr
-            ? <HPBar current={oppHp} max={oppHpMax} label={oppActiveCr.name} />
-            : <div className="h-4 bg-white/5 rounded-full animate-pulse" />
-          }
+      {/* ── OPPONENT ZONE (top ~42%) ── */}
+      <div className="relative z-10 shrink-0" style={{ height: '42%' }}>
+
+        {/* Opponent sprite — top-right */}
+        <div className="absolute top-3 right-3 z-10">
+          <motion.div className="relative">
+            <AnimatePresence>
+              {lastDamage?.target === 'opp' && (
+                <motion.div
+                  key={`opp-dmg-${lastDamage.amount}`}
+                  initial={{ opacity: 1, y: 0, scale: 1 }}
+                  animate={{ opacity: 0, y: -30, scale: 1.5 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.65 }}
+                  className="absolute -top-2 left-1/2 -translate-x-1/2 font-extrabold text-[#E85D2F] text-xl pointer-events-none z-20"
+                  style={{ textShadow: '0 0 12px rgba(232,93,47,0.9)' }}
+                >
+                  -{lastDamage.amount}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {oppActiveCr ? (
+              <CreatureSprite
+                imageUrl={oppActiveCr.image_url}
+                name={oppActiveCr.name}
+                animState={oppAnimState}
+                size={125}
+                element={oppActiveCr.element}
+                rarity={oppActiveCr.rarity}
+                showAura
+              />
+            ) : (
+              <div className="w-[125px] h-[125px] rounded-full animate-pulse" style={{ background: 'rgba(255,255,255,0.05)' }} />
+            )}
+          </motion.div>
+        </div>
+
+        {/* Opponent info card — bottom-left of opponent zone */}
+        <div className="absolute bottom-3 left-4 z-10" style={{ maxWidth: 'calc(55%)' }}>
+          {oppActiveCr ? (
+            <div className="rounded-2xl overflow-hidden"
+              style={{
+                background: 'rgba(6,12,24,0.90)',
+                border: `1px solid ${oppRarityColor}40`,
+                backdropFilter: 'blur(12px)',
+                boxShadow: `0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px ${oppRarityColor}15`,
+              }}>
+              <div className="px-3 pt-2.5 pb-2.5">
+                {/* Lineup dots */}
+                <div className="flex items-center gap-1 mb-1.5">
+                  <p className="text-[9px] text-white/25 uppercase tracking-wider flex-1">Avversario</p>
+                  <div className="flex gap-1">
+                    {[...oppLineup].sort((a, b) => a.slot - b.slot).map(entry => {
+                      const cr = entry.player_creatures?.creatures
+                      const color = cr ? RARITY_COLORS[cr.rarity] : '#64748b'
+                      const isFainted = !!entry.fainted_at
+                      return (
+                        <div key={entry.id} className="w-2 h-2 rounded-full"
+                          style={{
+                            background: isFainted ? 'rgba(255,255,255,0.1)' : color,
+                            opacity: isFainted ? 0.3 : entry.is_active ? 1 : 0.55,
+                            boxShadow: entry.is_active ? `0 0 4px ${color}` : 'none',
+                          }} />
+                      )
+                    })}
+                  </div>
+                </div>
+                <p className="font-extrabold text-white text-sm leading-tight truncate mb-1.5 tracking-wide">
+                  {oppActiveCr.name}
+                </p>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: `${oppRarityColor}25`, color: oppRarityColor, border: `1px solid ${oppRarityColor}50` }}>
+                    {oppActiveCr.rarity?.replace('_', ' ')}
+                  </span>
+                  <span className="text-xs">{ELEMENT_EMOJI[oppActiveCr.element]}</span>
+                  <span className="text-[10px] text-white/35 capitalize">{oppActiveCr.element}</span>
+                </div>
+                {/* HP bar */}
+                <div className="h-2.5 rounded-full overflow-hidden mb-1" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    animate={{ width: `${oppHpPct}%` }}
+                    transition={{ duration: 0.5 }}
+                    style={{
+                      background: hpBarColor(oppHpPct),
+                      boxShadow: `0 0 8px ${hpBarColor(oppHpPct)}80`,
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-white/25">HP</span>
+                  <span className="text-[10px] font-mono font-bold text-white/45">{oppHp}/{oppHpMax}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-24 w-44 rounded-2xl animate-pulse" style={{ background: 'rgba(255,255,255,0.04)' }} />
+          )}
         </div>
       </div>
 
-      {/* Opponent sprite */}
-      <div className="flex-none flex justify-center pt-1 relative z-10">
-        <motion.div
-          animate={
-            oppAnimState === 'damage' ? { x: [0, 8, -8, 6, -6, 0], transition: { duration: 0.35 } } :
-            oppAnimState === 'attack' ? { y: [0, 6, 0],            transition: { duration: 0.25 } } : {}
-          }
-          className="relative"
-        >
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={oppActive?.id ?? 'opp-loading'}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.3 }}
-            >
-              {oppActiveCr
-                ? <CreatureSprite
-                    imageUrl={oppActiveCr.image_url}
-                    name={oppActiveCr.name}
-                    animState={oppAnimState}
-                    size={100}
-                    element={oppActiveCr.element}
-                    rarity={oppActiveCr.rarity}
-                    showAura
-                  />
-                : <div className="w-[100px] h-[100px] rounded-full bg-white/5 animate-pulse" />
-              }
-            </motion.div>
-          </AnimatePresence>
-          <AnimatePresence>
-            {lastDamage?.target === 'opp' && (
-              <motion.div
-                key={`opp-${lastDamage.amount}`}
-                initial={{ opacity: 1, y: 0, scale: 1 }}
-                animate={{ opacity: 0, y: -28, scale: 1.4 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.65 }}
-                className="absolute -top-1 left-1/2 -translate-x-1/2 font-extrabold text-[#E85D2F] text-lg pointer-events-none"
-                style={{ textShadow: '0 0 10px rgba(232,93,47,0.8)' }}
-              >
-                -{lastDamage.amount}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      </div>
-
-      {/* Turn indicator + Switch notice */}
-      <div className="flex-none flex items-center gap-3 px-4 py-1 relative z-10">
+      {/* ── SEPARATOR ── */}
+      <div className="relative z-10 shrink-0 flex items-center gap-3 px-4 py-1">
         <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06))' }} />
         <AnimatePresence mode="wait">
           {switchNotice ? (
-            <motion.div
-              key="switch"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#7B4DB8]/20 border border-[#7B4DB8]/40"
-            >
-              <span className="text-[10px] font-bold text-[#C084FC]">✨ {switchNotice}</span>
+            <motion.div key="switch" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold text-[#C084FC]"
+              style={{ background: 'rgba(123,77,184,0.18)', border: '1px solid rgba(123,77,184,0.4)' }}>
+              ✨ {switchNotice}
             </motion.div>
           ) : (
-            <motion.div
-              key={isMyTurn ? 'my' : 'opp'}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
+            <motion.div key={isMyTurn ? 'my' : 'opp'} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
               transition={{ duration: 0.2 }}
               className="flex items-center gap-1.5 px-3 py-1 rounded-full"
-              style={{ background: `${turnColor}18`, border: `1px solid ${turnColor}40` }}
-            >
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: turnColor }} />
+              style={{ background: `${turnColor}15`, border: `1px solid ${turnColor}40` }}>
+              <motion.div className="w-1.5 h-1.5 rounded-full" style={{ background: turnColor }}
+                animate={isMyTurn ? { scale: [1, 1.5, 1] } : {}}
+                transition={{ duration: 1.2, repeat: Infinity }} />
               <span className="text-[10px] font-bold" style={{ color: turnColor }}>{turnLabel}</span>
             </motion.div>
+          )}
+        </AnimatePresence>
+        {/* Battle log */}
+        <AnimatePresence>
+          {log[0] && (
+            <motion.span key={log[0] + log.length} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
+              className="text-[10px] font-semibold text-white/35">
+              {log[0]}
+            </motion.span>
           )}
         </AnimatePresence>
         <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.06), transparent)' }} />
       </div>
 
-      {/* Battle log */}
-      <div className="flex-none px-4 h-7 overflow-hidden relative z-10">
-        <AnimatePresence>
-          {log[0] && (
-            <motion.p
-              key={log[0] + log.length}
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="text-xs text-center font-semibold text-white/45"
-            >
-              {log[0]}
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </div>
+      {/* ── PLAYER ZONE (~38%) ── */}
+      <div className="relative z-10 shrink-0" style={{ height: '38%' }}>
 
-      {/* Player sprite */}
-      <div className="flex-none flex justify-center pt-1 relative z-10">
-        <motion.div
-          animate={
-            animState === 'damage' ? { x: [0, -8, 8, -6, 6, 0], transition: { duration: 0.35 } } :
-            animState === 'attack' ? { y: [0, -6, 0],            transition: { duration: 0.25 } } : {}
-          }
-          className="relative"
-        >
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={myActive?.id ?? 'my-loading'}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.3 }}
-            >
-              {myActiveCr
-                ? <CreatureSprite
-                    imageUrl={myActiveCr.image_url}
-                    name={myActiveCr.name}
-                    animState={animState}
-                    size={120}
-                    element={myActiveCr.element}
-                    rarity={myActiveCr.rarity}
-                    showAura
-                  />
-                : <div className="w-[120px] h-[120px] rounded-full bg-white/5 animate-pulse" />
-              }
-            </motion.div>
-          </AnimatePresence>
-          <AnimatePresence>
-            {lastDamage?.target === 'me' && (
-              <motion.div
-                key={`me-${lastDamage.amount}`}
-                initial={{ opacity: 1, y: 0, scale: 1 }}
-                animate={{ opacity: 0, y: -28, scale: 1.4 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.65 }}
-                className="absolute -top-1 left-1/2 -translate-x-1/2 font-extrabold text-red-400 text-lg pointer-events-none"
-                style={{ textShadow: '0 0 10px rgba(248,113,113,0.8)' }}
-              >
-                -{lastDamage.amount}
-              </motion.div>
+        {/* Player sprite — bottom-left */}
+        <div className="absolute bottom-2 left-3 z-10">
+          <motion.div className="relative">
+            <AnimatePresence>
+              {lastDamage?.target === 'me' && (
+                <motion.div
+                  key={`me-dmg-${lastDamage.amount}`}
+                  initial={{ opacity: 1, y: 0, scale: 1 }}
+                  animate={{ opacity: 0, y: -30, scale: 1.5 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.65 }}
+                  className="absolute -top-2 left-1/2 -translate-x-1/2 font-extrabold text-red-400 text-xl pointer-events-none z-20"
+                  style={{ textShadow: '0 0 12px rgba(248,113,113,0.9)' }}
+                >
+                  -{lastDamage.amount}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {myActiveCr ? (
+              <CreatureSprite
+                imageUrl={myActiveCr.image_url}
+                name={myActiveCr.name}
+                animState={animState}
+                size={130}
+                element={myActiveCr.element}
+                rarity={myActiveCr.rarity}
+                showAura
+              />
+            ) : (
+              <div className="w-[130px] h-[130px] rounded-full animate-pulse" style={{ background: 'rgba(255,255,255,0.05)' }} />
             )}
-          </AnimatePresence>
-        </motion.div>
-      </div>
+          </motion.div>
+        </div>
 
-      {/* ── MY SECTION ── */}
-      <div className="flex-none px-4 pt-1 pb-2 relative z-10">
-        {myActiveCr
-          ? <HPBar current={myHp} max={myHpMax} label={myActiveCr.name} />
-          : <div className="h-4 bg-white/5 rounded-full animate-pulse" />
-        }
-        <div className="mt-1.5">
-          <LineupBar lineup={myLineup} label="La tua squadra" reverse />
+        {/* Player info card — top-right of player zone */}
+        <div className="absolute top-3 right-4 z-10" style={{ maxWidth: 'calc(55%)' }}>
+          {myActiveCr ? (
+            <div className="rounded-2xl overflow-hidden"
+              style={{
+                background: 'rgba(6,12,24,0.90)',
+                border: `1px solid ${myRarityColor}40`,
+                backdropFilter: 'blur(12px)',
+                boxShadow: `0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px ${myRarityColor}15`,
+              }}>
+              <div className="px-3 pt-2.5 pb-2.5">
+                {/* Lineup dots */}
+                <div className="flex items-center gap-1 mb-1.5 justify-end">
+                  <div className="flex gap-1">
+                    {[...myLineup].sort((a, b) => a.slot - b.slot).map(entry => {
+                      const cr = entry.player_creatures?.creatures
+                      const color = cr ? RARITY_COLORS[cr.rarity] : '#3A9DBC'
+                      const isFainted = !!entry.fainted_at
+                      return (
+                        <div key={entry.id} className="w-2 h-2 rounded-full"
+                          style={{
+                            background: isFainted ? 'rgba(255,255,255,0.1)' : color,
+                            opacity: isFainted ? 0.3 : entry.is_active ? 1 : 0.55,
+                            boxShadow: entry.is_active ? `0 0 4px ${color}` : 'none',
+                          }} />
+                      )
+                    })}
+                  </div>
+                  <p className="text-[9px] text-white/25 uppercase tracking-wider">Tu</p>
+                </div>
+                <p className="font-extrabold text-white text-sm leading-tight truncate mb-1.5 tracking-wide text-right">
+                  {myActiveCr.name}
+                </p>
+                <div className="flex items-center gap-1.5 mb-2 justify-end">
+                  <span className="text-[10px] text-white/35 capitalize">{myActiveCr.element}</span>
+                  <span className="text-xs">{ELEMENT_EMOJI[myActiveCr.element]}</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: `${myRarityColor}25`, color: myRarityColor, border: `1px solid ${myRarityColor}50` }}>
+                    {myActiveCr.rarity?.replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="h-2.5 rounded-full overflow-hidden mb-1" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    animate={{ width: `${myHpPct}%` }}
+                    transition={{ duration: 0.5 }}
+                    style={{
+                      background: hpBarColor(myHpPct),
+                      boxShadow: `0 0 8px ${hpBarColor(myHpPct)}80`,
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-white/25">HP</span>
+                  <span className="text-[10px] font-mono font-bold text-white/45">{myHp}/{myHpMax}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-24 w-44 rounded-2xl animate-pulse" style={{ background: 'rgba(255,255,255,0.04)' }} />
+          )}
         </div>
       </div>
 
       {/* ── ACTIONS ── */}
       {!result && !waiting && (
-        <div className="flex-none px-4 pb-4 pt-1 relative z-10 flex flex-col gap-2">
-          {/* Battaglia items picker */}
-          {battagliaItems.length > 0 && isMyTurn && (
-            <AnimatePresence>
-              {showItems && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="flex flex-col gap-1.5 pb-1">
-                    {battagliaItems.map(item => (
-                      <button
-                        key={item.inventoryId}
-                        onClick={() => setSelectedItemId(selectedItemId === item.inventoryId ? null : item.inventoryId)}
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-all cursor-pointer"
-                        style={{
-                          background: selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.04)',
-                          border: `1px solid ${selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                        }}
-                      >
-                        <span className="text-xl">⚔️</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-white truncate">{item.name}</p>
-                          <p className="text-[10px] text-[#FBBF24]">+{item.effectValue}% ATK</p>
-                        </div>
-                        <span className="text-xs text-white/30 shrink-0">×{item.quantity}</span>
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          )}
+        <div className="shrink-0 px-4 pb-4 pt-1 z-10 flex flex-col gap-2">
+
+          {/* Battaglia items */}
+          <AnimatePresence>
+            {showItems && battagliaItems.length > 0 && isMyTurn && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden">
+                <div className="flex flex-col gap-1.5 pb-1">
+                  {battagliaItems.map(item => (
+                    <button key={item.inventoryId}
+                      onClick={() => setSelectedItemId(selectedItemId === item.inventoryId ? null : item.inventoryId)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-all"
+                      style={{
+                        background: selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                      }}>
+                      <span className="text-lg">⚔️</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-white truncate">{item.name}</p>
+                        <p className="text-[10px] text-[#FBBF24]">+{item.effectValue}% ATK</p>
+                      </div>
+                      <span className="text-xs text-white/30 shrink-0">×{item.quantity}</span>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="flex gap-2">
             {/* Items toggle */}
@@ -565,10 +628,10 @@ export default function DuelPage() {
               <motion.button
                 onClick={() => { if (isMyTurn) setShowItems(s => !s) }}
                 whileTap={{ scale: 0.95 }}
-                className="w-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-all"
+                className="w-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all"
                 style={{
-                  background: showItems ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${showItems ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  background: showItems ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${showItems ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.09)'}`,
                   opacity: isMyTurn ? 1 : 0.4,
                 }}
               >
@@ -582,7 +645,7 @@ export default function DuelPage() {
               onClick={handleAttack}
               disabled={attacking || !isMyTurn}
               whileTap={isMyTurn ? { scale: 0.95 } : {}}
-              className="flex-1 relative overflow-hidden rounded-2xl py-4 font-extrabold text-white text-base cursor-pointer disabled:cursor-not-allowed transition-all"
+              className="flex-1 relative overflow-hidden rounded-2xl py-4 font-extrabold text-white text-base disabled:cursor-not-allowed transition-all"
               style={{
                 background: isMyTurn
                   ? selectedItemId
@@ -592,28 +655,31 @@ export default function DuelPage() {
                 boxShadow: isMyTurn && !attacking
                   ? selectedItemId ? '0 4px 20px rgba(251,191,36,0.35)' : '0 4px 20px rgba(232,93,47,0.4)'
                   : 'none',
+                border: !isMyTurn ? '1px solid rgba(255,255,255,0.08)' : 'none',
                 opacity: attacking ? 0.7 : 1,
               }}
             >
-              <span className="relative z-10 flex items-center justify-center gap-2">
-                {attacking ? (
+              {attacking ? (
+                <div className="flex items-center justify-center">
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : isMyTurn ? (
-                  <>⚔️ {selectedItemId ? 'Attacca (+ATK)' : 'Attacca'}</>
-                ) : (
-                  <span className="text-white/40 text-sm">In attesa...</span>
-                )}
-              </span>
+                </div>
+              ) : isMyTurn ? (
+                <span className="flex items-center justify-center gap-2">
+                  ⚔️ {selectedItemId ? 'Attacca (+ATK)' : 'Attacca'}
+                </span>
+              ) : (
+                <span className="text-white/35 text-sm">In attesa del tuo turno...</span>
+              )}
             </motion.button>
 
             {/* Surrender */}
             <motion.button
               onClick={handleSurrender}
               whileTap={{ scale: 0.95 }}
-              className="w-14 rounded-2xl flex items-center justify-center cursor-pointer"
+              className="w-14 rounded-2xl flex items-center justify-center"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
                 <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
                 <line x1="4" y1="22" x2="4" y2="15"/>
               </svg>
@@ -621,70 +687,6 @@ export default function DuelPage() {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ── Lineup bar component ───────────────────────────────────────────────────────
-function LineupBar({ lineup, label, reverse }: {
-  lineup: LineupEntry[]
-  label: string
-  reverse?: boolean
-}) {
-  if (lineup.length === 0) {
-    return (
-      <div className="flex items-center gap-2">
-        <p className="text-[9px] text-white/25 uppercase tracking-widest">{label}</p>
-        <div className="flex gap-1">
-          {[1,2,3].map(i => <div key={i} className="w-4 h-4 rounded-full bg-white/5 animate-pulse" />)}
-        </div>
-      </div>
-    )
-  }
-
-  const sorted = [...lineup].sort((a, b) => a.slot - b.slot)
-
-  return (
-    <div className={`flex items-center gap-2 ${reverse ? 'flex-row-reverse' : ''}`}>
-      <p className="text-[9px] text-white/25 uppercase tracking-widest shrink-0">{label}</p>
-      <div className={`flex gap-1.5 ${reverse ? 'flex-row-reverse' : ''}`}>
-        {sorted.map(entry => {
-          const cr = entry.player_creatures?.creatures
-          const color = cr ? RARITY_COLORS[cr.rarity] : '#94a3b8'
-          const isFainted = !!entry.fainted_at
-          const isActive  = entry.is_active
-          const hpPct = cr ? Math.max(0, (entry.current_hp / cr.hp) * 100) : 0
-
-          return (
-            <div
-              key={entry.id}
-              className="relative w-5 h-5 rounded-full flex items-center justify-center overflow-hidden"
-              style={{
-                background: isFainted ? 'rgba(255,255,255,0.05)' : `${color}30`,
-                border: `1.5px solid ${isActive ? color : isFainted ? 'rgba(255,255,255,0.1)' : color + '60'}`,
-                boxShadow: isActive ? `0 0 6px ${color}80` : 'none',
-                opacity: isFainted ? 0.4 : 1,
-              }}
-              title={cr?.name ?? `Slot ${entry.slot}`}
-            >
-              {isFainted ? (
-                <span className="text-[8px] text-white/30 font-bold">✕</span>
-              ) : (
-                <span className="text-[7px]" style={{ color }}>
-                  {Math.round(hpPct)}
-                </span>
-              )}
-              {/* HP fill indicator along bottom */}
-              {!isFainted && (
-                <div
-                  className="absolute bottom-0 left-0 h-[3px] transition-all duration-500"
-                  style={{ width: `${hpPct}%`, background: hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444' }}
-                />
-              )}
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }
