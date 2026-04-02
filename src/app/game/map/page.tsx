@@ -294,28 +294,21 @@ function MapPageInner() {
         </div>
       )}
 
-      {/* Session ended overlay on map */}
-      {sessionEnded && (
-        <div className="absolute top-2 left-2 right-2 bg-[#7B4DB8]/80 text-[#E9D5FF] text-xs px-3 py-2 rounded-xl z-[900] text-center backdrop-blur-sm">
-          🏁 Sessione terminata — la mappa è in sola lettura
-        </div>
-      )}
+      {/* Top-left alerts column — stops before the right-side HUD (right-20 = 80px) */}
+      <div className="absolute top-2 left-2 right-20 z-[900] flex flex-col gap-1.5 pointer-events-none">
+        {gpsError && (
+          <div className="bg-yellow-900/90 text-yellow-200 text-xs px-3 py-2 rounded-xl backdrop-blur-sm">
+            ⚠️ {gpsError}
+          </div>
+        )}
+        {!inBounds && (
+          <div className="bg-red-900/90 text-red-200 text-xs px-3 py-2 rounded-xl backdrop-blur-sm font-semibold">
+            🚫 Sei fuori dall'area di gioco
+          </div>
+        )}
+      </div>
 
-      {/* GPS error */}
-      {gpsError && (
-        <div className="absolute top-2 left-2 right-2 bg-yellow-900/90 text-yellow-200 text-sm px-3 py-2 rounded-lg z-[900]">
-          ⚠️ {gpsError}
-        </div>
-      )}
-
-      {/* Out of bounds */}
-      {!inBounds && (
-        <div className="absolute top-2 left-2 right-2 bg-red-900/90 text-red-200 text-sm px-3 py-2 rounded-lg z-[900] text-center">
-          🚫 Sei fuori dall'area di gioco — torna nella zona indicata!
-        </div>
-      )}
-
-      {/* Step counter + GPS accuracy overlay */}
+      {/* Top-right HUD column — step counter + GPS accuracy + esca */}
       <div className="absolute top-2 right-2 z-[900] flex flex-col items-end gap-1.5">
         <div className="bg-[#0F1F2E]/85 border border-white/10 backdrop-blur-sm rounded-xl px-3 py-2 flex items-center gap-2">
           <span className="text-sm">👟</span>
@@ -333,15 +326,12 @@ function MapPageInner() {
             GPS ±{gpsAccuracy}m
           </div>
         )}
+        {escaActiveUntil && (
+          <div className="bg-[#34D399]/20 border border-[#34D399]/40 text-[#34D399] text-[10px] px-2.5 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 font-semibold whitespace-nowrap">
+            🪱 Esca attiva
+          </div>
+        )}
       </div>
-
-      {/* Esca active indicator */}
-      {escaActiveUntil && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-[#34D399]/20 border border-[#34D399]/40 text-[#34D399] text-xs px-3 py-1.5 rounded-full z-[900] flex items-center gap-1.5 backdrop-blur-sm whitespace-nowrap">
-          <span>🪱</span>
-          <span className="font-semibold">Esca attiva</span>
-        </div>
-      )}
 
       {/* Egg hatched notification */}
       {hatchedCreature && (
@@ -354,12 +344,27 @@ function MapPageInner() {
         </div>
       )}
 
-      {/* QR scan button */}
+      {/* QR scan button — dark glass, game-themed */}
       <button
         onClick={() => router.push('/game/missions?qr=1')}
-        className="absolute bottom-4 right-4 bg-[#3A9DBC] text-white rounded-full w-14 h-14 flex items-center justify-center text-2xl shadow-lg z-[900]"
+        className="absolute bottom-4 right-4 z-[900] flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl transition-all active:scale-95"
+        style={{
+          background: 'rgba(10, 20, 35, 0.82)',
+          border: '1.5px solid rgba(58,157,188,0.55)',
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 0 18px rgba(58,157,188,0.18), 0 4px 14px rgba(0,0,0,0.5)',
+        }}
       >
-        📷
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="3" width="8" height="8" rx="1.5" stroke="#3A9DBC" strokeWidth="1.8"/>
+          <rect x="5.5" y="5.5" width="3" height="3" rx="0.5" fill="#3A9DBC"/>
+          <rect x="13" y="3" width="8" height="8" rx="1.5" stroke="#3A9DBC" strokeWidth="1.8"/>
+          <rect x="15.5" y="5.5" width="3" height="3" rx="0.5" fill="#3A9DBC"/>
+          <rect x="3" y="13" width="8" height="8" rx="1.5" stroke="#3A9DBC" strokeWidth="1.8"/>
+          <rect x="5.5" y="15.5" width="3" height="3" rx="0.5" fill="#3A9DBC"/>
+          <path d="M13 13h2.5M13 16h2.5M13 19h2.5M16.5 13h4M16.5 16h4M16.5 19h4" stroke="#3A9DBC" strokeWidth="1.8" strokeLinecap="round"/>
+        </svg>
+        <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: '#3A9DBC' }}>SCAN</span>
       </button>
 
       {/* Encounter popup */}
