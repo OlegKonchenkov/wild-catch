@@ -49,7 +49,7 @@ function MapPageInner() {
       supabase.auth.getUser().then(({ data: { user } }) => {
         if (!user) return
         supabase.from('player_sessions')
-          .select('esca_active_until, selected_creature_id')
+          .select('esca_active_until, selected_creature_id, steps_walked')
           .eq('user_id', user.id)
           .eq('session_id', sid)
           .single()
@@ -57,6 +57,9 @@ function MapPageInner() {
             if (data?.esca_active_until) {
               const d = new Date(data.esca_active_until)
               if (d > new Date()) setEscaActiveUntil(d)
+            }
+            if (typeof data?.steps_walked === 'number') {
+              setStepsWalked(data.steps_walked)
             }
             // Load selected creature image
             if (data?.selected_creature_id) {
