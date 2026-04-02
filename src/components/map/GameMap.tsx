@@ -2,10 +2,20 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Session } from '@/lib/types'
 
+export interface MapPin {
+  id: string
+  lat: number
+  lng: number
+  name: string
+  description: string
+}
+
 interface Props {
   session: Session
   playerPosition: { lat: number; lng: number } | null
   sessionId: string
+  creatureImageUrl?: string | null
+  pins?: MapPin[]
 }
 
 // Haversine distance in metres between two GPS points
@@ -28,10 +38,45 @@ function computeBearing(lat1: number, lon1: number, lat2: number, lon2: number):
   return (Math.atan2(y, x) * (180 / Math.PI) + 360) % 360
 }
 
-// Build the player marker HTML (inner div handles rotation independently of Leaflet's translate)
-function markerHTML(bearing: number | null): string {
+// Build the player marker HTML
+function markerHTML(bearing: number | null, creatureImageUrl?: string | null): string {
   const rotate = bearing !== null ? bearing : 0
   const showCone = bearing !== null
+
+  if (creatureImageUrl) {
+    // Creature image marker — 40×40 circular portrait
+    return `
+      <div class="wc-player-inner" style="
+        width:40px; height:40px; position:relative;
+        transform:rotate(${rotate}deg);
+        transform-origin:50% 50%;
+        transition:transform 0.4s ease-out;
+      ">
+        ${showCone ? `
+          <div style="
+            position:absolute; bottom:100%; left:50%; margin-left:-4px;
+            width:0; height:0;
+            border-left:4px solid transparent;
+            border-right:4px solid transparent;
+            border-bottom:9px solid rgba(58,157,188,0.9);
+            margin-bottom:1px;
+          "></div>
+        ` : ''}
+        <div style="
+          width:40px; height:40px;
+          border-radius:50%;
+          border:3px solid #3A9DBC;
+          box-shadow:0 0 0 3px rgba(58,157,188,0.35), 0 2px 8px rgba(0,0,0,0.5);
+          overflow:hidden;
+          background:#0F1F2E;
+        ">
+          <img src="${creatureImageUrl}" style="width:100%;height:100%;object-fit:cover;" />
+        </div>
+      </div>
+    `
+  }
+
+  // Default orange circle marker
   return `
     <div class="wc-player-inner" style="
       width:20px; height:20px; position:relative;
@@ -60,7 +105,11 @@ function markerHTML(bearing: number | null): string {
   `
 }
 
-export default function GameMap({ session, playerPosition, sessionId }: Props) {
+function markerSize(hasImage: boolean): number {
+  return hasImage ? 40 : 20
+}
+
+export default function GameMap({ session, playerPosition, sessionId, creatureImageUrl, pins }: Props) {
   const mapRef = useRef<unknown>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const markerRef = useRef<unknown>(null)
@@ -69,7 +118,10 @@ export default function GameMap({ session, playerPosition, sessionId }: Props) {
   const prevPosRef = useRef<{ lat: number; lng: number } | null>(null)
   const headingRef = useRef<number | null>(null)
   const playerPositionRef = useRef(playerPosition)
+  const pinMarkersRef = useRef<Map<string, unknown>>(new Map())
+  const LRef = useRef<any>(null)
   const [following, setFollowing] = useState(true)
+  const [mapReady, setMapReady] = useState(false)
 
   useEffect(() => { playerPositionRef.current = playerPosition }, [playerPosition])
 
@@ -88,6 +140,7 @@ export default function GameMap({ session, playerPosition, sessionId }: Props) {
       ]
 
       const Leaflet = L as unknown as typeof import('leaflet')
+      LRef.current = Leaflet
 
       const map = Leaflet.map(mapContainerRef.current!, {
         center,
@@ -103,10 +156,11 @@ export default function GameMap({ session, playerPosition, sessionId }: Props) {
       // Immediately create marker if we already have a GPS position
       const pos = playerPositionRef.current
       if (pos) {
+        const sz = markerSize(!!creatureImageUrl)
         const icon = Leaflet.divIcon({
-          html: markerHTML(null),
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
+          html: markerHTML(null, creatureImageUrl),
+          iconSize: [sz, sz],
+          iconAnchor: [sz / 2, sz / 2],
           className: '',
         })
         markerRef.current = Leaflet.marker([pos.lat, pos.lng], { icon, zIndexOffset: 1000 }).addTo(map)
@@ -114,20 +168,23 @@ export default function GameMap({ session, playerPosition, sessionId }: Props) {
         firstFixRef.current = false
       }
 
-      Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
+      // CartoDB Dark Matter tiles
+      Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
         maxZoom: 19,
       }).addTo(map)
 
       Leaflet.rectangle(
         [[bounds.south, bounds.west], [bounds.north, bounds.east]],
-        { color: '#3A9DBC', weight: 2, fillOpacity: 0.05 }
+        { color: '#3A9DBC', weight: 2, fillOpacity: 0.07 }
       ).addTo(map)
 
       map.on('dragstart', () => {
         followingRef.current = false
         setFollowing(false)
       })
+
+      setMapReady(true)
     })
 
     return () => {
@@ -139,9 +196,12 @@ export default function GameMap({ session, playerPosition, sessionId }: Props) {
         followingRef.current = true
         prevPosRef.current = null
         headingRef.current = null
+        LRef.current = null
+        pinMarkersRef.current.clear()
+        setMapReady(false)
       }
     }
-  }, [session])
+  }, [session]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update player marker position, bearing and map pan
   useEffect(() => {
@@ -158,33 +218,31 @@ export default function GameMap({ session, playerPosition, sessionId }: Props) {
         if (dist >= 5) {
           headingRef.current = computeBearing(prev.lat, prev.lng, lat, lng)
         }
-        // if dist < 5m, keep previous heading (player stationary or jitter)
       }
       prevPosRef.current = { lat, lng }
 
       const bearing = headingRef.current
+      const sz = markerSize(!!creatureImageUrl)
 
       if (markerRef.current) {
         const marker = markerRef.current as import('leaflet').Marker
         marker.setLatLng([lat, lng])
-        // Recreate icon so the cone appears/disappears correctly with bearing
         marker.setIcon(Leaflet.divIcon({
-          html: markerHTML(bearing),
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
+          html: markerHTML(bearing, creatureImageUrl),
+          iconSize: [sz, sz],
+          iconAnchor: [sz / 2, sz / 2],
           className: '',
         }))
       } else {
         const icon = Leaflet.divIcon({
-          html: markerHTML(bearing),
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
+          html: markerHTML(bearing, creatureImageUrl),
+          iconSize: [sz, sz],
+          iconAnchor: [sz / 2, sz / 2],
           className: '',
         })
         markerRef.current = Leaflet.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map)
       }
 
-      // Pan map
       if (firstFixRef.current) {
         map.setView([lat, lng], 17, { animate: true, duration: 0.8 })
         firstFixRef.current = false
@@ -192,7 +250,51 @@ export default function GameMap({ session, playerPosition, sessionId }: Props) {
         map.panTo([lat, lng], { animate: true, duration: 0.5, easeLinearity: 0.5 })
       }
     })
-  }, [playerPosition])
+  }, [playerPosition, creatureImageUrl])
+
+  // Render / update map pins
+  useEffect(() => {
+    if (!mapReady || !LRef.current || !mapRef.current) return
+    const Leaflet = LRef.current as typeof import('leaflet')
+    const map = mapRef.current as import('leaflet').Map
+
+    // Remove stale markers
+    pinMarkersRef.current.forEach(m => (m as import('leaflet').Marker).remove())
+    pinMarkersRef.current.clear()
+
+    // Pin icon — teardrop-style
+    const pinIcon = Leaflet.divIcon({
+      html: `<div style="
+        width:0; height:0;
+        position:relative;
+      ">
+        <div style="
+          position:absolute;
+          width:28px; height:28px;
+          left:-14px; top:-28px;
+          background:#F7C841;
+          border:3px solid #fff;
+          border-radius:50% 50% 50% 0;
+          transform:rotate(-45deg);
+          box-shadow:0 2px 8px rgba(0,0,0,0.45);
+        "></div>
+      </div>`,
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+      className: '',
+    })
+
+    ;(pins ?? []).forEach(pin => {
+      const popup = Leaflet.popup({ maxWidth: 220 }).setContent(`
+        <div style="font-family:sans-serif;padding:2px 0">
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#0F1F2E">${pin.name || 'Punto di interesse'}</div>
+          ${pin.description ? `<div style="font-size:12px;color:#4B5563;line-height:1.4">${pin.description}</div>` : ''}
+        </div>
+      `)
+      const m = Leaflet.marker([pin.lat, pin.lng], { icon: pinIcon }).addTo(map).bindPopup(popup)
+      pinMarkersRef.current.set(pin.id, m)
+    })
+  }, [mapReady, pins])
 
   function handleRecenter() {
     if (!playerPosition || !mapRef.current) return

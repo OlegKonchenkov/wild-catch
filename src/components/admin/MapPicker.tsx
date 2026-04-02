@@ -3,9 +3,20 @@ import { useEffect, useRef, useState } from 'react'
 
 export interface Bounds { north: number; south: number; east: number; west: number }
 
+export interface MapPin {
+  id?: string
+  lat: number
+  lng: number
+  name: string
+  description: string
+}
+
 interface Props {
   onBoundsChange: (b: Bounds | null) => void
   initialBounds?: Bounds | null
+  pins?: MapPin[]
+  onAddPin?: (pin: { lat: number; lng: number; name: string; description: string }) => Promise<void> | void
+  onDeletePin?: (id: string) => Promise<void> | void
 }
 
 function isValidBounds(b: Bounds | null | undefined): b is Bounds {
@@ -16,30 +27,41 @@ function isValidBounds(b: Bounds | null | undefined): b is Bounds {
     typeof b.west  === 'number' && isFinite(b.west)
 }
 
-export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
+export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPin, onDeletePin }: Props) {
   const containerRef      = useRef<HTMLDivElement>(null)
   const mapRef            = useRef<any>(null)
   const rectRef           = useRef<any>(null)
   const LRef              = useRef<any>(null)
   const drawModeRef       = useRef(false)
+  const pinModeRef        = useRef(false)
   const onChangeRef       = useRef(onBoundsChange)
+  const pinMarkersRef     = useRef<Map<string, any>>(new Map())
 
   const validInitial = isValidBounds(initialBounds) ? initialBounds : null
 
-  const [drawMode, setDrawMode]     = useState(false)
-  const [hasBounds, setHasBounds]   = useState(isValidBounds(initialBounds))
+  const [drawMode, setDrawMode]       = useState(false)
+  const [pinMode, setPinMode]         = useState(false)
+  const [hasBounds, setHasBounds]     = useState(isValidBounds(initialBounds))
   const [searchQuery, setSearchQuery] = useState('')
-  const [searching, setSearching]   = useState(false)
-  const [tooSmall, setTooSmall]     = useState(false)
+  const [searching, setSearching]     = useState(false)
+  const [tooSmall, setTooSmall]       = useState(false)
+  const [mapReady, setMapReady]       = useState(false)
+  // Pending pin: clicked point waiting for name/description
+  const [pendingPin, setPendingPin]   = useState<{ lat: number; lng: number } | null>(null)
+  const [pinName, setPinName]         = useState('')
+  const [pinDesc, setPinDesc]         = useState('')
+  const [savingPin, setSavingPin]     = useState(false)
 
   useEffect(() => { onChangeRef.current = onBoundsChange }, [onBoundsChange])
+  useEffect(() => { drawModeRef.current = drawMode }, [drawMode])
+  useEffect(() => { pinModeRef.current = pinMode }, [pinMode])
 
   // Sync drawMode → Leaflet dragging
   useEffect(() => {
     if (!mapRef.current) return
-    if (drawMode) mapRef.current.dragging.disable()
+    if (drawMode || pinMode) mapRef.current.dragging.disable()
     else mapRef.current.dragging.enable()
-  }, [drawMode])
+  }, [drawMode, pinMode])
 
   // Init Leaflet
   useEffect(() => {
@@ -47,7 +69,6 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
     let cleanupFn = () => {}
 
     import('leaflet').then(L => {
-      // Avoid double-init on React StrictMode
       if (mapRef.current) return
 
       LRef.current = L
@@ -59,15 +80,14 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
       const map = L.map(containerRef.current!, { center, zoom: validInitial ? 14 : 12, zoomControl: true })
       mapRef.current = map
 
-      // Force Leaflet to recalculate container size after render
       setTimeout(() => map.invalidateSize(), 100)
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a>',
+      // CartoDB Dark Matter tiles
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
         maxZoom: 19,
       }).addTo(map)
 
-      // Draw existing bounds (only if valid)
       if (validInitial) {
         const b = L.latLngBounds(
           [validInitial.south, validInitial.west],
@@ -76,6 +96,16 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
         rectRef.current = L.rectangle(b, { color: '#3A9DBC', weight: 2, fillOpacity: 0.15 }).addTo(map)
         map.fitBounds(b, { padding: [30, 30] })
       }
+
+      // Click handler for pin mode
+      map.on('click', (e: any) => {
+        if (!pinModeRef.current) return
+        setPendingPin({ lat: e.latlng.lat, lng: e.latlng.lng })
+        setPinName('')
+        setPinDesc('')
+        pinModeRef.current = false
+        setPinMode(false)
+      })
 
       /* ── Drag-to-draw ────────────────────────────────────── */
       let startLatLng: any = null
@@ -123,12 +153,10 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
         setDrawMode(false)
       }
 
-      // Mouse
       const onMouseDown = (e: MouseEvent) => { startDraw(e.clientX, e.clientY) }
       const onMouseMove = (e: MouseEvent) => { moveDraw(e.clientX, e.clientY) }
       const onMouseUp   = (e: MouseEvent) => { endDraw(e.clientX, e.clientY) }
 
-      // Touch
       const onTouchStart = (e: TouchEvent) => {
         if (!drawModeRef.current) return
         e.preventDefault()
@@ -145,9 +173,14 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
       el.addEventListener('touchmove',  onTouchMove,  { passive: false })
       el.addEventListener('touchend',   onTouchEnd)
 
+      setMapReady(true)
+
       cleanupFn = () => {
         map.remove()
         mapRef.current = null
+        LRef.current = null
+        pinMarkersRef.current.clear()
+        setMapReady(false)
         el.removeEventListener('mousedown',  onMouseDown)
         el.removeEventListener('mousemove',  onMouseMove)
         el.removeEventListener('mouseup',    onMouseUp)
@@ -160,8 +193,63 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
     return () => cleanupFn()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep ref in sync with state
-  useEffect(() => { drawModeRef.current = drawMode }, [drawMode])
+  // Sync pin markers when pins prop changes
+  useEffect(() => {
+    if (!mapReady || !LRef.current || !mapRef.current) return
+    const L = LRef.current
+    const map = mapRef.current
+
+    // Remove old markers
+    pinMarkersRef.current.forEach(m => m.remove())
+    pinMarkersRef.current.clear()
+
+    // Pin icon (teardrop)
+    const mkPinIcon = () => L.divIcon({
+      html: `<div style="position:relative;width:0;height:0">
+        <div style="
+          position:absolute;width:26px;height:26px;
+          left:-13px;top:-26px;
+          background:#F7C841;border:3px solid #fff;
+          border-radius:50% 50% 50% 0;
+          transform:rotate(-45deg);
+          box-shadow:0 2px 6px rgba(0,0,0,0.5);
+        "></div>
+      </div>`,
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+      className: '',
+    })
+
+    ;(pins ?? []).forEach(pin => {
+      const key = pin.id ?? `${pin.lat},${pin.lng}`
+      const deleteBtn = pin.id && onDeletePin
+        ? `<br><button
+            onclick="(function(){var ev=new CustomEvent('wc:delete-pin',{detail:'${pin.id}'});window.dispatchEvent(ev);})()"
+            style="margin-top:6px;font-size:11px;color:#E85D2F;background:none;border:none;cursor:pointer;padding:0;font-weight:600"
+          >🗑 Elimina pin</button>`
+        : ''
+      const popup = L.popup({ maxWidth: 220 }).setContent(
+        `<div style="font-family:sans-serif;padding:2px 0">
+          <div style="font-weight:700;font-size:13px;margin-bottom:3px">${pin.name || 'Pin'}</div>
+          ${pin.description ? `<div style="font-size:12px;color:#aaa;line-height:1.4">${pin.description}</div>` : ''}
+          ${deleteBtn}
+        </div>`
+      )
+      const m = L.marker([pin.lat, pin.lng], { icon: mkPinIcon() }).addTo(map).bindPopup(popup)
+      pinMarkersRef.current.set(key, m)
+    })
+  }, [mapReady, pins]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for delete-pin events fired from Leaflet popup buttons
+  useEffect(() => {
+    if (!onDeletePin) return
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail
+      if (id) onDeletePin(id)
+    }
+    window.addEventListener('wc:delete-pin', handler)
+    return () => window.removeEventListener('wc:delete-pin', handler)
+  }, [onDeletePin])
 
   async function geocode() {
     if (!searchQuery.trim() || !mapRef.current) return
@@ -189,6 +277,16 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
     setDrawMode(false)
   }
 
+  async function confirmPin() {
+    if (!pendingPin || !onAddPin) return
+    setSavingPin(true)
+    await onAddPin({ lat: pendingPin.lat, lng: pendingPin.lng, name: pinName.trim(), description: pinDesc.trim() })
+    setSavingPin(false)
+    setPendingPin(null)
+  }
+
+  const showPinTools = !!onAddPin
+
   return (
     <div className="flex flex-col gap-2">
       {/* Search bar */}
@@ -213,13 +311,24 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
       {/* Map */}
       <div
         className="relative rounded-xl overflow-hidden transition-all"
-        style={{ height: 300, border: `2px solid ${drawMode ? '#3A9DBC' : 'rgba(255,255,255,0.15)'}`, cursor: drawMode ? 'crosshair' : undefined }}
+        style={{
+          height: 300,
+          border: `2px solid ${drawMode ? '#3A9DBC' : pinMode ? '#F7C841' : 'rgba(255,255,255,0.15)'}`,
+          cursor: drawMode ? 'crosshair' : pinMode ? 'cell' : undefined,
+        }}
       >
         <div ref={containerRef} className="w-full h-full" />
         {drawMode && (
           <div className="absolute top-2 inset-x-2 flex justify-center pointer-events-none z-[1000]">
             <div className="bg-[#3A9DBC] text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-lg">
               ✏️ Clicca e trascina per disegnare l'area
+            </div>
+          </div>
+        )}
+        {pinMode && (
+          <div className="absolute top-2 inset-x-2 flex justify-center pointer-events-none z-[1000]">
+            <div className="bg-[#F7C841] text-black text-xs px-3 py-1.5 rounded-full font-bold shadow-lg">
+              📍 Clicca sulla mappa per posizionare il pin
             </div>
           </div>
         )}
@@ -235,7 +344,7 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
       {/* Action buttons */}
       <div className="flex gap-2">
         <button
-          onClick={() => setDrawMode(v => !v)}
+          onClick={() => { setDrawMode(v => !v); setPinMode(false) }}
           className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors border ${
             drawMode
               ? 'bg-[#3A9DBC] border-[#3A9DBC] text-white'
@@ -250,7 +359,57 @@ export default function MapPicker({ onBoundsChange, initialBounds }: Props) {
             🗑 Reset
           </button>
         )}
+        {showPinTools && (
+          <button
+            onClick={() => { setPinMode(v => !v); setDrawMode(false) }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors border ${
+              pinMode
+                ? 'bg-[#F7C841] border-[#F7C841] text-black'
+                : 'bg-white/8 border-white/20 text-white hover:bg-white/15'
+            }`}
+          >
+            {pinMode ? '✕ Annulla' : '📍 Pin'}
+          </button>
+        )}
       </div>
+
+      {/* Pending pin form */}
+      {pendingPin && (
+        <div className="bg-[#F7C841]/10 border border-[#F7C841]/30 rounded-xl p-3 space-y-2">
+          <p className="text-xs font-bold text-[#F7C841]">
+            📍 Nuovo pin — {pendingPin.lat.toFixed(5)}, {pendingPin.lng.toFixed(5)}
+          </p>
+          <input
+            autoFocus
+            value={pinName}
+            onChange={e => setPinName(e.target.value)}
+            placeholder="Nome del punto (es. Checkpoint A)"
+            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-1.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-[#F7C841]/60"
+          />
+          <textarea
+            value={pinDesc}
+            onChange={e => setPinDesc(e.target.value)}
+            placeholder="Descrizione (opzionale)"
+            rows={2}
+            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-1.5 text-sm resize-none placeholder:text-white/30 focus:outline-none focus:border-[#F7C841]/60"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPendingPin(null)}
+              className="flex-1 py-1.5 rounded-lg text-sm bg-white/8 text-white/60 border border-white/15 hover:bg-white/12 transition-colors"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={confirmPin}
+              disabled={savingPin || !pinName.trim()}
+              className="flex-1 py-1.5 rounded-lg text-sm bg-[#F7C841] text-black font-bold disabled:opacity-50 hover:brightness-105 transition-all"
+            >
+              {savingPin ? 'Salvataggio…' : '✓ Aggiungi pin'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Status */}
       {hasBounds ? (

@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { useGPS } from '@/hooks/useGPS'
 import type { Session } from '@/lib/types'
+import type { MapPin } from '@/components/map/GameMap'
 
 // Dynamic import — Leaflet is not SSR-safe
 const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false })
@@ -20,6 +21,8 @@ function MapPageInner() {
   const [sessionEnded, setSessionEnded] = useState(false)
   const [sessionRestarted, setSessionRestarted] = useState(false)
   const [escaActiveUntil, setEscaActiveUntil] = useState<Date | null>(null)
+  const [creatureImageUrl, setCreatureImageUrl] = useState<string | null>(null)
+  const [mapPins, setMapPins] = useState<MapPin[]>([])
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
   const [hatchedCreature, setHatchedCreature] = useState<{ name: string; rarity: string } | null>(null)
@@ -46,7 +49,7 @@ function MapPageInner() {
       supabase.auth.getUser().then(({ data: { user } }) => {
         if (!user) return
         supabase.from('player_sessions')
-          .select('esca_active_until')
+          .select('esca_active_until, selected_creature_id')
           .eq('user_id', user.id)
           .eq('session_id', sid)
           .single()
@@ -55,8 +58,24 @@ function MapPageInner() {
               const d = new Date(data.esca_active_until)
               if (d > new Date()) setEscaActiveUntil(d)
             }
+            // Load selected creature image
+            if (data?.selected_creature_id) {
+              supabase.from('player_creatures')
+                .select('creatures(image_url)')
+                .eq('id', data.selected_creature_id)
+                .single()
+                .then(({ data: pc }) => {
+                  const url = (pc?.creatures as any)?.image_url
+                  if (url) setCreatureImageUrl(url)
+                })
+            }
           })
       })
+      // Load map pins
+      fetch(`/api/game/map-pins?sessionId=${sid}`)
+        .then(r => r.json())
+        .then((d: { pins?: MapPin[] }) => { if (d.pins) setMapPins(d.pins) })
+        .catch(() => {})
     }
 
     // ?restored=<sid> from auth callback OR history re-entry from home page
@@ -257,6 +276,8 @@ function MapPageInner() {
         session={session}
         playerPosition={position ? { lat: position.lat, lng: position.lng } : null}
         sessionId={sessionId!}
+        creatureImageUrl={creatureImageUrl}
+        pins={mapPins}
       />
 
       {/* Session restarted overlay */}

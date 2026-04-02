@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { AdminListSkeleton } from '@/components/admin/AdminLoading'
-import type { Bounds } from '@/components/admin/MapPicker'
+import type { Bounds, MapPin } from '@/components/admin/MapPicker'
 
 function SessionTimeInfo({ session }: { session: { status: string; start_at: string | null; end_at: string | null; duration_minutes: number } }) {
   const [countdown, setCountdown] = useState('')
@@ -121,6 +121,8 @@ export default function SessionsPage() {
   const [editError, setEditError] = useState<string | null>(null)
   const [editOk, setEditOk]       = useState(false)
   const [allItems, setAllItems]   = useState<Item[]>([])
+  // Map pins for the session currently being edited
+  const [editingPins, setEditingPins] = useState<MapPin[]>([])
 
   // Create wizard
   const [step, setStep]           = useState<WizardStep>(1)
@@ -168,9 +170,31 @@ export default function SessionsPage() {
         if (data) setAllItems(data as Item[])
       })
     }
+    // Load map pins
+    setEditingPins([])
+    fetch(`/api/admin/session-pins?sessionId=${s.id}`)
+      .then(r => r.json())
+      .then((d: { pins?: MapPin[] }) => { if (d.pins) setEditingPins(d.pins) })
+      .catch(() => {})
   }
 
-  function closeEdit() { setEditingId(null); setEditForm(null); setEditError(null) }
+  function closeEdit() { setEditingId(null); setEditForm(null); setEditError(null); setEditingPins([]) }
+
+  async function handleAddPin(pin: { lat: number; lng: number; name: string; description: string }) {
+    if (!editingId) return
+    const res = await fetch('/api/admin/session-pins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: editingId, ...pin }),
+    })
+    const data = await res.json()
+    if (data.pin) setEditingPins(prev => [...prev, data.pin as MapPin])
+  }
+
+  async function handleDeletePin(id: string) {
+    await fetch(`/api/admin/session-pins/${id}`, { method: 'DELETE' })
+    setEditingPins(prev => prev.filter(p => p.id !== id))
+  }
 
   async function saveEdit() {
     if (!editingId || !editForm) return
@@ -439,6 +463,9 @@ export default function SessionsPage() {
                     key={`edit-${s.id}`}
                     initialBounds={editForm.areaBounds}
                     onBoundsChange={b => setEditForm(f => f && ({ ...f, areaBounds: b }))}
+                    pins={editingPins}
+                    onAddPin={handleAddPin}
+                    onDeletePin={handleDeletePin}
                   />
                 </div>
 
