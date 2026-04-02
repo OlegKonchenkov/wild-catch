@@ -194,6 +194,8 @@ export default function EncounterPage() {
   const [message, setMessage]   = useState('')
   const [loading, setLoading]   = useState(false)
   const [result, setResult]     = useState<'caught' | 'fled' | 'evolved' | 'ko' | null>(null)
+  const [caughtCreatureData, setCaughtCreatureData] = useState<any>(null)
+  const [caughtExpGain, setCaughtExpGain]           = useState(0)
   const [playerCreature, setPlayerCreature] = useState<{
     name: string; maxHp: number; atk: number; element: string; rarity: string; imageUrl: string
   } | null>(null)
@@ -359,6 +361,13 @@ export default function EncounterPage() {
     if (data.caught) {
       setWildAnim('catch')
       await new Promise(r => setTimeout(r, 1800))
+      // Fetch full creature data for the reveal card (atk, def, description)
+      const creatureId = data.newCreatureId ?? state.creature.id
+      supabase.from('creatures')
+        .select('name, hp, atk, def, element, rarity, image_url, description')
+        .eq('id', creatureId).single()
+        .then(({ data: cr }) => { if (cr) setCaughtCreatureData(cr) })
+      setCaughtExpGain(data.expGain ?? 0)
       setResult(data.evolved ? 'evolved' : 'caught')
       if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
       window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
@@ -737,9 +746,9 @@ export default function EncounterPage() {
         )}
       </AnimatePresence>
 
-      {/* ── RESULT OVERLAY ── */}
+      {/* ── RESULT OVERLAY: flee / ko ── */}
       <AnimatePresence>
-        {result && (
+        {(result === 'fled' || result === 'ko') && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             className="absolute inset-0 flex flex-col items-center justify-center z-40 px-6"
@@ -750,11 +759,9 @@ export default function EncounterPage() {
               transition={{ type: 'spring', stiffness: 320, damping: 22 }}
               className="flex flex-col items-center text-center"
             >
-              <div className="text-7xl mb-5">
-                {result === 'caught' ? '🎯' : result === 'evolved' ? '✨' : result === 'ko' ? '💥' : '💨'}
-              </div>
+              <div className="text-7xl mb-5">{result === 'ko' ? '💥' : '💨'}</div>
               <p className="text-3xl font-extrabold text-white mb-2 tracking-tight">
-                {result === 'caught' ? 'Catturato!' : result === 'evolved' ? 'Evoluzione!' : result === 'ko' ? 'Knock Out!' : 'Fuggita'}
+                {result === 'ko' ? 'Knock Out!' : 'Fuggita'}
               </p>
               {state.creature.name && (
                 <div className="flex items-center gap-2 mb-6">
@@ -766,17 +773,167 @@ export default function EncounterPage() {
                 </div>
               )}
               <motion.button onClick={() => router.push('/game/map')} whileTap={{ scale: 0.96 }}
-                className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
-                style={{
-                  background: result !== 'fled' ? 'linear-gradient(135deg,#3A9DBC,#2a7a99)' : 'rgba(255,255,255,0.08)',
-                  boxShadow: result !== 'fled' ? '0 4px 24px rgba(58,157,188,0.45)' : 'none',
-                  border: result === 'fled' ? '1px solid rgba(255,255,255,0.12)' : 'none',
-                }}>
+                className="w-full py-4 rounded-2xl font-extrabold text-white/60 text-base"
+                style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)' }}>
                 Continua
               </motion.button>
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* ── RESULT OVERLAY: caught / evolved — bestiary reveal card ── */}
+      <AnimatePresence>
+        {(result === 'caught' || result === 'evolved') && (() => {
+          const cr = caughtCreatureData
+          const crElem   = cr?.element ?? wildElem
+          const crRarity = cr?.rarity  ?? (state.creature.rarity ?? 'comune')
+          const crTheme  = ELEMENT_THEME[crElem] ?? ELEMENT_THEME.bosco
+          const crRarityColor = RARITY_COLORS[crRarity as Rarity] ?? '#64748b'
+          const crElemEmoji   = ELEMENT_EMOJI[crElem as keyof typeof ELEMENT_EMOJI] ?? '✦'
+          const isEvolved = result === 'evolved'
+
+          return (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                key="catch-backdrop"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="absolute inset-0 z-40"
+                style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(10px)' }}
+              />
+
+              {/* Sliding card */}
+              <motion.div
+                key="catch-card"
+                initial={{ y: '100%' }} animate={{ y: 0 }}
+                transition={{ type: 'spring', damping: 26, stiffness: 260, delay: 0.1 }}
+                className="absolute bottom-0 left-0 right-0 z-50 rounded-t-3xl overflow-y-auto"
+                style={{
+                  background: '#080E1A',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderBottom: 'none',
+                  maxHeight: '88vh',
+                }}
+              >
+                {/* Element-tinted header + sprite */}
+                <div className="relative pt-5 pb-2" style={{
+                  background: `linear-gradient(180deg, ${crTheme.glow}18 0%, transparent 100%)`,
+                }}>
+                  {/* Drag handle */}
+                  <div className="flex justify-center mb-3">
+                    <div className="w-10 h-1 rounded-full bg-white/20" />
+                  </div>
+
+                  {/* Caught / Evolved badge */}
+                  <div className="flex justify-center mb-3">
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 18, delay: 0.35 }}
+                      className="flex items-center gap-2 px-4 py-1.5 rounded-full font-extrabold text-sm"
+                      style={{
+                        background: isEvolved ? '#F7C841' : crTheme.glow,
+                        color: '#080E1A',
+                        boxShadow: `0 4px 20px ${isEvolved ? 'rgba(247,200,65,0.5)' : `${crTheme.glow}60`}`,
+                      }}
+                    >
+                      {isEvolved ? '✨ Evoluzione!' : '🎯 Catturato!'}
+                    </motion.div>
+                  </div>
+
+                  {/* Sprite */}
+                  <div className="flex justify-center">
+                    <motion.div
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.2 }}
+                    >
+                      <CreatureSprite
+                        imageUrl={cr?.image_url ?? state.creature.image_url ?? ''}
+                        name={cr?.name ?? state.creature.name ?? ''}
+                        animState="idle"
+                        size={160}
+                        element={crElem as Element}
+                        rarity={crRarity as Rarity}
+                        showAura
+                      />
+                    </motion.div>
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div className="px-5 pb-8">
+                  {/* Name + element + rarity */}
+                  <div className="text-center mb-4">
+                    <h3 className="text-2xl font-bold text-white mb-1">
+                      {cr?.name ?? state.creature.name}
+                    </h3>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-base">{crElemEmoji}</span>
+                      <span className="text-xs capitalize text-white/40">{crElem}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                        style={{ background: `${crRarityColor}22`, color: crRarityColor, border: `1px solid ${crRarityColor}55` }}>
+                        {crRarity?.replace('_', ' ')}
+                      </span>
+                    </div>
+                    {cr?.description && (
+                      <p className="text-sm text-white/45 mt-3 leading-relaxed">{cr.description}</p>
+                    )}
+                  </div>
+
+                  {/* Stats */}
+                  {cr && (
+                    <div className="grid grid-cols-3 gap-2 mb-4">
+                      {[
+                        { label: 'HP',  value: cr.hp,  color: '#F87171' },
+                        { label: 'ATK', value: cr.atk, color: '#FB923C' },
+                        { label: 'DEF', value: cr.def, color: '#60A5FA' },
+                      ].map(s => (
+                        <motion.div key={s.label}
+                          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.45 + (s.label === 'HP' ? 0 : s.label === 'ATK' ? 0.06 : 0.12) }}
+                          className="rounded-xl p-3 text-center"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${s.color}20` }}
+                        >
+                          <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
+                          <p className="text-[10px] text-white/35 mt-0.5 font-semibold uppercase tracking-wider">{s.label}</p>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* EXP gained */}
+                  {caughtExpGain > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.55 }}
+                      className="flex items-center justify-between rounded-xl px-4 py-3 mb-5"
+                      style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}
+                    >
+                      <span className="text-sm text-white/50">EXP guadagnata</span>
+                      <span className="font-extrabold text-[#34D399]">+{caughtExpGain} EXP</span>
+                    </motion.div>
+                  )}
+
+                  {/* Continua */}
+                  <motion.button
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
+                    onClick={() => router.push('/game/map')}
+                    whileTap={{ scale: 0.97 }}
+                    className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
+                    style={{
+                      background: `linear-gradient(135deg, ${crTheme.glow} 0%, ${crTheme.glow}99 100%)`,
+                      boxShadow: `0 4px 24px ${crTheme.glow}45`,
+                    }}
+                  >
+                    Continua
+                  </motion.button>
+                </div>
+              </motion.div>
+            </>
+          )
+        })()}
       </AnimatePresence>
     </div>
   )
