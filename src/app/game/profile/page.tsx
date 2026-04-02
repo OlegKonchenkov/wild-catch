@@ -86,7 +86,7 @@ function ProfileContent() {
       .then((d: { sessions: SessionSummary[] }) => {
         const list: SessionSummary[] = d.sessions ?? []
         // Pick current session or fall back to most recent
-        const s = (currentId && list.find(x => x.id === currentId))
+        const s: SessionSummary | null = (currentId ? list.find(x => x.id === currentId) : null)
           ?? list[0]
           ?? null
         setSession(s)
