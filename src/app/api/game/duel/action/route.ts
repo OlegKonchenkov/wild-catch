@@ -173,6 +173,14 @@ export async function POST(request: Request) {
       { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: user.id } },
     ]
     adminClient.from('player_game_events').insert(eventsToInsert).then(undefined, () => {})
+    if (myLevelUp) {
+      adminClient.from('player_game_events').insert({
+        user_id: user.id,
+        session_id: duel.session_id,
+        type: 'level_up',
+        payload: { new_level: myLevelUp.newLevel, gold_reward: myLevelUp.goldReward },
+      }).then(undefined, () => {})
+    }
   }
 
   // ── Broadcast ──────────────────────────────────────────────────────────────

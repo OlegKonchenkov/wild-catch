@@ -197,7 +197,7 @@ function HomeLobby() {
   const needsNickname  = nickname === null || nickname === ''
 
   const selected = sessions.find(s => s.id === selectedId) ?? null
-  const isPlayable = selected && (selected.status === 'active' || selected.status === 'ready')
+  const isPlayable = selected && (selected.status === 'active' || selected.status === 'ready' || selected.status === 'ended')
 
   if (loading) {
     return (
@@ -597,7 +597,7 @@ function HomeLobby() {
                         style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.03em', padding: '14px 16px', boxShadow: '0 4px 20px rgba(58,188,168,0.35)' }}
                         onClick={() => enterSession(selected)}
                       >
-                        {selected.status === 'active' ? '▶ Entra nella sessione' : '▶ Rientra nella sessione'}
+                        {selected.status === 'ended' ? '🏁 Visualizza sessione' : selected.status === 'active' ? '▶ Entra nella sessione' : '▶ Rientra nella sessione'}
                       </button>
                     </div>
                   )}

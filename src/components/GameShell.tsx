@@ -59,7 +59,15 @@ function formatGameEvent(ev: any): { icon: string; title: string; body: string }
     case 'boss_lost':
       return { icon: '💀', title: 'Sconfitto dal boss', body: '' }
     case 'mission_completed':
-      return { icon: '✅', title: 'Missione completata!', body: '' }
+      return { icon: '✅', title: 'Missione completata!', body: p.mission_target ? p.mission_target : '' }
+    case 'level_up':
+      return { icon: '⭐', title: `Livello ${p.new_level}!`, body: p.gold_reward > 0 ? `+${p.gold_reward} 💰` : '' }
+    case 'qr_redeemed': {
+      const parts: string[] = []
+      if (p.gold) parts.push(`+${p.gold} 💰`)
+      if (p.exp)  parts.push(`+${p.exp} ⭐`)
+      return { icon: '📱', title: `QR: "${p.item_name}"`, body: parts.join(' · ') }
+    }
     default:
       return { icon: '🎮', title: ev.type, body: '' }
   }

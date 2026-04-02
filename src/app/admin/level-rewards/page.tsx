@@ -301,6 +301,24 @@ export default function LevelRewardsPage() {
         </div>
       )}
 
+      {/* Add new level */}
+      <button
+        onClick={() => {
+          const maxLevel = rewards.length > 0 ? Math.max(...rewards.map(r => r.level)) : 0
+          const newLevel = maxLevel + 1
+          if (rewards.some(r => r.level === newLevel)) return
+          const newReward: LevelReward = { id: `new-${newLevel}`, level: newLevel, gold: 0, item_id: null, item_qty: 1, bonus_items: [], description: '' }
+          setRewards(prev => [...prev, newReward])
+          setEditingLevel(newLevel)
+          setForm({ gold: 0, bonus_items: [], description: '' })
+          setError(null); setSuccess(null)
+        }}
+        className="w-full mt-3 py-3 rounded-2xl text-sm font-bold text-[#3A9DBC] border border-dashed transition-all hover:bg-[#3A9DBC]/08"
+        style={{ borderColor: 'rgba(58,157,188,0.35)', background: 'rgba(58,157,188,0.04)' }}
+      >
+        + Aggiungi livello {rewards.length > 0 ? Math.max(...rewards.map(r => r.level)) + 1 : 1}
+      </button>
+
       <p className="text-white/20 text-xs text-center mt-4 mb-10 leading-relaxed">
         Tocca un livello per modificarne la ricompensa. Le modifiche hanno effetto immediato per i futuri level-up.
       </p>

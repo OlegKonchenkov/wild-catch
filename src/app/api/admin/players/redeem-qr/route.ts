@@ -131,6 +131,18 @@ export async function POST(request: Request) {
     },
   })
 
+  // Also write a game event so it appears in the events history tab
+  admin.from('player_game_events').insert({
+    user_id: userId,
+    session_id: sessionId,
+    type: 'qr_redeemed',
+    payload: {
+      item_name: item.name,
+      gold: reward.gold ?? 0,
+      exp: reward.exp ?? 0,
+    },
+  }).then(undefined, () => {})
+
   return NextResponse.json({
     success: true,
     itemName: item.name,

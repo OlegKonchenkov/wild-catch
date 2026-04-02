@@ -146,7 +146,16 @@ export async function POST(request: Request) {
 
   // Save game event for bell history
   const { createAdminClient } = await import('@/lib/supabase/admin')
-  createAdminClient().from('player_game_events').insert({
+  const adminEvt = createAdminClient()
+  if (levelUp) {
+    adminEvt.from('player_game_events').insert({
+      user_id: user.id,
+      session_id: encounter.session_id,
+      type: 'level_up',
+      payload: { new_level: levelUp.newLevel, gold_reward: levelUp.goldReward },
+    }).then(undefined, () => {})
+  }
+  adminEvt.from('player_game_events').insert({
     user_id: user.id,
     session_id: encounter.session_id,
     type: 'catch',
