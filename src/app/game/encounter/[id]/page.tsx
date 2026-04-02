@@ -193,7 +193,7 @@ export default function EncounterPage() {
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [message, setMessage]   = useState('')
   const [loading, setLoading]   = useState(false)
-  const [result, setResult]     = useState<'caught' | 'fled' | 'evolved' | null>(null)
+  const [result, setResult]     = useState<'caught' | 'fled' | 'evolved' | 'ko' | null>(null)
   const [playerCreature, setPlayerCreature] = useState<{
     name: string; maxHp: number; atk: number; element: string; rarity: string; imageUrl: string
   } | null>(null)
@@ -324,7 +324,7 @@ export default function EncounterPage() {
     setState(prev => prev ? { ...prev, wildHp: data.wildHpRemaining, catchBonus: data.catchBonus, turns: prev.turns + 1 } : null)
 
     if (data.fightResult === 'fled') {
-      setWildAnim('flee'); setMessage('La creatura è fuggita!'); setResult('fled'); setLoading(false); return
+      setWildAnim('flee'); setMessage(''); setResult('ko'); setLoading(false); return
     }
 
     setMessage(data.fightResult === 'catchable'
@@ -395,7 +395,17 @@ export default function EncounterPage() {
     setLoading(false)
   }
 
-  function handleFlee() { router.back() }
+  async function handleFlee() {
+    if (state) {
+      fetch('/api/game/encounter/flee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ encounterId: state.encounterId }),
+        keepalive: true,
+      }).catch(() => {})
+    }
+    router.back()
+  }
 
   // ── Loading / error ───────────────────────────────────────────────────────────
   if (!state) {
@@ -740,9 +750,11 @@ export default function EncounterPage() {
               transition={{ type: 'spring', stiffness: 320, damping: 22 }}
               className="flex flex-col items-center text-center"
             >
-              <div className="text-7xl mb-5">{result === 'caught' ? '🎯' : result === 'evolved' ? '✨' : '💨'}</div>
+              <div className="text-7xl mb-5">
+                {result === 'caught' ? '🎯' : result === 'evolved' ? '✨' : result === 'ko' ? '💥' : '💨'}
+              </div>
               <p className="text-3xl font-extrabold text-white mb-2 tracking-tight">
-                {result === 'caught' ? 'Catturato!' : result === 'evolved' ? 'Evoluzione!' : 'Fuggita'}
+                {result === 'caught' ? 'Catturato!' : result === 'evolved' ? 'Evoluzione!' : result === 'ko' ? 'Knock Out!' : 'Fuggita'}
               </p>
               {state.creature.name && (
                 <div className="flex items-center gap-2 mb-6">
