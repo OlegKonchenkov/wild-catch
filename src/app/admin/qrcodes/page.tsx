@@ -413,9 +413,8 @@ export default function QRCodesPage() {
     setType(t)
     setFields(defaultFields(t))
     setError('')
-    // Boss: auto-enforce 1 per user
-    if (t === 'boss') setUniquePerUser(true)
-    else setUniquePerUser(false)
+    // Boss: default to 1 per user, but admin can override
+    setUniquePerUser(t === 'boss')
   }
 
   function setField(key: string, val: string | number) {
@@ -462,7 +461,7 @@ export default function QRCodesPage() {
       payload: buildPayload(type, fields),
       usesRemaining,
       label,
-      uniquePerUser: type === 'boss' ? true : uniquePerUser,
+      uniquePerUser,
       sessionId: scopeSessionId || null,
     }
     if (isEditing) body.qrId = editingQrId
@@ -677,7 +676,6 @@ export default function QRCodesPage() {
                   <p className="text-[#F7C841] text-xs font-semibold">👑 QR Capo Palestra</p>
                   <p className="text-white/50 text-xs mt-1 leading-relaxed">
                     Configura la squadra del boss (fino a 3 creature) e la ricompensa per i giocatori che la sconfiggono.
-                    Questo QR è automaticamente riscattabile <strong className="text-white/70">1 sola volta per giocatore</strong>.
                   </p>
                 </div>
               )}
@@ -812,28 +810,25 @@ export default function QRCodesPage() {
                     className="w-40 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm" />
                 </Field>
 
-                {/* unique_per_user toggle — locked ON for boss */}
+                {/* unique_per_user toggle */}
                 <div className={`flex items-start gap-3 rounded-xl px-3 py-2.5 border ${
-                  uniquePerUser || isBossType
+                  uniquePerUser
                     ? 'bg-amber-500/8 border-amber-500/25'
                     : 'bg-white/3 border-white/8'
                 }`}>
                   <input
                     type="checkbox"
                     id="unique_per_user"
-                    checked={isBossType || uniquePerUser}
-                    disabled={isBossType}
+                    checked={uniquePerUser}
                     onChange={e => setUniquePerUser(e.target.checked)}
                     className="mt-0.5 accent-amber-400"
                   />
                   <label htmlFor="unique_per_user" className="text-sm cursor-pointer select-none">
-                    <span className={`font-semibold ${isBossType ? 'text-amber-400' : 'text-white/80'}`}>
+                    <span className={`font-semibold ${uniquePerUser ? 'text-amber-400' : 'text-white/80'}`}>
                       🔒 Riscattabile 1 sola volta per utente
                     </span>
                     <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
-                      {isBossType
-                        ? 'Obbligatorio per i boss: ogni giocatore può affrontarlo una sola volta.'
-                        : 'Ogni utente può scansionare questo QR una sola volta, indipendentemente dagli utilizzi totali.'}
+                      Ogni utente può scansionare questo QR una sola volta, indipendentemente dagli utilizzi totali.
                     </p>
                   </label>
                 </div>
