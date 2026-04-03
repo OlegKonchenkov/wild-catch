@@ -22,6 +22,12 @@ export async function POST(request: Request) {
 
   if (!duel) return NextResponse.json({ error: 'Duello non trovato' }, { status: 404 })
 
+  // Guard: session must still be active
+  const { data: sessionCheck } = await supabase.from('sessions').select('status').eq('id', duel.session_id).single()
+  if (!sessionCheck || sessionCheck.status !== 'active') {
+    return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
+  }
+
   const isChallenger = duel.challenger_id === user.id
   const isOpponent   = duel.opponent_id   === user.id
   if (!isChallenger && !isOpponent) return NextResponse.json({ error: 'Non sei in questo duello' }, { status: 403 })

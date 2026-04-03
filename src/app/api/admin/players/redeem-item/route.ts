@@ -24,6 +24,12 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
+  // Guard: session must still be active
+  const { data: sessionCheck } = await admin.from('sessions').select('status').eq('id', sessionId).single()
+  if (!sessionCheck || sessionCheck.status !== 'active') {
+    return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
+  }
+
   // Fetch the inventory row + item info
   const { data: invRow } = await admin
     .from('player_inventory')

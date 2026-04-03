@@ -15,9 +15,9 @@ export async function GET(request: Request) {
   const adminSupabase = createAdminClient()
   const { data: players } = await adminSupabase
     .from('player_sessions')
-    .select('user_id, exp, gold')
+    .select('user_id, score')
     .eq('session_id', sessionId)
-    .order('exp', { ascending: false })
+    .order('score', { ascending: false })
     .limit(50)
 
   if (!players || players.length === 0) return NextResponse.json({ leaderboard: [] })
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     rank: i + 1,
     user_id: p.user_id,
     nickname: profileMap[p.user_id] ?? 'Anonimo',
-    score: p.exp ?? 0,
+    score: p.score ?? 0,
     isMe: p.user_id === user.id,
   }))
 

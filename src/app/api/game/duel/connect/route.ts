@@ -26,6 +26,12 @@ export async function POST(request: Request) {
 
   if (!sessionId) return NextResponse.json({ error: 'sessionId richiesto' }, { status: 400 })
 
+  // Guard: session must still be active
+  const { data: sessionCheck } = await supabase.from('sessions').select('status').eq('id', sessionId).single()
+  if (!sessionCheck || sessionCheck.status !== 'active') {
+    return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
+  }
+
   if (!Array.isArray(lineup) || lineup.length !== 3) {
     return NextResponse.json({ error: 'La squadra deve avere esattamente 3 creature' }, { status: 400 })
   }

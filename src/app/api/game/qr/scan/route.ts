@@ -15,6 +15,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
   }
 
+  // Guard: session must still be active
+  const { data: sessionCheck } = await supabase.from('sessions').select('status').eq('id', sessionId).single()
+  if (!sessionCheck || sessionCheck.status !== 'active') {
+    return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
+  }
+
   // Get QR code — also matches global QRs (null session_id)
   const { data: qr } = await supabase
     .from('qr_codes')

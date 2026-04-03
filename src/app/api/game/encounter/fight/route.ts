@@ -27,6 +27,12 @@ export async function POST(request: Request) {
 
   if (!encounter) return NextResponse.json({ error: 'Incontro non trovato' }, { status: 404 })
 
+  // Guard: session must still be active
+  const { data: sessionCheck } = await supabase.from('sessions').select('status').eq('id', encounter.session_id).single()
+  if (!sessionCheck || sessionCheck.status !== 'active') {
+    return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
+  }
+
   const wildCreature = (encounter as any).creatures
 
   if (!encounter.player_creature_id) {

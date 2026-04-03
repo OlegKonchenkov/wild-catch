@@ -268,6 +268,32 @@ function getQrDetails(qr: any, items: any[], creatures: any[], sessions: any[]) 
   return details
 }
 
+/* ── Copyable code ───────────────────────────── */
+function CopyableCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <div className="mb-4">
+      <p className="text-[10px] text-white/30 uppercase tracking-widest font-bold mb-1.5">Codice alternativo</p>
+      <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2">
+        <code className="flex-1 text-[11px] text-[#3A9DBC] font-mono break-all leading-relaxed">{code}</code>
+        <button
+          onClick={copy}
+          className="shrink-0 text-xs px-2.5 py-1 rounded-lg font-semibold transition-all"
+          style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(58,157,188,0.12)', color: copied ? '#34D399' : '#3A9DBC', border: `1px solid ${copied ? 'rgba(52,211,153,0.3)' : 'rgba(58,157,188,0.25)'}` }}
+        >
+          {copied ? '✓' : 'Copia'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /* ── QR Preview Modal ────────────────────────── */
 function QRModal({
   qr, details, onClose, onDownload, onShare,
@@ -314,6 +340,9 @@ function QRModal({
         <div className="flex justify-center bg-white rounded-xl p-3 mb-4">
           <canvas ref={canvasRef} />
         </div>
+
+        {/* Text code — alternative to QR */}
+        <CopyableCode code={qr.id} />
 
         <div className="space-y-2 mb-4">
           {details.map(detail => (
