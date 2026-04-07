@@ -1,10 +1,9 @@
 'use client'
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
-import HPBar from '@/components/creature/HPBar'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 
@@ -26,11 +25,13 @@ interface PlayerSlot {
   player_creature_id: string
   name: string
   element: Element
+  rarity: Rarity
   atk: number
   max_hp: number
   current_hp: number
   fainted: boolean
   is_active: boolean
+  image_url: string
 }
 
 interface SquadCreature {
@@ -50,74 +51,166 @@ interface BattagliaItem {
   quantity: number
 }
 
-/* ── Sub-components ────────────────────────────────────────────────────────── */
+// ── Element theme ──────────────────────────────────────────────────────────────
+const ELEMENT_THEME: Record<string, { bg: string; glow: string; ground: string }> = {
+  bosco:     { bg: '#030B05', glow: '#2ECC6A', ground: '#061408' },
+  fiamma:    { bg: '#0D0305', glow: '#FF5520', ground: '#150505' },
+  adriatico: { bg: '#020810', glow: '#00C4E8', ground: '#040C18' },
+  terra:     { bg: '#0A0700', glow: '#D4A060', ground: '#120D02' },
+  armonia:   { bg: '#08030F', glow: '#B060F8', ground: '#0E0518' },
+}
+const DEFAULT_THEME = { bg: '#060C18', glow: '#3A9DBC', ground: '#080E1E' }
+const BOSS_THEME    = { bg: '#0D0205', glow: '#F7C841', ground: '#120309' }
 
-function BossLineupBar({ lineup, activeSlot }: { lineup: BossSlot[]; activeSlot: number }) {
-  return (
-    <div className="flex items-center gap-2">
-      {lineup.map((c, i) => {
-        const hpPct = c.max_hp > 0 ? (c.current_hp / c.max_hp) * 100 : 0
-        const isActive = i === activeSlot && !c.fainted
-        return (
-          <div key={i} className="relative">
-            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all ${
-              c.fainted
-                ? 'border-white/15 bg-white/5 opacity-30'
-                : isActive
-                  ? 'border-red-400 bg-red-500/20 shadow-lg shadow-red-500/30'
-                  : 'border-white/30 bg-white/10'
-            }`}>
-              {c.fainted ? '✕' : ELEMENT_EMOJI[c.element] ?? '?'}
-            </div>
-            {/* HP bar under indicator */}
-            {!c.fainted && (
-              <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${hpPct}%`,
-                    background: hpPct > 50 ? '#22c55e' : hpPct > 25 ? '#f59e0b' : '#ef4444',
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
+/* ── Creature Card ──────────────────────────────────────────────────────────── */
+
+interface CardProps {
+  imageUrl: string
+  name: string
+  element: string
+  rarity: string
+  currentHp: number
+  maxHp: number
+  atk?: number
+  animState?: 'idle' | 'attack' | 'damage'
+  side: 'left' | 'right'
+  lineup?: Array<{ color: string; isActive: boolean; fainted: boolean }>
+  lineupLabel?: string
+  damageFloat?: number | null
+  isBoss?: boolean
 }
 
-function PlayerLineupBar({ lineup }: { lineup: PlayerSlot[] }) {
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, animState = 'idle', side, lineup, lineupLabel, damageFloat, isBoss }: CardProps) {
+  const rarityColor = isBoss ? '#F7C841' : (RARITY_COLORS[rarity as Rarity] ?? '#64748b')
+  const elemEmoji   = ELEMENT_EMOJI[element as keyof typeof ELEMENT_EMOJI] ?? '✦'
+  const hpPct       = Math.max(0, Math.min(100, (currentHp / maxHp) * 100))
+  const hpColor     = hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444'
+
+  const borderRadius = side === 'right' ? '16px 0 0 16px' : '0 16px 16px 0'
+
   return (
-    <div className="flex items-center gap-2">
-      {lineup.map((c, i) => {
-        const hpPct = c.max_hp > 0 ? (c.current_hp / c.max_hp) * 100 : 0
-        return (
-          <div key={i} className="relative">
-            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all ${
-              c.fainted
-                ? 'border-white/15 bg-white/5 opacity-30'
-                : c.is_active
-                  ? 'border-[#3A9DBC] bg-[#3A9DBC]/20 shadow-lg shadow-[#3A9DBC]/30'
-                  : 'border-white/30 bg-white/10'
-            }`}>
-              {c.fainted ? '✕' : ELEMENT_EMOJI[c.element] ?? '?'}
-            </div>
-            {!c.fainted && (
-              <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${hpPct}%`,
-                    background: hpPct > 50 ? '#22c55e' : hpPct > 25 ? '#f59e0b' : '#ef4444',
-                  }}
-                />
-              </div>
-            )}
+    <div
+      className="flex overflow-hidden relative"
+      style={{
+        borderRadius,
+        background: 'rgba(4,8,18,0.92)',
+        border: `1px solid ${rarityColor}45`,
+        borderRight: side === 'right' ? 'none' : `1px solid ${rarityColor}45`,
+        borderLeft:  side === 'left'  ? 'none' : `1px solid ${rarityColor}45`,
+        backdropFilter: 'blur(16px)',
+        boxShadow: `0 16px 48px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0 1px ${rarityColor}18`,
+      }}
+    >
+      {/* Damage float */}
+      <AnimatePresence>
+        {damageFloat != null && (
+          <motion.div
+            key={`dmg-${damageFloat}-${Date.now()}`}
+            initial={{ opacity: 1, y: 0, scale: 1 }}
+            animate={{ opacity: 0, y: -36, scale: 1.6 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.7 }}
+            className="absolute inset-0 flex items-start justify-center pointer-events-none z-30"
+            style={{ paddingTop: 6 }}
+          >
+            <span className="font-extrabold text-[#E85D2F] text-xl"
+              style={{ textShadow: '0 0 12px rgba(232,93,47,0.9)' }}>
+              -{damageFloat}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Image section ── */}
+      <div
+        className="relative shrink-0 flex items-center justify-center"
+        style={{
+          width: 100,
+          background: `linear-gradient(135deg, ${rarityColor}18 0%, transparent 70%)`,
+        }}
+      >
+        <CreatureSprite
+          imageUrl={imageUrl}
+          name={name}
+          animState={animState}
+          size={95}
+          element={element as Element}
+          rarity={rarity as Rarity}
+          showAura
+        />
+        {isBoss && (
+          <div className="absolute top-1.5 left-1.5 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
+            style={{ background: 'rgba(247,200,65,0.2)', border: '1px solid rgba(247,200,65,0.5)', color: '#F7C841' }}>
+            BOSS
           </div>
-        )
-      })}
+        )}
+      </div>
+
+      {/* ── Info section ── */}
+      <div className="flex-1 px-3 py-2.5 flex flex-col justify-between min-w-0">
+        {/* Name + badges */}
+        <div>
+          <p className="font-extrabold text-white text-[13px] leading-tight truncate mb-1.5">{name}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {isBoss ? (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                style={{ background: 'rgba(247,200,65,0.15)', border: '1px solid rgba(247,200,65,0.4)', color: '#F7C841' }}>
+                Capo Palestra
+              </span>
+            ) : (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                style={{ background: `${rarityColor}22`, border: `1px solid ${rarityColor}55`, color: rarityColor }}>
+                {rarity?.replace('_', ' ')}
+              </span>
+            )}
+            <span className="text-[11px] leading-none">{elemEmoji}</span>
+            <span className="text-[9px] text-white/35 capitalize">{element}</span>
+          </div>
+        </div>
+
+        {/* Lineup dots */}
+        {lineup && lineup.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-1">
+            {lineupLabel && (
+              <span className="text-[8px] text-white/25 uppercase tracking-wider">{lineupLabel}</span>
+            )}
+            <div className="flex gap-1">
+              {lineup.map((dot, i) => (
+                <div key={i} className="w-2 h-2 rounded-full"
+                  style={{
+                    background: dot.fainted ? 'rgba(255,255,255,0.1)' : dot.color,
+                    opacity: dot.fainted ? 0.3 : dot.isActive ? 1 : 0.55,
+                    boxShadow: dot.isActive ? `0 0 4px ${dot.color}` : 'none',
+                  }} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ATK stat */}
+        {atk !== undefined && (
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-[8px] font-bold text-white/30 uppercase tracking-wider">ATK</span>
+            <span className="text-[11px] font-extrabold" style={{ color: isBoss ? '#F7C841' : '#E85D2F' }}>{atk}</span>
+          </div>
+        )}
+
+        {/* HP bar */}
+        <div className="mt-1.5">
+          <div className="h-[7px] rounded-full overflow-hidden mb-[3px]" style={{ background: 'rgba(255,255,255,0.08)' }}>
+            <motion.div
+              className="h-full rounded-full"
+              animate={{ width: `${hpPct}%` }}
+              transition={{ duration: 0.5 }}
+              style={{ background: hpColor, boxShadow: `0 0 6px ${hpColor}90` }}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[8px] font-bold uppercase tracking-wider text-white/25">HP</span>
+            <span className="text-[9px] font-mono font-bold text-white/50">{currentHp}/{maxHp}</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -150,25 +243,38 @@ function SquadSelector({
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-3 mb-1">
-          <span className="text-2xl">💀</span>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'rgba(247,200,65,0.12)', border: '1px solid rgba(247,200,65,0.3)' }}>
+            <span className="text-xl">💀</span>
+          </div>
           <div>
             <h1 className="text-lg font-extrabold tracking-tight">Capo Palestra</h1>
             <p className="text-white/40 text-xs">{bossName} ti sfida! Scegli la tua squadra</p>
           </div>
         </div>
 
-        {/* Boss lineup preview */}
-        <div className="flex items-center gap-2 mt-2">
+        {/* Boss lineup preview — with images */}
+        <div className="flex items-center gap-2 mt-3">
           {bossLineup.map((bc, i) => (
-            <div key={i} className="flex items-center gap-1 bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1">
-              <span className="text-sm">{ELEMENT_EMOJI[bc.element] ?? '?'}</span>
-              <span className="text-xs text-white/60">{bc.name}</span>
+            <div key={i} className="flex-1 flex items-center gap-2 rounded-xl px-2 py-1.5"
+              style={{ background: 'rgba(247,200,65,0.06)', border: '1px solid rgba(247,200,65,0.2)' }}>
+              <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0"
+                style={{ background: 'rgba(247,200,65,0.1)' }}>
+                {bc.image_url
+                  ? <img src={bc.image_url} alt={bc.name} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center text-base">{ELEMENT_EMOJI[bc.element] ?? '?'}</div>
+                }
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-white/80 truncate">{bc.name}</p>
+                <p className="text-[9px] text-white/35">{ELEMENT_EMOJI[bc.element]}</p>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Squad slots */}
+      {/* Squad slots — with images */}
       <div className="px-4 py-3 border-b border-white/10 shrink-0">
         <p className="text-xs text-white/40 uppercase tracking-wider mb-2 font-semibold">La tua squadra ({filledCount}/3)</p>
         <div className="flex gap-2">
@@ -176,19 +282,32 @@ function SquadSelector({
             <button
               key={i}
               onClick={() => c && onRemoveSlot(i)}
-              className={`flex-1 h-14 rounded-xl border-2 flex flex-col items-center justify-center text-xs transition-all ${
-                c
-                  ? 'border-[#3A9DBC]/60 bg-[#3A9DBC]/10'
-                  : 'border-dashed border-white/20 bg-white/3'
-              }`}
+              className="flex-1 rounded-xl border-2 transition-all overflow-hidden"
+              style={{
+                height: 64,
+                borderColor: c ? 'rgba(58,157,188,0.6)' : 'rgba(255,255,255,0.12)',
+                borderStyle: c ? 'solid' : 'dashed',
+                background: c ? 'rgba(58,157,188,0.08)' : 'rgba(255,255,255,0.02)',
+              }}
             >
               {c ? (
-                <>
-                  <span className="text-base">{ELEMENT_EMOJI[c.element]}</span>
-                  <span className="text-white/70 font-semibold truncate w-full text-center px-1">{c.name}</span>
-                </>
+                <div className="flex items-center gap-1.5 h-full px-2">
+                  <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0"
+                    style={{ background: `${RARITY_COLORS[c.rarity]}18` }}>
+                    {c.image_url
+                      ? <img src={c.image_url} alt={c.name} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center text-base">{ELEMENT_EMOJI[c.element]}</div>
+                    }
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-white truncate">{c.name}</p>
+                    <p className="text-[9px]" style={{ color: RARITY_COLORS[c.rarity] }}>{c.rarity}</p>
+                  </div>
+                </div>
               ) : (
-                <span className="text-white/20 text-lg">+</span>
+                <div className="flex items-center justify-center h-full">
+                  <span className="text-white/20 text-2xl font-light">+</span>
+                </div>
               )}
             </button>
           ))}
@@ -203,16 +322,17 @@ function SquadSelector({
             <button
               key={c.playerCreatureId}
               onClick={() => onToggle(c)}
-              className={`w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 border transition-all ${
-                inLineup
-                  ? 'border-[#3A9DBC]/60 bg-[#3A9DBC]/10'
-                  : 'border-white/8 bg-white/4 hover:bg-white/8'
-              }`}
+              className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 border transition-all"
+              style={{
+                borderColor: inLineup ? 'rgba(58,157,188,0.5)' : 'rgba(255,255,255,0.07)',
+                background: inLineup ? 'rgba(58,157,188,0.08)' : 'rgba(255,255,255,0.03)',
+              }}
             >
-              <div className="w-10 h-10 rounded-xl overflow-hidden bg-white/5 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0"
+                style={{ background: `${RARITY_COLORS[c.rarity]}18` }}>
                 {c.image_url
                   ? <img src={c.image_url} alt={c.name} className="w-full h-full object-cover" />
-                  : <span className="text-xl">{ELEMENT_EMOJI[c.element]}</span>
+                  : <div className="w-full h-full flex items-center justify-center text-xl">{ELEMENT_EMOJI[c.element]}</div>
                 }
               </div>
               <div className="flex-1 min-w-0 text-left">
@@ -223,7 +343,14 @@ function SquadSelector({
                 <p className="text-xs text-white/40">HP {c.hp}</p>
                 <p className="text-xs text-white/40">ATK {c.atk}</p>
               </div>
-              {inLineup && <span className="text-[#3A9DBC] text-sm">✓</span>}
+              {inLineup && (
+                <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: 'rgba(58,157,188,0.2)', border: '1px solid rgba(58,157,188,0.5)' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#3A9DBC" strokeWidth="2.5" strokeLinecap="round" className="w-3 h-3">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                </div>
+              )}
             </button>
           )
         })}
@@ -234,9 +361,13 @@ function SquadSelector({
         <button
           onClick={onConfirm}
           disabled={filledCount < 3 || starting}
-          className="w-full bg-red-500 hover:bg-red-400 disabled:bg-white/10 disabled:text-white/30 text-white font-extrabold py-3.5 rounded-xl text-sm transition-all"
+          className="w-full text-white font-extrabold py-3.5 rounded-xl text-sm transition-all disabled:opacity-40"
+          style={{
+            background: filledCount < 3 || starting ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)',
+            boxShadow: filledCount >= 3 && !starting ? '0 4px 20px rgba(232,93,47,0.4)' : 'none',
+          }}
         >
-          {starting ? 'Inizio battaglia...' : filledCount < 3 ? `Seleziona ${3 - filledCount} creature` : '⚔️ Inizia la battaglia!'}
+          {starting ? 'Inizio battaglia...' : filledCount < 3 ? `Seleziona ancora ${3 - filledCount}` : '⚔️ Inizia la battaglia!'}
         </button>
       </div>
     </div>
@@ -258,8 +389,6 @@ function BattleScreen({
   battagliaItems,
   selectedItemId,
   onSelectItem,
-  showItems,
-  onToggleItems,
   switchNotice,
 }: {
   bossLineup: BossSlot[]
@@ -274,20 +403,55 @@ function BattleScreen({
   battagliaItems: BattagliaItem[]
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
-  showItems: boolean
-  onToggleItems: () => void
   switchNotice: string | null
 }) {
+  const [showItemsModal, setShowItemsModal] = useState(false)
+
   const activeBoss   = bossLineup[bossActiveSlot]
   const activePlayer = playerLineup.find(c => c.is_active && !c.fainted)
 
   if (!activeBoss || !activePlayer) return null
 
-  const bossHpPct   = activeBoss.max_hp   > 0 ? (activeBoss.current_hp   / activeBoss.max_hp)   * 100 : 0
-  const playerHpPct = activePlayer.max_hp > 0 ? (activePlayer.current_hp / activePlayer.max_hp) * 100 : 0
+  // Build lineup dots
+  const bossLineupDots = bossLineup.map((c, i) => ({
+    color: '#F7C841',
+    isActive: i === bossActiveSlot && !c.fainted,
+    fainted: c.fainted,
+  }))
+  const playerLineupDots = [...playerLineup].sort((a, b) => a.slot - b.slot).map(c => ({
+    color: RARITY_COLORS[c.rarity] ?? '#3A9DBC',
+    isActive: c.is_active,
+    fainted: c.fainted,
+  }))
+
+  // Element-themed background
+  const playerTheme = ELEMENT_THEME[activePlayer.element] ?? DEFAULT_THEME
+  const selectedItem = battagliaItems.find(it => it.inventoryId === selectedItemId)
 
   return (
-    <div className="flex flex-col h-full overflow-hidden select-none">
+    <div className="flex flex-col h-full overflow-hidden select-none relative"
+      style={{ background: BOSS_THEME.bg }}>
+
+      {/* ── Atmospheric background ── */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {/* Boss glow — top-right */}
+        <div className="absolute top-0 right-0 w-[65%] h-[55%]"
+          style={{ background: 'radial-gradient(ellipse at 80% 20%, rgba(247,200,65,0.22) 0%, transparent 70%)' }} />
+        {/* Player element glow — bottom-left */}
+        <div className="absolute bottom-0 left-0 w-[65%] h-[50%]"
+          style={{ background: `radial-gradient(ellipse at 20% 80%, ${playerTheme.glow}22 0%, transparent 70%)` }} />
+        {/* Mid shadow */}
+        <div className="absolute inset-x-0" style={{
+          top: '38%', height: '24%',
+          background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 50%, transparent 100%)',
+        }} />
+        {/* Ground line */}
+        <div className="absolute inset-x-0" style={{
+          top: '48%', height: 1,
+          background: `linear-gradient(90deg, transparent, ${playerTheme.glow}18, rgba(247,200,65,0.18), transparent)`,
+        }} />
+      </div>
+
       {/* Switch notice */}
       <AnimatePresence>
         {switchNotice && (
@@ -295,199 +459,207 @@ function BattleScreen({
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-[#0a1520]/90 border border-white/20 rounded-xl px-4 py-2 text-sm font-bold text-white text-center shadow-xl"
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-30 rounded-xl px-4 py-2 text-sm font-bold text-[#C084FC] text-center"
+            style={{ background: 'rgba(123,77,184,0.18)', border: '1px solid rgba(123,77,184,0.4)', backdropFilter: 'blur(8px)' }}
           >
-            {switchNotice}
+            ✨ {switchNotice}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Boss HUD */}
-      <div className="px-4 pt-3 pb-2 shrink-0">
-        <div className="bg-white/4 border border-white/8 rounded-2xl px-3 py-2.5">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{ELEMENT_EMOJI[activeBoss.element]}</span>
-              <span className="font-extrabold text-white text-sm">{activeBoss.name}</span>
-              <span className="text-xs text-red-400/60">👿 Boss</span>
-            </div>
-            <BossLineupBar lineup={bossLineup} activeSlot={bossActiveSlot} />
-          </div>
-          <HPBar current={activeBoss.current_hp} max={activeBoss.max_hp} />
-          <p className="text-right text-xs text-white/40 mt-0.5">
-            {activeBoss.current_hp}/{activeBoss.max_hp}
-          </p>
-        </div>
-      </div>
-
-      {/* Battle arena */}
-      <div className="flex-1 relative flex items-center justify-around px-4 overflow-hidden">
-        {/* Boss sprite (top right, slightly smaller) */}
-        <motion.div
-          className="absolute top-4 right-8"
-          animate={bossAnimState === 'attack' ? { x: -20, scale: 1.05 } : bossAnimState === 'damage' ? { x: 10, opacity: 0.5 } : { x: 0, scale: 1, opacity: 1 }}
-          transition={{ duration: 0.15 }}
-        >
-          <div className="relative">
-            {activeBoss.sprite_url
-              ? <img src={activeBoss.sprite_url} alt={activeBoss.name} className="w-28 h-28 object-contain drop-shadow-lg" />
-              : <div className="w-28 h-28 rounded-2xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-5xl">
-                  {ELEMENT_EMOJI[activeBoss.element]}
-                </div>
-            }
-            {/* Damage number */}
-            <AnimatePresence>
-              {lastDamage?.target === 'boss' && (
-                <motion.div
-                  key={lastDamage.amount}
-                  initial={{ opacity: 1, y: 0 }}
-                  animate={{ opacity: 0, y: -30 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.8 }}
-                  className="absolute -top-6 left-1/2 -translate-x-1/2 text-lg font-extrabold text-[#F7C841]"
-                >
-                  -{lastDamage.amount}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-
-        {/* VS divider */}
-        <div className="absolute inset-x-0 top-1/2 flex items-center justify-center">
-          <div className="w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] text-white/20 font-bold">VS</div>
-        </div>
-
-        {/* Player sprite (bottom left) */}
-        <motion.div
-          className="absolute bottom-4 left-8"
-          animate={animState === 'attack' ? { x: 20, scale: 1.1 } : animState === 'damage' ? { x: -10, opacity: 0.5 } : { x: 0, scale: 1, opacity: 1 }}
-          transition={{ duration: 0.15 }}
-        >
-          <div className="relative">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activePlayer.player_creature_id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.25 }}
-              >
-                <CreatureSprite
-                  imageUrl={''}
-                  name={activePlayer.name}
-                  size={112}
-                />
-              </motion.div>
-            </AnimatePresence>
-            <AnimatePresence>
-              {lastDamage?.target === 'me' && (
-                <motion.div
-                  key={lastDamage.amount}
-                  initial={{ opacity: 1, y: 0 }}
-                  animate={{ opacity: 0, y: -30 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.8 }}
-                  className="absolute -top-6 left-1/2 -translate-x-1/2 text-lg font-extrabold text-red-400"
-                >
-                  -{lastDamage.amount}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Player HUD */}
-      <div className="px-4 pb-2 shrink-0">
-        <div className="bg-[#3A9DBC]/8 border border-[#3A9DBC]/20 rounded-2xl px-3 py-2.5">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{ELEMENT_EMOJI[activePlayer.element]}</span>
-              <span className="font-extrabold text-white text-sm">{activePlayer.name}</span>
-            </div>
-            <PlayerLineupBar lineup={playerLineup} />
-          </div>
-          <HPBar current={activePlayer.current_hp} max={activePlayer.max_hp} />
-          <p className="text-right text-xs text-white/40 mt-0.5">
-            {activePlayer.current_hp}/{activePlayer.max_hp}
-          </p>
-        </div>
-      </div>
-
-      {/* Battle log */}
-      <div className="mx-4 mb-2 bg-white/4 border border-white/8 rounded-xl px-3 py-2 h-12 overflow-hidden shrink-0">
-        <AnimatePresence mode="wait">
-          {log.length > 0 && (
-            <motion.p
-              key={log[log.length - 1]}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="text-xs text-white/70 leading-relaxed"
+      {/* ── Items modal ── */}
+      <AnimatePresence>
+        {showItemsModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowItemsModal(false)}
+              className="absolute inset-0 z-20"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            />
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="absolute bottom-0 left-0 right-0 z-30 rounded-t-3xl overflow-hidden"
+              style={{ background: 'rgba(8,14,28,0.98)', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none' }}
             >
-              {log[log.length - 1]}
-            </motion.p>
+              <div className="px-5 pt-4 pb-2 flex items-center justify-between">
+                <p className="font-extrabold text-white text-base">Oggetti Battaglia</p>
+                <button onClick={() => setShowItemsModal(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(255,255,255,0.08)' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" className="w-4 h-4">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              <div className="px-4 pb-6 flex flex-col gap-2">
+                {battagliaItems.map(item => (
+                  <button key={item.inventoryId}
+                    onClick={() => {
+                      onSelectItem(selectedItemId === item.inventoryId ? null : item.inventoryId)
+                      setShowItemsModal(false)
+                    }}
+                    className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all"
+                    style={{
+                      background: selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                    }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                      style={{ background: 'rgba(255,255,255,0.06)' }}>
+                      ⚔️
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{item.name}</p>
+                      <p className="text-xs text-[#FBBF24]">+{item.effectValue}% ATK</p>
+                    </div>
+                    <span className="text-sm font-bold text-white/35 shrink-0">×{item.quantity}</span>
+                    {selectedItemId === item.inventoryId && (
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: '#FBBF24' }} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── BATTLE FIELD ── */}
+      <div className="relative flex-1 z-10 overflow-hidden">
+        {/* Boss card — top-right, flush to right edge */}
+        <motion.div
+          className="absolute z-10"
+          style={{ top: 12, right: 0, left: '18%' }}
+          animate={
+            bossAnimState === 'attack' ? { x: -14, scale: 1.03 } :
+            bossAnimState === 'damage' ? { x: 8, opacity: 0.6 } :
+            { x: 0, scale: 1, opacity: 1 }
+          }
+          transition={{ duration: 0.15 }}
+        >
+          <CreatureCard
+            imageUrl={activeBoss.image_url || activeBoss.sprite_url}
+            name={activeBoss.name}
+            element={activeBoss.element}
+            rarity="leggendaria"
+            currentHp={activeBoss.current_hp}
+            maxHp={activeBoss.max_hp}
+            atk={activeBoss.atk}
+            animState={bossAnimState}
+            side="right"
+            lineup={bossLineupDots}
+            lineupLabel="Boss"
+            damageFloat={lastDamage?.target === 'boss' ? lastDamage.amount : null}
+            isBoss
+          />
+        </motion.div>
+
+        {/* Player card — bottom-left, flush to left edge */}
+        <motion.div
+          className="absolute z-10"
+          style={{ bottom: 12, left: 0, right: '18%' }}
+          animate={
+            animState === 'attack' ? { x: 14, scale: 1.03 } :
+            animState === 'damage' ? { x: -8, opacity: 0.6 } :
+            { x: 0, scale: 1, opacity: 1 }
+          }
+          transition={{ duration: 0.15 }}
+        >
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activePlayer.player_creature_id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.25 }}
+            >
+              <CreatureCard
+                imageUrl={activePlayer.image_url}
+                name={activePlayer.name}
+                element={activePlayer.element}
+                rarity={activePlayer.rarity}
+                currentHp={activePlayer.current_hp}
+                maxHp={activePlayer.max_hp}
+                atk={activePlayer.atk}
+                animState={animState}
+                side="left"
+                lineup={playerLineupDots}
+                lineupLabel="Tu"
+                damageFloat={lastDamage?.target === 'me' ? lastDamage.amount : null}
+              />
+            </motion.div>
+          </AnimatePresence>
+        </motion.div>
+      </div>
+
+      {/* ── Log strip ── */}
+      <div className="relative z-10 shrink-0 flex items-center gap-3 px-4 py-1.5">
+        <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06))' }} />
+        <AnimatePresence mode="wait">
+          {switchNotice ? null : (
+            <AnimatePresence>
+              {log[log.length - 1] && (
+                <motion.span
+                  key={log.length}
+                  initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
+                  className="text-[10px] font-semibold text-white/35 text-center"
+                >
+                  {log[log.length - 1]}
+                </motion.span>
+              )}
+            </AnimatePresence>
           )}
         </AnimatePresence>
+        <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.06), transparent)' }} />
       </div>
 
-      {/* Actions */}
-      <div className="px-4 pb-4 shrink-0 space-y-2">
-        {/* Items */}
+      {/* ── ACTIONS ── */}
+      <div className="shrink-0 px-4 pb-5 pt-1 z-10 flex gap-2">
+        {/* Items button */}
         {battagliaItems.length > 0 && (
-          <div>
-            <button
-              onClick={onToggleItems}
-              className="text-xs text-white/40 underline mb-1"
-            >
-              {showItems ? '▲ Nascondi oggetti' : `▼ Usa oggetto ${selectedItemId ? '(selezionato)' : ''}`}
-            </button>
-            <AnimatePresence>
-              {showItems && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="flex gap-2 pb-2">
-                    {battagliaItems.map(item => (
-                      <button
-                        key={item.inventoryId}
-                        onClick={() => onSelectItem(selectedItemId === item.inventoryId ? null : item.inventoryId)}
-                        className={`flex-1 text-xs py-2 px-3 rounded-xl border font-semibold transition-all ${
-                          selectedItemId === item.inventoryId
-                            ? 'bg-[#FBBF24]/20 border-[#FBBF24]/50 text-[#FBBF24]'
-                            : 'bg-white/5 border-white/10 text-white/50'
-                        }`}
-                      >
-                        ⚔️ +{item.effectValue}%<br/>
-                        <span className="text-white/30">×{item.quantity}</span>
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <motion.button
+            onClick={() => setShowItemsModal(true)}
+            whileTap={{ scale: 0.95 }}
+            className="w-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all"
+            style={{
+              background: selectedItemId ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${selectedItemId ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.09)'}`,
+            }}
+          >
+            <span className="text-lg leading-none">🗡️</span>
+            {selectedItemId && <div className="w-1.5 h-1.5 rounded-full bg-[#FBBF24]" />}
+          </motion.button>
         )}
 
         {/* Attack button */}
-        <button
+        <motion.button
           onClick={onAttack}
           disabled={attacking}
-          className="w-full bg-red-500 hover:bg-red-400 disabled:bg-white/10 disabled:text-white/30 text-white font-extrabold py-4 rounded-2xl text-base transition-all active:scale-95 shadow-lg shadow-red-500/20"
+          whileTap={!attacking ? { scale: 0.95 } : {}}
+          className="flex-1 relative overflow-hidden rounded-2xl py-4 font-extrabold text-white text-base disabled:cursor-not-allowed transition-all"
+          style={{
+            background: attacking
+              ? 'rgba(255,255,255,0.06)'
+              : selectedItemId
+                ? 'linear-gradient(135deg, #FBBF24 0%, #d97706 100%)'
+                : 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)',
+            boxShadow: !attacking
+              ? selectedItemId ? '0 4px 20px rgba(251,191,36,0.35)' : '0 4px 20px rgba(232,93,47,0.4)'
+              : 'none',
+            opacity: attacking ? 0.7 : 1,
+          }}
         >
           {attacking ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Attacco...
-            </span>
+            <div className="flex items-center justify-center">
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
           ) : (
-            '⚔️ Attacca!'
+            <span className="flex items-center justify-center gap-2">
+              ⚔️ {selectedItem ? `Attacca (+${selectedItem.effectValue}% ATK)` : 'Attacca!'}
+            </span>
           )}
-        </button>
+        </motion.button>
       </div>
     </div>
   )
@@ -527,23 +699,26 @@ function ResultScreen({
       </div>
 
       {won && reward && (
-        <div className="w-full bg-[#3A9DBC]/10 border border-[#3A9DBC]/25 rounded-2xl p-4 space-y-2">
+        <div className="w-full rounded-2xl p-4 space-y-2"
+          style={{ background: 'rgba(247,200,65,0.06)', border: '1px solid rgba(247,200,65,0.2)' }}>
           <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-3 text-center">Ricompense</p>
           <div className="grid grid-cols-2 gap-2">
             {(reward.gold ?? 0) > 0 && (
-              <div className="flex items-center gap-2 bg-[#F7C841]/8 border border-[#F7C841]/20 rounded-xl px-3 py-2.5">
+              <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+                style={{ background: 'rgba(247,200,65,0.08)', border: '1px solid rgba(247,200,65,0.2)' }}>
                 <span className="text-lg">🪙</span>
                 <div>
-                  <p className="text-[#F7C841] font-extrabold text-sm">{reward.gold}</p>
+                  <p className="font-extrabold text-sm" style={{ color: '#F7C841' }}>{reward.gold}</p>
                   <p className="text-white/30 text-xs">Oro</p>
                 </div>
               </div>
             )}
             {(reward.exp ?? 0) > 0 && (
-              <div className="flex items-center gap-2 bg-[#3A9DBC]/8 border border-[#3A9DBC]/20 rounded-xl px-3 py-2.5">
+              <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+                style={{ background: 'rgba(58,157,188,0.08)', border: '1px solid rgba(58,157,188,0.2)' }}>
                 <span className="text-lg">✨</span>
                 <div>
-                  <p className="text-[#3A9DBC] font-extrabold text-sm">{reward.exp}</p>
+                  <p className="font-extrabold text-sm" style={{ color: '#3A9DBC' }}>{reward.exp}</p>
                   <p className="text-white/30 text-xs">EXP</p>
                 </div>
               </div>
@@ -551,7 +726,7 @@ function ResultScreen({
           </div>
           {levelUp && (
             <div className="mt-2 text-center">
-              <span className="text-sm font-bold text-[#F7C841]">⭐ Level Up! Livello {levelUp.newLevel}</span>
+              <span className="text-sm font-bold" style={{ color: '#F7C841' }}>⭐ Level Up! Livello {levelUp.newLevel}</span>
             </div>
           )}
         </div>
@@ -559,7 +734,12 @@ function ResultScreen({
 
       <button
         onClick={onExit}
-        className="w-full bg-[#3A9DBC] text-white font-extrabold py-4 rounded-2xl text-base"
+        className="w-full text-white font-extrabold py-4 rounded-2xl text-base"
+        style={{
+          background: won ? 'linear-gradient(135deg, #F7C841 0%, #d4a030 100%)' : 'rgba(255,255,255,0.08)',
+          boxShadow: won ? '0 4px 20px rgba(247,200,65,0.35)' : 'none',
+          color: won ? '#0D0205' : 'white',
+        }}
       >
         {won ? 'Continua →' : 'Torna al gioco'}
       </button>
@@ -595,13 +775,11 @@ export default function BossFightPage() {
   const [lastDamage, setLastDamage]       = useState<{ amount: number; target: 'me' | 'boss' } | null>(null)
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
-  const [showItems, setShowItems]         = useState(false)
   const [switchNotice, setSwitchNotice]   = useState<string | null>(null)
   const [finalResult, setFinalResult]     = useState<{ won: boolean; reward: any; levelUp: any } | null>(null)
 
   const addLog = (msg: string) => setLog(prev => [...prev.slice(-9), msg])
 
-  // Load fight + creatures
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
 
@@ -624,7 +802,6 @@ export default function BossFightPage() {
         addLog('La battaglia è in corso...')
       }
 
-      // Load player creatures for squad selection or items
       if (sessionId) {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
@@ -713,15 +890,13 @@ export default function BossFightPage() {
     setPlayerLineup(data.playerLineup)
     setBossActiveSlot(0)
     setFight((prev: any) => ({ ...prev, status: 'active' }))
-    addLog(`La battaglia contro il Capo Palestra è iniziata!`)
+    addLog('La battaglia contro il Capo Palestra è iniziata!')
     setStarting(false)
   }
 
   async function handleAttack() {
     if (attacking) return
     setAttacking(true)
-
-    // Attack animation
     setAnimState('attack')
     setTimeout(() => setAnimState('idle'), 300)
 
@@ -743,13 +918,11 @@ export default function BossFightPage() {
       ).filter(item => item.quantity > 0))
     }
 
-    // Update state from response
     setBossLineup(data.bossLineup)
     setPlayerLineup(data.playerLineup)
     const newBossSlot = data.bossLineup.findIndex((c: BossSlot) => !c.fainted)
     setBossActiveSlot(newBossSlot === -1 ? 0 : newBossSlot)
 
-    // Damage animations
     setLastDamage({ amount: data.playerDamage, target: 'boss' })
     setBossAnimState('damage')
     setTimeout(() => {
@@ -761,12 +934,9 @@ export default function BossFightPage() {
       }
     }, 300)
 
-    // Log
     const activePlayer = data.playerLineup.find((c: PlayerSlot) => c.is_active)
     addLog(`${activePlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni!`)
-    if (data.bossDamage > 0) {
-      addLog(`Il boss risponde con ${data.bossDamage} danni!`)
-    }
+    if (data.bossDamage > 0) addLog(`Il boss risponde con ${data.bossDamage} danni!`)
 
     if (data.bossSwitchedTo) {
       setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
@@ -797,15 +967,15 @@ export default function BossFightPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-full" style={{ background: BOSS_THEME.bg }}>
+        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'rgba(247,200,65,0.4)', borderTopColor: '#F7C841' }} />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
+      <div className="flex flex-col items-center justify-center h-full gap-4 px-6" style={{ background: BOSS_THEME.bg }}>
         <span className="text-4xl">❌</span>
         <p className="text-red-400 text-center">{error}</p>
         <button onClick={() => router.back()} className="text-[#3A9DBC] underline text-sm">Torna indietro</button>
@@ -815,7 +985,7 @@ export default function BossFightPage() {
 
   if (finalResult) {
     return (
-      <div className="h-full bg-[#0A1520]">
+      <div className="h-full" style={{ background: BOSS_THEME.bg }}>
         <ResultScreen
           won={finalResult.won}
           reward={finalResult.reward}
@@ -827,13 +997,14 @@ export default function BossFightPage() {
   }
 
   return (
-    <div className="h-full bg-[#0A1520] text-white flex flex-col overflow-hidden relative">
-      {/* Header with back/surrender */}
-      <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b border-white/8">
+    <div className="h-full text-white flex flex-col overflow-hidden relative" style={{ background: BOSS_THEME.bg }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0 z-10 relative"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
         <button onClick={() => router.back()} className="text-white/40 text-sm">← Indietro</button>
-        <span className="text-sm font-bold text-white/60">💀 Capo Palestra</span>
+        <span className="text-sm font-bold" style={{ color: 'rgba(247,200,65,0.7)' }}>💀 Capo Palestra</span>
         {fight?.status === 'active' && (
-          <button onClick={handleSurrender} className="text-red-400/60 text-xs">Arrenditi</button>
+          <button onClick={handleSurrender} className="text-red-400/50 text-xs">Arrenditi</button>
         )}
         {fight?.status !== 'active' && <span className="w-16" />}
       </div>
@@ -841,7 +1012,7 @@ export default function BossFightPage() {
       {fight?.status === 'selecting' || fight?.status === undefined ? (
         loadingCreatures ? (
           <div className="flex items-center justify-center flex-1">
-            <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'rgba(247,200,65,0.3)', borderTopColor: '#F7C841' }} />
           </div>
         ) : (
           <div className="flex-1 overflow-hidden">
@@ -872,8 +1043,6 @@ export default function BossFightPage() {
             battagliaItems={battagliaItems}
             selectedItemId={selectedItemId}
             onSelectItem={setSelectedItemId}
-            showItems={showItems}
-            onToggleItems={() => setShowItems(v => !v)}
             switchNotice={switchNotice}
           />
         </div>

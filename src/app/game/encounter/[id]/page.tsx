@@ -78,7 +78,7 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
       <div
         className="relative shrink-0 flex items-center justify-center"
         style={{
-          width: 100,
+          width: 112,
           background: `linear-gradient(135deg, ${rarityColor}18 0%, transparent 70%)`,
         }}
       >
@@ -110,7 +110,7 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
           imageUrl={imageUrl}
           name={name}
           animState={animState}
-          size={95}
+          size={108}
           element={element as Element}
           rarity={rarity as Rarity}
           showAura
