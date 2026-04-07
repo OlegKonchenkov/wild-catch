@@ -341,8 +341,8 @@ function QRModal({
           <canvas ref={canvasRef} />
         </div>
 
-        {/* Text code — alternative to QR */}
-        <CopyableCode code={qr.id} />
+        {/* Short manual fallback code */}
+        {qr.manual_code && <CopyableCode code={qr.manual_code} />}
 
         <div className="space-y-2 mb-4">
           {details.map(detail => (
@@ -387,6 +387,7 @@ export default function QRCodesPage() {
   // scope: '' = current session, 'global' = all sessions
   const [scopeSessionId, setScopeSessionId] = useState<string>('')
   const [uniquePerUser, setUniquePerUser]   = useState(false)
+  const [manualCode, setManualCode] = useState('')
   const [creating, setCreating]     = useState(false)
   const [error, setError]           = useState('')
   const [actionMsg, setActionMsg]   = useState<{ ok: boolean; text: string } | null>(null)
@@ -429,6 +430,7 @@ export default function QRCodesPage() {
     setUsesRemaining(null)
     setScopeSessionId(selectedId !== 'all' ? selectedId : sessions[0]?.id ?? '')
     setUniquePerUser(false)
+    setManualCode('')
     setError('')
     setEditorOpen(true)
   }
@@ -436,7 +438,7 @@ export default function QRCodesPage() {
   function clearEditor() {
     setEditingQrId(null); setType('oggetto'); setLabel('')
     setFields(defaultFields('oggetto')); setUsesRemaining(null)
-    setUniquePerUser(false); setError(''); setEditorOpen(false)
+    setUniquePerUser(false); setManualCode(''); setError(''); setEditorOpen(false)
   }
 
   function startEditing(qr: any) {
@@ -449,6 +451,7 @@ export default function QRCodesPage() {
     setScopeSessionId(qr.session_id ?? '')
     setUniquePerUser(qr.unique_per_user ?? (qrType === 'boss'))
     setFields(payloadToFields(qrType, qr.payload ?? {}))
+    setManualCode(String(qr.manual_code ?? ''))
     setError('')
     setEditorOpen(true)
   }
@@ -463,6 +466,7 @@ export default function QRCodesPage() {
       label,
       uniquePerUser,
       sessionId: scopeSessionId || null,
+      manualCode: manualCode.trim() || undefined,
     }
     if (isEditing) body.qrId = editingQrId
 
@@ -614,9 +618,17 @@ export default function QRCodesPage() {
                   )}
                 </div>
                 <p className="text-xs text-white/45 truncate mt-0.5">{description}</p>
-                <p className="text-xs text-white/30 mt-0.5">
-                  {qr.uses_remaining === null ? '∞ illimitati' : `${qr.uses_remaining} usi rimanenti`}
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs text-white/30">
+                    {qr.uses_remaining === null ? '∞ illimitati' : `${qr.uses_remaining} usi rimanenti`}
+                  </span>
+                  {qr.manual_code && (
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(58,157,188,0.12)', color: '#3A9DBC', border: '1px solid rgba(58,157,188,0.25)' }}>
+                      {qr.manual_code}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={e => { e.stopPropagation(); setPreviewQr(qr) }}
@@ -685,6 +697,25 @@ export default function QRCodesPage() {
                 <input value={label} onChange={e => setLabel(e.target.value)}
                   placeholder={isBossType ? 'es. Capo Palestra — Arena Sud' : 'es. Stazione A'}
                   className={cls} autoFocus />
+              </Field>
+
+              {/* Manual fallback code */}
+              <Field label="Codice manuale (piano B)" hint="Massimo 6 caratteri — usato dai giocatori se il QR non si scansiona. Lascia vuoto per generarlo in automatico.">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={manualCode}
+                    onChange={e => setManualCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                    placeholder="es. BOSS01"
+                    maxLength={6}
+                    className="w-36 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm font-mono tracking-widest uppercase"
+                  />
+                  {editingQrId && manualCode && (
+                    <span className="text-xs text-white/40 font-mono">{manualCode.length}/6</span>
+                  )}
+                  {!editingQrId && (
+                    <span className="text-xs text-white/30 italic">{manualCode ? `${manualCode.length}/6` : 'auto-generato'}</span>
+                  )}
+                </div>
               </Field>
 
               {/* Dynamic fields per type */}

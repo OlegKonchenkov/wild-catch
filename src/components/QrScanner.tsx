@@ -231,16 +231,17 @@ export default function QrScanner({ onScan, onClose }: Props) {
           <div className="text-center space-y-2">
             <span className="text-6xl block">🔢</span>
             <p className="text-white font-bold text-lg">Inserisci il codice</p>
-            <p className="text-white/40 text-sm">Digita il codice UUID riportato sul QR</p>
+            <p className="text-white/40 text-sm">Digita il codice a <strong className="text-white/60">6 caratteri</strong> stampato accanto al QR</p>
           </div>
           <div className="w-full space-y-3">
             <input
               value={manual}
-              onChange={e => setManual(e.target.value)}
+              onChange={e => setManual(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
               onKeyDown={e => e.key === 'Enter' && handleManualSubmit()}
-              placeholder="es. a1b2c3d4-..."
+              placeholder="es. BOSS01"
+              maxLength={6}
               autoFocus
-              className="w-full bg-white/10 text-white border border-white/20 rounded-xl px-4 py-3 text-sm placeholder:text-white/20 focus:outline-none focus:border-[#3A9DBC]/60 text-center font-mono"
+              className="w-full bg-white/10 text-white border border-white/20 rounded-xl px-4 py-3 text-sm placeholder:text-white/20 focus:outline-none focus:border-[#3A9DBC]/60 text-center font-mono text-2xl tracking-[0.4em] uppercase"
             />
             <button
               onClick={handleManualSubmit}

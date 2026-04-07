@@ -21,13 +21,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
   }
 
-  // Get QR code — also matches global QRs (null session_id)
-  const { data: qr } = await supabase
-    .from('qr_codes')
-    .select('*')
-    .eq('id', qrId)
-    .or(`session_id.eq.${sessionId},session_id.is.null`)
-    .single()
+  // Get QR code — match by UUID or short manual_code (case-insensitive)
+  // Also matches global QRs (null session_id)
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrId)
+  let qrQuery = supabase.from('qr_codes').select('*').or(`session_id.eq.${sessionId},session_id.is.null`)
+  if (isUuid) {
+    qrQuery = qrQuery.eq('id', qrId)
+  } else {
+    qrQuery = qrQuery.ilike('manual_code', qrId.trim().toUpperCase())
+  }
+  const { data: qr } = await qrQuery.single()
 
   if (!qr) return NextResponse.json({ error: 'QR code non valido' }, { status: 404 })
 
