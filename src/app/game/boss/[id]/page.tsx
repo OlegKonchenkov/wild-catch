@@ -365,6 +365,7 @@ function BattleScreen({
   bossActiveSlot,
   onAttack,
   attacking,
+  bossAttacking,
   log,
   animState,
   bossAnimState,
@@ -379,10 +380,11 @@ function BattleScreen({
   bossActiveSlot: number
   onAttack: () => void
   attacking: boolean
+  bossAttacking: boolean
   log: string[]
   animState: 'idle' | 'attack' | 'damage'
   bossAnimState: 'idle' | 'attack' | 'damage'
-  lastDamage: { amount: number; target: 'me' | 'boss' } | null
+  lastDamage: { amount: number; target: 'me' | 'boss'; id: number } | null
   battagliaItems: BattagliaItem[]
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
@@ -610,11 +612,27 @@ function BattleScreen({
         </AnimatePresence>
       </div>
 
-      {/* ── Log strip ── */}
+      {/* ── Turn / Log strip ── */}
       <div className="relative z-10 shrink-0 flex items-center gap-3 px-4 py-1.5">
         <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06))' }} />
         <AnimatePresence mode="wait">
-          {switchNotice ? null : (
+          {bossAttacking ? (
+            <motion.div key="boss-turn"
+              initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full"
+              style={{ background: 'rgba(247,200,65,0.15)', border: '1px solid rgba(247,200,65,0.4)' }}
+            >
+              <motion.div className="w-1.5 h-1.5 rounded-full bg-[#F7C841]"
+                animate={{ scale: [1, 1.5, 1] }} transition={{ duration: 0.8, repeat: Infinity }} />
+              <span className="text-[10px] font-bold text-[#F7C841]">Capo Palestra attacca!</span>
+            </motion.div>
+          ) : switchNotice ? (
+            <motion.div key="switch" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
+              className="text-[10px] font-bold text-[#C084FC] px-3 py-1 rounded-full"
+              style={{ background: 'rgba(123,77,184,0.18)', border: '1px solid rgba(123,77,184,0.4)' }}>
+              ✨ {switchNotice}
+            </motion.div>
+          ) : (
             <AnimatePresence>
               {log[log.length - 1] && (
                 <motion.span
@@ -652,22 +670,27 @@ function BattleScreen({
         {/* Attack button */}
         <motion.button
           onClick={onAttack}
-          disabled={attacking}
-          whileTap={!attacking ? { scale: 0.95 } : {}}
+          disabled={attacking || bossAttacking}
+          whileTap={!attacking && !bossAttacking ? { scale: 0.95 } : {}}
           className="flex-1 relative overflow-hidden rounded-2xl py-4 font-extrabold text-white text-base disabled:cursor-not-allowed transition-all"
           style={{
-            background: attacking
-              ? 'rgba(255,255,255,0.06)'
-              : selectedItemId
-                ? 'linear-gradient(135deg, #FBBF24 0%, #d97706 100%)'
-                : 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)',
-            boxShadow: !attacking
+            background: bossAttacking
+              ? 'rgba(247,200,65,0.08)'
+              : attacking
+                ? 'rgba(255,255,255,0.06)'
+                : selectedItemId
+                  ? 'linear-gradient(135deg, #FBBF24 0%, #d97706 100%)'
+                  : 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)',
+            boxShadow: !attacking && !bossAttacking
               ? selectedItemId ? '0 4px 20px rgba(251,191,36,0.35)' : '0 4px 20px rgba(232,93,47,0.4)'
               : 'none',
-            opacity: attacking ? 0.7 : 1,
+            border: bossAttacking ? '1px solid rgba(247,200,65,0.25)' : 'none',
+            opacity: attacking || bossAttacking ? 0.7 : 1,
           }}
         >
-          {attacking ? (
+          {bossAttacking ? (
+            <span className="text-[#F7C841]/60 text-sm">Turno del Capo Palestra...</span>
+          ) : attacking ? (
             <div className="flex items-center justify-center">
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             </div>
@@ -786,6 +809,7 @@ export default function BossFightPage() {
   const [playerLineup, setPlayerLineup]   = useState<PlayerSlot[]>([])
   const [bossActiveSlot, setBossActiveSlot]     = useState(0)
   const [attacking, setAttacking]         = useState(false)
+  const [bossAttacking, setBossAttacking] = useState(false)
   const [log, setLog]                     = useState<string[]>([])
   const [animState, setAnimState]         = useState<'idle' | 'attack' | 'damage'>('idle')
   const [bossAnimState, setBossAnimState] = useState<'idle' | 'attack' | 'damage'>('idle')
@@ -950,42 +974,58 @@ export default function BossFightPage() {
     const newBossSlot = data.bossLineup.findIndex((c: BossSlot) => !c.fainted)
     setBossActiveSlot(newBossSlot === -1 ? 0 : newBossSlot)
 
+    const isOver = data.status === 'won' || data.status === 'lost'
+    const activePlayer = data.playerLineup.find((c: PlayerSlot) => c.is_active)
+    addLog(`${activePlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni!`)
+
+    // Phase 1: player attacks boss
     setLastDamage({ amount: data.playerDamage, target: 'boss', id: Date.now() })
     setBossAnimState('damage')
+
     setTimeout(() => {
       setBossAnimState('idle')
       setLastDamage(null)
-      if (data.bossDamage > 0) {
+
+      if (!isOver && data.bossDamage > 0) {
+        // Phase 2: boss counter-attacks (2 seconds total from player attack)
+        setBossAttacking(true)
         setTimeout(() => {
+          setBossAttacking(false)
           setLastDamage({ amount: data.bossDamage, target: 'me', id: Date.now() })
           setAnimState('damage')
-          setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 900)
-        }, 100)
+          addLog(`Il Capo Palestra risponde con ${data.bossDamage} danni!`)
+
+          if (data.bossSwitchedTo) {
+            setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
+            setTimeout(() => setSwitchNotice(null), 2000)
+          }
+          if (data.playerSwitchedTo) {
+            setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`)
+            setTimeout(() => setSwitchNotice(null), 2000)
+          }
+
+          setTimeout(() => {
+            setAnimState('idle')
+            setLastDamage(null)
+            setAttacking(false)  // re-enable only after both animations done
+          }, 900)
+        }, 1100)  // boss "thinks" for ~1s then strikes
+      } else {
+        // Boss fainted or game over — no counter-attack
+        if (data.bossSwitchedTo) {
+          setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
+          setTimeout(() => setSwitchNotice(null), 2000)
+        }
+        if (isOver) {
+          window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+          if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+          setTimeout(() => {
+            setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp })
+          }, 400)
+        }
+        setAttacking(false)
       }
     }, 900)
-
-    const activePlayer = data.playerLineup.find((c: PlayerSlot) => c.is_active)
-    addLog(`${activePlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni!`)
-    if (data.bossDamage > 0) addLog(`Il boss risponde con ${data.bossDamage} danni!`)
-
-    if (data.bossSwitchedTo) {
-      setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
-      setTimeout(() => setSwitchNotice(null), 2000)
-    }
-    if (data.playerSwitchedTo) {
-      setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`)
-      setTimeout(() => setSwitchNotice(null), 2000)
-    }
-
-    if (data.status === 'won' || data.status === 'lost') {
-      window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
-      if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
-      setTimeout(() => {
-        setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp })
-      }, 800)
-    }
-
-    setAttacking(false)
   }
 
   async function handleSurrender() {
@@ -1068,6 +1108,7 @@ export default function BossFightPage() {
             bossActiveSlot={bossActiveSlot}
             onAttack={handleAttack}
             attacking={attacking}
+            bossAttacking={bossAttacking}
             log={log}
             animState={animState}
             bossAnimState={bossAnimState}

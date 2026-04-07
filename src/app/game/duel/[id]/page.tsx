@@ -215,7 +215,7 @@ export default function DuelPage() {
       const role: 'challenger' | 'opponent' = duelData.challenger_id === user.id ? 'challenger' : 'opponent'
       setMyRole(role)
 
-      if (duelData.status === 'active') setIsMyTurn(role === 'challenger')
+      if (duelData.status === 'active') setIsMyTurn(duelData.current_turn === role)
 
       const { data: lineups } = await supabase
         .from('duel_lineups')

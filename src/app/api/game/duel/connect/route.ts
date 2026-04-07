@@ -40,17 +40,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Slot non validi — richiesti 1, 2, 3' }, { status: 400 })
   }
 
-  // Validate ownership + fetch HP for each lineup creature
+  // Validate ownership + fetch HP (and ATK for slot 1) for each lineup creature
   const hpMap = new Map<string, number>()
+  let opponentSlot1Atk = 0
   for (const entry of lineup) {
     const { data: pc } = await supabase
       .from('player_creatures')
-      .select('creatures(hp)')
+      .select('creatures(hp, atk)')
       .eq('id', entry.playerCreatureId)
       .eq('user_id', user.id)
       .single()
     if (!pc) return NextResponse.json({ error: 'Creatura non valida o non posseduta' }, { status: 400 })
     hpMap.set(entry.playerCreatureId, (pc as any).creatures?.hp ?? 100)
+    if (entry.slot === 1) opponentSlot1Atk = (pc as any).creatures?.atk ?? 0
   }
 
   const slot1 = lineup.find(l => l.slot === 1)!
@@ -80,6 +82,15 @@ export async function POST(request: Request) {
       }))
     )
 
+    // Determine who goes first: lower slot-1 ATK attacks first
+    const { data: challengerPc } = await supabase
+      .from('player_creatures')
+      .select('creatures(atk)')
+      .eq('id', duel.challenger_creature_id)
+      .single()
+    const challengerSlot1Atk = (challengerPc as any)?.creatures?.atk ?? 0
+    const firstTurn: 'challenger' | 'opponent' = challengerSlot1Atk <= opponentSlot1Atk ? 'challenger' : 'opponent'
+
     const { data: updated } = await supabase
       .from('duels')
       .update({
@@ -87,7 +98,7 @@ export async function POST(request: Request) {
         opponent_creature_id: slot1.playerCreatureId,
         status: 'active',
         started_at: new Date().toISOString(),
-        current_turn: 'challenger',
+        current_turn: firstTurn,
       })
       .eq('id', duel.id)
       .is('opponent_id', null)
