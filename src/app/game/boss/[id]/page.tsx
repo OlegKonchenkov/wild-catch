@@ -76,11 +76,14 @@ interface CardProps {
   side: 'left' | 'right'
   lineup?: Array<{ color: string; isActive: boolean; fainted: boolean }>
   lineupLabel?: string
-  damageFloat?: number | null
   isBoss?: boolean
 }
 
-function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, animState = 'idle', side, lineup, lineupLabel, damageFloat, isBoss }: CardProps) {
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, animState = 'idle', side, lineup, lineupLabel, isBoss }: CardProps) {
+  const spriteSize = typeof window !== 'undefined'
+    ? Math.round(Math.min(window.innerWidth * 0.35, window.innerHeight * 0.2, 158))
+    : 122
+  const imageWidth = spriteSize + 10
   const rarityColor = isBoss ? '#F7C841' : (RARITY_COLORS[rarity as Rarity] ?? '#64748b')
   const elemEmoji   = ELEMENT_EMOJI[element as keyof typeof ELEMENT_EMOJI] ?? '✦'
   const hpPct       = Math.max(0, Math.min(100, (currentHp / maxHp) * 100))
@@ -101,31 +104,11 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
         boxShadow: `0 16px 48px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0 1px ${rarityColor}18`,
       }}
     >
-      {/* Damage float */}
-      <AnimatePresence>
-        {damageFloat != null && (
-          <motion.div
-            key={`dmg-${damageFloat}-${Date.now()}`}
-            initial={{ opacity: 1, y: 0, scale: 1 }}
-            animate={{ opacity: 0, y: -36, scale: 1.6 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.7 }}
-            className="absolute inset-0 flex items-start justify-center pointer-events-none z-30"
-            style={{ paddingTop: 6 }}
-          >
-            <span className="font-extrabold text-[#E85D2F] text-xl"
-              style={{ textShadow: '0 0 12px rgba(232,93,47,0.9)' }}>
-              -{damageFloat}
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* ── Image section ── */}
       <div
         className="relative shrink-0 flex items-center justify-center"
         style={{
-          width: 100,
+          width: imageWidth,
           background: `linear-gradient(135deg, ${rarityColor}18 0%, transparent 70%)`,
         }}
       >
@@ -133,7 +116,7 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
           imageUrl={imageUrl}
           name={name}
           animState={animState}
-          size={95}
+          size={spriteSize}
           element={element as Element}
           rarity={rarity as Rarity}
           showAura
@@ -530,7 +513,7 @@ function BattleScreen({
         {/* Boss card — top-right, flush to right edge */}
         <motion.div
           className="absolute z-10"
-          style={{ top: 12, right: 0, left: '18%' }}
+          style={{ top: 12, right: 0, left: '8%' }}
           animate={
             bossAnimState === 'attack' ? { x: -14, scale: 1.03 } :
             bossAnimState === 'damage' ? { x: 8, opacity: 0.6 } :
@@ -550,7 +533,6 @@ function BattleScreen({
             side="right"
             lineup={bossLineupDots}
             lineupLabel="Boss"
-            damageFloat={lastDamage?.target === 'boss' ? lastDamage.amount : null}
             isBoss
           />
         </motion.div>
@@ -558,7 +540,7 @@ function BattleScreen({
         {/* Player card — bottom-left, flush to left edge */}
         <motion.div
           className="absolute z-10"
-          style={{ bottom: 12, left: 0, right: '18%' }}
+          style={{ bottom: 12, left: 0, right: '8%' }}
           animate={
             animState === 'attack' ? { x: 14, scale: 1.03 } :
             animState === 'damage' ? { x: -8, opacity: 0.6 } :
@@ -586,11 +568,46 @@ function BattleScreen({
                 side="left"
                 lineup={playerLineupDots}
                 lineupLabel="Tu"
-                damageFloat={lastDamage?.target === 'me' ? lastDamage.amount : null}
               />
             </motion.div>
           </AnimatePresence>
         </motion.div>
+
+        {/* ── Standalone damage floats (outside cards, not clipped) ── */}
+        <AnimatePresence>
+          {lastDamage?.target === 'boss' && (
+            <motion.div
+              key={`boss-dmg-${lastDamage.amount}-${Date.now()}`}
+              initial={{ opacity: 1, y: 0, scale: 1 }}
+              animate={{ opacity: 0, y: -80, scale: 2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9 }}
+              className="absolute pointer-events-none z-50"
+              style={{ top: '28%', left: '50%', transform: 'translateX(-50%)' }}
+            >
+              <span style={{ color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }}>
+                -{lastDamage.amount}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {lastDamage?.target === 'me' && (
+            <motion.div
+              key={`me-dmg-${lastDamage.amount}-${Date.now()}`}
+              initial={{ opacity: 1, y: 0, scale: 1 }}
+              animate={{ opacity: 0, y: -80, scale: 2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9 }}
+              className="absolute pointer-events-none z-50"
+              style={{ bottom: '32%', left: '50%', transform: 'translateX(-50%)' }}
+            >
+              <span style={{ color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }}>
+                -{lastDamage.amount}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── Log strip ── */}
@@ -830,6 +847,16 @@ export default function BossFightPage() {
             }))
           setAllCreatures(mapped)
 
+          // Patch player lineup with image_url from creature data (fixes resumed fights
+          // where the JSONB was saved before image_url was added to the API response)
+          if (f.status === 'active') {
+            const imgById: Record<string, string> = {}
+            mapped.forEach(c => { if (c.image_url) imgById[c.playerCreatureId] = c.image_url })
+            setPlayerLineup((prev: PlayerSlot[]) =>
+              prev.map(slot => ({ ...slot, image_url: slot.image_url || imgById[slot.player_creature_id] || '' }))
+            )
+          }
+
           const bItems: BattagliaItem[] = ((invRes.data ?? []) as any[])
             .filter(inv => inv.items?.type === 'battaglia' && inv.quantity > 0)
             .map(inv => ({
@@ -948,6 +975,8 @@ export default function BossFightPage() {
     }
 
     if (data.status === 'won' || data.status === 'lost') {
+      window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+      if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
       setTimeout(() => {
         setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp })
       }, 800)

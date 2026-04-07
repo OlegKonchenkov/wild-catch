@@ -456,11 +456,19 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       >
         {(() => {
           const inEncounter = pathname.startsWith('/game/encounter/')
-          if (inEncounter) {
+          const inDuelFight = pathname.startsWith('/game/duel/') && pathname !== '/game/duel'
+          const inBossFight = pathname.startsWith('/game/boss/')
+          const inAnyBattle = inEncounter || inDuelFight || inBossFight
+          if (inAnyBattle) {
+            const battleMsg = inBossFight
+              ? '💀 Sfida al Capo Palestra — combatti!'
+              : inDuelFight
+                ? '⚔️ Duello in corso — combatti!'
+                : '⚔️ Incontro in corso — cattura o fuggi'
             return (
               <>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span className="text-[10px] text-white/25 tracking-widest uppercase">⚔️ Incontro in corso — cattura o fuggi</span>
+                  <span className="text-[10px] text-white/25 tracking-widest uppercase">{battleMsg}</span>
                 </div>
                 {NAV_ITEMS.map(({ href, icon, label }) => (
                   <span

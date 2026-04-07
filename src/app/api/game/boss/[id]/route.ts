@@ -58,7 +58,7 @@ export async function POST(request: Request, { params }: Params) {
     const pcIds = lineup.map((e: any) => e.playerCreatureId)
     const { data: pcs } = await supabase
       .from('player_creatures')
-      .select('id, creatures(name, element, hp, atk)')
+      .select('id, creatures(name, element, rarity, hp, atk, image_url)')
       .in('id', pcIds)
       .eq('user_id', user.id)
 
@@ -78,11 +78,13 @@ export async function POST(request: Request, { params }: Params) {
         player_creature_id: e.playerCreatureId,
         name: cr?.name ?? 'Creatura',
         element: cr?.element ?? 'armonia',
+        rarity: cr?.rarity ?? 'comune',
         atk: cr?.atk ?? 10,
         max_hp: cr?.hp ?? 100,
         current_hp: cr?.hp ?? 100,
         fainted: false,
         is_active: i === 0,
+        image_url: cr?.image_url ?? '',
       }
     })
 

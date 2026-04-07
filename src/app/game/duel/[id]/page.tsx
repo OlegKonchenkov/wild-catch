@@ -57,10 +57,13 @@ interface CardProps {
   side: 'left' | 'right'
   lineup?: Array<{ color: string; isActive: boolean; fainted: boolean }>
   lineupLabel?: string
-  damageFloat?: number | null
 }
 
-function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, animState = 'idle', side, lineup, lineupLabel, damageFloat }: CardProps) {
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, animState = 'idle', side, lineup, lineupLabel }: CardProps) {
+  const spriteSize = typeof window !== 'undefined'
+    ? Math.round(Math.min(window.innerWidth * 0.35, window.innerHeight * 0.2, 158))
+    : 122
+  const imageWidth = spriteSize + 10
   const rarityColor = RARITY_COLORS[rarity as Rarity] ?? '#64748b'
   const elemEmoji   = ELEMENT_EMOJI[element as keyof typeof ELEMENT_EMOJI] ?? '✦'
   const hpPct       = Math.max(0, Math.min(100, (currentHp / maxHp) * 100))
@@ -81,31 +84,11 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
         boxShadow: `0 16px 48px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0 1px ${rarityColor}18`,
       }}
     >
-      {/* Damage float */}
-      <AnimatePresence>
-        {damageFloat != null && (
-          <motion.div
-            key={`dmg-${damageFloat}-${Date.now()}`}
-            initial={{ opacity: 1, y: 0, scale: 1 }}
-            animate={{ opacity: 0, y: -36, scale: 1.6 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.7 }}
-            className="absolute inset-0 flex items-start justify-center pointer-events-none z-30"
-            style={{ paddingTop: 6 }}
-          >
-            <span className="font-extrabold text-[#E85D2F] text-xl"
-              style={{ textShadow: '0 0 12px rgba(232,93,47,0.9)' }}>
-              -{damageFloat}
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* ── Image section ── */}
       <div
         className="relative shrink-0 flex items-center justify-center"
         style={{
-          width: 112,
+          width: imageWidth,
           background: `linear-gradient(135deg, ${rarityColor}18 0%, transparent 70%)`,
         }}
       >
@@ -113,7 +96,7 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
           imageUrl={imageUrl}
           name={name}
           animState={animState}
-          size={108}
+          size={spriteSize}
           element={element as Element}
           rarity={rarity as Rarity}
           showAura
@@ -586,7 +569,7 @@ export default function DuelPage() {
       <div className="relative flex-1 z-10 overflow-hidden">
 
         {/* Opponent card — top-right, flush to right edge */}
-        <div className="absolute z-10" style={{ top: 12, right: 0, left: '18%' }}>
+        <div className="absolute z-10" style={{ top: 12, right: 0, left: '8%' }}>
           {oppActiveCr ? (
             <CreatureCard
               imageUrl={oppActiveCr.image_url}
@@ -598,15 +581,50 @@ export default function DuelPage() {
               animState={oppAnimState}
               side="right"
               lineup={oppLineupDots}
-              damageFloat={lastDamage?.target === 'opp' ? lastDamage.amount : null}
             />
           ) : (
             <div className="h-[100px] rounded-l-2xl animate-pulse mx-0" style={{ background: 'rgba(255,255,255,0.04)' }} />
           )}
         </div>
 
+        {/* Standalone damage floats — outside cards to avoid overflow-hidden clipping */}
+        <AnimatePresence>
+          {lastDamage?.target === 'opp' && (
+            <motion.div
+              key={`opp-dmg-${lastDamage.amount}-${Date.now()}`}
+              initial={{ opacity: 1, y: 0, scale: 1 }}
+              animate={{ opacity: 0, y: -80, scale: 2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9 }}
+              className="absolute pointer-events-none z-50"
+              style={{ top: '28%', left: '50%', transform: 'translateX(-50%)' }}
+            >
+              <span style={{ color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }}>
+                -{lastDamage.amount}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {lastDamage?.target === 'me' && (
+            <motion.div
+              key={`me-dmg-${lastDamage.amount}-${Date.now()}`}
+              initial={{ opacity: 1, y: 0, scale: 1 }}
+              animate={{ opacity: 0, y: -80, scale: 2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9 }}
+              className="absolute pointer-events-none z-50"
+              style={{ bottom: '32%', left: '50%', transform: 'translateX(-50%)' }}
+            >
+              <span style={{ color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }}>
+                -{lastDamage.amount}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Player card — bottom-left, flush to left edge */}
-        <div className="absolute z-10" style={{ bottom: 12, left: 0, right: '18%' }}>
+        <div className="absolute z-10" style={{ bottom: 12, left: 0, right: '8%' }}>
           {myActiveCr ? (
             <CreatureCard
               imageUrl={myActiveCr.image_url}
@@ -620,7 +638,6 @@ export default function DuelPage() {
               side="left"
               lineup={myLineupDots}
               lineupLabel="Tu"
-              damageFloat={lastDamage?.target === 'me' ? lastDamage.amount : null}
             />
           ) : (
             <div className="h-[100px] rounded-r-2xl animate-pulse" style={{ background: 'rgba(255,255,255,0.04)' }} />
