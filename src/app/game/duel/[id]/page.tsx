@@ -184,7 +184,7 @@ export default function DuelPage() {
   const [myRole, setMyRole]                 = useState<'challenger' | 'opponent' | null>(null)
   const [isMyTurn, setIsMyTurn]             = useState(false)
   const [attacking, setAttacking]           = useState(false)
-  const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp' } | null>(null)
+  const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp'; id: number } | null>(null)
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [showItemsModal, setShowItemsModal] = useState(false)
@@ -256,12 +256,12 @@ export default function DuelPage() {
           const iAttacked = actorId === currentId
           if (iAttacked) {
             setOppAnimState('damage')
-            setLastDamage({ amount: damage, target: 'opp' })
-            setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 700)
+            setLastDamage({ amount: damage, target: 'opp', id: Date.now() })
+            setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 900)
           } else {
             setAnimState('damage')
-            setLastDamage({ amount: damage, target: 'me' })
-            setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 700)
+            setLastDamage({ amount: damage, target: 'me', id: Date.now() })
+            setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 900)
           }
           if (nextTurn && currentId) {
             setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
@@ -591,7 +591,7 @@ export default function DuelPage() {
         <AnimatePresence>
           {lastDamage?.target === 'opp' && (
             <motion.div
-              key={`opp-dmg-${lastDamage.amount}-${Date.now()}`}
+              key={`opp-dmg-${lastDamage.id}`}
               initial={{ opacity: 1, y: 0, scale: 1 }}
               animate={{ opacity: 0, y: -80, scale: 2 }}
               exit={{ opacity: 0 }}
@@ -608,7 +608,7 @@ export default function DuelPage() {
         <AnimatePresence>
           {lastDamage?.target === 'me' && (
             <motion.div
-              key={`me-dmg-${lastDamage.amount}-${Date.now()}`}
+              key={`me-dmg-${lastDamage.id}`}
               initial={{ opacity: 1, y: 0, scale: 1 }}
               animate={{ opacity: 0, y: -80, scale: 2 }}
               exit={{ opacity: 0 }}

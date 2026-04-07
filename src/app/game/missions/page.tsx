@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Mission } from '@/lib/types'
 import dynamic from 'next/dynamic'
@@ -302,11 +302,12 @@ function ProgressRing({ pct, color, size = 36 }: { pct: number; color: string; s
 /* ── Page ────────────────────────────────────── */
 export default function MissionsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [missions, setMissions]       = useState<Mission[]>([])
   const [playerMissions, setPlayerMissions] = useState<PlayerMissionData[]>([])
   const [loading, setLoading]         = useState(true)
   const [detailMission, setDetailMission] = useState<Mission | null>(null)
-  const [showScanner, setShowScanner] = useState(false)
+  const [showScanner, setShowScanner] = useState(() => searchParams.get('qr') === '1')
   const [scanResult, setScanResult]   = useState<ScanResult | null>(null)
   const [scanning, setScanning]       = useState(false)
   const [filter, setFilter]           = useState<'all' | 'todo' | 'done'>('all')

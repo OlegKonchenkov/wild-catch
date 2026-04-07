@@ -577,7 +577,7 @@ function BattleScreen({
         <AnimatePresence>
           {lastDamage?.target === 'boss' && (
             <motion.div
-              key={`boss-dmg-${lastDamage.amount}-${Date.now()}`}
+              key={`boss-dmg-${lastDamage.id}`}
               initial={{ opacity: 1, y: 0, scale: 1 }}
               animate={{ opacity: 0, y: -80, scale: 2 }}
               exit={{ opacity: 0 }}
@@ -594,7 +594,7 @@ function BattleScreen({
         <AnimatePresence>
           {lastDamage?.target === 'me' && (
             <motion.div
-              key={`me-dmg-${lastDamage.amount}-${Date.now()}`}
+              key={`me-dmg-${lastDamage.id}`}
               initial={{ opacity: 1, y: 0, scale: 1 }}
               animate={{ opacity: 0, y: -80, scale: 2 }}
               exit={{ opacity: 0 }}
@@ -789,7 +789,7 @@ export default function BossFightPage() {
   const [log, setLog]                     = useState<string[]>([])
   const [animState, setAnimState]         = useState<'idle' | 'attack' | 'damage'>('idle')
   const [bossAnimState, setBossAnimState] = useState<'idle' | 'attack' | 'damage'>('idle')
-  const [lastDamage, setLastDamage]       = useState<{ amount: number; target: 'me' | 'boss' } | null>(null)
+  const [lastDamage, setLastDamage]       = useState<{ amount: number; target: 'me' | 'boss'; id: number } | null>(null)
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [switchNotice, setSwitchNotice]   = useState<string | null>(null)
@@ -950,16 +950,19 @@ export default function BossFightPage() {
     const newBossSlot = data.bossLineup.findIndex((c: BossSlot) => !c.fainted)
     setBossActiveSlot(newBossSlot === -1 ? 0 : newBossSlot)
 
-    setLastDamage({ amount: data.playerDamage, target: 'boss' })
+    setLastDamage({ amount: data.playerDamage, target: 'boss', id: Date.now() })
     setBossAnimState('damage')
     setTimeout(() => {
       setBossAnimState('idle')
+      setLastDamage(null)
       if (data.bossDamage > 0) {
-        setLastDamage({ amount: data.bossDamage, target: 'me' })
-        setAnimState('damage')
-        setTimeout(() => setAnimState('idle'), 300)
+        setTimeout(() => {
+          setLastDamage({ amount: data.bossDamage, target: 'me', id: Date.now() })
+          setAnimState('damage')
+          setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 900)
+        }, 100)
       }
-    }, 300)
+    }, 900)
 
     const activePlayer = data.playerLineup.find((c: PlayerSlot) => c.is_active)
     addLog(`${activePlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni!`)
