@@ -159,10 +159,33 @@ export default function QrScanner({ onScan, onClose }: Props) {
 
           {/* Error overlay */}
           {phase === 'error' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 px-6">
-              <span className="text-5xl">📷</span>
-              <p className="text-white text-center font-bold">{camError}</p>
-              <p className="text-white/50 text-sm text-center">Puoi inserire il codice manualmente</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 px-6 overflow-y-auto py-8">
+              <span className="text-5xl mb-4">📷</span>
+              <p className="text-white text-center font-bold text-base mb-1">{camError}</p>
+
+              {camError === 'Permesso fotocamera negato' && (
+                <div className="w-full max-w-xs mt-3 mb-4 rounded-2xl p-4 text-xs space-y-2"
+                  style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                  <p className="font-bold text-red-400 text-center">Come riabilitare la fotocamera</p>
+                  {/iP(hone|ad|od)/.test(typeof navigator !== 'undefined' ? navigator.userAgent : '') ? (
+                    <ol className="text-white/60 space-y-1 list-decimal list-inside leading-relaxed">
+                      <li>Apri <strong className="text-white/80">Impostazioni</strong> del telefono</li>
+                      <li>Vai su <strong className="text-white/80">Privacy → Fotocamera</strong></li>
+                      <li>Abilita <strong className="text-white/80">Safari</strong> (o il browser usato)</li>
+                      <li>Torna qui e riprova</li>
+                    </ol>
+                  ) : (
+                    <ol className="text-white/60 space-y-1 list-decimal list-inside leading-relaxed">
+                      <li>Tocca l'icona 🔒 nella barra degli indirizzi</li>
+                      <li>Seleziona <strong className="text-white/80">Autorizzazioni sito</strong></li>
+                      <li>Imposta <strong className="text-white/80">Fotocamera</strong> su <strong className="text-white/80">Consenti</strong></li>
+                      <li>Ricarica la pagina</li>
+                    </ol>
+                  )}
+                </div>
+              )}
+
+              <p className="text-white/40 text-sm text-center mb-4">Oppure inserisci il codice manualmente</p>
               <button
                 onClick={() => setPhase('manual')}
                 className="bg-[#3A9DBC] text-white font-bold px-6 py-3 rounded-xl"

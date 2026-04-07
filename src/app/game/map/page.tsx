@@ -14,6 +14,41 @@ const ENCOUNTER_COOLDOWN_MS = 30000  // 30s between encounters
 // Cumulative distance that, when exceeded, probabilistically triggers a walk-based encounter
 const WALK_ENCOUNTER_DIST_M = 25  // trigger after accumulating ~25 m
 
+function GPSErrorBanner({ message }: { message: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const isDenied = message.toLowerCase().includes('abilita') || message.toLowerCase().includes('denied')
+  const ios = typeof navigator !== 'undefined' && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(120,53,15,0.92)', backdropFilter: 'blur(8px)', border: '1px solid rgba(251,191,36,0.3)' }}>
+      <button
+        onClick={() => isDenied && setExpanded(e => !e)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left"
+      >
+        <span className="text-sm">⚠️</span>
+        <span className="flex-1 text-yellow-200 text-xs font-semibold">{message}</span>
+        {isDenied && <span className="text-yellow-400/60 text-xs">{expanded ? '▲' : '▼ Come risolvere'}</span>}
+      </button>
+      {expanded && isDenied && (
+        <div className="px-3 pb-3 text-xs text-yellow-100/70 space-y-1 border-t border-yellow-400/20 pt-2">
+          {ios ? (
+            <>
+              <p className="font-bold text-yellow-200">iPhone/iPad:</p>
+              <p>Impostazioni → Privacy → Localizzazione → Safari → Consenti</p>
+            </>
+          ) : (
+            <>
+              <p className="font-bold text-yellow-200">Android:</p>
+              <p>Tocca 🔒 nella barra indirizzi → Autorizzazioni → Posizione → Consenti</p>
+            </>
+          )}
+          <p className="text-yellow-200/50 mt-1">Poi ricarica la pagina.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MapPageInner() {
   const [session, setSession] = useState<Session | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -295,11 +330,9 @@ function MapPageInner() {
       )}
 
       {/* Top-left alerts column — stops before the right-side HUD (right-20 = 80px) */}
-      <div className="absolute top-2 left-2 right-20 z-[900] flex flex-col gap-1.5 pointer-events-none">
+      <div className="absolute top-2 left-2 right-20 z-[900] flex flex-col gap-1.5" style={{ pointerEvents: gpsError ? 'auto' : 'none' }}>
         {gpsError && (
-          <div className="bg-yellow-900/90 text-yellow-200 text-xs px-3 py-2 rounded-xl backdrop-blur-sm">
-            ⚠️ {gpsError}
-          </div>
+          <GPSErrorBanner message={gpsError} />
         )}
         {!inBounds && (
           <div className="bg-red-900/90 text-red-200 text-xs px-3 py-2 rounded-xl backdrop-blur-sm font-semibold">
