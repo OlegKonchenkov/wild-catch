@@ -779,7 +779,7 @@ export default function QRCodesPage() {
                             placeholder={slot === 1 ? 'Seleziona creatura…' : 'Vuoto = non usato'}
                           />
                         </Field>
-                        <Field label="Livello" hint="Moltiplica HP e ATK della creatura per questo valore">
+                        <Field label="Livello" hint="Livello della creatura boss: influenza HP, ATK e DEF in battaglia">
                           <input type="number" value={fields[`boss_lv${slot}`]} min={1} max={50}
                             onChange={e => setField(`boss_lv${slot}`, +e.target.value)} className={cls} />
                         </Field>

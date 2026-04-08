@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { calculateFightDamage } from '@/lib/game/rng'
+import { calculateCombatDamage, scaleCombatStats } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
 
@@ -54,11 +54,19 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: 'Seleziona esattamente 3 creature' }, { status: 400 })
     }
 
+    const { data: playerSession } = await supabase
+      .from('player_sessions')
+      .select('level')
+      .eq('user_id', user.id)
+      .eq('session_id', fight.session_id)
+      .maybeSingle()
+    const playerLevel = playerSession?.level ?? 1
+
     // Validate ownership & fetch creature data
     const pcIds = lineup.map((e: any) => e.playerCreatureId)
     const { data: pcs } = await supabase
       .from('player_creatures')
-      .select('id, creatures(name, element, rarity, hp, atk, image_url)')
+      .select('id, creatures(name, element, rarity, hp, atk, def, image_url)')
       .in('id', pcIds)
       .eq('user_id', user.id)
 
@@ -73,15 +81,21 @@ export async function POST(request: Request, { params }: Params) {
     const playerLineup = lineup.map((e: any, i: number) => {
       const pc = pcMap[e.playerCreatureId]
       const cr = pc?.creatures
+      const scaledStats = scaleCombatStats(
+        { hp: cr?.hp ?? 100, atk: cr?.atk ?? 10, def: cr?.def ?? 0 },
+        playerLevel,
+      )
       return {
         slot: i,
         player_creature_id: e.playerCreatureId,
         name: cr?.name ?? 'Creatura',
         element: cr?.element ?? 'armonia',
         rarity: cr?.rarity ?? 'comune',
-        atk: cr?.atk ?? 10,
-        max_hp: cr?.hp ?? 100,
-        current_hp: cr?.hp ?? 100,
+        level: playerLevel,
+        atk: scaledStats.atk,
+        def: scaledStats.def,
+        max_hp: scaledStats.hp,
+        current_hp: scaledStats.hp,
         fainted: false,
         is_active: i === 0,
         image_url: cr?.image_url ?? '',
@@ -146,7 +160,12 @@ export async function POST(request: Request, { params }: Params) {
 
     // ── Player → Boss ────────────────────────────────────────────────────
     const playerMult   = getElementMultiplier(playerActive.element as Element, bossActive.element as Element)
-    const playerDamage = Math.round(calculateFightDamage(playerActive.atk) * playerMult * atkMultiplier)
+    const playerDamage = calculateCombatDamage({
+      attackerAtk: playerActive.atk,
+      defenderDef: bossActive.def ?? 0,
+      attackMultiplier: atkMultiplier,
+      elementMultiplier: playerMult,
+    })
     const newBossHp    = Math.max(0, bossActive.current_hp - playerDamage)
     bossActive.current_hp = newBossHp
     if (newBossHp === 0) bossActive.fainted = true
@@ -169,11 +188,15 @@ export async function POST(request: Request, { params }: Params) {
     let bossDamage = 0
     let newPlayerHp = playerActive.current_hp
 
-    if (!allBossFainted) {
-      const counterBoss = allBossFainted ? null : bossLineup[newBossActiveSlot]
+    if (!allBossFainted && newBossHp > 0) {
+      const counterBoss = bossActive
       if (counterBoss && !counterBoss.fainted) {
         const bossMult = getElementMultiplier(counterBoss.element as Element, playerActive.element as Element)
-        bossDamage = Math.round(calculateFightDamage(counterBoss.atk) * bossMult)
+        bossDamage = calculateCombatDamage({
+          attackerAtk: counterBoss.atk,
+          defenderDef: playerActive.def ?? 0,
+          elementMultiplier: bossMult,
+        })
         newPlayerHp = Math.max(0, playerActive.current_hp - bossDamage)
         playerActive.current_hp = newPlayerHp
         if (newPlayerHp === 0) playerActive.fainted = true
@@ -225,8 +248,18 @@ export async function POST(request: Request, { params }: Params) {
 
     // ── Grant reward on win ──────────────────────────────────────────────
     let levelUp: { newLevel: number; goldReward: number } | null = null
-    if (won && !fight.reward_claimed) {
-      await supabase.from('boss_fights').update({ reward_claimed: true }).eq('id', id)
+    let rewardGranted = false
+    if (won) {
+      const { data: claimedRows } = await supabase
+        .from('boss_fights')
+        .update({ reward_claimed: true })
+        .eq('id', id)
+        .or('reward_claimed.is.null,reward_claimed.eq.false')
+        .select('id')
+      rewardGranted = (claimedRows?.length ?? 0) > 0
+    }
+
+    if (rewardGranted) {
       const reward = fight.reward as { gold?: number; exp?: number; item_id?: string; item_qty?: number } | null
       const admin = createAdminClient()
 
@@ -289,7 +322,7 @@ export async function POST(request: Request, { params }: Params) {
       won,
       lost: newStatus === 'lost',
       levelUp,
-      reward: won ? fight.reward : null,
+      reward: rewardGranted ? fight.reward : null,
     })
   }
 

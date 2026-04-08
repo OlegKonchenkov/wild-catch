@@ -12,7 +12,9 @@ interface BossSlot {
   creature_id: string
   name: string
   element: Element
+  level?: number
   atk: number
+  def?: number
   max_hp: number
   current_hp: number
   fainted: boolean
@@ -26,7 +28,9 @@ interface PlayerSlot {
   name: string
   element: Element
   rarity: Rarity
+  level?: number
   atk: number
+  def?: number
   max_hp: number
   current_hp: number
   fainted: boolean
@@ -832,7 +836,11 @@ export default function BossFightPage() {
       setFight(f)
 
       if (f.status === 'won' || f.status === 'lost') {
-        setFinalResult({ won: f.status === 'won', reward: f.reward, levelUp: null })
+        setFinalResult({
+          won: f.status === 'won',
+          reward: f.status === 'won' && !f.reward_claimed ? f.reward : null,
+          levelUp: null,
+        })
         setLoading(false)
         return
       }

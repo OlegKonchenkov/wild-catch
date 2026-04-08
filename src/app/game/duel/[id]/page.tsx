@@ -1,9 +1,10 @@
 'use client'
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import { scaleCombatStats } from '@/lib/game/combat'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 
@@ -22,6 +23,7 @@ interface LineupEntry {
       rarity: Rarity
       hp: number
       atk: number
+      def: number
       image_url: string
     }
   }
@@ -167,6 +169,16 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
   )
 }
 
+function getScaledLineupStats(entry: LineupEntry | undefined, playerLevels: Record<string, number>) {
+  const creature = entry?.player_creatures?.creatures
+  if (!entry || !creature) return null
+
+  return scaleCombatStats(
+    { hp: creature.hp, atk: creature.atk, def: creature.def ?? 0 },
+    playerLevels[entry.user_id] ?? 1,
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function DuelPage() {
   const { id } = useParams<{ id: string }>()
@@ -190,11 +202,30 @@ export default function DuelPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [showItemsModal, setShowItemsModal] = useState(false)
   const [switchNotice, setSwitchNotice]     = useState<string | null>(null)
+  const [playerLevels, setPlayerLevels]     = useState<Record<string, number>>({})
 
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
   const duelStatusRef      = useRef<string | null>(null)
   const supabase = useMemo(() => createClient(), [])
+
+  const loadPlayerLevels = useCallback(async (sessionId: string | undefined, duelUserIds: Array<string | null | undefined>) => {
+    const uniqueIds = Array.from(new Set(duelUserIds.filter((value): value is string => Boolean(value))))
+    if (!sessionId || uniqueIds.length === 0) return
+
+    const { data } = await supabase
+      .from('player_sessions')
+      .select('user_id, level')
+      .eq('session_id', sessionId)
+      .in('user_id', uniqueIds)
+
+    if (!data) return
+
+    setPlayerLevels(prev => ({
+      ...prev,
+      ...Object.fromEntries((data as Array<{ user_id: string; level: number | null }>).map(row => [row.user_id, row.level ?? 1])),
+    }))
+  }, [supabase])
 
   useEffect(() => {
     async function init() {
@@ -215,12 +246,13 @@ export default function DuelPage() {
 
       const role: 'challenger' | 'opponent' = duelData.challenger_id === user.id ? 'challenger' : 'opponent'
       setMyRole(role)
+      await loadPlayerLevels(duelData.session_id, [duelData.challenger_id, duelData.opponent_id])
 
       if (duelData.status === 'active') setIsMyTurn(duelData.current_turn === role)
 
       const { data: lineups } = await supabase
         .from('duel_lineups')
-        .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, image_url))')
+        .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url))')
         .eq('duel_id', id)
         .order('slot', { ascending: true })
 
@@ -308,9 +340,10 @@ export default function DuelPage() {
 
           if (updated.status === 'active' && updated.current_turn) {
             setMyRole(role => { setIsMyTurn(updated.current_turn === role); return role })
+            loadPlayerLevels(updated.session_id, [updated.challenger_id, updated.opponent_id]).catch(() => {})
             // Re-fetch all lineups to get opponent's creatures (they were inserted, not updated)
             supabase.from('duel_lineups')
-              .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, image_url))')
+              .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url))')
               .eq('duel_id', id)
               .order('slot', { ascending: true })
               .then(({ data: freshLineups }) => {
@@ -338,7 +371,7 @@ export default function DuelPage() {
         }).catch(() => {})
       }
     }
-  }, [id, supabase])
+  }, [id, loadPlayerLevels, supabase])
 
   useEffect(() => {
     if (myLineup.length === 0 || result || waiting || surrenderedRef.current) return
@@ -401,10 +434,12 @@ export default function DuelPage() {
   const oppActive   = oppLineup.find(l => l.is_active)
   const myActiveCr  = myActive?.player_creatures?.creatures
   const oppActiveCr = oppActive?.player_creatures?.creatures
+  const myCombatStats = getScaledLineupStats(myActive, playerLevels)
+  const oppCombatStats = getScaledLineupStats(oppActive, playerLevels)
   const myHp        = myActive?.current_hp ?? 0
-  const myHpMax     = myActiveCr?.hp ?? 100
+  const myHpMax     = myCombatStats?.hp ?? myActiveCr?.hp ?? 100
   const oppHp       = oppActive?.current_hp ?? 0
-  const oppHpMax    = oppActiveCr?.hp ?? 100
+  const oppHpMax    = oppCombatStats?.hp ?? oppActiveCr?.hp ?? 100
 
   // ── Element-themed background ──────────────────────────────────────────────
   const myTheme  = ELEMENT_THEME[myActiveCr?.element ?? '']  ?? DEFAULT_THEME
@@ -651,7 +686,7 @@ export default function DuelPage() {
               rarity={myActiveCr.rarity}
               currentHp={myHp}
               maxHp={myHpMax}
-              atk={myActiveCr.atk}
+              atk={myCombatStats?.atk ?? myActiveCr.atk}
               animState={animState}
               side="left"
               lineup={myLineupDots}

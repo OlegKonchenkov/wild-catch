@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { incrementMissionProgress } from '@/lib/game/missions'
+import { scaleCombatStats } from '@/lib/game/combat'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -44,13 +45,13 @@ export async function POST(request: Request) {
     const { data: existingScan } = await supabase
       .from('qr_scan_log')
       .select('id')
-      .eq('qr_id', qrId)
+      .eq('qr_id', qr.id)
       .eq('user_id', user.id)
       .maybeSingle()
     if (existingScan) {
       return NextResponse.json({ error: 'Hai già riscattato questo QR', alreadyScanned: true }, { status: 409 })
     }
-    await supabase.from('qr_scan_log').insert({ qr_id: qrId, user_id: user.id, session_id: sessionId })
+    await supabase.from('qr_scan_log').insert({ qr_id: qr.id, user_id: user.id, session_id: sessionId })
   }
 
   // Decrement uses
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
     await supabase
       .from('qr_codes')
       .update({ uses_remaining: qr.uses_remaining - 1 })
-      .eq('id', qrId)
+      .eq('id', qr.id)
   }
 
   const payload = qr.payload as any
@@ -149,7 +150,7 @@ export async function POST(request: Request) {
       const creatureIds = bossCreatureEntries.map(e => e.creature_id)
       const { data: creaturesData } = await admin
         .from('creatures')
-        .select('id, name, element, hp, atk, image_url, sprite_url')
+        .select('id, name, element, hp, atk, def, image_url, sprite_url')
         .in('id', creatureIds)
 
       const crMap: Record<string, any> = Object.fromEntries(
@@ -159,17 +160,20 @@ export async function POST(request: Request) {
       const bossLineup = bossCreatureEntries.map((entry, i) => {
         const cr = crMap[entry.creature_id]
         if (!cr) return null
-        const lvl = entry.level_override ?? 1
-        const scaledHp  = Math.round(cr.hp  * lvl)
-        const scaledAtk = Math.round(cr.atk * lvl)
+        const scaledStats = scaleCombatStats(
+          { hp: cr.hp, atk: cr.atk, def: cr.def ?? 0 },
+          entry.level_override ?? 1,
+        )
         return {
           slot: i,
           creature_id: cr.id,
           name: cr.name,
           element: cr.element,
-          atk: scaledAtk,
-          max_hp: scaledHp,
-          current_hp: scaledHp,
+          level: scaledStats.level,
+          atk: scaledStats.atk,
+          def: scaledStats.def,
+          max_hp: scaledStats.hp,
+          current_hp: scaledStats.hp,
           fainted: false,
           image_url: cr.image_url ?? '',
           sprite_url: cr.sprite_url ?? '',
@@ -186,7 +190,7 @@ export async function POST(request: Request) {
         .from('boss_fights')
         .select('id, status')
         .eq('user_id', user.id)
-        .eq('qr_code_id', qrId)
+        .eq('qr_code_id', qr.id)
         .in('status', ['selecting', 'active', 'won'])
         .maybeSingle()
 
@@ -199,7 +203,7 @@ export async function POST(request: Request) {
           .insert({
             user_id: user.id,
             session_id: sessionId,
-            qr_code_id: qrId,
+            qr_code_id: qr.id,
             boss_lineup: bossLineup,
             player_lineup: [],
             boss_active_slot: 0,

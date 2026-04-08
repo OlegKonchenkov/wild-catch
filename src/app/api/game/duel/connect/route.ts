@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { scaleCombatStats } from '@/lib/game/combat'
 
 // Room code chars: exclude ambiguous 0, O, I, 1
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -41,17 +42,30 @@ export async function POST(request: Request) {
   }
 
   // Validate ownership + fetch HP (and ATK for slot 1) for each lineup creature
+  const { data: playerSession } = await supabase
+    .from('player_sessions')
+    .select('level')
+    .eq('user_id', user.id)
+    .eq('session_id', sessionId)
+    .maybeSingle()
+  const playerLevel = playerSession?.level ?? 1
+
   const hpMap = new Map<string, number>()
   let opponentSlot1Atk = 0
   for (const entry of lineup) {
     const { data: pc } = await supabase
       .from('player_creatures')
-      .select('creatures(hp, atk)')
+      .select('creatures(hp, atk, def)')
       .eq('id', entry.playerCreatureId)
       .eq('user_id', user.id)
       .single()
     if (!pc) return NextResponse.json({ error: 'Creatura non valida o non posseduta' }, { status: 400 })
-    hpMap.set(entry.playerCreatureId, (pc as any).creatures?.hp ?? 100)
+    const creature = (pc as any).creatures
+    const scaledStats = scaleCombatStats(
+      { hp: creature?.hp ?? 100, atk: creature?.atk ?? 0, def: creature?.def ?? 0 },
+      playerLevel,
+    )
+    hpMap.set(entry.playerCreatureId, scaledStats.hp)
     if (entry.slot === 1) opponentSlot1Atk = (pc as any).creatures?.atk ?? 0
   }
 

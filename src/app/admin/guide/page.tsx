@@ -524,8 +524,8 @@ export default function AdminGuidePage() {
               <SubHeader>Configurazione QR Boss</SubHeader>
               <Prose>
                 Per i QR di tipo <Code>boss</Code> puoi configurare fino a 3 creature nella lineup.
-                Ogni creatura ha un <Code>level_override</Code> che scala proporzionalmente HP e ATK
-                (livello 10 = 10× le stats base).
+                Ogni creatura ha un <Code>level_override</Code> che rappresenta il livello della
+                creatura boss e ne influenza HP, ATK e DEF in battaglia.
               </Prose>
               <Callout type="info">
                 Se il giocatore abbandona il boss fight, può riscansionare lo stesso QR per riprendere

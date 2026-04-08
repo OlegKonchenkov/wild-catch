@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { calculateFightDamage } from '@/lib/game/rng'
+import { calculateCombatDamage, scaleCombatStats } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { Element } from '@/lib/types'
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
   // ── Load all lineups ───────────────────────────────────────────────────────
   const { data: allLineups } = await supabase
     .from('duel_lineups')
-    .select('*, player_creatures(*, creatures(name, element, hp, atk))')
+    .select('*, player_creatures(*, creatures(name, element, hp, atk, def))')
     .eq('duel_id', duelId)
     .order('slot', { ascending: true })
 
@@ -82,6 +82,25 @@ export async function POST(request: Request) {
   if (!myCreature || !oppCreature) {
     return NextResponse.json({ error: 'Dati creature non disponibili' }, { status: 500 })
   }
+
+  const duelUserIds = [user.id, oppUserId].filter(Boolean)
+  const { data: playerSessions } = await supabase
+    .from('player_sessions')
+    .select('user_id, level')
+    .eq('session_id', duel.session_id)
+    .in('user_id', duelUserIds)
+
+  const levelByUser = Object.fromEntries(
+    (playerSessions ?? []).map((row: { user_id: string; level: number | null }) => [row.user_id, row.level ?? 1]),
+  ) as Record<string, number>
+  const myCombatStats = scaleCombatStats(
+    { hp: myCreature.hp, atk: myCreature.atk, def: myCreature.def ?? 0 },
+    levelByUser[user.id],
+  )
+  const oppCombatStats = scaleCombatStats(
+    { hp: oppCreature.hp, atk: oppCreature.atk, def: oppCreature.def ?? 0 },
+    levelByUser[oppUserId!] ?? 1,
+  )
 
   // ── Optional battaglia item ────────────────────────────────────────────────
   let atkMultiplier = 1
@@ -106,7 +125,12 @@ export async function POST(request: Request) {
 
   // ── Damage calculation ─────────────────────────────────────────────────────
   const mult   = getElementMultiplier(myCreature.element as Element, oppCreature.element as Element)
-  const damage = Math.round(calculateFightDamage(myCreature.atk) * mult * atkMultiplier)
+  const damage = calculateCombatDamage({
+    attackerAtk: myCombatStats.atk,
+    defenderDef: oppCombatStats.def,
+    attackMultiplier: atkMultiplier,
+    elementMultiplier: mult,
+  })
   const newOppHp = Math.max(0, oppActive.current_hp - damage)
 
   // Update opponent active creature HP (+ mark fainted if dead)
