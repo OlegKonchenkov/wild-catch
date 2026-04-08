@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { useGPS } from '@/hooks/useGPS'
+import CreatureSprite from '@/components/creature/CreatureSprite'
 import type { Session } from '@/lib/types'
 import type { MapPin } from '@/components/map/GameMap'
 
@@ -64,7 +65,16 @@ function MapPageInner() {
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
-  const [pendingEncounter, setPendingEncounter] = useState<{ encounterId: string; creature: { name: string; element: string; rarity: string } } | null>(null)
+  const [pendingEncounter, setPendingEncounter] = useState<{
+    encounterId: string
+    creature: {
+      name: string
+      element: string
+      rarity: string
+      image_url?: string | null
+      sprite_url?: string | null
+    }
+  } | null>(null)
   const lastEncounterRef = useRef(0)
   const sessionIdRef = useRef<string | null>(null)
   // Tracks metres walked since the last encounter attempt — resets after each attempt
@@ -423,10 +433,28 @@ function MapPageInner() {
       {showEncounterPopup && pendingEncounter && (
         <div className="absolute inset-x-4 bottom-16 bg-[#0F1F2E] border border-[#3A9DBC] rounded-2xl p-4 z-[1000] shadow-xl">
           <div className="flex items-center gap-3">
-            <div className="text-4xl">🐾</div>
-            <div>
-              <p className="font-bold text-white">Una {pendingEncounter.creature.name} selvatica!</p>
-              <p className="text-sm text-[#3A9DBC]">{pendingEncounter.creature.element} · {pendingEncounter.creature.rarity}</p>
+            <div
+              className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center overflow-hidden"
+              style={{
+                background: 'radial-gradient(circle at 30% 30%, rgba(58,157,188,0.18), rgba(255,255,255,0.04))',
+                border: '1px solid rgba(58,157,188,0.28)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+              }}
+            >
+              <CreatureSprite
+                imageUrl={pendingEncounter.creature.image_url || pendingEncounter.creature.sprite_url || ''}
+                name={pendingEncounter.creature.name}
+                size={48}
+                element={pendingEncounter.creature.element}
+                rarity={pendingEncounter.creature.rarity}
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35">Creatura selvatica</p>
+              <p className="font-bold text-white truncate">{pendingEncounter.creature.name}</p>
+              <p className="text-sm text-[#3A9DBC]">
+                {pendingEncounter.creature.element} · {pendingEncounter.creature.rarity.replace('_', ' ')}
+              </p>
             </div>
           </div>
           <div className="flex gap-2 mt-3">
