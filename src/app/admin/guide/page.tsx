@@ -646,8 +646,8 @@ export default function AdminGuidePage() {
               </div>
               <Callout type="tip">
                 <strong>Bonus HP</strong> — i giocatori possono aumentare le chance indebolendo la creatura:
-                <strong style={{ color: '#FBBF24' }}> ≤ 50% HP → +30%</strong>,
-                <strong style={{ color: '#F87171' }}> ≤ 30% HP → +60%</strong>.
+                <strong style={{ color: '#FBBF24' }}> ≤ 50% HP → ×1.5 sulla chance base</strong>,
+                <strong style={{ color: '#F87171' }}> ≤ 30% HP → ×2.25 sulla chance base</strong>.
                 Tienilo a mente quando bilanci la difficoltà di cattura delle creature rare.
               </Callout>
 

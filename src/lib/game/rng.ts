@@ -5,10 +5,37 @@ export function rollDice(): number {
   return 0.8 + Math.random() * 0.4  // 0.8 to 1.2
 }
 
-export function rollCatch(rarity: Rarity, bonusAdditive: number, difficulty = 3): boolean {
+export const CATCH_HP_MULTIPLIERS = {
+  normal: 1,
+  weakened: 1.5,
+  critical: 2.25,
+} as const
+
+export function getCatchHealthMultiplier(currentHp: number, maxHp: number): number {
+  const safeMaxHp = Math.max(1, maxHp)
+  const hpRatio = Math.max(0, Math.min(1, currentHp / safeMaxHp))
+  if (hpRatio <= 0.30) return CATCH_HP_MULTIPLIERS.critical
+  if (hpRatio <= 0.50) return CATCH_HP_MULTIPLIERS.weakened
+  return CATCH_HP_MULTIPLIERS.normal
+}
+
+export function calculateCatchRate(
+  rarity: Rarity,
+  bonusAdditive: number,
+  difficulty = 3,
+  hpMultiplier: number = CATCH_HP_MULTIPLIERS.normal,
+): number {
   const baseRate = RARITY_CATCH_RATES[rarity] * (CATCH_DIFFICULTY_MULT[difficulty] ?? 1.0)
-  const rate = Math.min(1.0, baseRate + bonusAdditive)
-  return Math.random() < rate
+  return Math.min(1.0, (baseRate * hpMultiplier) + bonusAdditive)
+}
+
+export function rollCatch(
+  rarity: Rarity,
+  bonusAdditive: number,
+  difficulty = 3,
+  hpMultiplier: number = CATCH_HP_MULTIPLIERS.normal,
+): boolean {
+  return Math.random() < calculateCatchRate(rarity, bonusAdditive, difficulty, hpMultiplier)
 }
 
 interface SpawnableCreature {

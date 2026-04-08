@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { rollCatch, calculateFightDamage } from '@/lib/game/rng'
+import { rollCatch, calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
 import { incrementMissionProgress } from '@/lib/game/missions'
 
 export async function POST(request: Request) {
@@ -52,13 +52,16 @@ export async function POST(request: Request) {
     }
   }
 
-  // HP reduction bonus: ≤50% HP → +30%; ≤30% HP → further +30% (total +60%)
-  const hpRatio = encounter.wild_creature_hp / creature.hp
-  if (hpRatio <= 0.30) bonus += 0.60
-  else if (hpRatio <= 0.50) bonus += 0.30
+  // HP weakness now scales the base chance instead of adding a large flat bonus.
+  const hpMultiplier = getCatchHealthMultiplier(encounter.wild_creature_hp, creature.hp)
 
   // RNG catch — server-side only
-  const caught = rollCatch(creature.rarity, bonus, creature.catch_difficulty ?? 3)
+  const caught = rollCatch(
+    creature.rarity,
+    bonus,
+    creature.catch_difficulty ?? 3,
+    hpMultiplier,
+  )
 
   if (!caught) {
     // 40% chance the creature flees immediately, 60% chance it counter-attacks and stays
@@ -176,3 +179,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, scoreGain, levelUp, completedMissions })
 }
+

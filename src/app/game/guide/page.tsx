@@ -360,7 +360,7 @@ function TipChips() {
     { text: 'Usa un\'Esca prima di esplorare — aumenta la frequenza di creature rare per 10 minuti', color: '#34D399' },
     { text: 'Controlla l\'elemento del boss QR prima di scegliere la squadra — il vantaggio vale ×1.5!', color: '#E85D2F' },
     { text: 'Accumula 3 duplicati della stessa creatura per sbloccare l\'evoluzione automatica', color: '#F7C841' },
-    { text: 'Abbassa gli HP prima di lanciare la rete: sotto 50% +30%, sotto 30% +60% di bonus cattura!', color: '#3A9DBC' },
+    { text: 'Abbassa gli HP prima di lanciare la rete: sotto 50% la chance base va ×1.5, sotto 30% sale a ×2.25!', color: '#3A9DBC' },
     { text: 'Cammina per far schiudere le uova — ogni passo conta anche se non incontri creature!', color: '#C084FC' },
     { text: 'Completa le missioni QR e di cattura per guadagnare monete extra da spendere nel negozio', color: '#FBBF24' },
     { text: 'Dopo una cattura apri il WildDex e cerca il pulsante 🧩 — alcune creature nascondono frammenti enigma segreti!', color: '#C084FC' },
@@ -445,8 +445,8 @@ function buildSections(): Section[] {
           <p className="text-white/80 text-sm leading-relaxed">
             Quando trovi una creatura puoi scegliere: <span className="text-[#E85D2F] font-bold">combatti</span> (attacca
             con la tua creatura attiva per indebolirla) oppure lancia direttamente la rete.
-            Più è debole, più facile catturarla! Portarla sotto il <span className="text-[#FBBF24] font-bold">50% di HP aggiunge +30%</span> alle
-            chance di cattura; scendendo sotto il <span className="text-[#F87171] font-bold">30% il bonus sale a +60%</span>.
+            Più è debole, più facile catturarla! Portarla sotto il <span className="text-[#FBBF24] font-bold">50% di HP porta la chance base a ×1.5</span>;
+            scendendo sotto il <span className="text-[#F87171] font-bold">30% sale a ×2.25</span>.
             Attenzione — la creatura selvatica può contrattaccare e ridurre gli HP della tua.
             Se gli HP scendono a 0: <span className="text-[#EF4444] font-bold">Sconfitta!</span>
           </p>
@@ -461,7 +461,7 @@ function buildSections(): Section[] {
                 </span>
               ))}
             </div>
-            <p className="mt-1.5">Le reti migliorano queste percentuali. Indebolire la creatura aggiunge un bonus a scalare: <strong className="text-[#FBBF24]">≤50% HP → +30%</strong>, <strong className="text-[#F87171]">≤30% HP → +60%</strong>.</p>
+            <p className="mt-1.5">Le reti aggiungono un bonus percentuale diretto. Indebolire la creatura ricalcola invece la chance base con moltiplicatori: <strong className="text-[#FBBF24]">≤50% HP → ×1.5</strong>, <strong className="text-[#F87171]">≤30% HP → ×2.25</strong>.</p>
           </div>
         </div>
       ),

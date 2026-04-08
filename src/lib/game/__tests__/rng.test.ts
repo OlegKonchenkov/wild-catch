@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rollCatch, rollDice, selectCreatureForEncounter } from '@/lib/game/rng'
+import { calculateCatchRate, getCatchHealthMultiplier, rollCatch, rollDice, selectCreatureForEncounter } from '@/lib/game/rng'
 import type { Rarity } from '@/lib/types'
 
 describe('rollCatch', () => {
@@ -22,13 +22,36 @@ describe('rollCatch', () => {
     expect(caught).toBeLessThan(90)
   })
 
-  it('bonus additivo increases catch rate', () => {
+  it('item bonus additivo still increases catch rate', () => {
     let noBonus = 0, withBonus = 0
     for (let i = 0; i < 1000; i++) {
       if (rollCatch('raro', 0)) noBonus++
       if (rollCatch('raro', 0.20)) withBonus++
     }
     expect(withBonus).toBeGreaterThan(noBonus)
+  })
+
+  it('hp multipliers increase catch rate without flattening rarity', () => {
+    const legendaryBase = calculateCatchRate('leggendario', 0, 3, 1)
+    const legendaryLowHp = calculateCatchRate('leggendario', 0, 3, 2.25)
+    const mythicLowHp = calculateCatchRate('mitologico', 0, 3, 2.25)
+
+    expect(legendaryLowHp).toBeGreaterThan(legendaryBase)
+    expect(mythicLowHp).toBeLessThan(legendaryLowHp)
+  })
+})
+
+describe('getCatchHealthMultiplier', () => {
+  it('returns no bonus above half hp', () => {
+    expect(getCatchHealthMultiplier(80, 100)).toBe(1)
+  })
+
+  it('returns weakened bonus at or below half hp', () => {
+    expect(getCatchHealthMultiplier(50, 100)).toBe(1.5)
+  })
+
+  it('returns critical bonus at or below 30% hp', () => {
+    expect(getCatchHealthMultiplier(30, 100)).toBe(2.25)
   })
 })
 

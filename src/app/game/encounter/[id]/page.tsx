@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { createClient } from '@/lib/supabase/client'
 import { RARITY_COLORS, ELEMENT_EMOJI } from '@/lib/types'
+import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import type { Creature, Element, Rarity } from '@/lib/types'
 
 interface EncounterState {
@@ -12,7 +13,7 @@ interface EncounterState {
   creature: Partial<Creature>
   wildHp: number
   wildHpMax: number
-  catchBonus: number
+  catchMultiplier: number
   turns: number
 }
 interface InvItem {
@@ -43,13 +44,18 @@ interface CardProps {
   currentHp: number
   maxHp: number
   atk?: number
-  catchBonus?: number
+  catchMultiplier?: number
   isWild?: boolean
   animState?: 'idle' | 'attack' | 'damage' | 'catch' | 'flee'
   side: 'left' | 'right'
 }
 
-function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, catchBonus, isWild, animState = 'idle', side }: CardProps) {
+function formatCatchMultiplier(multiplier: number): string {
+  if (Number.isInteger(multiplier)) return String(multiplier)
+  return multiplier.toFixed(multiplier >= 2 ? 2 : 1).replace(/\.0$/, '')
+}
+
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, catchMultiplier, isWild, animState = 'idle', side }: CardProps) {
   const rarityColor = RARITY_COLORS[rarity as Rarity] ?? '#64748b'
   const elemEmoji   = ELEMENT_EMOJI[element as keyof typeof ELEMENT_EMOJI] ?? '✦'
   const hpPct       = Math.max(0, Math.min(100, (currentHp / maxHp) * 100))
@@ -148,8 +154,8 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
                 indebolita!
               </span>
             )}
-            {(catchBonus ?? 0) > 0 && (
-              <span className="text-[10px] font-bold text-[#34D399]">+{Math.round((catchBonus ?? 0) * 100)}%</span>
+            {(catchMultiplier ?? 1) > 1 && (
+              <span className="text-[10px] font-bold text-[#34D399]">×{formatCatchMultiplier(catchMultiplier ?? 1)}</span>
             )}
           </div>
         )}
@@ -219,20 +225,29 @@ export default function EncounterPage() {
   // ── Data loading ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const stored = sessionStorage.getItem(`encounter_${id}`)
-    if (stored) { setState(JSON.parse(stored)); return }
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      setState({
+        ...parsed,
+        catchMultiplier: typeof parsed.catchMultiplier === 'number'
+          ? parsed.catchMultiplier
+          : getCatchHealthMultiplier(parsed.wildHp ?? 0, parsed.wildHpMax ?? 1),
+      })
+      return
+    }
     fetch(`/api/game/encounter/get?id=${id}`)
       .then(r => r.json())
       .then(data => {
         if (!data.encounterId) { setLoadError(true); return }
         if (data.status && data.status !== 'active') {
           setResult(data.status === 'caught' ? 'caught' : 'fled')
-          setState({ encounterId: data.encounterId, creature: data.creature, wildHp: 0, wildHpMax: data.wildHpMax ?? 100, catchBonus: 0, turns: 0 })
+          setState({ encounterId: data.encounterId, creature: data.creature, wildHp: 0, wildHpMax: data.wildHpMax ?? 100, catchMultiplier: 1, turns: 0 })
           return
         }
         const s: EncounterState = {
           encounterId: data.encounterId, creature: data.creature,
           wildHp: data.wildHp, wildHpMax: data.wildHpMax,
-          catchBonus: data.wildHp <= data.wildHpMax * 0.30 ? 0.60 : data.wildHp <= data.wildHpMax * 0.50 ? 0.30 : 0, turns: 0,
+          catchMultiplier: getCatchHealthMultiplier(data.wildHp, data.wildHpMax), turns: 0,
         }
         sessionStorage.setItem(`encounter_${id}`, JSON.stringify(s))
         setState(s)
@@ -326,14 +341,14 @@ export default function EncounterPage() {
     await new Promise(r => setTimeout(r, 380))
     setWildAnim('idle')
 
-    setState(prev => prev ? { ...prev, wildHp: data.wildHpRemaining, catchBonus: data.catchBonus, turns: prev.turns + 1 } : null)
+    setState(prev => prev ? { ...prev, wildHp: data.wildHpRemaining, catchMultiplier: data.catchMultiplier, turns: prev.turns + 1 } : null)
 
     if (data.fightResult === 'fled') {
       setWildAnim('flee'); setMessage(''); setResult('ko'); setLoading(false); return
     }
 
     setMessage(data.fightResult === 'catchable'
-      ? `HP basso! Bonus cattura +${Math.round(data.catchBonus * 100)}%`
+      ? `HP basso! Cattura ×${formatCatchMultiplier(data.catchMultiplier)}`
       : `Danno: ${data.playerDamage} (×${data.elementMultiplier.toFixed(1)})`)
 
     if (data.playerTookDamage && data.wildDamage > 0) {
@@ -467,6 +482,11 @@ export default function EncounterPage() {
   const timerUrgent = turnTimer <= 10
 
   const activeItemLabel = selectedReteId ? '🎯' : selectedBattagliaId ? '⚔️' : selectedPozioneId ? '🧪' : null
+  const selectedReteBonus = reteItems.find(i => i.id === selectedReteId)?.items.effect_value ?? 0
+  const catchInfoParts = [
+    state.catchMultiplier > 1 ? `HP ×${formatCatchMultiplier(state.catchMultiplier)}` : null,
+    selectedReteBonus > 0 ? `Rete +${selectedReteBonus}%` : null,
+  ].filter(Boolean)
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
@@ -502,7 +522,7 @@ export default function EncounterPage() {
               rarity={state.creature.rarity ?? 'comune'}
               currentHp={state.wildHp}
               maxHp={state.wildHpMax}
-              catchBonus={state.catchBonus}
+              catchMultiplier={state.catchMultiplier}
               isWild
               animState={wildAnim}
               side="right"
@@ -585,9 +605,9 @@ export default function EncounterPage() {
               style={{ background: 'linear-gradient(145deg,#E85D2F,#c94a20)', boxShadow: '0 4px 18px rgba(232,93,47,0.4)' }}>
               <span className="text-base leading-none">🎯</span>
               <span className="text-[10px] font-extrabold text-white tracking-wide">CATTURA</span>
-              {(state.catchBonus > 0 || selectedReteId) && (
+              {catchInfoParts.length > 0 && (
                 <span className="text-[8px] text-[#F7C841] font-bold">
-                  +{Math.round((state.catchBonus + (reteItems.find(i => i.id === selectedReteId)?.items.effect_value ?? 0) / 100) * 100)}%
+                  {catchInfoParts.join(' • ')}
                 </span>
               )}
             </motion.button>

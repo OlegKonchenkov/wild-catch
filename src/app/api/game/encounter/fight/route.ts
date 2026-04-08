@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { calculateFightDamage } from '@/lib/game/rng'
+import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
 import { getElementMultiplier } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
 
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     fightResult = 'catchable'  // ≤50% HP = catch bonus active
   }
 
-  const catchBonus = hpRatioAfter <= 0.30 ? 0.60 : hpRatioAfter <= 0.50 ? 0.30 : 0
+  const catchMultiplier = getCatchHealthMultiplier(wildHpRemaining, wildCreature.hp)
 
   await supabase
     .from('encounters')
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
     playerTookDamage,
     elementMultiplier: elementMult,
     fightResult,
-    catchBonus,
+    catchMultiplier,
     levelUp: null,
   })
 }
