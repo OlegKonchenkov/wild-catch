@@ -40,6 +40,27 @@ const SPAWN_LABELS: Record<keyof SpawnConfig, { label: string; color: string }> 
 
 const PREVIEW_LEVELS = [1, 5, 10, 15, 20]
 
+const BASE_TIER_WEIGHTS: Record<string, number> = {
+  comune: 65, non_comune: 22, raro: 7, epico: 4, leggendario: 2,
+}
+
+const ALL_RARITIES = ['comune', 'non_comune', 'raro', 'epico', 'leggendario'] as const
+
+const RARITY_BONUS_KEY: Partial<Record<string, keyof SpawnConfig>> = {
+  non_comune:  'non_comune_bonus',
+  raro:        'raro_bonus',
+  epico:       'epico_bonus',
+  leggendario: 'leggendario_bonus',
+}
+
+const RARITY_DISPLAY: Record<string, { label: string; color: string }> = {
+  comune:      { label: 'Comune',      color: '#9ca3af' },
+  non_comune:  { label: 'Non comune',  color: '#4ade80' },
+  raro:        { label: 'Raro',        color: '#60a5fa' },
+  epico:       { label: 'Epico',       color: '#c084fc' },
+  leggendario: { label: 'Leggendario', color: '#fbbf24' },
+}
+
 const cls = 'w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#3A9DBC]'
 
 export default function LevelRewardsPage() {
@@ -160,6 +181,16 @@ export default function LevelRewardsPage() {
   // Preview table: effective weight multiplier = 1 + bonus × level
   function multiplierAt(bonus: number, level: number) {
     return (1 + bonus * level).toFixed(2)
+  }
+
+  function encounterPctsAt(level: number): Record<string, number> {
+    const weights = Object.fromEntries(ALL_RARITIES.map(r => {
+      const bonusKey = RARITY_BONUS_KEY[r]
+      const bonus = bonusKey ? spawnConfig[bonusKey] : 0
+      return [r, BASE_TIER_WEIGHTS[r] * (1 + bonus * level)]
+    }))
+    const total = Object.values(weights).reduce((s, w) => s + w, 0)
+    return Object.fromEntries(ALL_RARITIES.map(r => [r, (weights[r] / total) * 100]))
   }
 
   const itemName = (id: string) => items.find(i => i.id === id)?.name ?? id.slice(0, 8) + '…'
@@ -399,6 +430,46 @@ export default function LevelRewardsPage() {
                         <td key={lv} className="text-center px-2 py-2 text-white/30 font-mono">×1.00</td>
                       ))}
                     </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Encounter probability table */}
+            <div className="bg-white/3 border border-white/8 rounded-xl overflow-hidden mb-4">
+              <p className="text-[10px] text-white/30 uppercase tracking-wider px-3 pt-3 pb-2 font-semibold">
+                % incontro per rarità per livello
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-white/8">
+                      <th className="text-left px-3 py-2 text-white/40 font-semibold">Rarità</th>
+                      {PREVIEW_LEVELS.map(lv => (
+                        <th key={lv} className="text-center px-2 py-2 text-white/40 font-semibold">Lv.{lv}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ALL_RARITIES.map(rarity => {
+                      const display = RARITY_DISPLAY[rarity]
+                      return (
+                        <tr key={rarity} className="border-b border-white/5">
+                          <td className="px-3 py-2 font-semibold" style={{ color: display.color }}>
+                            {display.label}
+                          </td>
+                          {PREVIEW_LEVELS.map(lv => {
+                            const pct = encounterPctsAt(lv)[rarity]
+                            return (
+                              <td key={lv} className="text-center px-2 py-2 font-mono"
+                                style={{ color: pct < 1 ? '#a78bfa' : pct < 5 ? '#c084fc' : pct < 15 ? '#60a5fa' : pct < 40 ? '#4ade80' : '#9ca3af' }}>
+                                {pct.toFixed(1)}%
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
