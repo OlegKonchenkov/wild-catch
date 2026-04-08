@@ -756,6 +756,7 @@ export default function QRCodesPage() {
                         <option value="raro">🔵 Raro</option>
                         <option value="epico">🟣 Epico</option>
                         <option value="leggendario">🟡 Leggendario</option>
+                        <option value="mitologico">🌌 Mitologico</option>
                       </select>
                     </Field>
                     <Field label="Passi di incubazione" hint="Quanti passi il giocatore deve percorrere dal ritiro dell'uovo prima di poterlo schiudere. 0 = immediato.">

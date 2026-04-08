@@ -206,6 +206,7 @@ const EGG_POOLS = [
   { rarity: 'raro',        color: '#3A9DBC', icon: '💎', pool: '50% comune · 30% non comune · 20% raro' },
   { rarity: 'epico',       color: '#C084FC', icon: '🔮', pool: '40% · 30% · 20% · 10% epico' },
   { rarity: 'leggendario', color: '#FBBF24', icon: '⭐', pool: '35% · 25% · 20% · 15% · 5% leggendario' },
+  { rarity: 'mitologico',  color: '#FF4D6D', icon: '🌌', pool: '30% · 25% · 20% · 15% · 8% leggendario · 2% mitologico' },
 ]
 
 function EggPoolTable() {
@@ -228,7 +229,7 @@ function EggPoolTable() {
 const missionTypes = [
   { type: 'cattura',  desc: 'Cattura una creatura specifica (per nome) o qualunque creatura (target vuoto)',          color: '#3A9DBC' },
   { type: 'duel',     desc: 'Vinci N duelli PvP contro altri giocatori (squadra da 1 a 3 creature)',                  color: '#FBBF24' },
-  { type: 'qr',       desc: 'Scansiona un QR code fisico (target = etichetta QR, vuoto = qualunque QR)',              color: '#34D399' },
+  { type: 'qr',       desc: 'Scansiona un QR code fisico (target = codice specifico; vuoto = contano solo QR univoci diversi)', color: '#34D399' },
   { type: 'walk',     desc: 'Percorri una distanza totale in passi GPS durante la sessione',                          color: '#C084FC' },
   { type: 'collect',  desc: 'Acquista un oggetto nel negozio o scansiona un QR oggetto (target = nome oggetto)',      color: '#F97316' },
 ]
@@ -579,7 +580,7 @@ export default function AdminGuidePage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0.5rem 0' }}>
                 <div style={{ background: '#C084FC0d', border: '1px solid #C084FC2a', borderRadius: '8px', padding: '0.6rem 0.9rem', fontSize: '0.88rem', color: '#94a3b8' }}>
                   <strong style={{ color: '#C084FC' }}>egg_rarity:</strong>{' '}
-                  comune · non_comune · raro · epico · leggendario — determina il pool di creature ottenibili.
+                  comune · non_comune · raro · epico · leggendario · mitologico — determina il pool di creature ottenibili.
                 </div>
                 <div style={{ background: '#3A9DBC0d', border: '1px solid #3A9DBC2a', borderRadius: '8px', padding: '0.6rem 0.9rem', fontSize: '0.88rem', color: '#94a3b8' }}>
                   <strong style={{ color: '#3A9DBC' }}>steps_required:</strong>{' '}
@@ -589,7 +590,7 @@ export default function AdminGuidePage() {
               </div>
               <Callout type="tip">
                 Uova con passi alti (500–1000) incentivano i giocatori a esplorare tutta l&rsquo;area.
-                Usa rarità epica/leggendaria solo per le uova nelle zone più difficili da raggiungere.
+                Usa rarità epica/leggendaria/mitologica solo per le uova nelle zone più difficili da raggiungere.
               </Callout>
 
               <SubHeader>Configurazione QR Boss</SubHeader>
@@ -635,7 +636,7 @@ export default function AdminGuidePage() {
 
               <SubHeader>Rarità e probabilità catch base</SubHeader>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', margin: '0.5rem 0' }}>
-                {[['comune','#7AB87A','70%'], ['non_comune','#4A9FD4','45%'], ['raro','#E8A820','25%'], ['epico','#7B4DB8','12%'], ['leggendario','#C8352A','5%']].map(([r, c, p]) => (
+                {[['comune','#7AB87A','70%'], ['non_comune','#4A9FD4','45%'], ['raro','#E8A820','25%'], ['epico','#7B4DB8','12%'], ['leggendario','#C8352A','5%'], ['mitologico','#FF4D6D','1.25%']].map(([r, c, p]) => (
                   <div key={r} style={{ background: `${c}12`, border: `1px solid ${c}30`, borderRadius: '8px',
                     padding: '0.4rem 0.75rem', textAlign: 'center' }}>
                     <div style={{ color: c as string, fontWeight: 700, fontSize: '0.82rem' }}>{r}</div>
@@ -740,7 +741,7 @@ export default function AdminGuidePage() {
 
               <Callout type="info">
                 Il campo <Code>target</Code> usa il confronto case-insensitive: &ldquo;fiammare&rdquo; corrisponde a
-                &ldquo;Fiammare&rdquo;. Lascialo vuoto per accettare qualunque creatura/QR/oggetto del tipo indicato.
+                &ldquo;Fiammare&rdquo;. Per le missioni QR, target vuoto = contano solo scansioni di QR diversi; ripetere lo stesso QR non aumenta il contatore.
               </Callout>
 
               <Callout type="warning">

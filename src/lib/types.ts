@@ -1,5 +1,5 @@
 export type Element = 'fiamma' | 'adriatico' | 'bosco' | 'terra' | 'armonia'
-export type Rarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario'
+export type Rarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario' | 'mitologico'
 export type SessionStatus = 'draft' | 'ready' | 'active' | 'ended'
 export type ItemType = 'rete' | 'esca' | 'uovo' | 'battaglia' | 'pozione' | 'cura'
 export type QRCodeType = 'uovo' | 'indizio' | 'oggetto' | 'boss' | 'evento'
@@ -194,6 +194,7 @@ export const RARITY_CATCH_RATES: Record<Rarity, number> = {
   raro: 0.25,
   epico: 0.12,
   leggendario: 0.05,
+  mitologico: 0.0125,
 }
 
 // Multiplier applied to the rarity base catch rate based on catch_difficulty (1–5 stars).
@@ -212,6 +213,7 @@ export const RARITY_COLORS: Record<Rarity, string> = {
   raro: '#E8A820',
   epico: '#7B4DB8',
   leggendario: '#C8352A',
+  mitologico: '#FF4D6D',
 }
 
 export const ELEMENT_EMOJI: Record<Element, string> = {

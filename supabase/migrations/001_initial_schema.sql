@@ -8,7 +8,7 @@ CREATE TABLE creatures (
   name TEXT NOT NULL,
   description TEXT NOT NULL,
   element TEXT NOT NULL CHECK (element IN ('fiamma','adriatico','bosco','terra','armonia')),
-  rarity TEXT NOT NULL CHECK (rarity IN ('comune','non_comune','raro','epico','leggendario')),
+  rarity TEXT NOT NULL CHECK (rarity IN ('comune','non_comune','raro','epico','leggendario','mitologico')),
   hp INTEGER NOT NULL CHECK (hp > 0),
   atk INTEGER NOT NULL CHECK (atk > 0),
   def INTEGER NOT NULL CHECK (def >= 0),

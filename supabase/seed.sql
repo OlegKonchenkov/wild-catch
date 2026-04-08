@@ -1,5 +1,5 @@
 -- ============================================================
--- Seed Data: Starter Items + 30 Creatures
+-- Seed Data: Starter Items + 31 Creatures
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -84,7 +84,7 @@ VALUES (
   '00000000-0000-0000-0001-000000000002',
   'Volcino',
   'Embris cresciuto, il suo corpo irradia calore intenso e lascia tracce bruciate.',
-  'fiamma', 'non_comune', 72, 22, 12, 5, 12,
+  'fiamma', 'non_comune', 72, 22, 12, 1, 12,
   '00000000-0000-0000-0001-000000000001'
 ) ON CONFLICT (id) DO NOTHING;
 
@@ -94,7 +94,7 @@ VALUES (
   '00000000-0000-0000-0001-000000000004',
   'Marestella',
   'Ondina evoluta che cavalca le onde come una stella marina danzante.',
-  'adriatico', 'non_comune', 78, 20, 14, 5, 11,
+  'adriatico', 'non_comune', 78, 20, 14, 1, 11,
   '00000000-0000-0000-0001-000000000003'
 ) ON CONFLICT (id) DO NOTHING;
 
@@ -104,7 +104,7 @@ VALUES (
   '00000000-0000-0000-0001-000000000006',
   'Quercino',
   'Foglino che ha assorbito la forza di una vecchia quercia del bosco appenninico.',
-  'bosco', 'non_comune', 75, 18, 18, 5, 12,
+  'bosco', 'non_comune', 75, 18, 18, 1, 12,
   '00000000-0000-0000-0001-000000000005'
 ) ON CONFLICT (id) DO NOTHING;
 
@@ -114,7 +114,7 @@ VALUES (
   '00000000-0000-0000-0001-000000000008',
   'Petroso',
   'Sassetto che si è indurito nel tempo, diventando un guardiano di pietra delle colline.',
-  'terra', 'raro', 98, 24, 30, 8, 6,
+  'terra', 'raro', 98, 24, 30, 1, 6,
   '00000000-0000-0000-0001-000000000007'
 ) ON CONFLICT (id) DO NOTHING;
 
@@ -159,23 +159,23 @@ ON CONFLICT DO NOTHING;
 INSERT INTO creatures (name, description, element, rarity, hp, atk, def, min_level, spawn_weight) VALUES
   ('Pirostrega',
    'Strega delle fiamme che danza nei boschi la notte di San Giovanni.',
-   'fiamma', 'non_comune', 80, 26, 10, 4, 13),
+   'fiamma', 'non_comune', 80, 26, 10, 1, 13),
 
   ('Algario',
    'Guardiano delle alghe profonde, conosce i segreti del fondale adriatico.',
-   'adriatico', 'non_comune', 82, 21, 16, 4, 11),
+   'adriatico', 'non_comune', 82, 21, 16, 1, 11),
 
   ('Tempestino',
    'Spirito delle tempeste marine, cavalca le onde durante le burrasche.',
-   'adriatico', 'non_comune', 68, 28, 8, 4, 14),
+   'adriatico', 'non_comune', 68, 28, 8, 1, 14),
 
   ('Fungoppo',
    'Fungo gigante animato che sparge spore luminose nei boschi notturni.',
-   'bosco', 'non_comune', 76, 19, 15, 4, 12),
+   'bosco', 'non_comune', 76, 19, 15, 1, 12),
 
   ('Spinoso',
    'Creatura coperta di spine acuminate che presidia i cespugli di rovo.',
-   'bosco', 'non_comune', 65, 24, 14, 4, 14)
+   'bosco', 'non_comune', 65, 24, 14, 1, 14)
 ON CONFLICT DO NOTHING;
 
 -- ===== RARO (4 more, total 5) =====
@@ -183,19 +183,19 @@ ON CONFLICT DO NOTHING;
 INSERT INTO creatures (name, description, element, rarity, hp, atk, def, min_level, spawn_weight) VALUES
   ('Pescluce',
    'Pesce abissale luminescente che risale dal profondo solo nelle notti senza luna.',
-   'adriatico', 'raro', 100, 30, 20, 7, 7),
+   'adriatico', 'raro', 100, 30, 20, 1, 7),
 
   ('Abissolo',
    'Creatura delle profondità, nata nelle fosse più scure dell Adriatico.',
-   'adriatico', 'raro', 108, 32, 22, 7, 5),
+   'adriatico', 'raro', 108, 32, 22, 1, 5),
 
   ('Rampicante',
    'Vite selvaggia animata che avvolge gli alberi più alti del bosco.',
-   'bosco', 'raro', 95, 28, 24, 7, 6),
+   'bosco', 'raro', 95, 28, 24, 1, 6),
 
   ('Nocciolo',
    'Antico spirito del nocciolo selvatico, custode dei boschi collinari.',
-   'bosco', 'raro', 112, 26, 28, 7, 5)
+   'bosco', 'raro', 112, 26, 28, 1, 5)
 ON CONFLICT DO NOTHING;
 
 -- ===== EPICO (3 total) =====
@@ -203,15 +203,15 @@ ON CONFLICT DO NOTHING;
 INSERT INTO creatures (name, description, element, rarity, hp, atk, def, min_level, spawn_weight) VALUES
   ('Incendino',
    'Drago di fuoco minore che sorvola i vulcani sottomarini dell Adriatico meridionale.',
-   'fiamma', 'epico', 145, 45, 28, 12, 3),
+   'fiamma', 'epico', 145, 45, 28, 1, 3),
 
   ('Fangolo',
    'Colosso di fango primordiale formatosi nei delta dei grandi fiumi padani.',
-   'terra', 'epico', 152, 38, 42, 12, 2),
+   'terra', 'epico', 152, 38, 42, 1, 2),
 
   ('Equilibrio',
    'Essere di pura armonia nato dall incontro tra mare, terra e cielo.',
-   'armonia', 'epico', 138, 40, 35, 12, 2)
+   'armonia', 'epico', 138, 40, 35, 1, 2)
 ON CONFLICT DO NOTHING;
 
 -- ===== LEGGENDARIO (2 total) =====
@@ -219,9 +219,17 @@ ON CONFLICT DO NOTHING;
 INSERT INTO creatures (name, description, element, rarity, hp, atk, def, min_level, spawn_weight) VALUES
   ('Armovolo',
    'Leggendario signore dei cieli adriatici, la cui presenza porta pace e prosperità alle coste.',
-   'armonia', 'leggendario', 185, 55, 50, 20, 1),
+   'armonia', 'leggendario', 185, 55, 50, 1, 1),
 
   ('Miniera',
    'Spirito primordiale della terra che dorme nelle profondità delle Apennini da millenni.',
-   'terra', 'leggendario', 200, 60, 55, 20, 1)
+   'terra', 'leggendario', 200, 60, 55, 1, 1)
 ON CONFLICT DO NOTHING;
+-- ===== MITOLOGICO (1 total) =====
+
+INSERT INTO creatures (id, name, description, element, rarity, hp, atk, def, min_level, spawn_weight) VALUES
+  ('00000000-0000-0000-0001-000000000031',
+   'Miraluna',
+   'Creatura mitologica che appare solo quando la luna si riflette perfettamente sull Adriatico in silenzio assoluto.',
+   'armonia', 'mitologico', 225, 68, 62, 1, 1)
+ON CONFLICT (id) DO NOTHING;

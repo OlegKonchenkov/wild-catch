@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { AdminListSkeleton } from '@/components/admin/AdminLoading'
 import { RARITY_CATCH_RATES, CATCH_DIFFICULTY_MULT } from '@/lib/types'
 
-type Rarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario'
+type Rarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario' | 'mitologico'
 type ElementType = 'fiamma' | 'adriatico' | 'bosco' | 'terra' | 'armonia'
 
 interface Creature {
@@ -28,7 +28,7 @@ interface Creature {
   enigma_video_url: string | null
 }
 
-const RARITIES: Rarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario']
+const RARITIES: Rarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
 const ELEMENTS: ElementType[] = ['fiamma', 'adriatico', 'bosco', 'terra', 'armonia']
 
 const RARITY_META: Record<Rarity, { label: string; color: string; glow: string }> = {
@@ -37,6 +37,7 @@ const RARITY_META: Record<Rarity, { label: string; color: string; glow: string }
   raro:        { label: 'Raro',        color: '#38BDF8', glow: 'rgba(56,189,248,0.25)' },
   epico:       { label: 'Epico',       color: '#C084FC', glow: 'rgba(192,132,252,0.25)' },
   leggendario: { label: 'Leggendario', color: '#FBBF24', glow: 'rgba(251,191,36,0.35)' },
+  mitologico:  { label: 'Mitologico',  color: '#FF4D6D', glow: 'rgba(255,77,109,0.35)' },
 }
 
 const ELEMENT_META: Record<ElementType, { label: string; emoji: string; bg: string }> = {

@@ -101,7 +101,7 @@ const DETAIL_CONFIG: Record<DetailType, { title: string; icon: string; emptyLabe
 
 const RARITY_COLOR: Record<string, string> = {
   comune: '#94a3b8', non_comune: '#34d399', raro: '#3A9DBC',
-  epico: '#7B4DB8', leggendario: '#F7C841',
+  epico: '#7B4DB8', leggendario: '#F7C841', mitologico: '#FF4D6D',
 }
 
 function DetailRow({ detail, row }: { detail: DetailType; row: any }) {

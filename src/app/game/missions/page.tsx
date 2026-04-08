@@ -11,7 +11,7 @@ const QrScanner = dynamic(() => import('@/components/QrScanner'), { ssr: false }
 const TYPE_META: Record<string, { icon: string; label: string; hint: string; color: string }> = {
   cattura:  { icon: '🐾', label: 'Cattura',  hint: 'Cattura la creatura indicata',      color: '#3A9DBC' },
   duel:     { icon: '⚔️', label: 'Duello',   hint: 'Vinci un duello contro un altro giocatore', color: '#FBBF24' },
-  qr:       { icon: '📷', label: 'Scansione', hint: 'Scansiona un QR code specifico',   color: '#34D399' },
+  qr:       { icon: '📷', label: 'Scansione', hint: 'Scansiona il QR richiesto oppure QR diversi, se la missione non ne specifica uno',   color: '#34D399' },
   walk:     { icon: '🚶', label: 'Cammino',  hint: 'Percorri la distanza indicata (m)', color: '#C084FC' },
   collect:  { icon: '🎒', label: 'Raccolta', hint: 'Raccogli gli oggetti indicati',     color: '#F97316' },
 }

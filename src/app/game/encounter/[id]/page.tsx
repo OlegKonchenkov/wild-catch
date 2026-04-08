@@ -31,7 +31,7 @@ const ELEMENT_THEME: Record<string, { bg: string; glow: string; ground: string }
 }
 
 const CATCH_STARS: Record<string, number> = {
-  comune: 1, non_comune: 2, raro: 3, epico: 4, leggendario: 5
+  comune: 1, non_comune: 2, raro: 3, epico: 4, leggendario: 5, mitologico: 6
 }
 
 // ── Creature card (unified image + info) ──────────────────────────────────────

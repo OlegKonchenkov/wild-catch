@@ -224,6 +224,7 @@ const EGG_RARITY_POOLS: Record<string, Array<{ rarity: string; weight: number }>
   raro:        [{ rarity: 'comune', weight: 50 }, { rarity: 'non_comune', weight: 30 }, { rarity: 'raro',       weight: 20 }],
   epico:       [{ rarity: 'comune', weight: 40 }, { rarity: 'non_comune', weight: 30 }, { rarity: 'raro',       weight: 20 }, { rarity: 'epico',      weight: 10 }],
   leggendario: [{ rarity: 'comune', weight: 35 }, { rarity: 'non_comune', weight: 25 }, { rarity: 'raro',       weight: 20 }, { rarity: 'epico',      weight: 15 }, { rarity: 'leggendario', weight: 5 }],
+  mitologico:  [{ rarity: 'comune', weight: 30 }, { rarity: 'non_comune', weight: 25 }, { rarity: 'raro',       weight: 20 }, { rarity: 'epico',      weight: 15 }, { rarity: 'leggendario', weight: 8 }, { rarity: 'mitologico', weight: 2 }],
 }
 
 function pickEggRarity(eggRarity: string): string {

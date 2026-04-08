@@ -41,16 +41,17 @@ const SPAWN_LABELS: Record<keyof SpawnConfig, { label: string; color: string }> 
 const PREVIEW_LEVELS = [1, 5, 10, 15, 20]
 
 const BASE_TIER_WEIGHTS: Record<string, number> = {
-  comune: 65, non_comune: 22, raro: 7, epico: 4, leggendario: 2,
+  comune: 65, non_comune: 22, raro: 7, epico: 4, leggendario: 2, mitologico: 0.5,
 }
 
-const ALL_RARITIES = ['comune', 'non_comune', 'raro', 'epico', 'leggendario'] as const
+const ALL_RARITIES = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico'] as const
 
 const RARITY_BONUS_KEY: Partial<Record<string, keyof SpawnConfig>> = {
   non_comune:  'non_comune_bonus',
   raro:        'raro_bonus',
   epico:       'epico_bonus',
   leggendario: 'leggendario_bonus',
+  mitologico:  'leggendario_bonus',
 }
 
 const RARITY_DISPLAY: Record<string, { label: string; color: string }> = {
@@ -59,6 +60,7 @@ const RARITY_DISPLAY: Record<string, { label: string; color: string }> = {
   raro:        { label: 'Raro',        color: '#60a5fa' },
   epico:       { label: 'Epico',       color: '#c084fc' },
   leggendario: { label: 'Leggendario', color: '#fbbf24' },
+  mitologico:  { label: 'Mitologico',  color: '#FF4D6D' },
 }
 
 const cls = 'w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#3A9DBC]'

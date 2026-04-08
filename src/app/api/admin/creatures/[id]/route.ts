@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-const VALID_RARITIES = ['comune', 'non_comune', 'raro', 'epico', 'leggendario'] as const
+const VALID_RARITIES = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico'] as const
 const VALID_ELEMENTS = ['fiamma', 'adriatico', 'bosco', 'terra', 'armonia'] as const
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {

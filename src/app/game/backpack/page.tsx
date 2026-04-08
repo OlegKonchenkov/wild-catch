@@ -21,6 +21,7 @@ const RARITY_COLOR: Record<string, string> = {
   raro:        '#3A9DBC',
   epico:       '#C084FC',
   leggendario: '#FBBF24',
+  mitologico:  '#FF4D6D',
 }
 
 const RARITY_LABEL: Record<string, string> = {
@@ -29,6 +30,7 @@ const RARITY_LABEL: Record<string, string> = {
   raro:        'Raro',
   epico:       'Epico',
   leggendario: 'Leggendario',
+  mitologico:  'Mitologico',
 }
 
 const EGG_ICON: Record<string, string> = {
@@ -37,6 +39,7 @@ const EGG_ICON: Record<string, string> = {
   raro:        '💎',
   epico:       '🔮',
   leggendario: '⭐',
+  mitologico:  '🌌',
 }
 
 interface InventoryRow {

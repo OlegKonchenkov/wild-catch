@@ -4,7 +4,7 @@ import { calculateFightDamage } from '@/lib/game/rng'
 import { getElementMultiplier } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
 
-const RARE_TIERS = ['raro', 'epico', 'leggendario']
+const RARE_TIERS = ['raro', 'epico', 'leggendario', 'mitologico']
 
 export async function POST(request: Request) {
   const supabase = await createClient()

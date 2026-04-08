@@ -19,9 +19,9 @@ interface SpawnableCreature {
 }
 
 // Two-stage spawn system:
-//   Stage 1 — pick a RARITY TIER via tier base weights scaled by level bonus.
+//   Stage 1 - pick a RARITY TIER via tier base weights scaled by level bonus.
 //             Adding/removing creatures never changes tier probabilities.
-//   Stage 2 — pick a SPECIFIC CREATURE within the tier via spawn_weight.
+//   Stage 2 - pick a SPECIFIC CREATURE within the tier via spawn_weight.
 //             spawn_weight controls variety inside the tier only.
 
 // Base weight for each rarity tier (level 1, no bonuses).
@@ -32,16 +32,18 @@ export const DEFAULT_RARITY_TIER_WEIGHTS: Record<string, number> = {
   raro:        7,
   epico:       4,
   leggendario: 2,
+  mitologico:  0.5,
 }
 
 // Per-level multiplier bonus applied to each tier's base weight.
 // At level N: effective_tier_weight = base * (1 + bonus * N)
 export const DEFAULT_RARITY_LEVEL_BONUS: Record<string, number> = {
   comune:      0,
-  non_comune:  0.02,  // ×1.2 at lv10, ×1.4 at lv20
-  raro:        0.10,  // ×2.0 at lv10, ×3.0 at lv20
-  epico:       0.20,  // ×3.0 at lv10, ×5.0 at lv20
-  leggendario: 0.40,  // ×5.0 at lv10, ×9.0 at lv20
+  non_comune:  0.02,  // x1.2 at lv10, x1.4 at lv20
+  raro:        0.10,  // x2.0 at lv10, x3.0 at lv20
+  epico:       0.20,  // x3.0 at lv10, x5.0 at lv20
+  leggendario: 0.40,  // x5.0 at lv10, x9.0 at lv20
+  mitologico:  0.40,  // mirrors leggendario growth while staying 1/4 in base odds
 }
 
 export interface SpawnBonusConfig {
@@ -58,16 +60,20 @@ export function selectCreatureForEncounter(
 ): SpawnableCreature | null {
   if (creatures.length === 0) return null
 
+  const eligibleCreatures = creatures.filter(c => (c.min_level ?? 1) <= playerLevel)
+  const poolSource = eligibleCreatures.length > 0 ? eligibleCreatures : creatures
+
   const levelBonusMap: Record<string, number> = {
     comune:      0,
     non_comune:  spawnConfig?.non_comune_bonus ?? DEFAULT_RARITY_LEVEL_BONUS.non_comune,
     raro:        spawnConfig?.raro_bonus        ?? DEFAULT_RARITY_LEVEL_BONUS.raro,
     epico:       spawnConfig?.epico_bonus       ?? DEFAULT_RARITY_LEVEL_BONUS.epico,
     leggendario: spawnConfig?.leggendario_bonus ?? DEFAULT_RARITY_LEVEL_BONUS.leggendario,
+    mitologico:  spawnConfig?.leggendario_bonus ?? DEFAULT_RARITY_LEVEL_BONUS.mitologico,
   }
 
   // Stage 1: pick rarity tier
-  const presentRarities = [...new Set(creatures.map(c => c.rarity))]
+  const presentRarities = [...new Set(poolSource.map(c => c.rarity))]
   const tierWeights = presentRarities.map(rarity => ({
     rarity,
     weight: (DEFAULT_RARITY_TIER_WEIGHTS[rarity] ?? 1) * (1 + (levelBonusMap[rarity] ?? 0) * playerLevel),
@@ -81,8 +87,8 @@ export function selectCreatureForEncounter(
   }
 
   // Stage 2: pick creature within tier via spawn_weight
-  const pool = creatures.filter(c => c.rarity === selectedRarity)
-  if (pool.length === 0) return creatures[creatures.length - 1]
+  const pool = poolSource.filter(c => c.rarity === selectedRarity)
+  if (pool.length === 0) return poolSource[poolSource.length - 1]
   const totalPoolWeight = pool.reduce((sum, c) => sum + c.spawn_weight, 0)
   let poolRng = Math.random() * totalPoolWeight
   for (const c of pool) {

@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
   }
 
-  // Get QR code — match by UUID or short manual_code (case-insensitive)
+  // Get QR code - match by UUID or short manual_code (case-insensitive)
   // Also matches global QRs (null session_id)
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrId)
   let qrQuery = supabase.from('qr_codes').select('*').or(`session_id.eq.${sessionId},session_id.is.null`)
@@ -40,17 +40,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'QR code esaurito' }, { status: 410 })
   }
 
-  // Per-user enforcement: each user can scan this QR at most once
-  if (qr.unique_per_user) {
-    const { data: existingScan } = await supabase
-      .from('qr_scan_log')
-      .select('id')
-      .eq('qr_id', qr.id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-    if (existingScan) {
-      return NextResponse.json({ error: 'Hai già riscattato questo QR', alreadyScanned: true }, { status: 409 })
-    }
+  // Track whether this is the first unique scan for this user.
+  // Generic QR missions advance only on the first unique QR scan.
+  const { data: existingScan } = await supabase
+    .from('qr_scan_log')
+    .select('id')
+    .eq('qr_id', qr.id)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (qr.unique_per_user && existingScan) {
+    return NextResponse.json({ error: 'Hai già riscattato questo QR', alreadyScanned: true }, { status: 409 })
+  }
+
+  const isFirstUniqueScan = !existingScan
+  if (isFirstUniqueScan) {
     await supabase.from('qr_scan_log').insert({ qr_id: qr.id, user_id: user.id, session_id: sessionId })
   }
 
@@ -82,8 +86,10 @@ export async function POST(request: Request) {
           .eq('id', existing.id)
       } else {
         await supabase.from('player_inventory').insert({
-          user_id: user.id, session_id: sessionId,
-          item_id: payload.item_id, quantity: payload.quantity,
+          user_id: user.id,
+          session_id: sessionId,
+          item_id: payload.item_id,
+          quantity: payload.quantity,
         })
       }
 
@@ -154,7 +160,7 @@ export async function POST(request: Request) {
         .in('id', creatureIds)
 
       const crMap: Record<string, any> = Object.fromEntries(
-        (creaturesData ?? []).map((c: any) => [c.id, c])
+        (creaturesData ?? []).map((c: any) => [c.id, c]),
       )
 
       const bossLineup = bossCreatureEntries.map((entry, i) => {
@@ -240,13 +246,17 @@ export async function POST(request: Request) {
     }
   }
 
-  // Track qr missions (match on qr label or any qr scan)
-  incrementMissionProgress({
-    type: 'qr',
-    target: qr.label ?? '',
-    userId: user.id,
-    sessionId,
-  }).catch(() => {})
+  // Track qr missions only on first unique scan for this user.
+  // Match specific missions against qr id / manual code / label, while generic missions
+  // (empty target) still progress for any unique QR.
+  if (isFirstUniqueScan) {
+    incrementMissionProgress({
+      type: 'qr',
+      target: [qr.id, qr.manual_code ?? '', qr.label ?? ''],
+      userId: user.id,
+      sessionId,
+    }).catch(() => {})
+  }
 
   // Track collect missions when an item QR is scanned
   if (qr.type === 'oggetto' && (result as any).itemName) {

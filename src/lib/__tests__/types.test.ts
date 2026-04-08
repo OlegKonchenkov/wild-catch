@@ -9,6 +9,7 @@ describe('types', () => {
       min_level: 1, image_url: '', sprite_url: '', lottie_url: null,
       spawn_weight: 10, evolution_of: null,
       catch_difficulty: 1, session_id: null,
+      enigma_title: null, enigma_description: null, enigma_image_url: null, enigma_video_url: null,
     }
     expect(c.element).toBe('fiamma')
   })

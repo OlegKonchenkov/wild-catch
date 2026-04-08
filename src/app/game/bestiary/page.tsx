@@ -7,7 +7,7 @@ import { RARITY_COLORS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS }
 import type { Creature, PlayerCreature, Element } from '@/lib/types'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 
-const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario']
+const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
 
 function getVideoEmbed(url: string): { type: 'iframe'; src: string } | { type: 'video'; src: string } | null {
   try {
@@ -198,7 +198,7 @@ export default function BestiaryPage() {
   }
 
   const RARITY_LABELS: Record<string, string> = {
-    comune: 'Comune', non_comune: 'Non Com.', raro: 'Raro', epico: 'Epico', leggendario: 'Legg.',
+    comune: 'Comune', non_comune: 'Non Com.', raro: 'Raro', epico: 'Epico', leggendario: 'Legg.', mitologico: 'Mito',
   }
 
   const caughtCount = playerCreatures.length
@@ -439,7 +439,7 @@ export default function BestiaryPage() {
 
                 {/* Rarity chips */}
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
-                  {(['all', 'comune', 'non_comune', 'raro', 'epico', 'leggendario'] as const).map(r => {
+                  {(['all', 'comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico'] as const).map(r => {
                     const active = rarityFilter === r
                     const color = r !== 'all' ? RARITY_COLORS[r] : null
                     return (

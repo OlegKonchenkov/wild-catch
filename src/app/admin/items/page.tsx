@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { AdminListSkeleton } from '@/components/admin/AdminLoading'
 
 type ItemType = 'rete' | 'esca' | 'uovo' | 'battaglia' | 'pozione' | 'cura' | 'custom'
-type EggRarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario'
+type EggRarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario' | 'mitologico'
 
 interface Item {
   id: string
@@ -85,10 +85,10 @@ const TYPE_META: Record<ItemType, TypeMeta> = {
   },
 }
 
-const EGG_RARITIES: EggRarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario']
+const EGG_RARITIES: EggRarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
 const EGG_RARITY_LABEL: Record<EggRarity, string> = {
   comune: '⚪ Comune', non_comune: '🟢 Non comune', raro: '🔵 Raro',
-  epico: '🟣 Epico', leggendario: '🟡 Leggendario',
+  epico: '🟣 Epico', leggendario: '🟡 Leggendario', mitologico: '🌌 Mitologico',
 }
 
 const EMPTY_FORM = {

@@ -33,6 +33,7 @@ const RARITY_ALPHA: Record<string, number> = {
   raro:        0.48,
   epico:       0.62,
   leggendario: 0.82,
+  mitologico:  0.96,
 }
 
 const ANIM_VARIANTS: Record<AnimState, TargetAndTransition> = {

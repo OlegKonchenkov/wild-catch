@@ -21,7 +21,7 @@ export interface CompletedMission {
 /**
  * Increment progress for all matching missions of a given type.
  * @param type     Mission type: 'cattura' | 'duel' | 'qr' | 'collect' | 'walk'
- * @param target   The specific target (creature name, qr label, item name). Empty = match all.
+ * @param target   One or more event targets (creature name, qr id/manual code/label, item name).
  * @param userId
  * @param sessionId
  */
@@ -32,11 +32,12 @@ export async function incrementMissionProgress({
   sessionId,
 }: {
   type: string
-  target?: string
+  target?: string | string[]
   userId: string
   sessionId: string
 }): Promise<CompletedMission[]> {
   const admin = createAdminClient()
+  const eventTargets = normalizeMissionTargets(target)
 
   // Load matching missions for this session and type (include global missions with null session_id)
   const { data: missions } = await admin
@@ -48,8 +49,9 @@ export async function incrementMissionProgress({
   if (!missions?.length) return []
 
   // Match missions: empty mission.target = matches anything; otherwise compare case-insensitively
+  // against one or more event targets (qr id/manual code/label, etc).
   const matching = (missions as MissionRow[]).filter(m =>
-    !m.target || !target || m.target.toLowerCase() === target.toLowerCase()
+    missionMatchesTarget(m.target, eventTargets)
   )
   if (!matching.length) return []
 
@@ -107,6 +109,22 @@ export async function incrementMissionProgress({
   }
 
   return completed
+}
+
+export function normalizeMissionTargets(target?: string | string[]): string[] {
+  const rawTargets = Array.isArray(target) ? target : target ? [target] : []
+  return [...new Set(
+    rawTargets
+      .map(value => value.trim().toLowerCase())
+      .filter(Boolean),
+  )]
+}
+
+export function missionMatchesTarget(missionTarget: string | null | undefined, eventTargets: string[]): boolean {
+  const normalizedMissionTarget = (missionTarget ?? '').trim().toLowerCase()
+  if (!normalizedMissionTarget) return true
+  if (eventTargets.length === 0) return false
+  return eventTargets.includes(normalizedMissionTarget)
 }
 
 async function grantMissionReward(

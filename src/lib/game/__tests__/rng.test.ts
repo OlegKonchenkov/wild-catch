@@ -16,6 +16,12 @@ describe('rollCatch', () => {
     expect(caught).toBeLessThan(100)
   })
 
+  it('mitologico without bonus is far rarer than leggendario', () => {
+    let caught = 0
+    for (let i = 0; i < 4000; i++) if (rollCatch('mitologico', 0)) caught++
+    expect(caught).toBeLessThan(90)
+  })
+
   it('bonus additivo increases catch rate', () => {
     let noBonus = 0, withBonus = 0
     for (let i = 0; i < 1000; i++) {
@@ -49,5 +55,16 @@ describe('selectCreatureForEncounter', () => {
     }
     expect(counts.a).toBeGreaterThan(800)
     expect(counts.b).toBeLessThan(200)
+  })
+
+  it('never selects creatures above the player min_level when eligible options exist', () => {
+    const creatures = [
+      { id: 'a', spawn_weight: 100, rarity: 'comune' as Rarity, min_level: 1 },
+      { id: 'm', spawn_weight: 100, rarity: 'mitologico' as Rarity, min_level: 20 },
+    ]
+    for (let i = 0; i < 200; i++) {
+      const c = selectCreatureForEncounter(creatures, 5)
+      expect(c?.id).toBe('a')
+    }
   })
 })

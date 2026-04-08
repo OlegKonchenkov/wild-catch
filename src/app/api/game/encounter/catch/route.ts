@@ -126,7 +126,7 @@ export async function POST(request: Request) {
   }
 
   // Award EXP and score — new catch=15 EXP, duplicate=5 EXP
-  const rarityMultiplier = { comune: 1, non_comune: 2, raro: 3, epico: 4, leggendario: 5 }
+  const rarityMultiplier = { comune: 1, non_comune: 2, raro: 3, epico: 4, leggendario: 5, mitologico: 6 }
   const rarityMult = rarityMultiplier[creature.rarity as keyof typeof rarityMultiplier] ?? 1
   const expGain   = existing ? 5  : 15
   const scoreGain = existing ? 5  : 15 * rarityMult

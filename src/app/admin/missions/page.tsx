@@ -20,7 +20,7 @@ interface Mission {
 
 interface Creature  { id: string; name: string; rarity: string; element: string }
 interface Item      { id: string; name: string; type: string }
-interface QRCode    { id: string; label: string; type: string }
+interface QRCode    { id: string; label: string; type: string; manual_code?: string | null }
 
 /* ── Mission types ────────────────────────────── */
 const MISSION_TYPES = [
@@ -45,11 +45,11 @@ const MISSION_TYPES = [
   {
     value: 'qr',
     label: 'Scansione QR',
-    hint: 'Il giocatore deve scansionare un QR code specifico della sessione',
+    hint: 'Il giocatore deve scansionare un QR specifico oppure N QR diversi della sessione',
     targetType: 'qr' as const,
     targetLabel: 'QR code da scansionare',
-    targetHint: 'Seleziona quale QR code deve essere scansionato',
-    countLabel: 'Quante volte scansionare',
+    targetHint: 'Seleziona un QR specifico. Lascia vuoto = contano solo QR univoci diversi, non scansioni ripetute dello stesso codice',
+    countLabel: 'Quanti QR univoci scansionare',
   },
   {
     value: 'walk',
@@ -248,9 +248,9 @@ export default function AdminMissions() {
     }
     if (typeInfo.targetType === 'qr') {
       return qrCodes.map(q => ({
-        value: q.id,
-        label: q.label || q.id.slice(0, 12),
-        sub: q.type,
+        value: q.manual_code || q.id,
+        label: q.label || q.manual_code || q.id.slice(0, 12),
+        sub: [q.type, q.manual_code].filter(Boolean).join(' · '),
       }))
     }
     return []
