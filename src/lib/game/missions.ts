@@ -2,12 +2,20 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 interface MissionRow {
   id: string
+  title: string
   target: string
   target_count: number
   reward_gold: number
   reward_exp: number
   reward_item_id: string | null
   reward_items: Array<{ item_id: string; quantity: number }> | null
+}
+
+export interface CompletedMission {
+  title: string
+  rewardGold: number
+  rewardExp: number
+  levelUp?: { newLevel: number; goldReward: number } | null
 }
 
 /**
@@ -27,23 +35,23 @@ export async function incrementMissionProgress({
   target?: string
   userId: string
   sessionId: string
-}) {
+}): Promise<CompletedMission[]> {
   const admin = createAdminClient()
 
   // Load matching missions for this session and type (include global missions with null session_id)
   const { data: missions } = await admin
     .from('missions')
-    .select('id, target, target_count, reward_gold, reward_exp, reward_item_id, reward_items')
+    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_items')
     .or(`session_id.eq.${sessionId},session_id.is.null`)
     .eq('type', type)
 
-  if (!missions?.length) return
+  if (!missions?.length) return []
 
   // Match missions: empty mission.target = matches anything; otherwise compare case-insensitively
   const matching = (missions as MissionRow[]).filter(m =>
     !m.target || !target || m.target.toLowerCase() === target.toLowerCase()
   )
-  if (!matching.length) return
+  if (!matching.length) return []
 
   // Load existing player_missions entries
   const missionIds = matching.map(m => m.id)
@@ -56,6 +64,8 @@ export async function incrementMissionProgress({
   const pmMap: Record<string, any> = Object.fromEntries(
     (playerMissions ?? []).map((pm: any) => [pm.mission_id, pm])
   )
+
+  const completed: CompletedMission[] = []
 
   for (const mission of matching) {
     const existing = pmMap[mission.id]
@@ -79,7 +89,7 @@ export async function incrementMissionProgress({
     }
 
     if (justCompleted) {
-      await grantMissionReward(mission, userId, sessionId, admin)
+      const levelUp = await grantMissionReward(mission, userId, sessionId, admin)
       // Game event for bell history
       admin.from('player_game_events').insert({
         user_id: userId,
@@ -87,8 +97,16 @@ export async function incrementMissionProgress({
         type: 'mission_completed',
         payload: { mission_id: mission.id, mission_target: mission.target },
       }).then(undefined, () => {})
+      completed.push({
+        title: mission.title,
+        rewardGold: mission.reward_gold,
+        rewardExp: mission.reward_exp,
+        levelUp,
+      })
     }
   }
+
+  return completed
 }
 
 async function grantMissionReward(
@@ -96,14 +114,20 @@ async function grantMissionReward(
   userId: string,
   sessionId: string,
   admin: ReturnType<typeof createAdminClient>,
-) {
+): Promise<{ newLevel: number; goldReward: number } | null> {
+  let levelUp: { newLevel: number; goldReward: number } | null = null
+
   if (mission.reward_exp > 0) {
-    await admin.rpc('increment_player_stats', {
+    const { data: rpcData } = await admin.rpc('increment_player_stats', {
       p_user_id: userId,
       p_session_id: sessionId,
       p_exp: mission.reward_exp,
       p_score: 0,
     })
+    const rpcRow = Array.isArray(rpcData) ? rpcData[0] : null
+    if (rpcRow?.leveled_up) {
+      levelUp = { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
+    }
   }
 
   if (mission.reward_gold > 0) {
@@ -152,4 +176,6 @@ async function grantMissionReward(
       })
     }
   }
+
+  return levelUp
 }

@@ -142,13 +142,13 @@ export async function POST(request: Request) {
     ? { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
     : null
 
-  // Track cattura missions (fire-and-forget)
-  incrementMissionProgress({
+  // Track cattura missions — await so we can return completion data to client
+  const completedMissions = await incrementMissionProgress({
     type: 'cattura',
     target: creature.name,
     userId: user.id,
     sessionId: encounter.session_id,
-  }).then(undefined, () => {})
+  }).catch(() => [])
 
   // Save game event for bell history
   const { createAdminClient } = await import('@/lib/supabase/admin')
@@ -173,5 +173,5 @@ export async function POST(request: Request) {
     },
   }).then(undefined, () => {})
 
-  return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, scoreGain, levelUp })
+  return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, scoreGain, levelUp, completedMissions })
 }

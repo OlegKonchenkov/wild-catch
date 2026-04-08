@@ -728,7 +728,13 @@ export default function BestiaryPage() {
                                 <p className="text-xl font-black" style={{ color: s.color }}>{s.scaled}</p>
                                 <p className="text-[10px] font-bold text-white/50 mt-0.5">{s.label}</p>
                                 {lv > 1 && (
-                                  <p className="text-[9px] text-white/25 mt-0.5">base {s.base}</p>
+                                  <>
+                                    <div className="my-1.5 mx-1" style={{ height: '1px', background: `${s.color}20` }} />
+                                    <p className="text-[10px] text-white/40 leading-none">
+                                      <span className="text-white/25">base </span>
+                                      <span className="font-semibold">{s.base}</span>
+                                    </p>
+                                  </>
                                 )}
                               </div>
                             ))}

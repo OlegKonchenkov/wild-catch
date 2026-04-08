@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -817,7 +817,9 @@ function SectionCard({ section }: { section: Section }) {
 
 export default function GuidePage() {
   const allSections = buildSections()
-  const [query, setQuery] = useState('')
+  const [query, setQuery]           = useState('')
+  const [showSearch, setShowSearch] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const sections = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -827,6 +829,16 @@ export default function GuidePage() {
     )
   }, [query, allSections])
 
+  function toggleSearch() {
+    if (showSearch) {
+      setQuery('')
+      setShowSearch(false)
+    } else {
+      setShowSearch(true)
+      setTimeout(() => inputRef.current?.focus(), 80)
+    }
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-[#0F1F2E]">
       <div className="sticky top-0 z-20 bg-[#0F1F2E]/95 backdrop-blur-md border-b border-white/8">
@@ -834,27 +846,56 @@ export default function GuidePage() {
           <div className="w-9 h-9 rounded-xl bg-[#3A9DBC]/20 border border-[#3A9DBC]/40 flex items-center justify-center text-lg flex-shrink-0">
             📖
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-base font-bold text-white leading-tight">Guida Giocatore</h1>
             <p className="text-xs text-[#3A9DBC]/80">Come funziona WildCatch</p>
           </div>
-        </div>
-        {/* Search bar */}
-        <div className="px-4 pb-3">
-          <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          {/* Search toggle icon */}
+          <button
+            onClick={toggleSearch}
+            aria-label="Cerca argomento"
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
+            style={{
+              background: showSearch ? 'rgba(58,157,188,0.22)' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${showSearch ? 'rgba(58,157,188,0.5)' : 'rgba(255,255,255,0.1)'}`,
+              color: showSearch ? '#3A9DBC' : 'rgba(255,255,255,0.4)',
+            }}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
             </svg>
-            <input
-              type="search"
-              placeholder="Cerca argomento…"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl text-sm text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-[#3A9DBC]/50"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-            />
-          </div>
+          </button>
         </div>
+        {/* Collapsible search bar */}
+        <AnimatePresence initial={false}>
+          {showSearch && (
+            <motion.div
+              key="searchbar"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="px-4 pb-3">
+                <div className="relative">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                  </svg>
+                  <input
+                    ref={inputRef}
+                    type="search"
+                    placeholder="Cerca argomento…"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-xl text-sm text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-[#3A9DBC]/50"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className="h-0.5 bg-gradient-to-r from-[#3A9DBC] via-[#F7C841] to-[#34D399] opacity-60" />
       </div>
 

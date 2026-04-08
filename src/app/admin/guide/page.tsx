@@ -1,5 +1,6 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 
 const tocItems = [
   { id: 'overview',      label: 'Panoramica' },
@@ -371,12 +372,25 @@ function MobileToc({ items }: { items: typeof tocItems }) {
 /* ──────────────────── main page ──────────────────── */
 
 export default function AdminGuidePage() {
-  const [query, setQuery] = useState('')
+  const [query, setQuery]           = useState('')
+  const [showSearch, setShowSearch] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
   const filteredToc = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return tocItems
     return tocItems.filter(t => t.label.toLowerCase().includes(q) || t.id.toLowerCase().includes(q))
   }, [query])
+
+  function toggleSearch() {
+    if (showSearch) {
+      setQuery('')
+      setShowSearch(false)
+    } else {
+      setShowSearch(true)
+      setTimeout(() => inputRef.current?.focus(), 80)
+    }
+  }
 
   return (
     <>
@@ -395,32 +409,64 @@ export default function AdminGuidePage() {
 
       <div style={{ maxWidth: '960px' }}>
         <header style={{ marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span style={{ fontSize: '1.6rem' }}>📖</span>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em', margin: 0 }}>
-              Guida per l&rsquo;Amministratore
-            </h1>
+            <div style={{ flex: 1 }}>
+              <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em', margin: 0, lineHeight: 1.1 }}>
+                Guida per l&rsquo;Amministratore
+              </h1>
+              <p style={{ color: '#64748b', fontSize: '0.92rem', margin: '0.2rem 0 0' }}>
+                Manuale operativo &mdash; WildCatch Game Master Handbook
+              </p>
+            </div>
+            {/* Search toggle icon */}
+            <button
+              onClick={toggleSearch}
+              aria-label="Cerca sezione"
+              style={{
+                flexShrink: 0, width: '38px', height: '38px', borderRadius: '10px', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s',
+                background: showSearch ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${showSearch ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.12)'}`,
+                color: showSearch ? '#818cf8' : '#64748b',
+              }}
+            >
+              <svg style={{ width: '16px', height: '16px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+              </svg>
+            </button>
           </div>
-          <p style={{ color: '#64748b', fontSize: '0.92rem', marginTop: '0.25rem' }}>
-            Manuale operativo &mdash; WildCatch Game Master Handbook
-          </p>
-          {/* Search bar */}
-          <div style={{ position: 'relative', marginTop: '1rem', maxWidth: '420px' }}>
-            <svg style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
-              width: '16px', height: '16px', color: '#475569', pointerEvents: 'none' }}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-            </svg>
-            <input
-              type="search"
-              placeholder="Cerca sezione…"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              style={{ width: '100%', paddingLeft: '38px', paddingRight: '12px', paddingTop: '9px', paddingBottom: '9px',
-                borderRadius: '10px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
-                color: '#e2e8f0', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
-            />
-          </div>
+          {/* Collapsible search bar */}
+          <AnimatePresence initial={false}>
+            {showSearch && (
+              <motion.div
+                key="admin-searchbar"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: 'easeInOut' }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div style={{ position: 'relative', marginTop: '0.75rem', maxWidth: '420px' }}>
+                  <svg style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+                    width: '16px', height: '16px', color: '#475569', pointerEvents: 'none' }}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                  </svg>
+                  <input
+                    ref={inputRef}
+                    type="search"
+                    placeholder="Cerca sezione…"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    style={{ width: '100%', paddingLeft: '38px', paddingRight: '12px', paddingTop: '9px', paddingBottom: '9px',
+                      borderRadius: '10px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
+                      color: '#e2e8f0', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </header>
 
         <div className="guide-toc-mobile"><MobileToc items={filteredToc} /></div>
