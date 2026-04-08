@@ -8,7 +8,7 @@ import { useSessionTimer } from '@/hooks/useSessionTimer'
 
 const NAV_ITEMS = [
   { href: '/game/map',      icon: '🗺️', label: 'Mappa'     },
-  { href: '/game/bestiary', icon: '📖', label: 'Bestiario' },
+  { href: '/game/bestiary', icon: '🦎', label: 'WildDex'   },
   { href: '/game/duel',     icon: '⚔️', label: 'Duelli'   },
   { href: '/game/missions', icon: '🎯', label: 'Missioni'  },
   { href: '/game/shop',     icon: '🛒', label: 'Shop'      },

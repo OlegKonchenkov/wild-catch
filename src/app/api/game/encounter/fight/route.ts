@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   if (!encounter.player_creature_id) {
     return NextResponse.json({
-      error: 'Nessuna creatura selezionata. Seleziona una creatura dal Bestiario prima di combattere.'
+      error: 'Nessuna creatura selezionata. Seleziona una creatura dal WildDex prima di combattere.'
     }, { status: 400 })
   }
 

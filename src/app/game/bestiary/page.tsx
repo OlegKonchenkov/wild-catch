@@ -62,6 +62,7 @@ export default function BestiaryPage() {
   const [showEnigma, setShowEnigma]         = useState(false)
   const [loading, setLoading]               = useState(true)
   const [selectedPcId, setSelectedPcId]     = useState<string | null>(null)
+  const [playerLevel, setPlayerLevel]       = useState(1)
   const supabase   = useMemo(() => createClient(), [])
   const userIdRef  = useRef<string | null>(null)
   const sessionRef = useRef<string | null>(null)
@@ -84,11 +85,14 @@ export default function BestiaryPage() {
     if (!uid || !sid) return
     supabase
       .from('player_sessions')
-      .select('selected_creature_id')
+      .select('selected_creature_id, level')
       .eq('user_id', uid)
       .eq('session_id', sid)
       .single()
-      .then(({ data }) => { if (data?.selected_creature_id) setSelectedPcId(data.selected_creature_id) })
+      .then(({ data }) => {
+        if (data?.selected_creature_id) setSelectedPcId(data.selected_creature_id)
+        if (data?.level) setPlayerLevel(data.level as number)
+      })
   }
 
   useEffect(() => {
@@ -121,12 +125,13 @@ export default function BestiaryPage() {
 
       supabase
         .from('player_sessions')
-        .select('selected_creature_id')
+        .select('selected_creature_id, level')
         .eq('user_id', user.id)
         .eq('session_id', sessionId)
         .single()
         .then(({ data }) => {
           if (data?.selected_creature_id) setSelectedPcId(data.selected_creature_id)
+          if (data?.level) setPlayerLevel(data.level as number)
           finish()
         })
 
@@ -320,7 +325,7 @@ export default function BestiaryPage() {
         {/* Row 1: title + progress */}
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-white tracking-tight">Bestiario</h1>
+            <h1 className="text-lg font-bold text-white tracking-tight">WildDex</h1>
             <button
               onClick={() => setShowWeakness(true)}
               aria-label="Forze e debolezze"
@@ -695,19 +700,42 @@ export default function BestiaryPage() {
                       )}
                     </div>
 
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2 mb-5">
-                      {[
-                        { label: 'HP', value: creature.hp, color: '#F87171', emoji: '❤️' },
-                        { label: 'ATK', value: creature.atk, color: '#FB923C', emoji: '⚔️' },
-                        { label: 'DEF', value: creature.def, color: '#60A5FA', emoji: '🛡️' },
-                      ].map(s => (
-                        <div key={s.label} className="bg-white/5 rounded-xl p-3 text-center">
-                          <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
-                          <p className="text-xs text-white/40 mt-0.5">{s.label}</p>
+                    {/* Stats — scaled to player level */}
+                    {(() => {
+                      const lv = Math.max(1, playerLevel)
+                      const delta = lv - 1
+                      const sHP  = Math.max(1, Math.round(creature.hp  * (1 + delta * 0.14)))
+                      const sATK = Math.max(1, Math.round(creature.atk * (1 + delta * 0.10)))
+                      const sDEF = Math.max(0, Math.round((creature.def ?? 0) * (1 + delta * 0.09)))
+                      const stats = [
+                        { label: 'HP',  base: creature.hp,        scaled: sHP,  color: '#F87171' },
+                        { label: 'ATK', base: creature.atk,       scaled: sATK, color: '#FB923C' },
+                        { label: 'DEF', base: creature.def ?? 0,  scaled: sDEF, color: '#60A5FA' },
+                      ]
+                      return (
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs text-white/35 uppercase tracking-wider font-bold">Statistiche</p>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                              style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.35)', color: '#FBBF24' }}>
+                              Lv. {lv}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {stats.map(s => (
+                              <div key={s.label} className="rounded-xl p-3 text-center"
+                                style={{ background: `${s.color}10`, border: `1px solid ${s.color}25` }}>
+                                <p className="text-xl font-black" style={{ color: s.color }}>{s.scaled}</p>
+                                <p className="text-[10px] font-bold text-white/50 mt-0.5">{s.label}</p>
+                                {lv > 1 && (
+                                  <p className="text-[9px] text-white/25 mt-0.5">base {s.base}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      )
+                    })()}
 
                     {/* Difficoltà cattura + % base */}
                     <div className="bg-white/5 rounded-xl px-4 py-2.5 mb-4 flex items-center justify-between">

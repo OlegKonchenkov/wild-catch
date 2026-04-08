@@ -292,7 +292,7 @@ function BossGuide() {
       {/* Rules */}
       <div className="space-y-2 text-xs">
         {[
-          { icon: '🐾', text: 'Seleziona da 1 a 3 creature dal tuo Bestiario. Con meno di 3 comparirà un avviso di conferma.' },
+          { icon: '🐾', text: 'Seleziona da 1 a 3 creature dal tuo WildDex. Con meno di 3 comparirà un avviso di conferma.' },
           { icon: '⚔️', text: 'Il boss schiera fino a 3 creature. Il combattimento è a turni: tu attacchi, poi risponde il boss.' },
           { icon: '🔄', text: 'Quando una creatura è KO entra automaticamente la prossima. Il boss NON attacca automaticamente entrando.' },
           { icon: '🧪', text: 'Gli oggetti Battaglia e Pozione vengono usati automaticamente durante il boss fight.' },
@@ -363,7 +363,7 @@ function TipChips() {
     { text: 'Abbassa gli HP della creatura selvatica prima di lanciare la rete — le chance aumentano', color: '#3A9DBC' },
     { text: 'Cammina per far schiudere le uova — ogni passo conta anche se non incontri creature!', color: '#C084FC' },
     { text: 'Completa le missioni QR e di cattura per guadagnare monete extra da spendere nel negozio', color: '#FBBF24' },
-    { text: 'Dopo una cattura apri il Bestiario e cerca il pulsante 🧩 — alcune creature nascondono frammenti enigma segreti!', color: '#C084FC' },
+    { text: 'Dopo una cattura apri il WildDex e cerca il pulsante 🧩 — alcune creature nascondono frammenti enigma segreti!', color: '#C084FC' },
   ]
   return (
     <div className="flex flex-col gap-2 mt-3">
@@ -524,14 +524,14 @@ function buildSections(): Section[] {
       ),
     },
     {
-      id: 'bestiario',
-      icon: '📖',
-      title: 'Il Bestiario',
+      id: 'wilddex',
+      icon: '🦎',
+      title: 'WildDex',
       accent: '#7B4DB8',
       content: (
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
-            Ogni creatura catturata viene registrata nel bestiario. Le creature non ancora catturate
+            Ogni creatura catturata viene registrata nel WildDex. Le creature non ancora catturate
             appaiono come sagome misteriose — solo l&apos;elemento è visibile. Collezionale tutte!
           </p>
           <p className="text-white/60 text-xs mt-2">5 rarità in ordine crescente:</p>
@@ -549,12 +549,12 @@ function buildSections(): Section[] {
           <p className="text-white/80 text-sm leading-relaxed">
             Alcune creature nascondono un <span className="text-[#C084FC] font-bold">Frammento Enigma</span> —
             un indizio, un segreto o un dettaglio speciale sbloccato dopo la cattura.
-            Trovalo nel Bestiario toccando la creatura e premendo il pulsante viola 🧩.
+            Trovalo nel WildDex toccando la creatura e premendo il pulsante viola 🧩.
           </p>
           <div className="mt-3 space-y-2 text-xs">
             {[
               { icon: '🐾', text: 'Cattura la creatura — solo le creature nel tuo bestiario svelano l\'enigma' },
-              { icon: '📖', text: 'Vai nel Bestiario → tocca la creatura → premi "🧩 Frammento Enigma"' },
+              { icon: '🦎', text: 'Vai nel WildDex → tocca la creatura → premi "🧩 Frammento Enigma"' },
               { icon: '✨', text: 'L\'enigma si rivela con un\'animazione: titolo, testo, immagine o video' },
               { icon: '🔒', text: 'Il pulsante è disattivato se la creatura non ha un enigma assegnato dall\'admin' },
             ].map(row => (
