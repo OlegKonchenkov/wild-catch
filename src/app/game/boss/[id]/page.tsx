@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -810,6 +810,7 @@ export default function BossFightPage() {
   const [bossActiveSlot, setBossActiveSlot]     = useState(0)
   const [attacking, setAttacking]         = useState(false)
   const [bossAttacking, setBossAttacking] = useState(false)
+  const attackingRef = useRef(false)
   const [log, setLog]                     = useState<string[]>([])
   const [animState, setAnimState]         = useState<'idle' | 'attack' | 'damage'>('idle')
   const [bossAnimState, setBossAnimState] = useState<'idle' | 'attack' | 'damage'>('idle')
@@ -946,7 +947,8 @@ export default function BossFightPage() {
   }
 
   async function handleAttack() {
-    if (attacking) return
+    if (attackingRef.current) return
+    attackingRef.current = true
     setAttacking(true)
     setAnimState('attack')
     setTimeout(() => setAnimState('idle'), 300)
@@ -958,7 +960,7 @@ export default function BossFightPage() {
     })
     const data = await res.json()
 
-    if (!res.ok) { setError(data.error); setAttacking(false); return }
+    if (!res.ok) { setError(data.error); attackingRef.current = false; setAttacking(false); return }
 
     setSelectedItemId(null)
     if (selectedItemId) {
@@ -1007,6 +1009,7 @@ export default function BossFightPage() {
           setTimeout(() => {
             setAnimState('idle')
             setLastDamage(null)
+            attackingRef.current = false
             setAttacking(false)  // re-enable only after both animations done
           }, 900)
         }, 1100)  // boss "thinks" for ~1s then strikes
@@ -1023,6 +1026,7 @@ export default function BossFightPage() {
             setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp })
           }, 400)
         }
+        attackingRef.current = false
         setAttacking(false)
       }
     }, 900)

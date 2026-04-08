@@ -181,13 +181,13 @@ export async function POST(request: Request) {
         break
       }
 
-      // Check if this player already has an active boss fight for this QR
+      // Check if this player already has a boss fight for this QR (including won — don't re-reward)
       const { data: existingFight } = await admin
         .from('boss_fights')
         .select('id, status')
         .eq('user_id', user.id)
         .eq('qr_code_id', qrId)
-        .in('status', ['selecting', 'active'])
+        .in('status', ['selecting', 'active', 'won'])
         .maybeSingle()
 
       let bossFightId: string

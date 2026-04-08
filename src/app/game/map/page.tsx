@@ -278,13 +278,19 @@ function MapPageInner() {
     return () => window.removeEventListener('wc:esca-activated', onEscaActivated)
   }, [])
 
-  // Clear esca indicator when it expires
+  const [escaSecondsLeft, setEscaSecondsLeft] = useState(0)
+
+  // Countdown tick — updates every second while esca is active
   useEffect(() => {
-    if (!escaActiveUntil) return
-    const ms = escaActiveUntil.getTime() - Date.now()
-    if (ms <= 0) { setEscaActiveUntil(null); return }
-    const t = setTimeout(() => setEscaActiveUntil(null), ms)
-    return () => clearTimeout(t)
+    if (!escaActiveUntil) { setEscaSecondsLeft(0); return }
+    function tick() {
+      const secs = Math.max(0, Math.round((escaActiveUntil!.getTime() - Date.now()) / 1000))
+      setEscaSecondsLeft(secs)
+      if (secs <= 0) setEscaActiveUntil(null)
+    }
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => clearInterval(t)
   }, [escaActiveUntil])
 
   // Realtime broadcast: session_ended / session_restarted from admin
@@ -359,9 +365,22 @@ function MapPageInner() {
             GPS ±{gpsAccuracy}m
           </div>
         )}
-        {escaActiveUntil && (
-          <div className="bg-[#34D399]/20 border border-[#34D399]/40 text-[#34D399] text-[10px] px-2.5 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 font-semibold whitespace-nowrap">
-            🪱 Esca attiva
+        {escaActiveUntil && escaSecondsLeft > 0 && (
+          <div
+            className="backdrop-blur-sm rounded-2xl px-3 py-2 flex items-center gap-2 whitespace-nowrap"
+            style={{
+              background: 'linear-gradient(135deg, rgba(52,211,153,0.25) 0%, rgba(16,185,129,0.18) 100%)',
+              border: '1.5px solid rgba(52,211,153,0.7)',
+              boxShadow: '0 0 12px rgba(52,211,153,0.35), 0 2px 8px rgba(0,0,0,0.4)',
+            }}
+          >
+            <span className="text-base leading-none" style={{ filter: 'drop-shadow(0 0 4px rgba(52,211,153,0.8))' }}>🪱</span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-[10px] font-extrabold text-[#34D399] uppercase tracking-wider">Esca attiva</span>
+              <span className="text-[11px] font-mono font-bold text-white">
+                {Math.floor(escaSecondsLeft / 60)}:{String(escaSecondsLeft % 60).padStart(2, '0')}
+              </span>
+            </div>
           </div>
         )}
       </div>

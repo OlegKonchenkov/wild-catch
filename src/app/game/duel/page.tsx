@@ -98,6 +98,7 @@ export default function DuelLobbyPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingCreatures, setLoadingCreatures] = useState(true)
+  const [pendingConnect, setPendingConnect] = useState<{ roomCode?: string } | null>(null)
   const { history, loading: historyLoading } = useHistory(supabase)
 
   useEffect(() => {
@@ -157,9 +158,21 @@ export default function DuelLobbyPage() {
   async function connect(roomCode?: string) {
     const sessionId = localStorage.getItem('current_session_id')
     const filledLineup = lineup.filter(Boolean) as SquadCreature[]
-    if (!sessionId || filledLineup.length !== 3 || loading) return
+    if (!sessionId || filledLineup.length === 0 || loading) return
+    // Warn when fewer than 3 creatures selected
+    if (filledLineup.length < 3) {
+      setPendingConnect({ roomCode })
+      return
+    }
+    await doConnect(filledLineup, roomCode)
+  }
+
+  async function doConnect(filledLineup: SquadCreature[], roomCode?: string) {
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId) return
     setLoading(true)
     setError(null)
+    setPendingConnect(null)
     try {
       const lineupPayload = filledLineup.map((cr, i) => ({
         playerCreatureId: cr.playerCreatureId,
@@ -185,10 +198,11 @@ export default function DuelLobbyPage() {
     }
   }
 
-  const lineupFull = lineup.every(c => c !== null)
+  const filledCount = lineup.filter(Boolean).length
+  const lineupReady = filledCount >= 1
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden relative">
       {/* Header + tabs — single compact row */}
       <div className="flex-none px-4 pt-3 pb-2 flex items-center gap-3">
         <h1 className="text-base font-extrabold text-white shrink-0 flex items-center gap-1.5">
@@ -268,7 +282,7 @@ export default function DuelLobbyPage() {
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
           <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-2 mx-auto text-4xl">⚔️</div>
           <p className="text-white font-bold text-lg">Nessuna creatura disponibile</p>
-          <p className="text-white/50 text-sm leading-relaxed">Cattura almeno 3 creature prima di sfidare qualcuno.</p>
+          <p className="text-white/50 text-sm leading-relaxed">Cattura almeno una creatura prima di sfidare qualcuno.</p>
           <button onClick={() => router.push('/game/map')}
             className="bg-[#3A9DBC] text-white font-bold py-3 px-6 rounded-xl cursor-pointer active:scale-95 transition-transform">
             Vai alla Mappa
@@ -321,12 +335,12 @@ export default function DuelLobbyPage() {
           })}
         </div>
         <AnimatePresence>
-          {lineupFull && (
+          {lineupReady && (
             <motion.p
               initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="text-[10px] text-[#34D399] text-center mt-1.5 font-semibold"
+              className={`text-[10px] text-center mt-1.5 font-semibold ${filledCount === 3 ? 'text-[#34D399]' : 'text-[#FBBF24]'}`}
             >
-              Squadra pronta! Tocca uno slot per sostituire.
+              {filledCount === 3 ? 'Squadra completa! Tocca uno slot per sostituire.' : `${filledCount}/3 creature — puoi combattere lo stesso`}
             </motion.p>
           )}
         </AnimatePresence>
@@ -343,7 +357,7 @@ export default function DuelLobbyPage() {
             {creatures.map(cr => {
               const slotIdx = lineup.findIndex(l => l?.playerCreatureId === cr.playerCreatureId)
               const inLineup = slotIdx !== -1
-              const canAdd = !inLineup && !lineupFull
+              const canAdd = !inLineup && filledCount < 3
               const rarityColor = RARITY_COLORS[cr.rarity]
               return (
                 <motion.button
@@ -406,17 +420,19 @@ export default function DuelLobbyPage() {
       <div className="flex-none px-4 pb-3 pt-2 space-y-2 border-t border-white/8">
         <button
           onClick={() => connect()}
-          disabled={!lineupFull || loading}
+          disabled={!lineupReady || loading}
           className="w-full rounded-2xl py-3 font-extrabold text-white text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
           style={{
-            background: lineupFull ? 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)' : 'rgba(255,255,255,0.06)',
-            boxShadow: lineupFull && !loading ? '0 4px 18px rgba(232,93,47,0.4)' : 'none',
+            background: lineupReady ? 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)' : 'rgba(255,255,255,0.06)',
+            boxShadow: lineupReady && !loading ? '0 4px 18px rgba(232,93,47,0.4)' : 'none',
           }}
         >
           {loading && !joinCode ? (
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
           ) : (
-            <span className="flex items-center justify-center gap-2">⚔️ Crea Sfida</span>
+            <span className="flex items-center justify-center gap-2">
+              ⚔️ {filledCount < 3 && filledCount > 0 ? `Crea Sfida (${filledCount}/3)` : 'Crea Sfida'}
+            </span>
           )}
         </button>
 
@@ -438,11 +454,11 @@ export default function DuelLobbyPage() {
           />
           <button
             onClick={() => connect(joinCode)}
-            disabled={joinCode.length < 4 || !lineupFull || loading}
+            disabled={joinCode.length < 4 || !lineupReady || loading}
             className="shrink-0 px-5 py-2.5 rounded-xl font-bold text-sm disabled:opacity-35 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
             style={{
-              background: joinCode.length === 4 && lineupFull ? 'linear-gradient(135deg, #3A9DBC 0%, #2a7a99 100%)' : 'rgba(255,255,255,0.05)',
-              color: joinCode.length === 4 && lineupFull ? 'white' : 'rgba(255,255,255,0.3)',
+              background: joinCode.length === 4 && lineupReady ? 'linear-gradient(135deg, #3A9DBC 0%, #2a7a99 100%)' : 'rgba(255,255,255,0.05)',
+              color: joinCode.length === 4 && lineupReady ? 'white' : 'rgba(255,255,255,0.3)',
               border: '1px solid rgba(255,255,255,0.1)',
             }}
           >
@@ -465,6 +481,55 @@ export default function DuelLobbyPage() {
       </div>
       </>)}
       </>)}
+
+      {/* Confirmation modal — fewer than 3 creatures */}
+      <AnimatePresence>
+        {pendingConnect && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-40"
+              style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setPendingConnect(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="absolute inset-x-4 z-50 rounded-3xl p-5"
+              style={{ background: '#0D1525', border: '1px solid rgba(255,255,255,0.1)', top: '50%', marginTop: '-160px' }}
+            >
+              <div className="text-4xl text-center mb-3">⚠️</div>
+              <p className="text-white font-extrabold text-center text-base mb-1">
+                Squadra incompleta
+              </p>
+              <p className="text-white/50 text-sm text-center mb-5 leading-relaxed">
+                Stai usando solo <span className="text-[#FBBF24] font-bold">{filledCount}/3</span> creature.
+                L'avversario potrebbe averne di più — sei sicuro di voler combattere così?
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => { setPendingConnect(null) }}
+                  className="w-full py-3 rounded-2xl font-bold text-sm text-white"
+                  style={{ background: 'rgba(58,157,188,0.15)', border: '1px solid rgba(58,157,188,0.4)', color: '#3A9DBC' }}
+                >
+                  Aggiungi più creature
+                </button>
+                <button
+                  onClick={() => {
+                    const filled = lineup.filter(Boolean) as SquadCreature[]
+                    doConnect(filled, pendingConnect.roomCode)
+                  }}
+                  disabled={loading}
+                  className="w-full py-3 rounded-2xl font-extrabold text-sm text-white disabled:opacity-40"
+                  style={{ background: 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)' }}
+                >
+                  {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" /> : 'Combatti lo stesso'}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

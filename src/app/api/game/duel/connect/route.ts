@@ -32,12 +32,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
   }
 
-  if (!Array.isArray(lineup) || lineup.length !== 3) {
-    return NextResponse.json({ error: 'La squadra deve avere esattamente 3 creature' }, { status: 400 })
+  if (!Array.isArray(lineup) || lineup.length < 1 || lineup.length > 3) {
+    return NextResponse.json({ error: 'La squadra deve avere tra 1 e 3 creature' }, { status: 400 })
   }
-  const slots = lineup.map(l => l.slot).sort((a, b) => a - b)
-  if (JSON.stringify(slots) !== '[1,2,3]') {
-    return NextResponse.json({ error: 'Slot non validi — richiesti 1, 2, 3' }, { status: 400 })
+  const slots = lineup.map(l => l.slot)
+  if (slots.some((s: number) => s < 1 || s > 3) || new Set(slots).size !== slots.length) {
+    return NextResponse.json({ error: 'Slot non validi — usare slot 1, 2 o 3 (unici)' }, { status: 400 })
   }
 
   // Validate ownership + fetch HP (and ATK for slot 1) for each lineup creature

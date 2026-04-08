@@ -184,6 +184,7 @@ export default function DuelPage() {
   const [myRole, setMyRole]                 = useState<'challenger' | 'opponent' | null>(null)
   const [isMyTurn, setIsMyTurn]             = useState(false)
   const [attacking, setAttacking]           = useState(false)
+  const attackingRef = useRef(false)
   const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp'; id: number } | null>(null)
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
@@ -307,6 +308,21 @@ export default function DuelPage() {
 
           if (updated.status === 'active' && updated.current_turn) {
             setMyRole(role => { setIsMyTurn(updated.current_turn === role); return role })
+            // Re-fetch all lineups to get opponent's creatures (they were inserted, not updated)
+            supabase.from('duel_lineups')
+              .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, image_url))')
+              .eq('duel_id', id)
+              .order('slot', { ascending: true })
+              .then(({ data: freshLineups }) => {
+                if (!freshLineups) return
+                supabase.auth.getUser().then(({ data: { user } }) => {
+                  if (!user) return
+                  const mine = freshLineups.filter((l: LineupEntry) => l.user_id === user.id)
+                  const opp  = freshLineups.filter((l: LineupEntry) => l.user_id !== user.id)
+                  setMyLineup(mine)
+                  setOppLineup(opp)
+                })
+              })
           }
         })
       .subscribe()
@@ -339,7 +355,8 @@ export default function DuelPage() {
   }, [myLineup, result, waiting, id])
 
   async function handleAttack() {
-    if (attacking || !isMyTurn) return
+    if (attackingRef.current || !isMyTurn) return
+    attackingRef.current = true
     setAttacking(true)
     setAnimState('attack')
     setTimeout(() => setAnimState('idle'), 400)
@@ -367,6 +384,7 @@ export default function DuelPage() {
       setSelectedItemId(null)
       setShowItemsModal(false)
     }
+    attackingRef.current = false
     setAttacking(false)
   }
 

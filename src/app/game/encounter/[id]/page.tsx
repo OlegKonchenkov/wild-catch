@@ -193,7 +193,7 @@ export default function EncounterPage() {
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [message, setMessage]   = useState('')
   const [loading, setLoading]   = useState(false)
-  const [result, setResult]     = useState<'caught' | 'fled' | 'evolved' | 'ko' | null>(null)
+  const [result, setResult]     = useState<'caught' | 'fled' | 'evolved' | 'ko' | 'lost' | null>(null)
   const [caughtCreatureData, setCaughtCreatureData] = useState<any>(null)
   const [caughtExpGain, setCaughtExpGain]           = useState(0)
   const [playerCreature, setPlayerCreature] = useState<{
@@ -335,10 +335,16 @@ export default function EncounterPage() {
 
     if (data.playerTookDamage && data.wildDamage > 0) {
       await new Promise(r => setTimeout(r, 280))
-      setPlayerHp(prev => prev !== null ? Math.max(0, prev - data.wildDamage) : null)
+      const newHp = Math.max(0, (playerHp ?? playerCreature?.maxHp ?? 100) - data.wildDamage)
+      setPlayerHp(newHp)
       setPlayerAnim('damage')
       await new Promise(r => setTimeout(r, 420))
       setPlayerAnim('idle')
+      if (newHp <= 0) {
+        setResult('lost')
+        setLoading(false)
+        return
+      }
     }
 
     if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
@@ -376,10 +382,16 @@ export default function EncounterPage() {
       setWildAnim('flee'); setMessage('La creatura è fuggita...'); setResult('fled')
     } else {
       if (data.wildDamage > 0) {
-        setPlayerHp(prev => prev !== null ? Math.max(0, prev - data.wildDamage) : null)
+        const newHp = Math.max(0, (playerHp ?? playerCreature?.maxHp ?? 100) - data.wildDamage)
+        setPlayerHp(newHp)
         setPlayerAnim('damage')
         await new Promise(r => setTimeout(r, 420))
         setPlayerAnim('idle')
+        if (newHp <= 0) {
+          setResult('lost')
+          setLoading(false)
+          return
+        }
         setMessage(`Cattura fallita! Contrattacco (-${data.wildDamage} HP)`)
       } else {
         setMessage('Cattura fallita! La creatura resiste...')
@@ -748,7 +760,7 @@ export default function EncounterPage() {
 
       {/* ── RESULT OVERLAY: flee / ko ── */}
       <AnimatePresence>
-        {(result === 'fled' || result === 'ko') && (
+        {(result === 'fled' || result === 'ko' || result === 'lost') && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             className="absolute inset-0 flex flex-col items-center justify-center z-40 px-6"
@@ -759,11 +771,14 @@ export default function EncounterPage() {
               transition={{ type: 'spring', stiffness: 320, damping: 22 }}
               className="flex flex-col items-center text-center"
             >
-              <div className="text-7xl mb-5">{result === 'ko' ? '💥' : '💨'}</div>
+              <div className="text-7xl mb-5">{result === 'lost' ? '💀' : result === 'ko' ? '💥' : '💨'}</div>
               <p className="text-3xl font-extrabold text-white mb-2 tracking-tight">
-                {result === 'ko' ? 'Knock Out!' : 'Fuggita'}
+                {result === 'lost' ? 'Sconfitta!' : result === 'ko' ? 'Knock Out!' : 'Fuggita'}
               </p>
-              {state.creature.name && (
+              {result === 'lost' && (
+                <p className="text-white/50 text-sm mb-6">La tua creatura è esausta.</p>
+              )}
+              {result !== 'lost' && state.creature.name && (
                 <div className="flex items-center gap-2 mb-6">
                   <span className="text-base text-white/50">{state.creature.name}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full font-bold"
