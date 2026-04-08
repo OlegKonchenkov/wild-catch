@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { calculateCombatDamage, scaleCombatStats } from '@/lib/game/combat'
+import { calculateCombatDamage, rollCombatFortune, scaleCombatStats } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
 
@@ -160,11 +160,18 @@ export async function POST(request: Request, { params }: Params) {
 
     // ── Player → Boss ────────────────────────────────────────────────────
     const playerMult   = getElementMultiplier(playerActive.element as Element, bossActive.element as Element)
+    const playerFortune = rollCombatFortune({
+      attackerLevel: playerActive.level ?? 1,
+      defenderLevel: bossActive.level ?? 1,
+      attackerStats: { hp: playerActive.max_hp, atk: playerActive.atk, def: playerActive.def ?? 0 },
+      defenderStats: { hp: bossActive.max_hp, atk: bossActive.atk, def: bossActive.def ?? 0 },
+    })
     const playerDamage = calculateCombatDamage({
       attackerAtk: playerActive.atk,
       defenderDef: bossActive.def ?? 0,
       attackMultiplier: atkMultiplier,
       elementMultiplier: playerMult,
+      varianceMultiplier: playerFortune.multiplier,
     })
     const newBossHp    = Math.max(0, bossActive.current_hp - playerDamage)
     bossActive.current_hp = newBossHp
@@ -187,15 +194,23 @@ export async function POST(request: Request, { params }: Params) {
     // The boss that was alive before player's attack counter-attacks
     let bossDamage = 0
     let newPlayerHp = playerActive.current_hp
+    let bossFortune = null
 
     if (!allBossFainted && newBossHp > 0) {
       const counterBoss = bossActive
       if (counterBoss && !counterBoss.fainted) {
         const bossMult = getElementMultiplier(counterBoss.element as Element, playerActive.element as Element)
+        bossFortune = rollCombatFortune({
+          attackerLevel: counterBoss.level ?? 1,
+          defenderLevel: playerActive.level ?? 1,
+          attackerStats: { hp: counterBoss.max_hp, atk: counterBoss.atk, def: counterBoss.def ?? 0 },
+          defenderStats: { hp: playerActive.max_hp, atk: playerActive.atk, def: playerActive.def ?? 0 },
+        })
         bossDamage = calculateCombatDamage({
           attackerAtk: counterBoss.atk,
           defenderDef: playerActive.def ?? 0,
           elementMultiplier: bossMult,
+          varianceMultiplier: bossFortune.multiplier,
         })
         newPlayerHp = Math.max(0, playerActive.current_hp - bossDamage)
         playerActive.current_hp = newPlayerHp
@@ -311,6 +326,8 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({
       playerDamage,
       bossDamage,
+      playerFortune,
+      bossFortune,
       playerElementMult: playerMult,
       newBossHp,
       newPlayerHp,

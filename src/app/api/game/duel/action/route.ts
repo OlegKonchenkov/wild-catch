@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { calculateCombatDamage, scaleCombatStats } from '@/lib/game/combat'
+import { calculateCombatDamage, rollCombatFortune, scaleCombatStats } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { Element } from '@/lib/types'
@@ -125,11 +125,18 @@ export async function POST(request: Request) {
 
   // ── Damage calculation ─────────────────────────────────────────────────────
   const mult   = getElementMultiplier(myCreature.element as Element, oppCreature.element as Element)
+  const fortune = rollCombatFortune({
+    attackerLevel: levelByUser[user.id],
+    defenderLevel: levelByUser[oppUserId!] ?? 1,
+    attackerStats: myCombatStats,
+    defenderStats: oppCombatStats,
+  })
   const damage = calculateCombatDamage({
     attackerAtk: myCombatStats.atk,
     defenderDef: oppCombatStats.def,
     attackMultiplier: atkMultiplier,
     elementMultiplier: mult,
+    varianceMultiplier: fortune.multiplier,
   })
   const newOppHp = Math.max(0, oppActive.current_hp - damage)
 
@@ -223,6 +230,7 @@ export async function POST(request: Request) {
       actorId: user.id,
       action,
       damage,
+      fortune,
       elementMultiplier: mult,
       itemUsed: atkMultiplier > 1,
       nextTurn: duelOver ? null : nextTurn,
@@ -236,6 +244,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     damage,
+    fortune,
     elementMultiplier: mult,
     nextTurn: duelOver ? null : nextTurn,
     duelOver,

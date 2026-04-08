@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
@@ -34,6 +35,14 @@ interface BattagliaItem {
   name: string
   effectValue: number
   quantity: number
+}
+
+interface CombatFortuneInfo {
+  multiplier: number
+  deltaPercent: number
+  tone: 'lucky' | 'rough' | 'steady'
+  label: string
+  isUnderdog: boolean
 }
 
 // ── Element theme ──────────────────────────────────────────────────────────────
@@ -179,6 +188,14 @@ function getScaledLineupStats(entry: LineupEntry | undefined, playerLevels: Reco
   )
 }
 
+function formatFortuneText(fortune: CombatFortuneInfo | null | undefined): string | null {
+  if (!fortune) return null
+  if (fortune.deltaPercent === 0) return fortune.label
+
+  const sign = fortune.deltaPercent > 0 ? '+' : ''
+  return `${fortune.label} ${sign}${fortune.deltaPercent}%`
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function DuelPage() {
   const { id } = useParams<{ id: string }>()
@@ -202,12 +219,24 @@ export default function DuelPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [showItemsModal, setShowItemsModal] = useState(false)
   const [switchNotice, setSwitchNotice]     = useState<string | null>(null)
+  const [fortuneNotice, setFortuneNotice]   = useState<{ id: number; text: string; tone: CombatFortuneInfo['tone'] } | null>(null)
   const [playerLevels, setPlayerLevels]     = useState<Record<string, number>>({})
 
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
   const duelStatusRef      = useRef<string | null>(null)
   const supabase = useMemo(() => createClient(), [])
+
+  function flashFortuneNotice(fortune: CombatFortuneInfo | null | undefined) {
+    const text = formatFortuneText(fortune)
+    if (!text || !fortune) return
+
+    const id = Date.now()
+    setFortuneNotice({ id, text, tone: fortune.tone })
+    setTimeout(() => {
+      setFortuneNotice(current => current?.id === id ? null : current)
+    }, 1800)
+  }
 
   const loadPlayerLevels = useCallback(async (sessionId: string | undefined, duelUserIds: Array<string | null | undefined>) => {
     const uniqueIds = Array.from(new Set(duelUserIds.filter((value): value is string => Boolean(value))))
@@ -283,7 +312,7 @@ export default function DuelPage() {
     const channel = supabase
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
-        const { actorId, damage, nextTurn, itemUsed, switchedTo } = payload
+        const { actorId, damage, fortune, nextTurn, itemUsed, switchedTo } = payload
 
         setUserId(currentId => {
           const iAttacked = actorId === currentId
@@ -307,8 +336,11 @@ export default function DuelPage() {
           setTimeout(() => setSwitchNotice(null), 2500)
         }
 
+        flashFortuneNotice(fortune as CombatFortuneInfo | undefined)
+
         const atkLabel = itemUsed ? '⚔️+🗡️' : '⚔️'
-        setLog(prev => [`${atkLabel} ${damage} danno!`, ...prev.slice(0, 3)])
+        const fortuneText = formatFortuneText(fortune as CombatFortuneInfo | undefined)
+        setLog(prev => [`${atkLabel} ${damage} danno${fortuneText ? ` · ${fortuneText}` : ''}!`, ...prev.slice(0, 3)])
       })
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'duel_lineups', filter: `duel_id=eq.${id}` },
@@ -707,6 +739,10 @@ export default function DuelPage() {
               className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold text-[#C084FC]"
               style={{ background: 'rgba(123,77,184,0.18)', border: '1px solid rgba(123,77,184,0.4)' }}>
               ✨ {switchNotice}
+            </motion.div>
+          ) : fortuneNotice ? (
+            <motion.div key={`fortune-${fortuneNotice.id}`} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}>
+              <CombatFortuneBadge text={fortuneNotice.text} tone={fortuneNotice.tone} />
             </motion.div>
           ) : (
             <motion.div key={isMyTurn ? 'my' : 'opp'} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}

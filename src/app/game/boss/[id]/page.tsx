@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 
@@ -53,6 +54,14 @@ interface BattagliaItem {
   name: string
   effectValue: number
   quantity: number
+}
+
+interface CombatFortuneInfo {
+  multiplier: number
+  deltaPercent: number
+  tone: 'lucky' | 'rough' | 'steady'
+  label: string
+  isUnderdog: boolean
 }
 
 // ── Element theme ──────────────────────────────────────────────────────────────
@@ -200,6 +209,14 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
       </div>
     </div>
   )
+}
+
+function formatFortuneText(fortune: CombatFortuneInfo | null | undefined): string | null {
+  if (!fortune) return null
+  if (fortune.deltaPercent === 0) return fortune.label
+
+  const sign = fortune.deltaPercent > 0 ? '+' : ''
+  return `${fortune.label} ${sign}${fortune.deltaPercent}%`
 }
 
 /* ── Squad Selector ─────────────────────────────────────────────────────────── */
@@ -378,6 +395,7 @@ function BattleScreen({
   selectedItemId,
   onSelectItem,
   switchNotice,
+  fortuneNotice,
 }: {
   bossLineup: BossSlot[]
   playerLineup: PlayerSlot[]
@@ -393,6 +411,7 @@ function BattleScreen({
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
   switchNotice: string | null
+  fortuneNotice: { id: number; text: string; tone: CombatFortuneInfo['tone'] } | null
 }) {
   const [showItemsModal, setShowItemsModal] = useState(false)
 
@@ -636,6 +655,10 @@ function BattleScreen({
               style={{ background: 'rgba(123,77,184,0.18)', border: '1px solid rgba(123,77,184,0.4)' }}>
               ✨ {switchNotice}
             </motion.div>
+          ) : fortuneNotice ? (
+            <motion.div key={`fortune-${fortuneNotice.id}`} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}>
+              <CombatFortuneBadge text={fortuneNotice.text} tone={fortuneNotice.tone} />
+            </motion.div>
           ) : (
             <AnimatePresence>
               {log[log.length - 1] && (
@@ -822,9 +845,21 @@ export default function BossFightPage() {
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [switchNotice, setSwitchNotice]   = useState<string | null>(null)
+  const [fortuneNotice, setFortuneNotice] = useState<{ id: number; text: string; tone: CombatFortuneInfo['tone'] } | null>(null)
   const [finalResult, setFinalResult]     = useState<{ won: boolean; reward: any; levelUp: any } | null>(null)
 
   const addLog = (msg: string) => setLog(prev => [...prev.slice(-9), msg])
+
+  function flashFortuneNotice(fortune: CombatFortuneInfo | null | undefined) {
+    const text = formatFortuneText(fortune)
+    if (!text || !fortune) return
+
+    const id = Date.now()
+    setFortuneNotice({ id, text, tone: fortune.tone })
+    setTimeout(() => {
+      setFortuneNotice(current => current?.id === id ? null : current)
+    }, 1800)
+  }
 
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
@@ -986,7 +1021,9 @@ export default function BossFightPage() {
 
     const isOver = data.status === 'won' || data.status === 'lost'
     const activePlayer = data.playerLineup.find((c: PlayerSlot) => c.is_active)
-    addLog(`${activePlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni!`)
+    const playerFortuneText = formatFortuneText(data.playerFortune as CombatFortuneInfo | undefined)
+    addLog(`${activePlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni${playerFortuneText ? ` · ${playerFortuneText}` : ''}!`)
+    flashFortuneNotice(data.playerFortune as CombatFortuneInfo | undefined)
 
     // Phase 1: player attacks boss
     setLastDamage({ amount: data.playerDamage, target: 'boss', id: Date.now() })
@@ -1003,7 +1040,9 @@ export default function BossFightPage() {
           setBossAttacking(false)
           setLastDamage({ amount: data.bossDamage, target: 'me', id: Date.now() })
           setAnimState('damage')
-          addLog(`Il Capo Palestra risponde con ${data.bossDamage} danni!`)
+          const bossFortuneText = formatFortuneText(data.bossFortune as CombatFortuneInfo | undefined)
+          addLog(`Il Capo Palestra risponde con ${data.bossDamage} danni${bossFortuneText ? ` · ${bossFortuneText}` : ''}!`)
+          flashFortuneNotice(data.bossFortune as CombatFortuneInfo | undefined)
 
           if (data.bossSwitchedTo) {
             setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
@@ -1129,6 +1168,7 @@ export default function BossFightPage() {
             selectedItemId={selectedItemId}
             onSelectItem={setSelectedItemId}
             switchNotice={switchNotice}
+            fortuneNotice={fortuneNotice}
           />
         </div>
       )}
