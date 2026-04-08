@@ -25,6 +25,8 @@ export default function PlayersPage() {
   const [loadingPlayers, setLoadingPlayers] = useState(false)
   const [items, setItems]               = useState<any[]>([])
 
+  const [search, setSearch] = useState('')
+
   // Player detail modal
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
 
@@ -311,6 +313,15 @@ export default function PlayersPage() {
     setQrScanTarget(null); setQrScanResult(null); setQrScanning(false)
   }
 
+  const filteredPlayers = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return players
+    return players.filter(p =>
+      (p.nickname ?? '').toLowerCase().includes(q) ||
+      (p.email ?? '').toLowerCase().includes(q)
+    )
+  }, [players, search])
+
   return (
     <div className="max-w-4xl">
       <h1 className="text-2xl font-bold mb-4">👥 Giocatori</h1>
@@ -343,14 +354,27 @@ export default function PlayersPage() {
         </div>
       </div>
 
+      {/* Search */}
+      {players.length > 0 && (
+        <div className="mb-3">
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Cerca per nome o email…"
+            className="w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm placeholder-white/30 focus:outline-none focus:border-[#3A9DBC]"
+          />
+        </div>
+      )}
+
       {/* Players table */}
       <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden mb-8">
         {loadingPlayers && players.length === 0 ? (
           <div className="p-4">
             <AdminTableSkeleton rows={5} columns={6} />
           </div>
-        ) : players.length === 0 ? (
-          <p className="text-white/50 text-sm p-4">Nessun giocatore in questa sessione.</p>
+        ) : filteredPlayers.length === 0 ? (
+          <p className="text-white/50 text-sm p-4">{players.length === 0 ? 'Nessun giocatore in questa sessione.' : 'Nessun risultato per la ricerca.'}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -364,7 +388,7 @@ export default function PlayersPage() {
                 </tr>
               </thead>
               <tbody>
-                {players.map((p, i) => (
+                {filteredPlayers.map((p, i) => (
                   <tr
                     key={p.userId}
                     onClick={() => setSelectedPlayer(p)}
