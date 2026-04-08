@@ -499,10 +499,10 @@ export default function EncounterPage() {
   const timerUrgent = turnTimer <= 10
 
   const activeItemLabel = selectedReteId ? '🎯' : selectedBattagliaId ? '⚔️' : selectedPozioneId ? '🧪' : null
-  const selectedReteBonus = reteItems.find(i => i.id === selectedReteId)?.items.effect_value ?? 0
+  const selectedReteMult = reteItems.find(i => i.id === selectedReteId)?.items.effect_value ?? 1
   const catchInfoParts = [
     state.catchMultiplier > 1.0 ? `+${Math.round((state.catchMultiplier - 1) * 100)}% cattura` : null,
-    selectedReteBonus > 0 ? `Rete +${selectedReteBonus}%` : null,
+    selectedReteMult > 1 ? `Rete ×${selectedReteMult}` : null,
   ].filter(Boolean)
 
   return (
@@ -709,7 +709,7 @@ export default function EncounterPage() {
                             style={{ background: 'rgba(58,157,188,0.15)' }}>🎯</div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold text-white">{inv.items.name}</p>
-                            {inv.items.effect_value > 0 && <p className="text-xs text-[#34D399]">+{inv.items.effect_value}% cattura</p>}
+                            {inv.items.effect_value > 1 && <p className="text-xs text-[#34D399]">×{inv.items.effect_value} cattura</p>}
                           </div>
                           <span className="text-xs text-white/30 shrink-0">×{inv.quantity}</span>
                           {selectedReteId === inv.id && <div className="w-2 h-2 rounded-full bg-[#3A9DBC] shrink-0" />}

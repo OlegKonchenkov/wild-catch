@@ -172,8 +172,8 @@ function QrTypeTable() {
 /* ──────────────────── item types table ──────────────────── */
 
 const ITEM_TYPES = [
-  { type: 'rete',      color: '#3A9DBC', icon: '🎯', when: 'Automatica durante incontro',     desc: 'Bonus % cattura (effect_value = %). Più alta è la rarità, più aumenta le chance.' },
-  { type: 'esca',      color: '#34D399', icon: '🍖', when: 'Giocatore: Zaino → Usa',          desc: 'Attira creature rare per 10 min. L\'app mostra un indicatore quando è attiva.' },
+  { type: 'rete',      color: '#3A9DBC', icon: '🎯', when: 'Automatica durante incontro',     desc: 'Moltiplica la probabilità base di cattura (effect_value = moltiplicatore, es. 2.0 = ×2). Si combina col bonus HP.' },
+  { type: 'esca',      color: '#34D399', icon: '🍖', when: 'Giocatore: Zaino → Usa',          desc: 'Attira creature rare + moltiplica la probabilità di cattura (effect_value = moltiplicatore, es. 2.0 = ×2).' },
   { type: 'uovo',      color: '#C084FC', icon: '🥚', when: 'Giocatore: Zaino → Usa',          desc: 'Schiusura immediata di una creatura casuale (pool comune/non_comune). Distinto dalle uova QR.' },
   { type: 'battaglia', color: '#FBBF24', icon: '⚔️', when: 'Automatica in duello / boss',    desc: 'Boost ATK flat durante lo scontro (effect_value = bonus ATK).' },
   { type: 'pozione',   color: '#F472B6', icon: '🧪', when: 'Automatica in duello',            desc: 'Azzera il malus ×0.5 di debolezza elementale per tutta la battaglia.' },

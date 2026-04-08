@@ -32,8 +32,8 @@ export async function POST(request: Request) {
 
   const creature = (encounter as any).creatures
 
-  // Get item bonus from effect_value (rete/esca items stored as % integer, e.g. 10 = +10%)
-  let bonus = 0
+  // Get item multiplier from effect_value (rete/esca stored as decimal, e.g. 2.0 = ×2)
+  let itemMult = 1
   if (itemId) {
     const { data: invItem } = await supabase
       .from('player_inventory')
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     const inv = invItem as { quantity: number; items: { type: string; effect_value: number } } | null
     if (inv && inv.quantity > 0 && (inv.items?.type === 'rete' || inv.items?.type === 'esca')) {
-      bonus = (inv.items.effect_value ?? 0) / 100
+      itemMult = Number(inv.items.effect_value ?? 1)
       await supabase
         .from('player_inventory')
         .update({ quantity: inv.quantity - 1 })
@@ -52,13 +52,13 @@ export async function POST(request: Request) {
     }
   }
 
-  // HP weakness now scales the base chance instead of adding a large flat bonus.
-  const hpMultiplier = getCatchHealthMultiplier(encounter.wild_creature_hp, creature.hp)
+  // HP weakness multiplier × item multiplier — both scale the base catch rate
+  const hpMultiplier = getCatchHealthMultiplier(encounter.wild_creature_hp, creature.hp) * itemMult
 
   // RNG catch — server-side only
   const caught = rollCatch(
     creature.rarity,
-    bonus,
+    0,
     creature.catch_difficulty ?? 3,
     hpMultiplier,
   )

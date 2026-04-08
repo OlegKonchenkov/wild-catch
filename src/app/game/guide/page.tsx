@@ -462,7 +462,7 @@ function buildSections(): Section[] {
                 </span>
               ))}
             </div>
-            <p className="mt-1.5">Le reti aggiungono un bonus additivo diretto. Indebolire la creatura moltiplica invece la chance base in modo <strong className="text-[#34D399]">proporzionale agli HP mancanti</strong>: ogni −10% HP = <strong className="text-[#FBBF24]">×+0.2</strong> (da ×1.0 a piena vita fino a <strong className="text-[#F87171]">×3.0 a 0 HP</strong>).</p>
+            <p className="mt-1.5">Le <strong className="text-[#3A9DBC]">reti ed esche</strong> moltiplicano la chance base (es. Rete Superiore = ×2, Rete Master = ×3). Indebolire la creatura aggiunge un ulteriore moltiplicatore <strong className="text-[#34D399]">proporzionale agli HP mancanti</strong>: ogni −10% HP = <strong className="text-[#FBBF24]">×+0.2</strong> (da ×1.0 a piena vita fino a <strong className="text-[#F87171]">×3.0 a 0 HP</strong>). I due moltiplicatori si combinano.</p>
           </div>
         </div>
       ),

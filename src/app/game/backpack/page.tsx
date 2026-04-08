@@ -520,7 +520,7 @@ export default function BackpackPage() {
                         )}
                         {item.effect_value > 0 && (
                           <p className="text-xs mt-0.5" style={{ color: meta.color }}>
-                            +{item.effect_value}% {meta.hint}
+                            {(item.type === 'rete' || item.type === 'esca') ? `×${item.effect_value}` : `+${item.effect_value}%`}{' '}{meta.hint}
                           </p>
                         )}
                       </div>
