@@ -141,11 +141,11 @@ function EvolutionDiagram() {
 // ─── Element Chart ────────────────────────────────────────────────────────────
 
 const ELEMENTS = [
-  { name: 'Fiamma',    color: '#E85D2F', icon: '🔥', strong: ['Bosco', 'Armonia'],          weak: ['Adriatico', 'Terra'] },
-  { name: 'Adriatico', color: '#3A9DBC', icon: '💧', strong: ['Fiamma', 'Terra'],            weak: ['Bosco'] },
-  { name: 'Bosco',     color: '#34D399', icon: '🌿', strong: ['Adriatico'],                  weak: ['Fiamma'] },
-  { name: 'Terra',     color: '#F7C841', icon: '🪨', strong: ['Fiamma', 'Armonia'],          weak: ['Adriatico'] },
-  { name: 'Armonia',   color: '#C084FC', icon: '✨', strong: ['(+15% su tutti)'],            weak: ['Fiamma', 'Terra'] },
+  { name: 'Fiamma',    color: '#E85D2F', icon: '🔥', strong: ['Bosco'],                         weak: ['Adriatico'] },
+  { name: 'Adriatico', color: '#3A9DBC', icon: '💧', strong: ['Fiamma'],                         weak: ['Terra'] },
+  { name: 'Bosco',     color: '#34D399', icon: '🌿', strong: ['Terra'],                          weak: ['Fiamma'] },
+  { name: 'Terra',     color: '#F7C841', icon: '🪨', strong: ['Adriatico'],                      weak: ['Bosco'] },
+  { name: 'Armonia',   color: '#C084FC', icon: '✨', strong: ['Fiamma', 'Adriatico', 'Bosco', 'Terra'], weak: [] },
 ]
 
 function ElementChart() {
@@ -181,8 +181,8 @@ function ElementChart() {
       ))}
       <div className="rounded-xl border border-[#C084FC]/25 bg-[#C084FC]/5 px-3 py-2 text-xs text-[#C084FC]/80">
         ⚡ Il danno con vantaggio elementale vale <strong className="text-[#C084FC]">×1.5</strong>.
-        Lo svantaggio infligge solo <strong className="text-[#C084FC]">×0.5</strong>.
-        Armonia fa sempre <strong className="text-[#C084FC]">×1.15</strong> ma è fragile.
+        Lo svantaggio infligge solo <strong className="text-[#C084FC]">×0.5</strong> (neutro = ×1.0).
+        Armonia è forte su <em>tutti</em> gli elementi (×1.5) e non ha debolezze.
       </div>
     </div>
   )
@@ -501,7 +501,7 @@ function buildSections(): Section[] {
             </div>
             {[
               { label: 'ATK', color: '#E85D2F', desc: 'Statistica d\'attacco della creatura, scalata in base al livello (+10% per livello sopra 1).' },
-              { label: 'Moltiplicatore elemento', color: '#3A9DBC', desc: '×1.5 vantaggio · ×0.5 svantaggio · ×1.15 Armonia (sempre) · ×1.0 neutro.' },
+              { label: 'Moltiplicatore elemento', color: '#3A9DBC', desc: '×1.5 vantaggio · ×0.5 svantaggio · ×1.0 neutro. Armonia è forte su tutti (×1.5), nessuna debolezza.' },
               { label: 'Varianza fortuna', color: '#C084FC', desc: '±6% casuale ogni attacco. I combattenti più deboli ricevono un leggero bonus underdog fino a +6%.' },
               { label: 'DEF difensore', color: '#34D399', desc: 'La difesa riduce i danni: formula 120/(120+DEF). Con DEF=120 la riduzione è del 50%, con DEF=0 nessuna riduzione.' },
             ].map(row => (

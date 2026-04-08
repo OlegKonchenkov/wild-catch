@@ -96,11 +96,11 @@ function Divider() {
 /* ──────────────────── element table ──────────────────── */
 
 const ELEMENT_ROWS = [
-  { el: 'Fiamma 🔥',    color: '#E85D2F', strong: 'Bosco, Armonia',          weak: 'Adriatico, Terra' },
-  { el: 'Adriatico 💧', color: '#3A9DBC', strong: 'Fiamma, Terra',           weak: 'Bosco' },
-  { el: 'Bosco 🌿',     color: '#34D399', strong: 'Adriatico',               weak: 'Fiamma' },
-  { el: 'Terra 🪨',     color: '#F7C841', strong: 'Fiamma, Armonia',         weak: 'Adriatico' },
-  { el: 'Armonia ✨',   color: '#C084FC', strong: '+15% vs tutti (flat)',     weak: 'Fiamma, Terra' },
+  { el: 'Fiamma 🔥',    color: '#E85D2F', strong: 'Bosco',                              weak: 'Adriatico' },
+  { el: 'Adriatico 💧', color: '#3A9DBC', strong: 'Fiamma',                             weak: 'Terra' },
+  { el: 'Bosco 🌿',     color: '#34D399', strong: 'Terra',                              weak: 'Fiamma' },
+  { el: 'Terra 🪨',     color: '#F7C841', strong: 'Adriatico',                          weak: 'Bosco' },
+  { el: 'Armonia ✨',   color: '#C084FC', strong: 'Fiamma, Adriatico, Bosco, Terra',    weak: '—' },
 ]
 
 function ElementTable() {
@@ -629,8 +629,8 @@ export default function AdminGuidePage() {
               <SubHeader>Tabella degli elementi</SubHeader>
               <ElementTable />
               <Callout type="info">
-                <strong>Armonia</strong> è l&rsquo;elemento leggendario: infligge sempre +15% di danni a tutti
-                ma è vulnerabile a Fiamma e Terra (×1.5 in entrata). Ottimo per creature rare/boss con alta difesa.
+                <strong>Armonia</strong> è l&rsquo;elemento leggendario: infligge ×1.5 contro <em>tutti</em> gli
+                elementi e non ha debolezze. Ottima per boss e creature rare — bilancia assegnandola con parsimonia.
               </Callout>
 
               <SubHeader>Rarità e probabilità catch base</SubHeader>

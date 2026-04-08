@@ -175,15 +175,17 @@ export interface PlayerMission {
 }
 
 // Element type chart: attacker element -> multiplier for defender
-// Forte (1.5x): Fiamma→Bosco, Adriatico→Fiamma/Terra, Bosco→Adriatico, Terra→Fiamma
-// Debole (0.5x): inverse of forte relationships
-// Armonia: legendary, +15% flat (handled separately); weak to Terra and Fiamma (1.5x incoming)
+// 🔥 Fiamma   → forte su 🌳 Bosco
+// 💧 Adriatico → forte su 🔥 Fiamma
+// 🌳 Bosco    → forte su 🪨 Terra
+// 🪨 Terra    → forte su 💧 Adriatico
+// ✨ Armonia   → forte su tutti, nessuna debolezza
 export const ELEMENT_MULTIPLIERS: Record<Element, Partial<Record<Element, number>>> = {
-  fiamma: { bosco: 1.5, armonia: 1.5 },
-  adriatico: { fiamma: 1.5, terra: 1.5, bosco: 0.5 },
-  bosco: { adriatico: 1.5, fiamma: 0.5 },
-  terra: { fiamma: 1.5, adriatico: 0.5, armonia: 1.5 },
-  armonia: {},  // +15% flat bonus against all; defensive weaknesses encoded in attacker rows above
+  fiamma:    { bosco: 1.5 },
+  adriatico: { fiamma: 1.5 },
+  bosco:     { terra: 1.5 },
+  terra:     { adriatico: 1.5 },
+  armonia:   { fiamma: 1.5, adriatico: 1.5, bosco: 1.5, terra: 1.5 },
 }
 
 export const RARITY_CATCH_RATES: Record<Rarity, number> = {

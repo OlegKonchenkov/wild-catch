@@ -229,11 +229,11 @@ export default function BestiaryPage() {
   }
 
   const ELEM_TABLE: Record<string, { strong: string[]; weak: string[] }> = {
-    fiamma:    { strong: ['bosco', 'armonia'],           weak: ['adriatico', 'terra'] },
-    adriatico: { strong: ['fiamma', 'terra'],            weak: ['bosco'] },
-    bosco:     { strong: ['adriatico'],                  weak: ['fiamma'] },
-    terra:     { strong: ['fiamma', 'armonia'],          weak: ['adriatico'] },
-    armonia:   { strong: ['fiamma', 'adriatico', 'bosco', 'terra', 'armonia'], weak: ['fiamma', 'terra'] },
+    fiamma:    { strong: ['bosco'],                              weak: ['adriatico'] },
+    adriatico: { strong: ['fiamma'],                             weak: ['terra'] },
+    bosco:     { strong: ['terra'],                              weak: ['fiamma'] },
+    terra:     { strong: ['adriatico'],                          weak: ['bosco'] },
+    armonia:   { strong: ['fiamma', 'adriatico', 'bosco', 'terra'], weak: [] },
   }
 
   return (
@@ -277,7 +277,7 @@ export default function BestiaryPage() {
                   ))}
                 </div>
                 <p className="text-[10px] text-white/20 mt-3 text-center">
-                  ✨ Armonia: +15% su tutti, debole vs 🔥 e 🪨
+                  ✨ Armonia: forte su tutti, nessuna debolezza
                 </p>
               </div>
             </motion.div>
