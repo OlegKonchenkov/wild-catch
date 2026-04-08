@@ -5,25 +5,30 @@ export function rollDice(): number {
   return 0.8 + Math.random() * 0.4  // 0.8 to 1.2
 }
 
-export const CATCH_HP_MULTIPLIERS = {
-  normal: 1,
-  weakened: 1.5,
-  critical: 2.25,
-} as const
+/** Returned when HP is full — used as default parameter value. */
+export const CATCH_HP_NORMAL = 1
 
+/**
+ * Proportional catch multiplier based on missing HP.
+ * Formula: 1 + (1 - hpRatio) × 2.0
+ *   • Full HP  (100%) → ×1.0  (no bonus)
+ *   • −10% HP  ( 90%) → ×1.2  (+20%)
+ *   • Half HP  ( 50%) → ×2.0  (+100%)
+ *   • Critical ( 10%) → ×2.8  (+180%)
+ *   • Zero HP  (  0%) → ×3.0  (+200%)
+ * Every 10% of HP removed adds +0.20 to the multiplier.
+ */
 export function getCatchHealthMultiplier(currentHp: number, maxHp: number): number {
   const safeMaxHp = Math.max(1, maxHp)
   const hpRatio = Math.max(0, Math.min(1, currentHp / safeMaxHp))
-  if (hpRatio <= 0.30) return CATCH_HP_MULTIPLIERS.critical
-  if (hpRatio <= 0.50) return CATCH_HP_MULTIPLIERS.weakened
-  return CATCH_HP_MULTIPLIERS.normal
+  return 1 + (1 - hpRatio) * 2.0
 }
 
 export function calculateCatchRate(
   rarity: Rarity,
   bonusAdditive: number,
   difficulty = 3,
-  hpMultiplier: number = CATCH_HP_MULTIPLIERS.normal,
+  hpMultiplier: number = CATCH_HP_NORMAL,
 ): number {
   const baseRate = RARITY_CATCH_RATES[rarity] * (CATCH_DIFFICULTY_MULT[difficulty] ?? 1.0)
   return Math.min(1.0, (baseRate * hpMultiplier) + bonusAdditive)
@@ -33,7 +38,7 @@ export function rollCatch(
   rarity: Rarity,
   bonusAdditive: number,
   difficulty = 3,
-  hpMultiplier: number = CATCH_HP_MULTIPLIERS.normal,
+  hpMultiplier: number = CATCH_HP_NORMAL,
 ): boolean {
   return Math.random() < calculateCatchRate(rarity, bonusAdditive, difficulty, hpMultiplier)
 }

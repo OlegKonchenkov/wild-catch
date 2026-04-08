@@ -61,7 +61,10 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
   const hpPct       = Math.max(0, Math.min(100, (currentHp / maxHp) * 100))
   const hpColor     = hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444'
   const stars       = CATCH_STARS[rarity] ?? 1
-  const isWeakened  = isWild && hpPct < 30
+  const catchMult   = catchMultiplier ?? 1
+  const catchBonusPct = Math.round((catchMult - 1) * 100)
+  const catchFillPct  = Math.min(100, (catchMult - 1) / 2 * 100)
+  const catchIntensity = Math.min(1, (catchMult - 1) / 2)
 
   const borderRadius = side === 'right'
     ? '16px 0 0 16px'
@@ -141,21 +144,34 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
           </div>
         </div>
 
-        {/* Wild: catch stars + weakened/bonus */}
+        {/* Wild: catch stars + proportional HP catch bonus */}
         {isWild && (
-          <div className="flex items-center gap-1.5 mt-1.5">
+          <div className="mt-1.5 space-y-1.5">
+            {/* Difficulty stars */}
             <div className="flex gap-[2px]">
               {Array.from({ length: 5 }, (_, i) => (
                 <span key={i} style={{ fontSize: 11, color: i < stars ? '#FBBF24' : 'rgba(255,255,255,0.12)', lineHeight: 1 }}>★</span>
               ))}
             </div>
-            {isWeakened && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#34D399]/15 text-[#34D399] border border-[#34D399]/30">
-                indebolita!
-              </span>
-            )}
-            {(catchMultiplier ?? 1) > 1 && (
-              <span className="text-[10px] font-bold text-[#34D399]">×{formatCatchMultiplier(catchMultiplier ?? 1)}</span>
+            {/* Catch bonus bar — appears proportionally as HP drops */}
+            {catchMult > 1.0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="flex-1 h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    animate={{ width: `${catchFillPct}%` }}
+                    transition={{ duration: 0.5 }}
+                    style={{
+                      background: `rgba(52,211,153,${0.45 + catchIntensity * 0.55})`,
+                      boxShadow: catchIntensity > 0.4 ? `0 0 5px rgba(52,211,153,${catchIntensity * 0.5})` : 'none',
+                    }}
+                  />
+                </div>
+                <span className="text-[9px] font-bold tabular-nums"
+                  style={{ color: `rgba(52,211,153,${0.55 + catchIntensity * 0.45})` }}>
+                  +{catchBonusPct}%
+                </span>
+              </div>
             )}
           </div>
         )}
@@ -347,9 +363,10 @@ export default function EncounterPage() {
       setWildAnim('flee'); setMessage(''); setResult('ko'); setLoading(false); return
     }
 
-    setMessage(data.fightResult === 'catchable'
-      ? `HP basso! Cattura ×${formatCatchMultiplier(data.catchMultiplier)}`
-      : `Danno: ${data.playerDamage} (×${data.elementMultiplier.toFixed(1)})`)
+    const bonusPct = Math.round((data.catchMultiplier - 1) * 100)
+    const elemStr = data.elementMultiplier !== 1 ? ` (×${data.elementMultiplier.toFixed(1)})` : ''
+    const bonusStr = bonusPct > 0 ? ` · +${bonusPct}% 🎯` : ''
+    setMessage(`Danno: ${data.playerDamage}${elemStr}${bonusStr}`)
 
     if (data.playerTookDamage && data.wildDamage > 0) {
       await new Promise(r => setTimeout(r, 280))
@@ -484,7 +501,7 @@ export default function EncounterPage() {
   const activeItemLabel = selectedReteId ? '🎯' : selectedBattagliaId ? '⚔️' : selectedPozioneId ? '🧪' : null
   const selectedReteBonus = reteItems.find(i => i.id === selectedReteId)?.items.effect_value ?? 0
   const catchInfoParts = [
-    state.catchMultiplier > 1 ? `HP ×${formatCatchMultiplier(state.catchMultiplier)}` : null,
+    state.catchMultiplier > 1.0 ? `+${Math.round((state.catchMultiplier - 1) * 100)}% cattura` : null,
     selectedReteBonus > 0 ? `Rete +${selectedReteBonus}%` : null,
   ].filter(Boolean)
 
