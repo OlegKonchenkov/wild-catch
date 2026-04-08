@@ -1014,15 +1014,18 @@ export default function BossFightPage() {
       ).filter(item => item.quantity > 0))
     }
 
-    setBossLineup(data.bossLineup)
-    setPlayerLineup(data.playerLineup)
-    const newBossSlot = data.bossLineup.findIndex((c: BossSlot) => !c.fainted)
+    const nextBossLineup = data.bossLineup as BossSlot[]
+    const nextPlayerLineup = data.playerLineup as PlayerSlot[]
+    const actingPlayer = playerLineup.find((c: PlayerSlot) => c.is_active && !c.fainted)
+      ?? nextPlayerLineup.find((c: PlayerSlot) => c.is_active)
+
+    setBossLineup(nextBossLineup)
+    const newBossSlot = nextBossLineup.findIndex((c: BossSlot) => !c.fainted)
     setBossActiveSlot(newBossSlot === -1 ? 0 : newBossSlot)
 
     const isOver = data.status === 'won' || data.status === 'lost'
-    const activePlayer = data.playerLineup.find((c: PlayerSlot) => c.is_active)
     const playerFortuneText = formatFortuneText(data.playerFortune as CombatFortuneInfo | undefined)
-    addLog(`${activePlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni${playerFortuneText ? ` · ${playerFortuneText}` : ''}!`)
+    addLog(`${actingPlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni${playerFortuneText ? ` · ${playerFortuneText}` : ''}!`)
     flashFortuneNotice(data.playerFortune as CombatFortuneInfo | undefined)
 
     // Phase 1: player attacks boss
@@ -1038,6 +1041,14 @@ export default function BossFightPage() {
         setBossAttacking(true)
         setTimeout(() => {
           setBossAttacking(false)
+          setPlayerLineup(prev => prev.map(slot =>
+            slot.is_active
+              ? {
+                  ...slot,
+                  current_hp: data.newPlayerHp,
+                }
+              : slot,
+          ))
           setLastDamage({ amount: data.bossDamage, target: 'me', id: Date.now() })
           setAnimState('damage')
           const bossFortuneText = formatFortuneText(data.bossFortune as CombatFortuneInfo | undefined)
@@ -1054,6 +1065,7 @@ export default function BossFightPage() {
           }
 
           setTimeout(() => {
+            setPlayerLineup(nextPlayerLineup)
             setAnimState('idle')
             setLastDamage(null)
             attackingRef.current = false
@@ -1062,6 +1074,7 @@ export default function BossFightPage() {
         }, 1100)  // boss "thinks" for ~1s then strikes
       } else {
         // Boss fainted or game over — no counter-attack
+        setPlayerLineup(nextPlayerLineup)
         if (data.bossSwitchedTo) {
           setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
           setTimeout(() => setSwitchNotice(null), 2000)

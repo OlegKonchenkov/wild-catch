@@ -185,18 +185,23 @@ export async function POST(request: Request) {
         break
       }
 
-      // Check if this player already has a boss fight for this QR (including won — don't re-reward)
-      const { data: existingFight } = await admin
+      // Check if this player already has boss fights for this QR.
+      // Prefer an in-progress fight, otherwise reuse a won fight to avoid duplicate rewards.
+      const { data: existingFights } = await admin
         .from('boss_fights')
-        .select('id, status')
+        .select('id, status, created_at')
         .eq('user_id', user.id)
         .eq('qr_code_id', qr.id)
         .in('status', ['selecting', 'active', 'won'])
-        .maybeSingle()
+        .order('created_at', { ascending: false })
 
       let bossFightId: string
-      if (existingFight) {
-        bossFightId = existingFight.id
+      const reusableFight = (existingFights ?? []).find((fight: { id: string; status: string }) =>
+        fight.status === 'selecting' || fight.status === 'active',
+      ) ?? (existingFights ?? []).find((fight: { id: string; status: string }) => fight.status === 'won')
+
+      if (reusableFight) {
+        bossFightId = reusableFight.id
       } else {
         const { data: newFight, error: fightErr } = await admin
           .from('boss_fights')

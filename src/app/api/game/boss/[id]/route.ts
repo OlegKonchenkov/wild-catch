@@ -264,7 +264,19 @@ export async function POST(request: Request, { params }: Params) {
     // ── Grant reward on win ──────────────────────────────────────────────
     let levelUp: { newLevel: number; goldReward: number } | null = null
     let rewardGranted = false
-    if (won) {
+    const { data: priorRewardedFight } = won && fight.qr_code_id
+      ? await supabase
+          .from('boss_fights')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('qr_code_id', fight.qr_code_id)
+          .eq('reward_claimed', true)
+          .neq('id', id)
+          .limit(1)
+          .maybeSingle()
+      : { data: null }
+
+    if (won && !priorRewardedFight) {
       const { data: claimedRows } = await supabase
         .from('boss_fights')
         .update({ reward_claimed: true })
@@ -272,6 +284,12 @@ export async function POST(request: Request, { params }: Params) {
         .or('reward_claimed.is.null,reward_claimed.eq.false')
         .select('id')
       rewardGranted = (claimedRows?.length ?? 0) > 0
+    } else if (won && priorRewardedFight) {
+      await supabase
+        .from('boss_fights')
+        .update({ reward_claimed: true })
+        .eq('id', id)
+        .or('reward_claimed.is.null,reward_claimed.eq.false')
     }
 
     if (rewardGranted) {
