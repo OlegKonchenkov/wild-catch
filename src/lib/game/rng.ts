@@ -1,12 +1,12 @@
-import { RARITY_CATCH_RATES } from '@/lib/types'
+import { RARITY_CATCH_RATES, CATCH_DIFFICULTY_MULT } from '@/lib/types'
 import type { Rarity } from '@/lib/types'
 
 export function rollDice(): number {
   return 0.8 + Math.random() * 0.4  // 0.8 to 1.2
 }
 
-export function rollCatch(rarity: Rarity, bonusAdditive: number): boolean {
-  const baseRate = RARITY_CATCH_RATES[rarity]
+export function rollCatch(rarity: Rarity, bonusAdditive: number, difficulty = 3): boolean {
+  const baseRate = RARITY_CATCH_RATES[rarity] * (CATCH_DIFFICULTY_MULT[difficulty] ?? 1.0)
   const rate = Math.min(1.0, baseRate + bonusAdditive)
   return Math.random() < rate
 }

@@ -194,6 +194,16 @@ export const RARITY_CATCH_RATES: Record<Rarity, number> = {
   leggendario: 0.05,
 }
 
+// Multiplier applied to the rarity base catch rate based on catch_difficulty (1–5 stars).
+// 3⭐ = Normale = ×1.0 (no change). Lower difficulty = easier to catch.
+export const CATCH_DIFFICULTY_MULT: Record<number, number> = {
+  1: 1.50,  // Molto facile
+  2: 1.20,  // Facile
+  3: 1.00,  // Normale
+  4: 0.70,  // Difficile
+  5: 0.45,  // Molto difficile
+}
+
 export const RARITY_COLORS: Record<Rarity, string> = {
   comune: '#7AB87A',
   non_comune: '#4A9FD4',

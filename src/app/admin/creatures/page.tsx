@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
 import { AdminListSkeleton } from '@/components/admin/AdminLoading'
+import { RARITY_CATCH_RATES, CATCH_DIFFICULTY_MULT } from '@/lib/types'
 
 type Rarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario'
 type ElementType = 'fiamma' | 'adriatico' | 'bosco' | 'terra' | 'armonia'
@@ -595,14 +596,30 @@ export default function CreaturesPage() {
 
                     <div>
                       <label className="text-xs text-white/40 block mb-1">Difficoltà cattura</label>
-                      <div className="flex gap-1">
-                        {[1,2,3,4,5].map(n => (
-                          <button key={n} type="button"
-                            onClick={() => setFormData(f => ({ ...f, catch_difficulty: n } as any))}
-                            className={`text-xl leading-none transition-all ${n <= ((formData as any).catch_difficulty ?? 1) ? 'opacity-100' : 'opacity-25'}`}>
-                            ⭐
-                          </button>
-                        ))}
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          {[1,2,3,4,5].map(n => (
+                            <button key={n} type="button"
+                              onClick={() => setFormData(f => ({ ...f, catch_difficulty: n } as any))}
+                              className={`text-xl leading-none transition-all ${n <= ((formData as any).catch_difficulty ?? 1) ? 'opacity-100' : 'opacity-25'}`}>
+                              ⭐
+                            </button>
+                          ))}
+                        </div>
+                        {/* Live effective catch % */}
+                        {(() => {
+                          const diff = (formData as any).catch_difficulty ?? 3
+                          const base = RARITY_CATCH_RATES[formData.rarity as Rarity] ?? 0.5
+                          const mult = CATCH_DIFFICULTY_MULT[diff] ?? 1.0
+                          const pct  = Math.min(100, Math.round(base * mult * 100))
+                          const labels = ['', 'Molto facile', 'Facile', 'Normale', 'Difficile', 'Molto difficile']
+                          const color  = pct >= 60 ? '#34D399' : pct >= 30 ? '#FBBF24' : '#F87171'
+                          return (
+                            <span className="text-xs font-bold ml-1" style={{ color }}>
+                              {pct}% · {labels[diff]}
+                            </span>
+                          )
+                        })()}
                       </div>
                     </div>
 

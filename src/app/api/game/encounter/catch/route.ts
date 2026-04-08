@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   else if (hpRatio <= 0.50) bonus += 0.30
 
   // RNG catch — server-side only
-  const caught = rollCatch(creature.rarity, bonus)
+  const caught = rollCatch(creature.rarity, bonus, creature.catch_difficulty ?? 3)
 
   if (!caught) {
     // 40% chance the creature flees immediately, 60% chance it counter-attacks and stays
