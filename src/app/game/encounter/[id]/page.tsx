@@ -78,7 +78,8 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
       <div
         className="relative shrink-0 flex items-center justify-center"
         style={{
-          width: 112,
+          width: 152,
+          minHeight: 148,
           background: `linear-gradient(135deg, ${rarityColor}18 0%, transparent 70%)`,
         }}
       >
@@ -89,13 +90,13 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
               <motion.div
                 className="absolute rounded-full"
                 style={{ border: '2.5px solid rgba(58,157,188,1)', boxShadow: '0 0 18px rgba(58,157,188,0.9), 0 0 40px rgba(58,157,188,0.5)' }}
-                initial={{ width: 120, height: 120, opacity: 0 }}
-                animate={{ width: [120, 120, 45, 5], height: [120, 120, 45, 5], opacity: [0, 1, 1, 0] }}
+                initial={{ width: 148, height: 148, opacity: 0 }}
+                animate={{ width: [148, 148, 55, 5], height: [148, 148, 55, 5], opacity: [0, 1, 1, 0] }}
                 transition={{ duration: 1.4, times: [0, 0.12, 0.62, 1], ease: 'easeInOut' }}
               />
               <motion.div
                 className="absolute text-[#3A9DBC] font-extrabold"
-                style={{ fontSize: 16, textShadow: '0 0 10px rgba(58,157,188,0.9)' }}
+                style={{ fontSize: 20, textShadow: '0 0 10px rgba(58,157,188,0.9)' }}
                 initial={{ opacity: 0, scale: 0 }}
                 animate={{ opacity: [0, 1, 0], scale: [0, 2, 0] }}
                 transition={{ duration: 0.45, delay: 0.72 }}
@@ -110,7 +111,7 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
           imageUrl={imageUrl}
           name={name}
           animState={animState}
-          size={108}
+          size={140}
           element={element as Element}
           rarity={rarity as Rarity}
           showAura
@@ -118,62 +119,62 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
       </div>
 
       {/* ── Info section ── */}
-      <div className="flex-1 px-3 py-2.5 flex flex-col justify-between min-w-0">
+      <div className="flex-1 px-3.5 py-3 flex flex-col justify-between min-w-0">
         {/* Name + badges */}
         <div>
-          <p className="font-extrabold text-white text-[13px] leading-tight truncate mb-1.5">{name}</p>
+          <p className="font-extrabold text-white text-[15px] leading-tight truncate mb-2">{name}</p>
           <div className="flex items-center gap-1.5 flex-wrap">
             <span
-              className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
               style={{ background: `${rarityColor}22`, border: `1px solid ${rarityColor}55`, color: rarityColor }}
             >
               {rarity?.replace('_', ' ')}
             </span>
-            <span className="text-[11px] leading-none">{elemEmoji}</span>
-            <span className="text-[9px] text-white/35 capitalize">{element}</span>
+            <span className="text-[13px] leading-none">{elemEmoji}</span>
+            <span className="text-[10px] text-white/35 capitalize">{element}</span>
           </div>
         </div>
 
         {/* Wild: catch stars + weakened/bonus */}
         {isWild && (
-          <div className="flex items-center gap-1.5 mt-1">
-            <div className="flex gap-[1.5px]">
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <div className="flex gap-[2px]">
               {Array.from({ length: 5 }, (_, i) => (
-                <span key={i} style={{ fontSize: 9, color: i < stars ? '#FBBF24' : 'rgba(255,255,255,0.12)', lineHeight: 1 }}>★</span>
+                <span key={i} style={{ fontSize: 11, color: i < stars ? '#FBBF24' : 'rgba(255,255,255,0.12)', lineHeight: 1 }}>★</span>
               ))}
             </div>
             {isWeakened && (
-              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[#34D399]/15 text-[#34D399] border border-[#34D399]/30">
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#34D399]/15 text-[#34D399] border border-[#34D399]/30">
                 indebolita!
               </span>
             )}
             {(catchBonus ?? 0) > 0 && (
-              <span className="text-[9px] font-bold text-[#34D399]">+{Math.round((catchBonus ?? 0) * 100)}%</span>
+              <span className="text-[10px] font-bold text-[#34D399]">+{Math.round((catchBonus ?? 0) * 100)}%</span>
             )}
           </div>
         )}
 
         {/* Player: ATK stat */}
         {!isWild && atk !== undefined && (
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-[8px] font-bold text-white/30 uppercase tracking-wider">ATK</span>
-            <span className="text-[11px] font-extrabold" style={{ color: '#E85D2F' }}>{atk}</span>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-[9px] font-bold text-white/30 uppercase tracking-wider">ATK</span>
+            <span className="text-[13px] font-extrabold" style={{ color: '#E85D2F' }}>{atk}</span>
           </div>
         )}
 
         {/* HP bar */}
-        <div className="mt-1.5">
-          <div className="h-[7px] rounded-full overflow-hidden mb-[3px]" style={{ background: 'rgba(255,255,255,0.08)' }}>
+        <div className="mt-2">
+          <div className="h-[8px] rounded-full overflow-hidden mb-1" style={{ background: 'rgba(255,255,255,0.08)' }}>
             <motion.div
               className="h-full rounded-full"
               animate={{ width: `${hpPct}%` }}
               transition={{ duration: 0.5 }}
-              style={{ background: hpColor, boxShadow: `0 0 6px ${hpColor}90` }}
+              style={{ background: hpColor, boxShadow: `0 0 8px ${hpColor}90` }}
             />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[8px] font-bold uppercase tracking-wider text-white/25">HP</span>
-            <span className="text-[9px] font-mono font-bold text-white/50">{currentHp}/{maxHp}</span>
+            <span className="text-[9px] font-bold uppercase tracking-wider text-white/25">HP</span>
+            <span className="text-[10px] font-mono font-bold text-white/50">{currentHp}/{maxHp}</span>
           </div>
         </div>
       </div>
@@ -485,7 +486,7 @@ export default function EncounterPage() {
       <div className="relative z-10 flex-1 min-h-0">
 
         {/* WILD CARD — top, flush to right edge */}
-        <div className="absolute z-10" style={{ top: 12, right: 0, left: '22%' }}>
+        <div className="absolute z-10" style={{ top: 12, right: 0, left: '12%' }}>
           <motion.div
             initial={{ x: 80, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -507,7 +508,7 @@ export default function EncounterPage() {
         </div>
 
         {/* PLAYER CARD — bottom, flush to left edge */}
-        <div className="absolute z-10" style={{ bottom: 12, left: 0, right: '22%' }}>
+        <div className="absolute z-10" style={{ bottom: 12, left: 0, right: '12%' }}>
           <motion.div
             initial={{ x: -80, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}

@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -292,11 +292,12 @@ function BossGuide() {
       {/* Rules */}
       <div className="space-y-2 text-xs">
         {[
-          { icon: '🐾', text: 'Seleziona una squadra di 3 creature dal tuo Bestiario prima di iniziare lo scontro.' },
-          { icon: '⚔️', text: 'Il boss schiera 3 creature. Il combattimento è a turni: tu attacchi, poi risponde il boss.' },
-          { icon: '🔄', text: 'Quando una creatura è KO entra automaticamente la prossima della squadra.' },
+          { icon: '🐾', text: 'Seleziona da 1 a 3 creature dal tuo Bestiario. Con meno di 3 comparirà un avviso di conferma.' },
+          { icon: '⚔️', text: 'Il boss schiera fino a 3 creature. Il combattimento è a turni: tu attacchi, poi risponde il boss.' },
+          { icon: '🔄', text: 'Quando una creatura è KO entra automaticamente la prossima. Il boss NON attacca automaticamente entrando.' },
           { icon: '🧪', text: 'Gli oggetti Battaglia e Pozione vengono usati automaticamente durante il boss fight.' },
           { icon: '🏆', text: 'Vinci abbattendo tutte le creature boss → ricevi EXP, monete e oggetti rari.' },
+          { icon: '🎁', text: 'La ricompensa si ottiene solo alla prima vittoria per quel QR boss. Rivincite non danno premi aggiuntivi.' },
           { icon: '💀', text: 'Se tutte le tue creature cadono, la battaglia è persa — riprova scansionando di nuovo il QR.' },
         ].map(row => (
           <div key={row.text} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
@@ -336,11 +337,12 @@ function DuelDiagram() {
       </div>
       <div className="space-y-1.5 text-xs">
         {[
-          '⚔️ Scegli una squadra di 3 creature prima di ogni duello',
+          '⚔️ Puoi schierare da 1 a 3 creature — con meno di 3 ti verrà chiesta conferma',
           '🔄 Quando una creatura è KO entra la successiva in automatico',
           '⏱️ Ogni turno ha un timer: se scade, l\'avversario guadagna un turno bonus',
-          '🏆 Chi abbatte tutte e 3 le creature avversarie vince il duello',
+          '🏆 Chi abbatte tutte le creature avversarie vince il duello',
           '⚡ Vittoria → EXP + monete + progresso missione duello',
+          '⚠️ Se entrambi i giocatori restano in attesa di abbinamento, premi "Aggiorna" — la stanza è ancora attiva',
         ].map(tip => (
           <div key={tip} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
             <span className="text-white/70 leading-relaxed">{tip}</span>
@@ -425,6 +427,11 @@ function buildSections(): Section[] {
             quando ti muovi, sia con un timer casuale ogni pochi minuti. Non serve toccare nulla!
           </p>
           <MiniMap />
+          <div className="mt-3 rounded-xl border border-[#34D399]/25 bg-[#34D399]/6 px-3 py-2.5 text-xs text-[#34D399]/90">
+            <span className="font-bold text-[#34D399]">🪱 Esca attiva</span> — quando usi un&apos;esca dalla mappa comparirà
+            un badge verde con un <strong>conto alla rovescia M:SS</strong> che indica il tempo rimanente.
+            Con l&apos;esca attiva le creature rare compaiono più spesso nell&apos;area.
+          </div>
         </div>
       ),
     },
@@ -438,7 +445,8 @@ function buildSections(): Section[] {
           <p className="text-white/80 text-sm leading-relaxed">
             Quando trovi una creatura puoi scegliere: <span className="text-[#E85D2F] font-bold">combatti</span> (attacca
             con la tua creatura attiva per indebolirla) oppure lancia direttamente la rete.
-            Più è debole, più facile catturarla!
+            Più è debole, più facile catturarla! Attenzione — la creatura selvatica può contrattaccare e
+            ridurre gli HP della tua. Se gli HP scendono a 0: <span className="text-[#EF4444] font-bold">Sconfitta!</span>
           </p>
           <BattleDiagram />
           <div className="mt-3 rounded-xl border border-white/10 bg-white/4 px-3 py-2 text-xs text-white/55">
@@ -469,6 +477,49 @@ function buildSections(): Section[] {
             Uno svantaggio dimezza i danni. Vale sia negli incontri che nei duelli PvP e nei boss fight.
           </p>
           <ElementChart />
+        </div>
+      ),
+    },
+    {
+      id: 'danni',
+      icon: '⚡',
+      title: 'Calcolo Danni',
+      accent: '#FBBF24',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed mb-3">
+            Ogni attacco in incontri, duelli e boss fight segue la stessa formula.
+          </p>
+          <div className="space-y-2 text-xs">
+            <div className="rounded-xl border border-[#FBBF24]/30 bg-[#FBBF24]/8 px-3 py-2.5">
+              <p className="font-bold text-[#FBBF24] mb-1">Formula danno</p>
+              <p className="font-mono text-white/70 leading-relaxed">
+                danno = ATK × moltiplicatore_elemento × varianza × (120 / (120 + DEF_difensore))
+              </p>
+            </div>
+            {[
+              { label: 'ATK', color: '#E85D2F', desc: 'Statistica d\'attacco della creatura, scalata in base al livello (+10% per livello sopra 1).' },
+              { label: 'Moltiplicatore elemento', color: '#3A9DBC', desc: '×1.5 vantaggio · ×0.5 svantaggio · ×1.15 Armonia (sempre) · ×1.0 neutro.' },
+              { label: 'Varianza fortuna', color: '#C084FC', desc: '±6% casuale ogni attacco. I combattenti più deboli ricevono un leggero bonus underdog fino a +6%.' },
+              { label: 'DEF difensore', color: '#34D399', desc: 'La difesa riduce i danni: formula 120/(120+DEF). Con DEF=120 la riduzione è del 50%, con DEF=0 nessuna riduzione.' },
+            ].map(row => (
+              <div key={row.label} className="rounded-lg bg-white/4 border border-white/8 px-3 py-2">
+                <span className="font-bold text-sm" style={{ color: row.color }}>{row.label}</span>
+                <p className="text-white/55 mt-0.5 leading-relaxed">{row.desc}</p>
+              </div>
+            ))}
+            <div className="rounded-xl border border-white/10 bg-white/4 px-3 py-2.5">
+              <p className="font-bold text-white/70 mb-1 text-[11px] uppercase tracking-wider">Scaling livello creature</p>
+              <div className="flex gap-3 text-[11px] text-white/55">
+                <span>HP: <strong className="text-white/80">+14%/liv</strong></span>
+                <span>ATK: <strong className="text-white/80">+10%/liv</strong></span>
+                <span>DEF: <strong className="text-white/80">+9%/liv</strong></span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-xl border border-[#FBBF24]/20 bg-[#FBBF24]/5 px-3 py-2 text-xs text-[#FBBF24]/80">
+            💡 Il danno minimo è sempre 1 — nessun attacco va a vuoto.
+          </div>
         </div>
       ),
     },
@@ -765,7 +816,16 @@ function SectionCard({ section }: { section: Section }) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function GuidePage() {
-  const sections = buildSections()
+  const allSections = buildSections()
+  const [query, setQuery] = useState('')
+
+  const sections = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return allSections
+    return allSections.filter(s =>
+      s.title.toLowerCase().includes(q) || s.id.toLowerCase().includes(q)
+    )
+  }, [query, allSections])
 
   return (
     <div className="h-full overflow-y-auto bg-[#0F1F2E]">
@@ -779,46 +839,68 @@ export default function GuidePage() {
             <p className="text-xs text-[#3A9DBC]/80">Come funziona WildCatch</p>
           </div>
         </div>
+        {/* Search bar */}
+        <div className="px-4 pb-3">
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+            <input
+              type="search"
+              placeholder="Cerca argomento…"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl text-sm text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-[#3A9DBC]/50"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+            />
+          </div>
+        </div>
         <div className="h-0.5 bg-gradient-to-r from-[#3A9DBC] via-[#F7C841] to-[#34D399] opacity-60" />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, scale: 0.97 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="mx-4 mt-4 mb-5 rounded-2xl overflow-hidden relative"
-        style={{
-          background: 'linear-gradient(135deg, #0d2a3e 0%, #071420 50%, #0a1f14 100%)',
-          border: '1px solid rgba(58,157,188,0.25)',
-          boxShadow: '0 8px 40px rgba(58,157,188,0.12)',
-        }}>
-        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-10"
-          style={{ background: 'radial-gradient(circle, #3A9DBC 0%, transparent 70%)' }} />
-        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-10"
-          style={{ background: 'radial-gradient(circle, #34D399 0%, transparent 70%)' }} />
-        <div className="relative px-5 py-5">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-3xl">🐾</span>
-            <span className="text-xl font-black text-white tracking-tight">WildCatch</span>
+      {!query && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="mx-4 mt-4 mb-5 rounded-2xl overflow-hidden relative"
+          style={{
+            background: 'linear-gradient(135deg, #0d2a3e 0%, #071420 50%, #0a1f14 100%)',
+            border: '1px solid rgba(58,157,188,0.25)',
+            boxShadow: '0 8px 40px rgba(58,157,188,0.12)',
+          }}>
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-10"
+            style={{ background: 'radial-gradient(circle, #3A9DBC 0%, transparent 70%)' }} />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-10"
+            style={{ background: 'radial-gradient(circle, #34D399 0%, transparent 70%)' }} />
+          <div className="relative px-5 py-5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-3xl">🐾</span>
+              <span className="text-xl font-black text-white tracking-tight">WildCatch</span>
+            </div>
+            <p className="text-sm text-white/60 leading-relaxed">
+              Avventura nella natura adriatica e nei boschi appenninici.<br />
+              Cattura, evolvi, combatti — diventa il miglior cacciatore!
+            </p>
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {['📍 GPS Reale', '🔥 Elementi', '⚔️ Duelli', '🥚 Uova', '💀 Boss', '🏆 Classifica'].map(tag => (
+                <span key={tag} className="text-[10px] px-2.5 py-1 rounded-full bg-white/8 border border-white/12 text-white/70">
+                  {tag}
+                </span>
+              ))}
+            </div>
           </div>
-          <p className="text-sm text-white/60 leading-relaxed">
-            Avventura nella natura adriatica e nei boschi appenninici.<br />
-            Cattura, evolvi, combatti — diventa il miglior cacciatore!
-          </p>
-          <div className="flex gap-2 mt-3 flex-wrap">
-            {['📍 GPS Reale', '🔥 Elementi', '⚔️ Duelli 3v3', '🥚 Uova', '💀 Boss', '🏆 Classifica'].map(tag => (
-              <span key={tag} className="text-[10px] px-2.5 py-1 rounded-full bg-white/8 border border-white/12 text-white/70">
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
 
       <div className="px-4 space-y-3 pb-24">
-        {sections.map((section) => (
-          <SectionCard key={section.id} section={section} />
-        ))}
+        {sections.length === 0 ? (
+          <div className="text-center py-12 text-white/40 text-sm">Nessun argomento trovato per &ldquo;{query}&rdquo;</div>
+        ) : (
+          sections.map((section) => (
+            <SectionCard key={section.id} section={section} />
+          ))
+        )}
       </div>
     </div>
   )

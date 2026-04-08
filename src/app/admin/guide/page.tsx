@@ -1,4 +1,5 @@
 'use client'
+import { useState, useMemo } from 'react'
 
 const tocItems = [
   { id: 'overview',      label: 'Panoramica' },
@@ -134,7 +135,7 @@ function ElementTable() {
 const QR_TYPES = [
   { type: 'oggetto',  color: '#3A9DBC', desc: 'Aggiunge direttamente un oggetto all\'inventario del giocatore', fields: 'item_id, quantity' },
   { type: 'uovo',     color: '#C084FC', desc: 'Crea un\'uovo nello zaino. Il giocatore deve camminare X passi prima di schiuderlo.', fields: 'egg_rarity, steps_required' },
-  { type: 'boss',     color: '#E85D2F', desc: 'Avvia un boss fight 3v3 con creature configurabili. Supporta lineup fino a 3 creature.', fields: 'creatures[ ], reward' },
+  { type: 'boss',     color: '#E85D2F', desc: 'Avvia un boss fight con lineup fino a 3 creature. Ricompensa erogata solo alla prima vittoria per QR.', fields: 'creatures[ ], reward' },
   { type: 'indizio',  color: '#F7C841', desc: 'Sblocca un capitolo narrativo con testo e immagine opzionale', fields: 'chapter_order, text, image_url' },
   { type: 'evento',   color: '#34D399', desc: 'Attiva un bonus temporaneo sull\'intera sessione (EXP, spawn, oro doppio)', fields: 'event_type, multiplier, duration_minutes' },
 ]
@@ -225,7 +226,7 @@ function EggPoolTable() {
 
 const missionTypes = [
   { type: 'cattura',  desc: 'Cattura una creatura specifica (per nome) o qualunque creatura (target vuoto)',          color: '#3A9DBC' },
-  { type: 'duel',     desc: 'Vinci N duelli PvP 3v3 contro altri giocatori',                                          color: '#FBBF24' },
+  { type: 'duel',     desc: 'Vinci N duelli PvP contro altri giocatori (squadra da 1 a 3 creature)',                  color: '#FBBF24' },
   { type: 'qr',       desc: 'Scansiona un QR code fisico (target = etichetta QR, vuoto = qualunque QR)',              color: '#34D399' },
   { type: 'walk',     desc: 'Percorri una distanza totale in passi GPS durante la sessione',                          color: '#C084FC' },
   { type: 'collect',  desc: 'Acquista un oggetto nel negozio o scansiona un QR oggetto (target = nome oggetto)',      color: '#F97316' },
@@ -327,7 +328,7 @@ function WorkflowTimeline() {
 
 /* ──────────────────── ToC ──────────────────── */
 
-function TableOfContents() {
+function TableOfContents({ items }: { items: typeof tocItems }) {
   return (
     <nav aria-label="Indice" style={{ width: '220px', flexShrink: 0, position: 'sticky', top: '24px',
       alignSelf: 'flex-start', background: '#0a1825', border: '1px solid #ffffff10', borderRadius: '12px',
@@ -337,7 +338,7 @@ function TableOfContents() {
         In questa pagina
       </p>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        {tocItems.map(({ id, label }) => (
+        {items.map(({ id, label }) => (
           <li key={id}>
             <a href={`#${id}`} style={{ display: 'block', padding: '5px 8px', borderRadius: '6px',
               color: '#94a3b8', fontSize: '0.84rem', textDecoration: 'none', transition: 'background 0.15s, color 0.15s' }}
@@ -352,11 +353,11 @@ function TableOfContents() {
   )
 }
 
-function MobileToc() {
+function MobileToc({ items }: { items: typeof tocItems }) {
   return (
     <nav aria-label="Navigazione sezioni" style={{ display: 'flex', overflowX: 'auto', gap: '0.4rem',
       paddingBottom: '4px', marginBottom: '1.5rem', scrollbarWidth: 'none' }}>
-      {tocItems.map(({ id, label }) => (
+      {items.map(({ id, label }) => (
         <a key={id} href={`#${id}`} style={{ flexShrink: 0, display: 'inline-block', padding: '5px 12px',
           borderRadius: '20px', background: '#ffffff0a', border: '1px solid #ffffff15',
           color: '#94a3b8', fontSize: '0.8rem', textDecoration: 'none', whiteSpace: 'nowrap' }}>
@@ -370,6 +371,13 @@ function MobileToc() {
 /* ──────────────────── main page ──────────────────── */
 
 export default function AdminGuidePage() {
+  const [query, setQuery] = useState('')
+  const filteredToc = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return tocItems
+    return tocItems.filter(t => t.label.toLowerCase().includes(q) || t.id.toLowerCase().includes(q))
+  }, [query])
+
   return (
     <>
       <style>{`
@@ -396,12 +404,29 @@ export default function AdminGuidePage() {
           <p style={{ color: '#64748b', fontSize: '0.92rem', marginTop: '0.25rem' }}>
             Manuale operativo &mdash; WildCatch Game Master Handbook
           </p>
+          {/* Search bar */}
+          <div style={{ position: 'relative', marginTop: '1rem', maxWidth: '420px' }}>
+            <svg style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+              width: '16px', height: '16px', color: '#475569', pointerEvents: 'none' }}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+            <input
+              type="search"
+              placeholder="Cerca sezione…"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              style={{ width: '100%', paddingLeft: '38px', paddingRight: '12px', paddingTop: '9px', paddingBottom: '9px',
+                borderRadius: '10px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
+                color: '#e2e8f0', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
         </header>
 
-        <div className="guide-toc-mobile"><MobileToc /></div>
+        <div className="guide-toc-mobile"><MobileToc items={filteredToc} /></div>
 
         <div className="guide-layout">
-          <div className="guide-toc-desktop"><TableOfContents /></div>
+          <div className="guide-toc-desktop"><TableOfContents items={filteredToc} /></div>
 
           <article style={{ flex: 1, minWidth: 0 }}>
 
@@ -525,11 +550,16 @@ export default function AdminGuidePage() {
               <Prose>
                 Per i QR di tipo <Code>boss</Code> puoi configurare fino a 3 creature nella lineup.
                 Ogni creatura ha un <Code>level_override</Code> che rappresenta il livello della
-                creatura boss e ne influenza HP, ATK e DEF in battaglia.
+                creatura boss e ne influenza HP, ATK e DEF in battaglia (scaling: +14% HP, +10% ATK, +9% DEF per livello sopra 1).
               </Prose>
               <Callout type="info">
                 Se il giocatore abbandona il boss fight, può riscansionare lo stesso QR per riprendere
                 la battaglia dallo stato in cui era rimasta — non ricomincia dall&rsquo;inizio.
+              </Callout>
+              <Callout type="tip">
+                <strong>Ricompensa una tantum:</strong> la ricompensa (EXP, oro, oggetto) viene erogata
+                solo alla <em>prima vittoria</em> contro quel boss QR. Le rivincite riportano lo scontro
+                allo stato iniziale ma non concedono premi aggiuntivi. Questo previene farming infinito.
               </Callout>
 
               <SubHeader>Usi rimanenti</SubHeader>
