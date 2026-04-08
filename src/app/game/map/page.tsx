@@ -153,9 +153,9 @@ function MapPageInner() {
     }
   }, [])
 
-  const triggerEncounter = useCallback(async (trigger: 'gps' | 'timer' = 'gps') => {
+  const triggerEncounter = useCallback(async (trigger: 'gps' | 'timer' = 'gps'): Promise<boolean> => {
     const sid = sessionIdRef.current
-    if (!sid) return
+    if (!sid) return false
     const res = await fetch('/api/game/encounter/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -163,7 +163,6 @@ function MapPageInner() {
     })
     const data = await res.json()
     if (data.encounterId && data.creature) {
-      cumDistRef.current = 0  // reset walk accumulator after a successful encounter
       sessionStorage.setItem(`encounter_${data.encounterId}`, JSON.stringify({
         encounterId: data.encounterId,
         creature: data.creature,
@@ -174,10 +173,13 @@ function MapPageInner() {
       }))
       setPendingEncounter(data)
       setShowEncounterPopup(true)
+      return true
     } else if (data.encounterId) {
-      // Encounter already in progress — go directly to the battle page
+      // Encounter already in progress (stale active row) — navigate to it
       router.push(`/game/encounter/${data.encounterId}`)
+      return true
     }
+    return false
   }, [router])
 
   const onGPSPosition = useCallback(async (pos: { lat: number; lng: number; accuracy: number }) => {
@@ -232,17 +234,15 @@ function MapPageInner() {
 
     // GPS-based trigger (single update moved ≥ 5 m, 30% chance)
     if (data.triggerEncounter && cooldownPassed) {
-      lastEncounterRef.current = now
-      cumDistRef.current = 0
-      await triggerEncounter('gps')
+      const started = await triggerEncounter('gps')
+      if (started) { lastEncounterRef.current = now; cumDistRef.current = 0 }
       return
     }
 
     // Walk-accumulation trigger: fired after WALK_ENCOUNTER_DIST_M metres since last attempt
     if (cumDistRef.current >= WALK_ENCOUNTER_DIST_M && cooldownPassed) {
-      cumDistRef.current = 0
-      lastEncounterRef.current = now
-      await triggerEncounter('gps')
+      const started = await triggerEncounter('gps')
+      if (started) { lastEncounterRef.current = now; cumDistRef.current = 0 }
     }
   }, [triggerEncounter])
 
@@ -262,12 +262,11 @@ function MapPageInner() {
         if (!inBoundsRef.current) { scheduleTimerEncounter(); return }
         const now = Date.now()
         if (now - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS) {
-          lastEncounterRef.current = now
           try {
-            await triggerEncounter('timer')
+            const started = await triggerEncounter('timer')
+            if (started) lastEncounterRef.current = now
           } catch {
-            // network error — reset cooldown so the next timer tick can retry
-            lastEncounterRef.current = 0
+            // network error — leave cooldown reset so next tick retries immediately
           }
         }
         scheduleTimerEncounter()  // always reschedule, regardless of errors

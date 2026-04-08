@@ -83,15 +83,22 @@ export default function LevelRewardsPage() {
   const [spawnSaving, setSpawnSaving]   = useState(false)
   const [spawnSuccess, setSpawnSuccess] = useState(false)
 
+  // EXP config
+  const [expConfig, setExpConfig]       = useState<{ level: number; exp_to_next: number }[]>([])
+  const [expSaving, setExpSaving]       = useState<number | null>(null)
+  const [expSuccess, setExpSuccess]     = useState<number | null>(null)
+
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     Promise.all([
       fetch('/api/admin/level-rewards').then(r => r.json()),
       fetch('/api/admin/items').then(r => r.json()),
-    ]).then(([rwData, itData]) => {
+      fetch('/api/admin/exp-config').then(r => r.json()),
+    ]).then(([rwData, itData, expData]) => {
       setRewards(rwData.rewards ?? [])
       setItems(itData.items ?? [])
+      setExpConfig(expData.config ?? [])
       setLoading(false)
     })
     supabase.from('sessions').select('id, name').order('created_at', { ascending: false })
@@ -163,6 +170,21 @@ export default function LevelRewardsPage() {
 
   function removeBonusItem(idx: number) {
     setForm(f => ({ ...f, bonus_items: f.bonus_items.filter((_, i) => i !== idx) }))
+  }
+
+  async function saveExpRow(level: number, expToNext: number) {
+    setExpSaving(level)
+    const res = await fetch('/api/admin/exp-config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level, exp_to_next: expToNext }),
+    })
+    if (res.ok) {
+      setExpConfig(prev => prev.map(r => r.level === level ? { ...r, exp_to_next: expToNext } : r))
+      setExpSuccess(level)
+      setTimeout(() => setExpSuccess(null), 1500)
+    }
+    setExpSaving(null)
   }
 
   async function saveSpawnConfig() {
@@ -355,6 +377,78 @@ export default function LevelRewardsPage() {
       <p className="text-white/20 text-xs text-center mt-4 mb-10 leading-relaxed">
         Tocca un livello per modificarne la ricompensa. Le modifiche hanno effetto immediato per i futuri level-up.
       </p>
+
+      {/* ── EXP Curve Section ── */}
+      {expConfig.length > 0 && (
+        <div className="border-t border-white/10 pt-8 mt-8">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-white">⚡ Curva EXP per Livello</h2>
+            <p className="text-white/40 text-sm mt-1">
+              EXP necessaria per avanzare da ogni livello al successivo. Globale per tutte le sessioni.
+            </p>
+          </div>
+          <div className="bg-white/3 border border-white/8 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-white/8">
+                    <th className="text-left px-3 py-2 text-white/40 font-semibold">Livello</th>
+                    <th className="text-center px-3 py-2 text-white/40 font-semibold">EXP per avanzare</th>
+                    <th className="text-right px-3 py-2 text-white/40 font-semibold">Totale cumulativo</th>
+                    <th className="px-2 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {expConfig.map((row, idx) => {
+                    const cumulative = expConfig.slice(0, idx + 1).reduce((s, r) => s + r.exp_to_next, 0)
+                    const isSaving  = expSaving === row.level
+                    const isSuccess = expSuccess === row.level
+                    return (
+                      <tr key={row.level} className="border-b border-white/5 last:border-0">
+                        <td className="px-3 py-2 text-white/60 font-mono">
+                          Lv {row.level} → {row.level + 1}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="number"
+                            min={1}
+                            max={9999}
+                            value={row.exp_to_next}
+                            onChange={e => setExpConfig(prev =>
+                              prev.map(r => r.level === row.level
+                                ? { ...r, exp_to_next: Number(e.target.value) || 1 }
+                                : r
+                              )
+                            )}
+                            className="w-20 bg-white/8 border border-white/15 rounded-lg px-2 py-1 text-white text-xs text-center focus:outline-none focus:border-[#3A9DBC]"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right text-white/35 font-mono">{cumulative} EXP</td>
+                        <td className="px-2 py-2">
+                          <button
+                            onClick={() => saveExpRow(row.level, row.exp_to_next)}
+                            disabled={isSaving}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+                            style={{
+                              background: isSuccess ? 'rgba(52,211,153,0.2)' : 'rgba(58,157,188,0.15)',
+                              color: isSuccess ? '#34D399' : '#3A9DBC',
+                              border: `1px solid ${isSuccess ? 'rgba(52,211,153,0.4)' : 'rgba(58,157,188,0.3)'}`,
+                            }}>
+                            {isSaving ? '…' : isSuccess ? '✓' : 'Salva'}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p className="text-white/20 text-xs text-center mt-2">
+            Modifica il valore e clicca Salva sulla riga. Ha effetto immediato sui nuovi guadagni EXP.
+          </p>
+        </div>
+      )}
 
       {/* ── Spawn Config Section ── */}
       <div className="border-t border-white/10 pt-8">

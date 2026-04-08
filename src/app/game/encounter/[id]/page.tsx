@@ -454,11 +454,11 @@ export default function EncounterPage() {
 
   async function handleFlee() {
     if (state) {
-      fetch('/api/game/encounter/flee', {
+      // Await flee so the encounter is 'fled' in DB before returning to map
+      await fetch('/api/game/encounter/flee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ encounterId: state.encounterId }),
-        keepalive: true,
       }).catch(() => {})
     }
     router.back()
