@@ -52,9 +52,10 @@ export async function POST(request: Request) {
     }
   }
 
-  // HP reduction bonus: wild HP ≤ 30% → +20% catch bonus
+  // HP reduction bonus: ≤50% HP → +30%; ≤30% HP → further +30% (total +60%)
   const hpRatio = encounter.wild_creature_hp / creature.hp
-  if (hpRatio <= 0.3) bonus += 0.20
+  if (hpRatio <= 0.30) bonus += 0.60
+  else if (hpRatio <= 0.50) bonus += 0.30
 
   // RNG catch — server-side only
   const caught = rollCatch(creature.rarity, bonus)

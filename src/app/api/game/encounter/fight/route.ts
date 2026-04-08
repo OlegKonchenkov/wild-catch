@@ -106,11 +106,14 @@ export async function POST(request: Request) {
   // Determine outcome
   let fightResult: 'ongoing' | 'fled' | 'catchable' = 'ongoing'
 
+  const hpRatioAfter = wildHpRemaining / wildCreature.hp
   if (wildHpRemaining === 0) {
     fightResult = 'fled'  // HP 0 = flees
-  } else if (wildHpRemaining <= wildCreature.hp * 0.3) {
-    fightResult = 'catchable'  // ≤30% HP = +20% catch bonus
+  } else if (hpRatioAfter <= 0.50) {
+    fightResult = 'catchable'  // ≤50% HP = catch bonus active
   }
+
+  const catchBonus = hpRatioAfter <= 0.30 ? 0.60 : hpRatioAfter <= 0.50 ? 0.30 : 0
 
   await supabase
     .from('encounters')
@@ -131,7 +134,7 @@ export async function POST(request: Request) {
     playerTookDamage,
     elementMultiplier: elementMult,
     fightResult,
-    catchBonus: fightResult === 'catchable' ? 0.20 : 0,
+    catchBonus,
     levelUp: null,
   })
 }

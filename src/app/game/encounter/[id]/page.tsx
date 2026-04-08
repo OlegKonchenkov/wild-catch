@@ -232,7 +232,7 @@ export default function EncounterPage() {
         const s: EncounterState = {
           encounterId: data.encounterId, creature: data.creature,
           wildHp: data.wildHp, wildHpMax: data.wildHpMax,
-          catchBonus: data.wildHp <= data.wildHpMax * 0.3 ? 0.20 : 0, turns: 0,
+          catchBonus: data.wildHp <= data.wildHpMax * 0.30 ? 0.60 : data.wildHp <= data.wildHpMax * 0.50 ? 0.30 : 0, turns: 0,
         }
         sessionStorage.setItem(`encounter_${id}`, JSON.stringify(s))
         setState(s)
