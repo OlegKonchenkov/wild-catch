@@ -399,11 +399,6 @@ export default function CreaturesPage() {
                         <div className="text-4xl opacity-30 group-hover:opacity-50 transition-opacity"
                           style={{ filter: 'saturate(0)' }}>🐾</div>
                       )}
-                      {/* Element badge */}
-                      <div className="absolute top-1.5 right-1.5 text-xs px-1.5 py-0.5 rounded-md font-semibold backdrop-blur-sm"
-                        style={{ background: em.bg, color: 'rgba(255,255,255,0.85)' }}>
-                        {em.emoji}
-                      </div>
                       {/* Non-spawnable badge */}
                       {(c as any).spawnable === false && (
                         <div className="absolute top-1.5 left-1.5 text-xs px-1.5 py-0.5 rounded-md font-semibold bg-black/70 text-white/60">
@@ -414,7 +409,13 @@ export default function CreaturesPage() {
 
                     {/* Info */}
                     <div className="px-3 py-2.5">
-                      <p className="font-bold text-sm text-white truncate">{c.name}</p>
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="font-bold text-sm text-white truncate flex-1">{c.name}</p>
+                        <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold shrink-0"
+                          style={{ background: em.bg, color: 'rgba(255,255,255,0.9)' }}>
+                          {em.emoji} {em.label}
+                        </span>
+                      </div>
                       <div className="flex items-center justify-between mt-1">
                         <span className="text-xs font-semibold" style={{ color: rm.color }}>{rm.label}</span>
                         <span className="stat-mono text-xs text-white/30">{c.hp}hp</span>
