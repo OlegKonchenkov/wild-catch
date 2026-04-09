@@ -399,10 +399,7 @@ export default function PlayersPage() {
                     className={`border-b border-white/5 hover:bg-white/5 active:bg-white/8 cursor-pointer transition-colors ${i === 0 ? 'text-[#FFD700]' : 'text-white'}`}
                   >
                     <td className="px-4 py-3">
-                      <div>
-                        {p.nickname && <p className="font-bold text-sm">{p.nickname}</p>}
-                        <p className="text-xs text-white/40 font-mono">{p.email || p.userId.slice(0, 12) + '…'}</p>
-                      </div>
+                      <p className="font-bold text-sm">{p.nickname || p.userId.slice(0, 12) + '…'}</p>
                     </td>
                     <td className="text-center px-3 py-3 font-bold">{p.level}</td>
                     <td className="text-center px-3 py-3">{p.exp}</td>
