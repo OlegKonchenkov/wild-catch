@@ -82,6 +82,9 @@ function MapPageInner() {
   const sessionIdRef = useRef<string | null>(null)
   // Tracks metres walked since the last encounter attempt — resets after each attempt
   const cumDistRef = useRef(0)
+  // Prevent concurrent triggerEncounter calls (mutex) and skip when popup is already open
+  const triggeringEncounterRef = useRef(false)
+  const encounterPopupRef = useRef(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
@@ -157,32 +160,42 @@ function MapPageInner() {
   }, [])
 
   const triggerEncounter = useCallback(async (trigger: 'gps' | 'timer' = 'gps'): Promise<boolean> => {
-    const sid = sessionIdRef.current
-    if (!sid) return false
-    const res = await fetch('/api/game/encounter/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: sid, trigger }),
-    })
-    const data = await res.json()
-    if (data.encounterId && data.creature) {
-      sessionStorage.setItem(`encounter_${data.encounterId}`, JSON.stringify({
-        encounterId: data.encounterId,
-        creature: data.creature,
-        wildHp: data.wildHp,
-        wildHpMax: data.wildHp,
-        catchBonus: 0,
-        turns: 0,
-      }))
-      setPendingEncounter(data)
-      setShowEncounterPopup(true)
-      return true
-    } else if (data.encounterId) {
-      // Encounter already in progress (stale active row) — navigate to it
-      router.push(`/game/encounter/${data.encounterId}`)
-      return true
+    // Mutex: skip if another trigger is in-flight or popup already showing
+    if (triggeringEncounterRef.current) return false
+    if (encounterPopupRef.current) return false
+
+    triggeringEncounterRef.current = true
+    try {
+      const sid = sessionIdRef.current
+      if (!sid) return false
+      const res = await fetch('/api/game/encounter/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sid, trigger }),
+      })
+      const data = await res.json()
+      if (data.encounterId && data.creature) {
+        sessionStorage.setItem(`encounter_${data.encounterId}`, JSON.stringify({
+          encounterId: data.encounterId,
+          creature: data.creature,
+          wildHp: data.wildHp,
+          wildHpMax: data.wildHp,
+          catchBonus: 0,
+          turns: 0,
+        }))
+        setPendingEncounter(data)
+        setShowEncounterPopup(true)
+        encounterPopupRef.current = true
+        return true
+      } else if (data.encounterId) {
+        // Stale active encounter — navigate only when no popup is showing
+        router.push(`/game/encounter/${data.encounterId}`)
+        return true
+      }
+      return false
+    } finally {
+      triggeringEncounterRef.current = false
     }
-    return false
   }, [router])
 
   const onGPSPosition = useCallback(async (pos: { lat: number; lng: number; accuracy: number }) => {
@@ -476,6 +489,7 @@ function MapPageInner() {
             <button
               onClick={() => {
                 setShowEncounterPopup(false)
+                encounterPopupRef.current = false
                 router.push(`/game/encounter/${pendingEncounter.encounterId}`)
               }}
               className="flex-1 bg-[#E85D2F] text-white font-bold py-3 rounded-xl"
@@ -483,7 +497,19 @@ function MapPageInner() {
               AFFRONTA
             </button>
             <button
-              onClick={() => setShowEncounterPopup(false)}
+              onClick={() => {
+                setShowEncounterPopup(false)
+                encounterPopupRef.current = false
+                lastEncounterRef.current = 0  // reset cooldown so GPS works immediately
+                // Mark encounter as fled so DB doesn't block future encounters
+                if (pendingEncounter) {
+                  fetch('/api/game/encounter/flee', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ encounterId: pendingEncounter.encounterId }),
+                  }).catch(() => {})
+                }
+              }}
               className="px-4 bg-white/10 text-white rounded-xl"
             >
               Fuggi
