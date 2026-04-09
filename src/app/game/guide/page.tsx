@@ -96,6 +96,7 @@ function RarityBadges() {
     { label: 'Raro',        color: '#E8A820' },
     { label: 'Epico',       color: '#7B4DB8' },
     { label: 'Leggendario', color: '#C8352A' },
+    { label: 'Mitologico',  color: '#F0A0FF' },
   ]
   return (
     <div className="flex flex-wrap gap-2 mt-3">
@@ -271,6 +272,58 @@ function EggGuide() {
   )
 }
 
+// ─── Squad guide ──────────────────────────────────────────────────────────────
+
+function SquadGuide() {
+  return (
+    <div className="mt-3 space-y-3">
+      {/* Visual squad bar example */}
+      <div className="flex gap-2 rounded-xl border border-white/10 bg-white/4 p-3">
+        {[
+          { label: 'Capitano ⚔', color: '#3ABCA8', border: 'rgba(58,188,168,0.5)', note: 'Entra per primo' },
+          { label: 'Riserva 2',  color: 'rgba(255,255,255,0.5)', border: 'rgba(255,255,255,0.3)', note: 'Entra se Cap. sviene' },
+          { label: 'Riserva 3',  color: 'rgba(255,255,255,0.5)', border: 'rgba(255,255,255,0.3)', note: 'Ultima speranza' },
+        ].map((slot, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            <div className="w-full h-14 rounded-xl flex items-center justify-center text-xl"
+              style={{ background: i === 0 ? 'rgba(58,188,168,0.12)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${slot.border}` }}>
+              🐾
+            </div>
+            <span className="text-[9px] font-bold text-center leading-tight" style={{ color: slot.color }}>{slot.label}</span>
+            <span className="text-[8px] text-white/30 text-center leading-tight">{slot.note}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* How to set up */}
+      <div className="space-y-1.5 text-xs">
+        {[
+          { icon: '🦎', text: 'Apri il WildDex → tocca una creatura → sezione "Squadra da battaglia"' },
+          { icon: '1️⃣', text: 'Slot 1 = Capitano — combatte per primo in ogni battaglia' },
+          { icon: '🔄', text: 'Slots 2 e 3 = Riserve — entrano in automatico quando la precedente sviene' },
+          { icon: '✕',  text: 'Per rimuovere una creatura dalla squadra: tocca la X rossa nello slot in alto nel WildDex' },
+          { icon: '⚔️', text: 'Con meno di 3 creature un avviso ti chiede conferma prima di ogni battaglia' },
+        ].map(row => (
+          <div key={row.text} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
+            <span className="flex-shrink-0 text-sm">{row.icon}</span>
+            <span className="text-white/70 leading-relaxed">{row.text}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Squad bar explanation */}
+      <div className="rounded-xl border border-[#3ABCA8]/25 bg-[#3ABCA8]/6 px-3 py-2.5 text-xs text-[#3ABCA8]/90 space-y-1">
+        <p className="font-bold text-[#3ABCA8]">📊 Barra squadra in battaglia</p>
+        <p>Durante incontri, duelli e boss fight appare in basso una barra con le 3 creature: immagine, nome e barra HP in tempo reale. La creatura attiva è evidenziata — le altre diventano grigie e mostrano ✕ se svenute.</p>
+      </div>
+
+      <div className="rounded-xl border border-[#EF4444]/20 bg-[#EF4444]/5 px-3 py-2 text-xs text-[#EF4444]/80">
+        💀 Se tutte e 3 le creature della squadra svenono sei sconfitto — riorganizza la squadra prima della prossima battaglia!
+      </div>
+    </div>
+  )
+}
+
 // ─── Boss guide ───────────────────────────────────────────────────────────────
 
 function BossGuide() {
@@ -292,13 +345,14 @@ function BossGuide() {
       {/* Rules */}
       <div className="space-y-2 text-xs">
         {[
-          { icon: '🐾', text: 'Seleziona da 1 a 3 creature dal tuo WildDex. Con meno di 3 comparirà un avviso di conferma.' },
-          { icon: '⚔️', text: 'Il boss schiera fino a 3 creature. Il combattimento è a turni: tu attacchi, poi risponde il boss.' },
-          { icon: '🔄', text: 'Quando una creatura è KO entra automaticamente la prossima. Il boss NON attacca automaticamente entrando.' },
-          { icon: '🧪', text: 'Gli oggetti Battaglia e Pozione vengono usati automaticamente durante il boss fight.' },
+          { icon: '🐾', text: 'Seleziona la tua squadra dal WildDex prima di iniziare (fino a 3 creature). Con meno di 3 comparirà un avviso di conferma.' },
+          { icon: '⚔️', text: 'Il boss schiera fino a 3 creature. Il combattimento è a turni: tu attacchi, poi il boss risponde immediatamente.' },
+          { icon: '⏱️', text: 'Hai 30 secondi per attaccare ogni turno — allo scadere parte un attacco automatico.' },
+          { icon: '🔄', text: 'Quando una creatura è KO entra automaticamente la prossima della squadra.' },
+          { icon: '🧪', text: 'Gli oggetti Battaglia e Pozione si attivano automaticamente durante la battaglia.' },
           { icon: '🏆', text: 'Vinci abbattendo tutte le creature boss → ricevi EXP, monete e oggetti rari.' },
           { icon: '🎁', text: 'La ricompensa si ottiene solo alla prima vittoria per quel QR boss. Rivincite non danno premi aggiuntivi.' },
-          { icon: '💀', text: 'Se tutte le tue creature cadono, la battaglia è persa — riprova scansionando di nuovo il QR.' },
+          { icon: '💀', text: 'Se tutte le creature della squadra svenono la battaglia è persa — riprova scansionando di nuovo il QR.' },
         ].map(row => (
           <div key={row.text} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
             <span className="text-sm flex-shrink-0">{row.icon}</span>
@@ -337,15 +391,16 @@ function DuelDiagram() {
       </div>
       <div className="space-y-1.5 text-xs">
         {[
-          '⚔️ Puoi schierare da 1 a 3 creature — con meno di 3 ti verrà chiesta conferma',
-          '🔄 Quando una creatura è KO entra la successiva in automatico',
-          '⏱️ Ogni turno ha un timer: se scade, l\'avversario guadagna un turno bonus',
-          '🏆 Chi abbatte tutte le creature avversarie vince il duello',
-          '⚡ Vittoria → EXP + monete + progresso missione duello',
-          '⚠️ Se entrambi i giocatori restano in attesa di abbinamento, premi "Aggiorna" — la stanza è ancora attiva',
-        ].map(tip => (
-          <div key={tip} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
-            <span className="text-white/70 leading-relaxed">{tip}</span>
+          { t: '🐾 Seleziona la squadra dal WildDex (slot 1 = Capitano, 2 e 3 = Riserve) — fino a 3 creature' },
+          { t: '🔄 Quando una creatura è KO entra la successiva in automatico' },
+          { t: '⏱️ Hai 30 secondi per attaccare ogni tuo turno — allo scadere parte un attacco automatico' },
+          { t: '💤 Quando non è il tuo turno il timer è fermo — attendi la risposta dell\'avversario' },
+          { t: '🏆 Chi abbatte tutte le creature avversarie vince il duello' },
+          { t: '⚡ Vittoria → EXP + monete + progresso missione duello' },
+          { t: '⚠️ Se entrambi i giocatori restano in attesa di abbinamento, premi "Aggiorna" — la stanza è ancora attiva' },
+        ].map(row => (
+          <div key={row.t} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
+            <span className="text-white/70 leading-relaxed">{row.t}</span>
           </div>
         ))}
       </div>
@@ -357,6 +412,7 @@ function DuelDiagram() {
 
 function TipChips() {
   const tips = [
+    { text: 'Configura la squadra nel WildDex prima di partire — Slot 1 = Capitano, Slot 2-3 = Riserve. Senza squadra non puoi combattere!', color: '#3ABCA8' },
     { text: 'Usa un\'Esca prima di esplorare — aumenta la frequenza di creature rare per 10 minuti', color: '#34D399' },
     { text: 'Controlla l\'elemento del boss QR prima di scegliere la squadra — il vantaggio vale ×1.5!', color: '#E85D2F' },
     { text: 'Accumula 3 duplicati della stessa creatura per sbloccare l\'evoluzione automatica', color: '#F7C841' },
@@ -444,18 +500,19 @@ function buildSections(): Section[] {
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
             Quando trovi una creatura puoi scegliere: <span className="text-[#E85D2F] font-bold">combatti</span> (attacca
-            con la tua creatura attiva per indebolirla) oppure lancia direttamente la rete.
+            con il Capitano della tua squadra per indebolirla) oppure lancia direttamente la rete.
             Più è debole, più facile catturarla! Il bonus cresce <span className="text-[#34D399] font-bold">continuamente</span>:
             ogni 10% di vita tolta aggiunge <span className="text-[#FBBF24] font-bold">+20%</span> al moltiplicatore —
             da <span className="text-white/60">×1.0</span> a vita piena fino a <span className="text-[#F87171] font-bold">×3.0</span> a 0 HP.
             Attenzione — la creatura selvatica può contrattaccare e ridurre gli HP della tua.
-            Se gli HP scendono a 0: <span className="text-[#EF4444] font-bold">Sconfitta!</span>
+            Hai <span className="text-[#FBBF24] font-bold">45 secondi</span> per ogni azione: allo scadere parte un attacco automatico.
+            Se tutte le creature della squadra svenono: <span className="text-[#EF4444] font-bold">Sconfitta!</span>
           </p>
           <BattleDiagram />
           <div className="mt-3 rounded-xl border border-white/10 bg-white/4 px-3 py-2 text-xs text-white/55">
             <strong className="text-white/80">Probabilità base di cattura per rarità:</strong>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {[['Comune','#7AB87A','70%'], ['Non Comune','#4A9FD4','45%'], ['Raro','#E8A820','25%'], ['Epico','#7B4DB8','12%'], ['Leggendario','#C8352A','5%']].map(([r, c, p]) => (
+              {[['Comune','#7AB87A','70%'], ['Non Comune','#4A9FD4','45%'], ['Raro','#E8A820','25%'], ['Epico','#7B4DB8','12%'], ['Leggendario','#C8352A','5%'], ['Mitologico','#F0A0FF','2%']].map(([r, c, p]) => (
                 <span key={r} className="px-2 py-0.5 rounded-full text-[10px] font-bold"
                   style={{ background: (c as string) + '22', color: c as string, border: `1px solid ${c}44` }}>
                   {r}: {p}
@@ -539,6 +596,23 @@ function buildSections(): Section[] {
           </p>
           <p className="text-white/60 text-xs mt-2">5 rarità in ordine crescente:</p>
           <RarityBadges />
+        </div>
+      ),
+    },
+    {
+      id: 'squadra',
+      icon: '🐾',
+      title: 'La Squadra',
+      accent: '#3ABCA8',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            Prima di ogni battaglia devi avere una <span className="text-[#3ABCA8] font-bold">squadra</span> pronta.
+            Puoi schierare fino a 3 creature dal WildDex: lo <span className="text-[#3ABCA8] font-bold">Slot 1</span> è il
+            Capitano che combatte per primo, gli Slot 2 e 3 sono le Riserve che entrano in automatico se il Capitano sviene.
+            Vale per incontri selvatici, duelli PvP e boss fight.
+          </p>
+          <SquadGuide />
         </div>
       ),
     },
@@ -663,11 +737,12 @@ function buildSections(): Section[] {
           </p>
           <div className="mt-3 space-y-1.5 text-xs">
             {[
-              { icon: '🎒', label: 'Oggetto', desc: 'Aggiunge direttamente l\'oggetto al tuo zaino' },
-              { icon: '🥚', label: 'Uovo',    desc: 'Crea un uovo nel tuo zaino da schiudere dopo X passi' },
-              { icon: '💀', label: 'Boss',    desc: 'Avvia il boss fight — scegli la squadra e combatti!' },
-              { icon: '📖', label: 'Indizio', desc: 'Sblocca un capitolo narrativo della storia' },
-              { icon: '✨', label: 'Evento',  desc: 'Attiva un bonus temporaneo (EXP, spawn, oro)' },
+              { icon: '🎒', label: 'Oggetto',  desc: 'Aggiunge direttamente l\'oggetto al tuo zaino' },
+              { icon: '🥚', label: 'Uovo',     desc: 'Crea un uovo nel tuo zaino da schiudere dopo X passi' },
+              { icon: '💀', label: 'Boss',     desc: 'Avvia il boss fight — scegli la squadra e combatti!' },
+              { icon: '🐾', label: 'Creatura', desc: 'Aggiunge direttamente una creatura speciale al tuo WildDex' },
+              { icon: '📖', label: 'Indizio',  desc: 'Sblocca un capitolo narrativo della storia' },
+              { icon: '✨', label: 'Evento',   desc: 'Attiva un bonus temporaneo (EXP, spawn, oro)' },
             ].map(row => (
               <div key={row.label} className="flex items-center gap-3 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
                 <span className="text-base">{row.icon}</span>
