@@ -81,11 +81,13 @@ export async function POST(request: Request) {
 
   // Walk mission progress + egg hatching: update whenever steps change
   let eggsHatched: Array<{ name: string; rarity: string; element: string }> = []
+  let completedMissions: Array<{ title: string; rewardGold: number; rewardExp: number }> = []
   if (stepsIncrement > 0 && session.status === 'active') {
-    const [, hatched] = await Promise.all([
+    const [missions, hatched] = await Promise.all([
       updateWalkMissions(sessionId, user.id, newStepsWalked, supabase),
       checkAndHatchEggs(sessionId, user.id, newStepsWalked, supabase),
     ])
+    completedMissions = missions
     eggsHatched = hatched
   }
 
@@ -97,7 +99,7 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status, stepsWalked: newStepsWalked, distanceMoved, eggsHatched })
+  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status, stepsWalked: newStepsWalked, distanceMoved, eggsHatched, completedMissions })
 }
 
 async function updateWalkMissions(
@@ -105,15 +107,15 @@ async function updateWalkMissions(
   userId: string,
   stepsWalked: number,
   supabase: any,
-) {
+): Promise<Array<{ title: string; rewardGold: number; rewardExp: number }>> {
   // Load walk missions for this session (session-scoped OR global)
   const { data: walkMissions } = await supabase
     .from('missions')
-    .select('id, target_count, reward_gold, reward_exp, reward_item_id')
+    .select('id, title, target_count, reward_gold, reward_exp, reward_item_id')
     .or(`session_id.eq.${sessionId},session_id.is.null`)
     .eq('type', 'walk')
 
-  if (!walkMissions?.length) return
+  if (!walkMissions?.length) return []
 
   // Load existing player_missions entries
   const missionIds = walkMissions.map((m: any) => m.id)
@@ -126,6 +128,8 @@ async function updateWalkMissions(
   const pmMap: Record<string, any> = Object.fromEntries(
     (playerMissions ?? []).map((pm: any) => [pm.mission_id, pm])
   )
+
+  const justCompletedMissions: Array<{ title: string; rewardGold: number; rewardExp: number }> = []
 
   for (const mission of walkMissions as any[]) {
     const existing = pmMap[mission.id]
@@ -141,16 +145,24 @@ async function updateWalkMissions(
         progress: newProgress,
         ...(justCompleted ? { completed_at: new Date().toISOString() } : {}),
       })
-      if (justCompleted) await grantMissionReward(mission, userId, sessionId)
+      if (justCompleted) {
+        await grantMissionReward(mission, userId, sessionId)
+        justCompletedMissions.push({ title: mission.title, rewardGold: mission.reward_gold, rewardExp: mission.reward_exp })
+      }
     } else if (newProgress > existing.progress) {
       const justCompleted = newProgress >= mission.target_count
       await supabase.from('player_missions').update({
         progress: newProgress,
         ...(justCompleted ? { completed_at: new Date().toISOString() } : {}),
       }).eq('id', existing.id)
-      if (justCompleted) await grantMissionReward(mission, userId, sessionId)
+      if (justCompleted) {
+        await grantMissionReward(mission, userId, sessionId)
+        justCompletedMissions.push({ title: mission.title, rewardGold: mission.reward_gold, rewardExp: mission.reward_exp })
+      }
     }
   }
+
+  return justCompletedMissions
 }
 
 async function grantMissionReward(

@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Mission } from '@/lib/types'
 import dynamic from 'next/dynamic'
+import MissionRewardModal from '@/components/game/MissionRewardModal'
+import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 
 const QrScanner = dynamic(() => import('@/components/QrScanner'), { ssr: false })
 
@@ -310,6 +312,7 @@ export default function MissionsPage() {
   const [showScanner, setShowScanner] = useState(() => searchParams.get('qr') === '1')
   const [scanResult, setScanResult]   = useState<ScanResult | null>(null)
   const [scanning, setScanning]       = useState(false)
+  const [pendingMissions, setPendingMissions] = useState<CompletedMissionInfo[]>([])
   const [filter, setFilter]           = useState<'all' | 'todo' | 'done'>('all')
   const supabase = useMemo(() => createClient(), [])
 
@@ -359,6 +362,9 @@ export default function MissionsPage() {
       if (res.ok && data.success) {
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
         window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
+        if (data.completedMissions?.length) {
+          setPendingMissions(data.completedMissions)
+        }
       }
     } catch {
       setScanResult({ error: 'Errore di rete', success: false })
@@ -525,12 +531,27 @@ export default function MissionsPage() {
       {scanResult && (
         <ScanResultCard
           result={scanResult}
-          onClose={() => setScanResult(null)}
+          onClose={() => {
+            setScanResult(null)
+            // Show mission reward modal after scan result dismissed (if any missions completed)
+            // pendingMissions already set — modal will appear automatically
+          }}
           onBossFight={(bossFightId) => {
             setScanResult(null)
+            setPendingMissions([]) // boss fight page shown — skip mission modal here
             router.push(`/game/boss/${bossFightId}`)
           }}
         />
+      )}
+
+      {/* Mission reward modal — shown after scan result is closed */}
+      {!scanResult && pendingMissions.length > 0 && (
+        <div className="absolute inset-0 z-[80]">
+          <MissionRewardModal
+            missions={pendingMissions}
+            onDone={() => setPendingMissions([])}
+          />
+        </div>
       )}
 
       {/* Mission detail modal */}

@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
+import MissionRewardModal from '@/components/game/MissionRewardModal'
+import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 
@@ -739,11 +741,13 @@ function ResultScreen({
   reward,
   levelUp,
   onExit,
+  ctaLabel,
 }: {
   won: boolean
   reward: any
   levelUp: { newLevel: number; goldReward: number } | null
   onExit: () => void
+  ctaLabel?: string
 }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 gap-6">
@@ -808,7 +812,7 @@ function ResultScreen({
           color: won ? '#0D0205' : 'white',
         }}
       >
-        {won ? 'Continua →' : 'Torna al gioco'}
+        {ctaLabel ?? (won ? 'Continua →' : 'Torna al gioco')}
       </button>
     </div>
   )
@@ -847,6 +851,8 @@ export default function BossFightPage() {
   const [switchNotice, setSwitchNotice]   = useState<string | null>(null)
   const [fortuneNotice, setFortuneNotice] = useState<{ id: number; text: string; tone: CombatFortuneInfo['tone'] } | null>(null)
   const [finalResult, setFinalResult]     = useState<{ won: boolean; reward: any; levelUp: any } | null>(null)
+  const [bossMissions, setBossMissions]   = useState<CompletedMissionInfo[]>([])
+  const [showBossMissions, setShowBossMissions] = useState(false)
 
   const addLog = (msg: string) => setLog(prev => [...prev.slice(-9), msg])
 
@@ -1082,6 +1088,7 @@ export default function BossFightPage() {
         if (isOver) {
           window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
           if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+          if (data.completedMissions?.length) setBossMissions(data.completedMissions)
           setTimeout(() => {
             setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp })
           }, 400)
@@ -1121,12 +1128,25 @@ export default function BossFightPage() {
 
   if (finalResult) {
     return (
-      <div className="h-full" style={{ background: BOSS_THEME.bg }}>
+      <div className="h-full relative" style={{ background: BOSS_THEME.bg }}>
+        {showBossMissions && bossMissions.length > 0 && (
+          <MissionRewardModal
+            missions={bossMissions}
+            onDone={() => { setShowBossMissions(false); router.replace('/game/missions') }}
+          />
+        )}
         <ResultScreen
           won={finalResult.won}
           reward={finalResult.reward}
           levelUp={finalResult.levelUp}
-          onExit={() => router.replace('/game/missions')}
+          ctaLabel={finalResult.won && bossMissions.length > 0 ? 'Vedi ricompense' : undefined}
+          onExit={() => {
+            if (finalResult.won && bossMissions.length > 0) {
+              setShowBossMissions(true)
+            } else {
+              router.replace('/game/missions')
+            }
+          }}
         />
       </div>
     )

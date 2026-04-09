@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { calculateCombatDamage, rollCombatFortune, scaleCombatStats } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { incrementMissionProgress } from '@/lib/game/missions'
+import type { CompletedMission } from '@/lib/game/missions'
 import type { Element } from '@/lib/types'
 
 export async function POST(request: Request) {
@@ -197,11 +198,14 @@ export async function POST(request: Request) {
 
   // ── Awards ─────────────────────────────────────────────────────────────────
   let myLevelUp: { newLevel: number; goldReward: number } | null = null
+  let completedMissions: CompletedMission[] = []
   if (duelOver) {
-    const levelUps = await awardDuelResults(supabase, duel.session_id, user.id, oppUserId!)
+    const [levelUps, missions] = await Promise.all([
+      awardDuelResults(supabase, duel.session_id, user.id, oppUserId!),
+      incrementMissionProgress({ type: 'duel', userId: user.id, sessionId: duel.session_id }).catch(() => [] as CompletedMission[]),
+    ])
     myLevelUp = levelUps.winnerLevelUp
-    // Track duel missions for the winner (fire-and-forget)
-    incrementMissionProgress({ type: 'duel', userId: user.id, sessionId: duel.session_id }).then(undefined, () => {})
+    completedMissions = missions
     // Save game events for bell history
     const { createAdminClient } = await import('@/lib/supabase/admin')
     const adminClient = createAdminClient()
@@ -250,6 +254,7 @@ export async function POST(request: Request) {
     duelOver,
     switchedTo,
     levelUp: myLevelUp,
+    completedMissions,
   })
 }
 

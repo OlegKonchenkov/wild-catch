@@ -75,18 +75,18 @@ export async function POST(request: Request) {
     if (invError) return NextResponse.json({ error: 'Errore aggiunta oggetto' }, { status: 500 })
   }
 
-  // Track collect missions for the purchased item (fire-and-forget)
-  incrementMissionProgress({
+  const completedMissions = await incrementMissionProgress({
     type: 'collect',
     target: item.name,
     userId: user.id,
     sessionId,
-  }).catch(() => {})
+  }).catch(() => [])
 
   return NextResponse.json({
     success: true,
     remainingGold: ps.gold - totalCost,
     itemName: item.name,
     quantity,
+    completedMissions,
   })
 }

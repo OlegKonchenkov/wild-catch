@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
+import MissionRewardModal from '@/components/game/MissionRewardModal'
+import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
@@ -221,6 +223,8 @@ export default function DuelPage() {
   const [switchNotice, setSwitchNotice]     = useState<string | null>(null)
   const [fortuneNotice, setFortuneNotice]   = useState<{ id: number; text: string; tone: CombatFortuneInfo['tone'] } | null>(null)
   const [playerLevels, setPlayerLevels]     = useState<Record<string, number>>({})
+  const [completedMissions, setCompletedMissions] = useState<CompletedMissionInfo[]>([])
+  const [showMissionModal, setShowMissionModal] = useState(false)
 
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
@@ -438,7 +442,10 @@ export default function DuelPage() {
     if (res.ok) {
       const data = await res.json()
       if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
-      if (data.duelOver) window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+      if (data.duelOver) {
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+        if (data.completedMissions?.length) setCompletedMissions(data.completedMissions)
+      }
     }
 
     if (selectedItemId && res.ok) {
@@ -580,17 +587,32 @@ export default function DuelPage() {
                 </span>
               </div>
               <motion.button
-                onClick={() => { window.dispatchEvent(new CustomEvent('wc:refresh-stats')); router.push('/game/map') }}
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+                  if (result === 'won' && completedMissions.length > 0) {
+                    setShowMissionModal(true)
+                  } else {
+                    router.push('/game/map')
+                  }
+                }}
                 whileTap={{ scale: 0.96 }}
                 className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
                 style={{ background: 'linear-gradient(135deg, #3A9DBC 0%, #2a7a99 100%)', boxShadow: '0 4px 20px rgba(58,157,188,0.35)' }}
               >
-                Torna alla Mappa
+                {result === 'won' && completedMissions.length > 0 ? 'Vedi ricompense' : 'Torna alla Mappa'}
               </motion.button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Mission reward overlay (shown after duel win) ── */}
+      {showMissionModal && (
+        <MissionRewardModal
+          missions={completedMissions}
+          onDone={() => { setShowMissionModal(false); router.push('/game/map') }}
+        />
+      )}
 
       {/* ── Items bottom-sheet modal ── */}
       <AnimatePresence>

@@ -2,6 +2,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Item, ItemType } from '@/lib/types'
+import MissionRewardModal from '@/components/game/MissionRewardModal'
+import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 
 const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; color: string }> = {
   rete:      { icon: '🎯', label: 'Rete',       hint: 'Aumenta la probabilità di cattura',       color: '#3A9DBC' },
@@ -18,9 +20,10 @@ export default function ShopPage() {
   const [items, setItems]         = useState<Item[]>([])
   const [gold, setGold]           = useState(0)
   const [filter, setFilter]       = useState<ItemType | 'all'>('all')
-  const [buying, setBuying]       = useState<string | null>(null)  // itemId being purchased
-  const [toast, setToast]         = useState<Toast | null>(null)
-  const [loading, setLoading]     = useState(true)
+  const [buying, setBuying]         = useState<string | null>(null)  // itemId being purchased
+  const [toast, setToast]           = useState<Toast | null>(null)
+  const [loading, setLoading]       = useState(true)
+  const [missionQueue, setMissionQueue] = useState<CompletedMissionInfo[]>([])
   const supabase = useMemo(() => createClient(), [])
 
   function showToast(ok: boolean, text: string) {
@@ -66,6 +69,9 @@ export default function ShopPage() {
         showToast(true, `${TYPE_META[item.type].icon} ${item.name} acquistato!`)
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
         window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
+        if (data.completedMissions?.length) {
+          setMissionQueue(prev => [...prev, ...data.completedMissions])
+        }
       } else {
         showToast(false, data.error ?? 'Errore acquisto')
       }
@@ -80,7 +86,13 @@ export default function ShopPage() {
   const types = [...new Set(items.map(i => i.type))] as ItemType[]
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden relative">
+      {missionQueue.length > 0 && (
+        <MissionRewardModal
+          missions={missionQueue}
+          onDone={() => setMissionQueue([])}
+        />
+      )}
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-white/10 bg-[#0A1520]/80">
         <div className="flex items-center justify-between mb-3">

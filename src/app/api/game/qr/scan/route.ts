@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { incrementMissionProgress } from '@/lib/game/missions'
+import type { CompletedMission } from '@/lib/game/missions'
 import { scaleCombatStats } from '@/lib/game/combat'
 
 export async function POST(request: Request) {
@@ -246,27 +247,29 @@ export async function POST(request: Request) {
     }
   }
 
-  // Track qr missions only on first unique scan for this user.
-  // Match specific missions against qr id / manual code / label, while generic missions
-  // (empty target) still progress for any unique QR.
+  // Track qr + collect missions (awaited so we can return completedMissions)
+  const missionPromises: Promise<CompletedMission[]>[] = []
+
   if (isFirstUniqueScan) {
-    incrementMissionProgress({
+    missionPromises.push(incrementMissionProgress({
       type: 'qr',
       target: [qr.id, qr.manual_code ?? '', qr.label ?? ''],
       userId: user.id,
       sessionId,
-    }).catch(() => {})
+    }))
   }
 
-  // Track collect missions when an item QR is scanned
   if (qr.type === 'oggetto' && (result as any).itemName) {
-    incrementMissionProgress({
+    missionPromises.push(incrementMissionProgress({
       type: 'collect',
       target: (result as any).itemName,
       userId: user.id,
       sessionId,
-    }).catch(() => {})
+    }))
   }
 
-  return NextResponse.json({ success: true, ...result })
+  const missionResults = await Promise.all(missionPromises).catch(() => [] as CompletedMission[][])
+  const completedMissions = missionResults.flat()
+
+  return NextResponse.json({ success: true, ...result, completedMissions })
 }

@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { useGPS } from '@/hooks/useGPS'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import MissionRewardModal from '@/components/game/MissionRewardModal'
+import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import type { Session } from '@/lib/types'
 import type { MapPin } from '@/components/map/GameMap'
 
@@ -62,6 +64,7 @@ function MapPageInner() {
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
   const [hatchedCreature, setHatchedCreature] = useState<{ name: string; rarity: string } | null>(null)
+  const [missionQueue, setMissionQueue] = useState<CompletedMissionInfo[]>([])
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
@@ -223,6 +226,11 @@ function MapPageInner() {
     if (data.eggsHatched?.length > 0) {
       setHatchedCreature(data.eggsHatched[0])
       setTimeout(() => setHatchedCreature(null), 5000)
+    }
+
+    // Queue walk mission completions for the modal
+    if (data.completedMissions?.length > 0) {
+      setMissionQueue(prev => [...prev, ...data.completedMissions])
     }
 
     // Accumulate distance for walk-based encounter trigger
@@ -427,6 +435,14 @@ function MapPageInner() {
         </svg>
         <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: '#3A9DBC' }}>SCAN</span>
       </button>
+
+      {/* Walk mission reward modal */}
+      {missionQueue.length > 0 && (
+        <MissionRewardModal
+          missions={missionQueue}
+          onDone={() => setMissionQueue([])}
+        />
+      )}
 
       {/* Encounter popup */}
       {showEncounterPopup && pendingEncounter && (
