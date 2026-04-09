@@ -8,6 +8,17 @@ import { RARITY_COLORS, ELEMENT_EMOJI } from '@/lib/types'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import type { Creature, Element, Rarity } from '@/lib/types'
 
+interface SquadCreature {
+  pcId: string
+  id: string
+  name: string
+  hp: number
+  atk: number
+  element: string
+  rarity: string
+  image_url: string | null
+}
+
 interface EncounterState {
   encounterId: string
   creature: Partial<Creature>
@@ -15,6 +26,7 @@ interface EncounterState {
   wildHpMax: number
   catchMultiplier: number
   turns: number
+  squadCreatures?: SquadCreature[]
 }
 interface InvItem {
   id: string
@@ -226,6 +238,11 @@ export default function EncounterPage() {
   } | null>(null)
   const [playerHp, setPlayerHp] = useState<number | null>(null)
 
+  // Squad state
+  const [squadCreatures, setSquadCreatures] = useState<SquadCreature[]>([])
+  const [activeSlot, setActiveSlot]         = useState(0)
+  const [slotHps, setSlotHps]               = useState<number[]>([])
+
   const [reteItems, setReteItems]         = useState<InvItem[]>([])
   const [battagliaItems, setBattagliaItems] = useState<InvItem[]>([])
   const [pozioneItems, setPozioneItems]   = useState<InvItem[]>([])
@@ -249,6 +266,11 @@ export default function EncounterPage() {
           ? parsed.catchMultiplier
           : getCatchHealthMultiplier(parsed.wildHp ?? 0, parsed.wildHpMax ?? 1),
       })
+      const squad: SquadCreature[] = parsed.squadCreatures ?? []
+      if (squad.length > 0) {
+        setSquadCreatures(squad)
+        setSlotHps(squad.map((c: SquadCreature) => c.hp))
+      }
       return
     }
     fetch(`/api/game/encounter/get?id=${id}`)
@@ -260,13 +282,19 @@ export default function EncounterPage() {
           setState({ encounterId: data.encounterId, creature: data.creature, wildHp: 0, wildHpMax: data.wildHpMax ?? 100, catchMultiplier: 1, turns: 0 })
           return
         }
+        const squad: SquadCreature[] = data.squadCreatures ?? []
         const s: EncounterState = {
           encounterId: data.encounterId, creature: data.creature,
           wildHp: data.wildHp, wildHpMax: data.wildHpMax,
           catchMultiplier: getCatchHealthMultiplier(data.wildHp, data.wildHpMax), turns: 0,
+          squadCreatures: squad,
         }
         sessionStorage.setItem(`encounter_${id}`, JSON.stringify(s))
         setState(s)
+        if (squad.length > 0) {
+          setSquadCreatures(squad)
+          setSlotHps(squad.map(c => c.hp))
+        }
       })
       .catch(() => {})
   }, [id])
@@ -292,6 +320,19 @@ export default function EncounterPage() {
 
   useEffect(() => {
     if (!state) return
+    // If we already have squad data from state (sessionStorage restore), set up player creature from slot 0
+    const squad = state.squadCreatures ?? []
+    if (squad.length > 0 && squadCreatures.length === 0) {
+      setSquadCreatures(squad)
+      const hps = squad.map(c => c.hp)
+      setSlotHps(hps)
+      const lead = squad[0]
+      setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity })
+      setPlayerHp(lead.hp)
+      return
+    }
+    if (squadCreatures.length > 0) return // already set up from fetch path
+
     supabase.from('encounters').select('player_creature_id').eq('id', state.encounterId).single()
       .then(async ({ data: enc }) => {
         if (!enc?.player_creature_id) return
@@ -307,7 +348,7 @@ export default function EncounterPage() {
           }
         }
       })
-  }, [state?.encounterId, supabase])
+  }, [state?.encounterId, supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Timer ─────────────────────────────────────────────────────────────────────
   const resetTimer = useCallback(() => {
@@ -336,9 +377,14 @@ export default function EncounterPage() {
     resetTimer(); setLoading(true); setMessage(''); setShowItemsModal(false)
 
     const activeItemId = selectedPozioneId ?? selectedBattagliaId ?? null
+    const activeSquadPcId = squadCreatures.length > 0 ? squadCreatures[activeSlot]?.pcId : undefined
     const res = await fetch('/api/game/encounter/fight', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ encounterId: state.encounterId, itemId: activeItemId }),
+      body: JSON.stringify({
+        encounterId: state.encounterId,
+        itemId: activeItemId,
+        ...(activeSlot > 0 && activeSquadPcId ? { activePlayerCreatureId: activeSquadPcId } : {}),
+      }),
     })
     const data = await res.json()
 
@@ -370,12 +416,40 @@ export default function EncounterPage() {
 
     if (data.playerTookDamage && data.wildDamage > 0) {
       await new Promise(r => setTimeout(r, 280))
-      const newHp = Math.max(0, (playerHp ?? playerCreature?.maxHp ?? 100) - data.wildDamage)
+      const curHp = playerHp ?? playerCreature?.maxHp ?? 100
+      const newHp = Math.max(0, curHp - data.wildDamage)
+
+      // Update squad HP tracking
+      if (squadCreatures.length > 0) {
+        setSlotHps(prev => {
+          const next = [...prev]
+          next[activeSlot] = Math.max(0, (next[activeSlot] ?? squadCreatures[activeSlot]?.hp ?? 100) - data.wildDamage)
+          return next
+        })
+      }
+
       setPlayerHp(newHp)
       setPlayerAnim('damage')
       await new Promise(r => setTimeout(r, 420))
       setPlayerAnim('idle')
+
       if (newHp <= 0) {
+        // Try next squad creature
+        if (squadCreatures.length > 0) {
+          const nextSlot = activeSlot + 1
+          if (nextSlot < squadCreatures.length) {
+            const next = squadCreatures[nextSlot]
+            setActiveSlot(nextSlot)
+            setPlayerCreature({
+              name: next.name, maxHp: next.hp, atk: next.atk,
+              element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '',
+            })
+            setPlayerHp(slotHps[nextSlot] ?? next.hp)
+            setMessage(`${squadCreatures[activeSlot].name} è svenuta! Entra ${next.name}!`)
+            setLoading(false)
+            return
+          }
+        }
         setResult('lost')
         setLoading(false)
         return
@@ -419,11 +493,33 @@ export default function EncounterPage() {
     } else {
       if (data.wildDamage > 0) {
         const newHp = Math.max(0, (playerHp ?? playerCreature?.maxHp ?? 100) - data.wildDamage)
+        if (squadCreatures.length > 0) {
+          setSlotHps(prev => {
+            const next = [...prev]
+            next[activeSlot] = Math.max(0, (next[activeSlot] ?? squadCreatures[activeSlot]?.hp ?? 100) - data.wildDamage)
+            return next
+          })
+        }
         setPlayerHp(newHp)
         setPlayerAnim('damage')
         await new Promise(r => setTimeout(r, 420))
         setPlayerAnim('idle')
         if (newHp <= 0) {
+          if (squadCreatures.length > 0) {
+            const nextSlot = activeSlot + 1
+            if (nextSlot < squadCreatures.length) {
+              const next = squadCreatures[nextSlot]
+              setActiveSlot(nextSlot)
+              setPlayerCreature({
+                name: next.name, maxHp: next.hp, atk: next.atk,
+                element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '',
+              })
+              setPlayerHp(slotHps[nextSlot] ?? next.hp)
+              setMessage(`${squadCreatures[activeSlot].name} è svenuta! Entra ${next.name}!`)
+              setLoading(false)
+              return
+            }
+          }
           setResult('lost')
           setLoading(false)
           return
@@ -594,6 +690,67 @@ export default function EncounterPage() {
           </div>
         </div>
       </div>
+
+      {/* ── SQUAD BAR (only if 2+ creatures) ── */}
+      {!result && squadCreatures.length >= 2 && (
+        <div className="shrink-0 px-3 pb-1.5 z-10">
+          <div className="flex gap-1.5">
+            {squadCreatures.map((cr, idx) => {
+              const hp = slotHps[idx] ?? cr.hp
+              const hpPct = Math.max(0, Math.min(100, (hp / cr.hp) * 100))
+              const hpColor = hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444'
+              const isActive = idx === activeSlot
+              const isFainted = hp <= 0
+              return (
+                <div
+                  key={cr.pcId}
+                  className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-xl transition-all"
+                  style={{
+                    background: isActive
+                      ? 'rgba(255,255,255,0.1)'
+                      : isFainted ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
+                    border: isActive
+                      ? '1px solid rgba(255,255,255,0.22)'
+                      : '1px solid rgba(255,255,255,0.07)',
+                    opacity: isFainted ? 0.35 : 1,
+                  }}
+                >
+                  {/* Creature tiny icon */}
+                  {cr.image_url ? (
+                    <img
+                      src={cr.image_url}
+                      alt={cr.name}
+                      className="w-6 h-6 object-contain shrink-0"
+                      style={{ filter: isFainted ? 'grayscale(1)' : 'none' }}
+                    />
+                  ) : (
+                    <span className="text-sm shrink-0 leading-none">{ELEMENT_EMOJI[cr.element as keyof typeof ELEMENT_EMOJI] ?? '✦'}</span>
+                  )}
+                  {/* HP bar */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] font-bold text-white/50 truncate leading-none mb-0.5">{cr.name}</p>
+                    <div className="h-[4px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                      <motion.div
+                        className="h-full rounded-full"
+                        animate={{ width: `${hpPct}%` }}
+                        transition={{ duration: 0.4 }}
+                        style={{ background: hpColor }}
+                      />
+                    </div>
+                  </div>
+                  {/* Active indicator */}
+                  {isActive && !isFainted && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-white/60 shrink-0" />
+                  )}
+                  {isFainted && (
+                    <span className="text-[9px] text-red-400/60 shrink-0 font-bold">✕</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── TIMER BAR ── */}
       {!result && (

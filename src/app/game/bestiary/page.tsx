@@ -65,6 +65,8 @@ export default function BestiaryPage() {
   const [playerLevel, setPlayerLevel]       = useState(1)
   // Set of creature IDs that have an evolved form
   const [evolvableIds, setEvolvableIds]     = useState<Set<string>>(new Set())
+  const [squad, setSquad]                   = useState<string[]>([]) // array of player_creatures.id (up to 3)
+  const [squadSaving, setSquadSaving]       = useState(false)
   // Reveal card after manual evolution
   const [evolveReveal, setEvolveReveal]     = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null; copiesRemaining: number } | null>(null)
   const [evolvePhase, setEvolvePhase]       = useState<'charge' | 'flash' | 'reveal'>('charge')
@@ -91,13 +93,14 @@ export default function BestiaryPage() {
     if (!uid || !sid) return
     supabase
       .from('player_sessions')
-      .select('selected_creature_id, level')
+      .select('selected_creature_id, level, squad_ids')
       .eq('user_id', uid)
       .eq('session_id', sid)
       .single()
       .then(({ data }) => {
         if (data?.selected_creature_id) setSelectedPcId(data.selected_creature_id)
         if (data?.level) setPlayerLevel(data.level as number)
+        if ((data as any)?.squad_ids) setSquad((data as any).squad_ids as string[])
       })
   }
 
@@ -139,13 +142,14 @@ export default function BestiaryPage() {
 
       supabase
         .from('player_sessions')
-        .select('selected_creature_id, level')
+        .select('selected_creature_id, level, squad_ids')
         .eq('user_id', user.id)
         .eq('session_id', sessionId)
         .single()
         .then(({ data }) => {
           if (data?.selected_creature_id) setSelectedPcId(data.selected_creature_id)
           if (data?.level) setPlayerLevel(data.level as number)
+          if ((data as any)?.squad_ids) setSquad((data as any).squad_ids as string[])
           finish()
         })
 
@@ -186,6 +190,39 @@ export default function BestiaryPage() {
       setSelectedPcId(pc.id)
       setMessage(`${name} selezionata come creatura attiva!`)
     }
+  }
+
+  async function handleSquadSlot(slotIdx: number, pcId: string) {
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId || squadSaving) return
+    setSquadSaving(true)
+
+    const newSquad = [...squad]
+    // Remove this creature from any existing slot
+    const existingIdx = newSquad.indexOf(pcId)
+    if (existingIdx !== -1) newSquad.splice(existingIdx, 1)
+
+    if (slotIdx === -1) {
+      // -1 = remove from squad entirely
+    } else {
+      // Insert at requested slot, pad with empty slots if needed
+      while (newSquad.length < slotIdx) newSquad.push('')
+      newSquad.splice(slotIdx, 0, pcId)
+    }
+
+    // Cap to 3, remove empty strings
+    const filtered = newSquad.filter(Boolean).slice(0, 3)
+
+    const res = await fetch('/api/game/squad', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, squadIds: filtered }),
+    })
+    if (res.ok) {
+      setSquad(filtered)
+      if (filtered.length > 0) setSelectedPcId(filtered[0])
+    }
+    setSquadSaving(false)
   }
 
   async function handleEvolve(pc: PlayerCreature) {
@@ -518,6 +555,63 @@ export default function BestiaryPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Squad bar — 3 slots */}
+        <div className="pt-2.5 pb-0.5">
+          <div className="flex items-center gap-1 mb-1.5">
+            <span className="text-[10px] font-bold text-white/35 uppercase tracking-wider">Squadra</span>
+            {squad.length > 0 && (
+              <span className="text-[9px] text-white/25">· tocca uno slot per gestire</span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {[0, 1, 2].map(slotIdx => {
+              const pcId = squad[slotIdx]
+              const pc = pcId ? playerCreatures.find(p => p.id === pcId) : null
+              const cr = pc ? creatures.find(c => c.id === pc.creature_id) : null
+              const isLead = slotIdx === 0
+              return (
+                <button
+                  key={slotIdx}
+                  onClick={() => {
+                    if (pc && cr) {
+                      setSelected({ creature: cr, pc })
+                    }
+                  }}
+                  className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded-xl transition-all"
+                  style={{
+                    background: pc
+                      ? isLead ? 'rgba(58,188,168,0.14)' : 'rgba(255,255,255,0.07)'
+                      : 'rgba(255,255,255,0.03)',
+                    border: pc
+                      ? isLead ? '1px solid rgba(58,188,168,0.45)' : '1px solid rgba(255,255,255,0.12)'
+                      : '1px dashed rgba(255,255,255,0.1)',
+                  }}
+                >
+                  {/* Slot number */}
+                  <span className="text-[10px] font-black shrink-0"
+                    style={{ color: pc ? (isLead ? '#3ABCA8' : 'rgba(255,255,255,0.4)') : 'rgba(255,255,255,0.15)' }}>
+                    {slotIdx + 1}
+                  </span>
+                  {pc && cr ? (
+                    <>
+                      {cr.image_url ? (
+                        <div className="w-6 h-6 shrink-0">
+                          <img src={cr.image_url} alt={cr.name} className="w-full h-full object-contain" />
+                        </div>
+                      ) : (
+                        <span className="text-sm shrink-0">{ELEMENT_EMOJI[cr.element]}</span>
+                      )}
+                      <span className="text-[10px] font-semibold text-white/70 truncate">{cr.name}</span>
+                    </>
+                  ) : (
+                    <span className="text-[10px] text-white/20 truncate">vuoto</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="px-4 py-4">
@@ -578,11 +672,13 @@ export default function BestiaryPage() {
                 className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all
                   ${canEvolve
                     ? 'border-2 border-[#F7C841]'
-                    : caught && pc?.id === selectedPcId
+                    : caught && pc && squad[0] === pc.id
                       ? 'wc-active-card border-2'
-                      : caught
-                        ? 'bg-gradient-to-b from-white/10 to-white/5 border border-white/15 hover:border-white/30'
-                        : 'mystery-shimmer border border-white/5 hover:border-white/10'
+                      : caught && pc && squad.includes(pc.id)
+                        ? 'bg-gradient-to-b from-white/12 to-white/6 border border-white/25'
+                        : caught
+                          ? 'bg-gradient-to-b from-white/10 to-white/5 border border-white/15 hover:border-white/30'
+                          : 'mystery-shimmer border border-white/5 hover:border-white/10'
                   }`}
                 style={canEvolve ? {
                   boxShadow: '0 0 12px rgba(247,200,65,0.45), 0 0 4px rgba(247,200,65,0.3)',
@@ -627,13 +723,17 @@ export default function BestiaryPage() {
                     </div>
                   )}
 
-                  {/* Active creature badge */}
-                  {pc?.id === selectedPcId && (
-                    <div className="wc-active-badge absolute bottom-0 left-0 right-0 text-[#0A1520] text-[8px] font-black text-center py-1 tracking-widest uppercase"
-                      style={{ background: 'linear-gradient(90deg, #2BBFAC, #3ABCA8, #2BBFAC)' }}>
-                      ⚔ IN SQUADRA
-                    </div>
-                  )}
+                  {/* Squad slot badge */}
+                  {pc && squad.includes(pc.id) && (() => {
+                    const slotIdx = squad.indexOf(pc.id)
+                    const isLead = slotIdx === 0
+                    return (
+                      <div className="wc-active-badge absolute bottom-0 left-0 right-0 text-[#0A1520] text-[8px] font-black text-center py-1 tracking-widest uppercase"
+                        style={{ background: isLead ? 'linear-gradient(90deg, #2BBFAC, #3ABCA8, #2BBFAC)' : 'linear-gradient(90deg, #4A5568, #6B7280, #4A5568)' }}>
+                        {isLead ? '⚔ CAP.' : `· ${slotIdx + 1}`}
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 {/* Name */}
@@ -719,9 +819,14 @@ export default function BestiaryPage() {
                   <>
                     <div className="text-center mb-4">
                       <h3 className="text-2xl font-bold text-white">{creature.name}</h3>
-                      {pc?.id === selectedPcId && (
-                        <div className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#3A9DBC]/20 border border-[#3A9DBC]/40 text-[#3A9DBC] text-xs font-semibold">
-                          Creatura attiva ⚔️
+                      {squad.includes(pc.id) && (
+                        <div className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-semibold"
+                          style={{
+                            background: squad[0] === pc.id ? 'rgba(58,188,168,0.2)' : 'rgba(255,255,255,0.1)',
+                            border: squad[0] === pc.id ? '1px solid rgba(58,188,168,0.45)' : '1px solid rgba(255,255,255,0.2)',
+                            color: squad[0] === pc.id ? '#3ABCA8' : 'rgba(255,255,255,0.6)',
+                          }}>
+                          {squad[0] === pc.id ? '⚔️ Capitano · Slot 1' : `🛡️ Slot ${squad.indexOf(pc.id) + 1}`}
                         </div>
                       )}
                       <div className="flex items-center justify-center gap-2 mt-1">
@@ -816,20 +921,60 @@ export default function BestiaryPage() {
                       </div>
                     )}
 
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <button onClick={() => handleSelect(pc)}
-                        className="flex-1 bg-[#3A9DBC] text-white font-bold py-3.5 rounded-xl">
-                        ⚔️ Usa in Battaglia
-                      </button>
-                      {pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
-                        <button onClick={() => handleEvolve(pc)}
-                          className="flex-1 font-extrabold py-3.5 rounded-xl text-[#0F1F2E]"
-                          style={{ background: 'linear-gradient(135deg, #F7C841 0%, #F59E0B 100%)', boxShadow: '0 4px 16px rgba(247,200,65,0.4)' }}>
-                          ✨ Evolvi
+                    {/* Squad assignment */}
+                    <div className="mb-3">
+                      <p className="text-[10px] font-bold text-white/35 uppercase tracking-wider mb-2">Squadra da battaglia</p>
+                      <div className="flex gap-2">
+                        {[0, 1, 2].map(slotIdx => {
+                          const inSlot = squad[slotIdx] === pc.id
+                          const slotTaken = !!squad[slotIdx] && squad[slotIdx] !== pc.id
+                          const mySlot = squad.indexOf(pc.id)
+                          const isLead = slotIdx === 0
+                          return (
+                            <button
+                              key={slotIdx}
+                              disabled={squadSaving}
+                              onClick={() => inSlot ? handleSquadSlot(-1, pc.id) : handleSquadSlot(slotIdx, pc.id)}
+                              className="flex-1 flex flex-col items-center py-2.5 rounded-xl font-bold text-xs transition-all disabled:opacity-50"
+                              style={{
+                                background: inSlot
+                                  ? isLead ? 'rgba(58,188,168,0.22)' : 'rgba(255,255,255,0.14)'
+                                  : slotTaken ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
+                                border: inSlot
+                                  ? isLead ? '1.5px solid rgba(58,188,168,0.7)' : '1.5px solid rgba(255,255,255,0.35)'
+                                  : '1px dashed rgba(255,255,255,0.15)',
+                              }}
+                            >
+                              <span className="text-lg leading-none mb-0.5">
+                                {inSlot ? (isLead ? '⚔️' : '🛡️') : slotTaken ? '🔒' : '+'}
+                              </span>
+                              <span style={{ color: inSlot ? (isLead ? '#3ABCA8' : 'white') : slotTaken ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.45)' }}>
+                                {inSlot ? (mySlot === slotIdx ? 'Slot ' + (slotIdx + 1) : '—') : 'Slot ' + (slotIdx + 1)}
+                              </span>
+                              {isLead && <span className="text-[8px] text-white/30 mt-0.5">Capitano</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {squad.includes(pc.id) && (
+                        <button
+                          onClick={() => handleSquadSlot(-1, pc.id)}
+                          disabled={squadSaving}
+                          className="w-full mt-2 text-[10px] text-red-400/60 hover:text-red-400 transition-colors py-1 disabled:opacity-40"
+                        >
+                          Rimuovi dalla squadra
                         </button>
                       )}
                     </div>
+
+                    {/* Evolve button */}
+                    {pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
+                      <button onClick={() => handleEvolve(pc)}
+                        className="w-full font-extrabold py-3.5 rounded-xl text-[#0F1F2E] mb-3"
+                        style={{ background: 'linear-gradient(135deg, #F7C841 0%, #F59E0B 100%)', boxShadow: '0 4px 16px rgba(247,200,65,0.4)' }}>
+                        ✨ Evolvi
+                      </button>
+                    )}
 
                     {/* Enigma button */}
                     <button

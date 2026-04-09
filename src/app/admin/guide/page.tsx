@@ -136,6 +136,7 @@ function ElementTable() {
 const QR_TYPES = [
   { type: 'oggetto',  color: '#3A9DBC', desc: 'Aggiunge direttamente un oggetto all\'inventario del giocatore', fields: 'item_id, quantity' },
   { type: 'uovo',     color: '#C084FC', desc: 'Crea un\'uovo nello zaino. Il giocatore deve camminare X passi prima di schiuderlo.', fields: 'egg_rarity, steps_required' },
+  { type: 'creatura', color: '#A78BFA', desc: 'Consegna direttamente una creatura specifica al giocatore (va nella collezione, non richiede cattura).', fields: 'creature_id' },
   { type: 'boss',     color: '#E85D2F', desc: 'Avvia un boss fight con lineup fino a 3 creature. Ricompensa erogata solo alla prima vittoria per QR.', fields: 'creatures[ ], reward' },
   { type: 'indizio',  color: '#F7C841', desc: 'Sblocca un capitolo narrativo con testo e immagine opzionale', fields: 'chapter_order, text, image_url' },
   { type: 'evento',   color: '#34D399', desc: 'Attiva un bonus temporaneo sull\'intera sessione (EXP, spawn, oro doppio)', fields: 'event_type, multiplier, duration_minutes' },
@@ -690,6 +691,32 @@ export default function AdminGuidePage() {
                 Lascia tutti i campi enigma vuoti se non vuoi associare un frammento a quella creatura.
                 Il pulsante 🧩 nell&rsquo;app sarà automaticamente disattivato per i giocatori.
               </Callout>
+
+              <SubHeader>Squadra da battaglia</SubHeader>
+              <Prose>
+                Ogni giocatore può selezionare una <strong style={{ color: '#3ABCA8' }}>squadra da 1 a 3 creature</strong>
+                dal proprio WildDex. La squadra è configurabile dalla schermata WildDex nell&rsquo;app &rarr;
+                bottoni <em>Slot 1 / Slot 2 / Slot 3</em> nella scheda dettaglio di ogni creatura.
+              </Prose>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0.5rem 0' }}>
+                {[
+                  { icon: '⚔️', label: 'Slot 1 — Capitano', color: '#3ABCA8', desc: 'Prima creatura schierata. Aggiornare il Capitano aggiorna anche la "creatura attiva" usata in battaglia.' },
+                  { icon: '🛡️', label: 'Slot 2 — Riserva', color: '#94a3b8', desc: 'Entra automaticamente quando lo Slot 1 sviene (HP = 0).' },
+                  { icon: '🛡️', label: 'Slot 3 — Ultima difesa', color: '#94a3b8', desc: 'Entra quando lo Slot 2 sviene. Se anche questo finisce gli HP, il giocatore è sconfitto.' },
+                ].map(({ icon, label, color, desc }) => (
+                  <div key={label} style={{ background: '#ffffff05', border: '1px solid #ffffff0e', borderRadius: '8px', padding: '0.55rem 0.9rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start', fontSize: '0.85rem' }}>
+                    <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{icon}</span>
+                    <div>
+                      <p style={{ color, fontWeight: 600, margin: '0 0 0.2rem', fontSize: '0.85rem' }}>{label}</p>
+                      <p style={{ color: '#64748b', margin: 0, lineHeight: 1.5 }}>{desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Callout type="info">
+                La barra squadra è visibile nell&rsquo;UI di battaglia solo se il giocatore ha configurato
+                almeno 2 creature. Con una sola creatura il comportamento è identico a prima (nessuna barra extra).
+              </Callout>
             </section>
 
             <Divider />
@@ -736,9 +763,25 @@ export default function AdminGuidePage() {
                 'Admin → Missioni → seleziona la sessione → "Nuova Missione"',
                 'Imposta titolo, tipo e target_count (numero di completamenti richiesti)',
                 'Per tipo cattura/qr/collect: inserisci il "target" (nome creatura/QR/oggetto) o lascia vuoto per "qualunque"',
-                'Imposta reward_exp, reward_gold e opzionalmente reward_item_id',
+                'Imposta reward_exp, reward_gold e opzionalmente reward_item_id o reward_creature_id',
                 'Attiva — appare immediatamente nell\'app dei giocatori',
               ]} />
+
+              <SubHeader>Ricompense missione</SubHeader>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0.5rem 0' }}>
+                {[
+                  { field: 'reward_gold',       color: '#F7C841', desc: 'Monete d\'oro erogate al completamento' },
+                  { field: 'reward_exp',         color: '#3A9DBC', desc: 'Punti EXP erogate al completamento' },
+                  { field: 'reward_item_id',     color: '#34D399', desc: 'Oggetto singolo aggiunto all\'inventario (scegli da dropdown)' },
+                  { field: 'reward_items',       color: '#34D399', desc: 'Lista oggetti multipli con quantità (formato JSON avanzato)' },
+                  { field: 'reward_creature_id', color: '#A78BFA', desc: 'Creatura consegnata direttamente alla collezione del giocatore' },
+                ].map(({ field, color, desc }) => (
+                  <div key={field} style={{ background: `${color}0a`, border: `1px solid ${color}20`, borderRadius: '8px', padding: '0.5rem 0.85rem', display: 'flex', gap: '0.6rem', alignItems: 'center', fontSize: '0.85rem' }}>
+                    <code style={{ color, fontFamily: 'monospace', fontSize: '0.83rem', flexShrink: 0 }}>{field}</code>
+                    <span style={{ color: '#94a3b8' }}>{desc}</span>
+                  </div>
+                ))}
+              </div>
 
               <Callout type="info">
                 Il campo <Code>target</Code> usa il confronto case-insensitive: &ldquo;fiammare&rdquo; corrisponde a
@@ -796,6 +839,39 @@ export default function AdminGuidePage() {
                   </div>
                 ))}
               </div>
+
+              <SubHeader>Assegna risorse a un giocatore</SubHeader>
+              <Prose>
+                Dal pannello di ogni giocatore (pulsante 🎁) puoi assegnare manualmente risorse.
+                Utile per compensare bug, premi speciali o creature di debug.
+              </Prose>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0.5rem 0' }}>
+                {[
+                  { type: 'Oro', icon: '🪙', color: '#F7C841', desc: 'Aggiunge direttamente monete al saldo del giocatore' },
+                  { type: 'EXP', icon: '⚡', color: '#3A9DBC', desc: 'Aggiunge punti esperienza (può far salire di livello)' },
+                  { type: 'Oggetto', icon: '🎒', color: '#34D399', desc: 'Aggiunge un oggetto scelto dall\'inventario della sessione' },
+                  { type: 'Creatura', icon: '🐾', color: '#A78BFA', desc: 'Consegna una creatura specifica direttamente alla collezione del giocatore' },
+                ].map(({ type, icon, color, desc }) => (
+                  <div key={type} style={{ background: `${color}0a`, border: `1px solid ${color}25`, borderRadius: '8px',
+                    padding: '0.55rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.85rem' }}>
+                    <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>{icon}</span>
+                    <strong style={{ color, minWidth: '60px' }}>{type}</strong>
+                    <span style={{ color: '#94a3b8' }}>{desc}</span>
+                  </div>
+                ))}
+              </div>
+
+              <SubHeader>Starter creature</SubHeader>
+              <Prose>
+                Al primo accesso alla mappa, se il giocatore non ha ancora creature, viene mostrata una
+                schermata di selezione starter: può scegliere una creatura <Code>comune</Code> e <Code>spawnable</Code>
+                dalla lista. La creatura viene consegnata con un'animazione di schiusura uovo e diventa
+                automaticamente il primo membro della squadra.
+              </Prose>
+              <Callout type="info">
+                Assicurati che ci siano almeno 2–3 creature di rarità <strong>comune</strong> con il flag
+                <Code>spawnable = true</Code> e un'immagine assegnata affinché la selezione starter funzioni.
+              </Callout>
             </section>
 
             <Divider />

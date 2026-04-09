@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   // Get player session
   const { data: playerSession } = await supabase
     .from('player_sessions')
-    .select('id, level, selected_creature_id')
+    .select('id, level, selected_creature_id, squad_ids')
     .eq('user_id', user.id)
     .eq('session_id', sessionId)
     .single()
@@ -99,6 +99,38 @@ export async function POST(request: Request) {
 
   if (!creature) return NextResponse.json({ error: 'Errore dati creatura' }, { status: 500 })
 
+  // Load squad creatures (up to 3), falling back to single selected_creature_id
+  const squadIds: string[] = (playerSession as any).squad_ids ?? []
+  const primaryCreatureId = squadIds.length > 0
+    ? squadIds[0]
+    : playerSession.selected_creature_id
+
+  let squadCreatures: Array<{ pcId: string; id: string; name: string; hp: number; atk: number; element: string; rarity: string; image_url: string | null }> = []
+  if (squadIds.length > 0) {
+    const { data: pcs } = await supabase
+      .from('player_creatures')
+      .select('id, creatures(id, name, hp, atk, element, rarity, image_url)')
+      .in('id', squadIds)
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId)
+
+    if (pcs) {
+      squadCreatures = squadIds
+        .map(sid => (pcs as any[]).find(pc => pc.id === sid))
+        .filter(Boolean)
+        .map((pc: any) => ({
+          pcId: pc.id,
+          id: pc.creatures.id,
+          name: pc.creatures.name,
+          hp: pc.creatures.hp,
+          atk: pc.creatures.atk,
+          element: pc.creatures.element,
+          rarity: pc.creatures.rarity,
+          image_url: pc.creatures.image_url ?? null,
+        }))
+    }
+  }
+
   // Create encounter — lock player_creature_id at start (anti-cheat)
   const { data: encounter, error: encError } = await supabase
     .from('encounters')
@@ -109,7 +141,7 @@ export async function POST(request: Request) {
       status: 'active',
       trigger,
       wild_creature_hp: creature.hp,
-      player_creature_id: playerSession.selected_creature_id,
+      player_creature_id: primaryCreatureId,
     })
     .select()
     .single()
@@ -129,5 +161,6 @@ export async function POST(request: Request) {
       lottie_url: creature.lottie_url,
     },
     wildHp: creature.hp,
+    squadCreatures,
   })
 }

@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const body = await request.json().catch(() => ({}))
-  const { encounterId, itemId } = body
+  const { encounterId, itemId, activePlayerCreatureId } = body
 
   if (!encounterId) return NextResponse.json({ error: 'encounterId mancante' }, { status: 400 })
 
@@ -35,16 +35,20 @@ export async function POST(request: Request) {
 
   const wildCreature = (encounter as any).creatures
 
-  if (!encounter.player_creature_id) {
+  if (!encounter.player_creature_id && !activePlayerCreatureId) {
     return NextResponse.json({
       error: 'Nessuna creatura selezionata. Seleziona una creatura dal WildDex prima di combattere.'
     }, { status: 400 })
   }
 
+  // Use activePlayerCreatureId (squad switch) if provided, else the locked encounter creature
+  const lookupId = activePlayerCreatureId ?? encounter.player_creature_id
+
   const { data: playerCreature } = await supabase
     .from('player_creatures')
     .select('*, creatures(*)')
-    .eq('id', encounter.player_creature_id)
+    .eq('id', lookupId)
+    .eq('user_id', user.id)
     .single()
 
   if (!playerCreature) return NextResponse.json({ error: 'Creatura giocatore non trovata' }, { status: 404 })
