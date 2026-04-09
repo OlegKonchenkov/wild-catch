@@ -63,6 +63,11 @@ export default function BestiaryPage() {
   const [loading, setLoading]               = useState(true)
   const [selectedPcId, setSelectedPcId]     = useState<string | null>(null)
   const [playerLevel, setPlayerLevel]       = useState(1)
+  // Set of creature IDs that have an evolved form
+  const [evolvableIds, setEvolvableIds]     = useState<Set<string>>(new Set())
+  // Reveal card after manual evolution
+  const [evolveReveal, setEvolveReveal]     = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null; copiesRemaining: number } | null>(null)
+  const [evolveCardVisible, setEvolveCardVisible] = useState(false)
   const supabase   = useMemo(() => createClient(), [])
   const userIdRef  = useRef<string | null>(null)
   const sessionRef = useRef<string | null>(null)
@@ -104,11 +109,19 @@ export default function BestiaryPage() {
     function finish() { if (++done === 3) setLoading(false) }
 
     supabase.from('creatures').select('*').order('rarity').then(({ data }) => {
-      if (data) setCreatures(
-        [...(data as unknown as Creature[])].sort(
+      if (data) {
+        const list = [...(data as unknown as Creature[])].sort(
           (a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
         )
-      )
+        setCreatures(list)
+        // Build set of IDs that have an evolution (i.e. some creature points evolution_of → them)
+        const ids = new Set<string>(
+          list
+            .filter(c => (c as any).evolution_of)
+            .map(c => (c as any).evolution_of as string)
+        )
+        setEvolvableIds(ids)
+      }
       finish()
     })
 
@@ -184,14 +197,25 @@ export default function BestiaryPage() {
     })
     const data = await res.json()
     if (res.ok) {
-      setMessage(`✨ ${data.newCreature.name} si è evoluta!`)
+      // Refresh collection
       const user = (await supabase.auth.getUser()).data.user
-      if (!user) return
-      const { data: refreshed } = await supabase
-        .from('player_creatures').select('*, creatures(*)')
-        .eq('user_id', user.id)
-        .eq('session_id', localStorage.getItem('current_session_id')!)
-      if (refreshed) setPlayerCreatures(refreshed as unknown as PlayerCreature[])
+      if (user) {
+        const { data: refreshed } = await supabase
+          .from('player_creatures').select('*, creatures(*)')
+          .eq('user_id', user.id)
+          .eq('session_id', sessionId)
+        if (refreshed) setPlayerCreatures(refreshed as unknown as PlayerCreature[])
+      }
+      // Close detail panel and show reveal card
+      setSelected(null)
+      const cr = data.newCreature
+      setEvolveReveal({
+        name: cr.name, rarity: cr.rarity, element: cr.element,
+        image_url: cr.image_url ?? null,
+        hp: cr.hp, atk: cr.atk, def: cr.def, description: cr.description ?? null,
+        copiesRemaining: data.copiesRemaining,
+      })
+      setTimeout(() => setEvolveCardVisible(true), 80)
     } else {
       setMessage(data.error)
     }
@@ -582,7 +606,7 @@ export default function BestiaryPage() {
                   )}
 
                   {/* Evolvibile badge */}
-                  {pc && pc.duplicates_count >= 3 && !pc.evolved && (
+                  {pc && pc.duplicates_count >= 3 && !pc.evolved && evolvableIds.has(pc.creature_id) && (
                     <div className="absolute top-1 left-1 animate-bounce">
                       <span className="text-sm">✨</span>
                     </div>
@@ -767,10 +791,10 @@ export default function BestiaryPage() {
                         className="flex-1 bg-[#3A9DBC] text-white font-bold py-3.5 rounded-xl">
                         ⚔️ Usa in Battaglia
                       </button>
-                      {pc.duplicates_count >= 3 && !pc.evolved && (
+                      {pc.duplicates_count >= 3 && !pc.evolved && evolvableIds.has(pc.creature_id) && (
                         <button onClick={() => handleEvolve(pc)}
                           className="flex-1 bg-[#F7C841] text-[#0F1F2E] font-bold py-3.5 rounded-xl">
-                          ✨ Evolvi
+                          ✨ Evolvi ({pc.duplicates_count} copie)
                         </button>
                       )}
                     </div>
@@ -867,6 +891,145 @@ export default function BestiaryPage() {
           )
         })()}
       </AnimatePresence>
+
+      {/* ── Evolution reveal card ─────────────────────────────────────── */}
+      {evolveReveal && (() => {
+        const cr = evolveReveal
+        const rarityColor = RARITY_COLORS[cr.rarity as keyof typeof RARITY_COLORS] ?? '#9CA3AF'
+        const elemEmoji = ELEMENT_EMOJI[cr.element as keyof typeof ELEMENT_EMOJI] ?? '✦'
+        const elemGlow: Record<string, string> = {
+          fiamma: '#FF6B35', adriatico: '#3A9DBC', bosco: '#34D399', terra: '#A78BFA', armonia: '#F9A8D4',
+        }
+        const glow = elemGlow[cr.element] ?? rarityColor
+        return (
+          <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/88 backdrop-blur-sm">
+            {/* Tap backdrop to dismiss */}
+            <div className="absolute inset-0" onClick={() => { setEvolveReveal(null); setEvolveCardVisible(false) }} />
+
+            {/* Sliding card */}
+            <div
+              className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-y-auto"
+              style={{
+                background: '#080E1A',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderBottom: 'none',
+                maxHeight: '88vh',
+                transform: evolveCardVisible ? 'translateY(0)' : 'translateY(100%)',
+                transition: 'transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              }}
+            >
+              {/* Drag handle */}
+              <div className="flex justify-center pt-3 mb-1">
+                <div className="w-10 h-1 rounded-full bg-white/20" />
+              </div>
+
+              {/* Header */}
+              <div className="relative pt-2 pb-2" style={{
+                background: `linear-gradient(180deg, ${glow}18 0%, transparent 100%)`,
+              }}>
+                {/* Badge */}
+                <div className="flex justify-center mb-3">
+                  <div
+                    className="flex items-center gap-2 px-4 py-1.5 rounded-full font-extrabold text-sm"
+                    style={{
+                      background: '#F7C841',
+                      color: '#080E1A',
+                      boxShadow: '0 4px 20px rgba(247,200,65,0.5)',
+                      opacity: evolveCardVisible ? 1 : 0,
+                      transform: evolveCardVisible ? 'scale(1)' : 'scale(0.6)',
+                      transition: 'opacity 0.3s 0.15s, transform 0.4s 0.15s cubic-bezier(0.34,1.56,0.64,1)',
+                    }}
+                  >
+                    ✨ Evoluzione!
+                  </div>
+                </div>
+
+                {/* Sprite */}
+                <div className="flex justify-center" style={{
+                  opacity: evolveCardVisible ? 1 : 0,
+                  transform: evolveCardVisible ? 'scale(1)' : 'scale(0.5)',
+                  transition: 'opacity 0.35s 0.1s, transform 0.45s 0.1s cubic-bezier(0.34,1.56,0.64,1)',
+                }}>
+                  <CreatureSprite
+                    imageUrl={cr.image_url ?? ''}
+                    name={cr.name}
+                    animState="idle"
+                    size={160}
+                    element={cr.element as any}
+                    rarity={cr.rarity as any}
+                    showAura
+                  />
+                </div>
+              </div>
+
+              {/* Info */}
+              <div className="px-5 pb-8">
+                {/* Name + element + rarity */}
+                <div className="text-center mb-4" style={{
+                  opacity: evolveCardVisible ? 1 : 0,
+                  transition: 'opacity 0.3s 0.25s',
+                }}>
+                  <h3 className="text-2xl font-bold text-white mb-1">{cr.name}</h3>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-base">{elemEmoji}</span>
+                    <span className="text-xs capitalize text-white/40">{cr.element}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                      style={{ background: `${rarityColor}22`, color: rarityColor, border: `1px solid ${rarityColor}55` }}>
+                      {cr.rarity.replace('_', ' ')}
+                    </span>
+                  </div>
+                  {cr.description && (
+                    <p className="text-sm text-white/45 mt-3 leading-relaxed">{cr.description}</p>
+                  )}
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-2 mb-4" style={{
+                  opacity: evolveCardVisible ? 1 : 0,
+                  transition: 'opacity 0.3s 0.32s',
+                }}>
+                  {[
+                    { label: 'HP',  value: cr.hp,  color: '#F87171' },
+                    { label: 'ATK', value: cr.atk, color: '#FB923C' },
+                    { label: 'DEF', value: cr.def, color: '#60A5FA' },
+                  ].map(s => (
+                    <div key={s.label}
+                      className="rounded-xl p-3 text-center"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${s.color}20` }}
+                    >
+                      <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
+                      <p className="text-[10px] text-white/35 mt-0.5 font-semibold uppercase tracking-wider">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Copies note */}
+                <p className="text-center text-xs text-white/30 mb-4" style={{
+                  opacity: evolveCardVisible ? 1 : 0,
+                  transition: 'opacity 0.3s 0.38s',
+                }}>
+                  2 copie consumate · {cr.copiesRemaining} {cr.copiesRemaining === 1 ? 'copia' : 'copie'} rimanenti
+                </p>
+
+                {/* CTA */}
+                <button
+                  onClick={() => { setEvolveReveal(null); setEvolveCardVisible(false) }}
+                  className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
+                  style={{
+                    background: 'linear-gradient(135deg, #F7C841 0%, #F59E0B 100%)',
+                    boxShadow: '0 4px 24px rgba(247,200,65,0.4)',
+                    color: '#0F1F2E',
+                    opacity: evolveCardVisible ? 1 : 0,
+                    transition: 'opacity 0.3s 0.4s',
+                  }}
+                >
+                  Continua
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

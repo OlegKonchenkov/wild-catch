@@ -114,10 +114,6 @@ export async function POST(request: Request) {
 
   if (existing) {
     const newCount = existing.duplicates_count + 1
-    await supabase
-      .from('player_creatures')
-      .update({ duplicates_count: newCount })
-      .eq('id', existing.id)
 
     if (newCount >= 3 && !existing.evolved) {
       const { data: evolvedForm } = await supabase
@@ -127,13 +123,50 @@ export async function POST(request: Request) {
         .maybeSingle()
 
       if (evolvedForm) {
+        // Consume 2 copies from base (always keeps ≥1), mark as evolved
+        const copiesRemaining = newCount - 2
         await supabase
           .from('player_creatures')
-          .update({ evolved: true, creature_id: evolvedForm.id })
+          .update({ duplicates_count: copiesRemaining, evolved: true })
           .eq('id', existing.id)
+
+        // Add evolved form as its own collection entry (or increment)
+        const { data: existingEvolved } = await supabase
+          .from('player_creatures')
+          .select('id, duplicates_count')
+          .eq('user_id', user.id)
+          .eq('creature_id', evolvedForm.id)
+          .eq('session_id', encounter.session_id)
+          .maybeSingle()
+
+        if (existingEvolved) {
+          await supabase
+            .from('player_creatures')
+            .update({ duplicates_count: existingEvolved.duplicates_count + 1 })
+            .eq('id', existingEvolved.id)
+        } else {
+          await supabase.from('player_creatures').upsert({
+            user_id: user.id,
+            creature_id: evolvedForm.id,
+            session_id: encounter.session_id,
+            duplicates_count: 1,
+          }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
+        }
+
         evolvedTriggered = true
         newCreatureId = evolvedForm.id
+      } else {
+        // No evolution available — just update count
+        await supabase
+          .from('player_creatures')
+          .update({ duplicates_count: newCount })
+          .eq('id', existing.id)
       }
+    } else {
+      await supabase
+        .from('player_creatures')
+        .update({ duplicates_count: newCount })
+        .eq('id', existing.id)
     }
   } else {
     // ignoreDuplicates guards against the rare concurrent-catch race condition
