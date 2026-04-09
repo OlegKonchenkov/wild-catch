@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { userId, sessionId, type, amount, itemId, quantity } = body
+  const { userId, sessionId, type, amount, itemId, quantity, creatureId } = body
 
   if (!userId || !sessionId || !type) {
     return NextResponse.json({ error: 'userId, sessionId e type richiesti' }, { status: 400 })
@@ -97,5 +97,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ granted: true, type, itemId, quantity: qty })
   }
 
-  return NextResponse.json({ error: 'Tipo non valido (gold|exp|item)' }, { status: 400 })
+  if (type === 'creature') {
+    if (!creatureId) return NextResponse.json({ error: 'creatureId richiesto' }, { status: 400 })
+    const { data: existing } = await admin
+      .from('player_creatures')
+      .select('id, duplicates_count')
+      .eq('user_id', userId)
+      .eq('session_id', sessionId)
+      .eq('creature_id', creatureId)
+      .maybeSingle()
+    if (existing) {
+      await admin.from('player_creatures')
+        .update({ duplicates_count: existing.duplicates_count + 1 })
+        .eq('id', existing.id)
+    } else {
+      const { error } = await admin.from('player_creatures').insert({
+        user_id: userId, session_id: sessionId, creature_id: creatureId, duplicates_count: 1,
+      })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    return NextResponse.json({ granted: true, type, creatureId })
+  }
+
+  return NextResponse.json({ error: 'Tipo non valido (gold|exp|item|creature)' }, { status: 400 })
 }

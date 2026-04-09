@@ -674,18 +674,19 @@ export default function BestiaryPage() {
               key="sheet"
               initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="fixed inset-x-0 bottom-0 bg-[#0F1F2E] border-t border-white/10 rounded-t-3xl z-50 pb-8"
+              className="fixed inset-x-0 bottom-0 bg-[#0F1F2E] border-t border-white/10 rounded-t-3xl z-50 overflow-y-auto"
+              style={{ maxHeight: '88vh' }}
             >
               {/* Drag handle */}
-              <div className="flex justify-center pt-3 pb-1">
+              <div className="flex justify-center pt-3 pb-1 sticky top-0 bg-[#0F1F2E] z-10">
                 <div className="w-10 h-1 bg-white/20 rounded-full" />
               </div>
               <button onClick={() => setSelected(null)}
-                className="absolute top-4 right-4 text-white/30 hover:text-white/70 text-xl w-8 h-8 flex items-center justify-center">
+                className="absolute top-4 right-4 text-white/30 hover:text-white/70 text-xl w-8 h-8 flex items-center justify-center z-20">
                 ✕
               </button>
 
-              <div className="px-6 pt-2">
+              <div className="px-6 pt-2 pb-8">
                 {/* Image */}
                 <div className="flex justify-center mb-4">
                   {caught ? (

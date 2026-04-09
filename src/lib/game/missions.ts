@@ -9,6 +9,7 @@ interface MissionRow {
   reward_exp: number
   reward_item_id: string | null
   reward_items: Array<{ item_id: string; quantity: number }> | null
+  reward_creature_id: string | null
 }
 
 export interface CompletedMission {
@@ -42,7 +43,7 @@ export async function incrementMissionProgress({
   // Load matching missions for this session and type (include global missions with null session_id)
   const { data: missions } = await admin
     .from('missions')
-    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_items')
+    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_items, reward_creature_id')
     .or(`session_id.eq.${sessionId},session_id.is.null`)
     .eq('type', type)
 
@@ -192,6 +193,28 @@ async function grantMissionReward(
         item_id: ri.item_id,
         quantity: ri.quantity,
       })
+    }
+  }
+
+  // Creature reward
+  if (mission.reward_creature_id) {
+    const { data: existing } = await admin.from('player_creatures')
+      .select('id, duplicates_count')
+      .eq('user_id', userId)
+      .eq('session_id', sessionId)
+      .eq('creature_id', mission.reward_creature_id)
+      .maybeSingle()
+    if (existing) {
+      await admin.from('player_creatures')
+        .update({ duplicates_count: (existing as any).duplicates_count + 1 })
+        .eq('id', (existing as any).id)
+    } else {
+      await admin.from('player_creatures').upsert({
+        user_id: userId,
+        creature_id: mission.reward_creature_id,
+        session_id: sessionId,
+        duplicates_count: 1,
+      }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
     }
   }
 

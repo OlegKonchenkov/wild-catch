@@ -68,11 +68,12 @@ function SearchSelect({
 
 /* ── Per-type field definitions ─────────────── */
 const TYPE_INFO: Record<QRCodeType, { label: string; icon: string; description: string; color?: string }> = {
-  oggetto: { label: 'Oggetto',           icon: '🎁', description: 'Il giocatore ottiene un oggetto nello zaino.' },
-  indizio: { label: 'Indizio',           icon: '🔍', description: 'Il giocatore riceve un testo/immagine narrativo.' },
-  uovo:    { label: 'Uovo',              icon: '🥚', description: 'Il giocatore ottiene un uovo da incubare e schiudere.' },
-  boss:    { label: 'Capo Palestra',     icon: '👑', description: 'Avvia uno scontro speciale 3v3 contro il Capo Palestra.', color: '#F7C841' },
-  evento:  { label: 'Evento speciale',   icon: '⚡', description: 'Attiva un bonus temporaneo per il giocatore.' },
+  oggetto:  { label: 'Oggetto',           icon: '🎁', description: 'Il giocatore ottiene un oggetto nello zaino.' },
+  indizio:  { label: 'Indizio',           icon: '🔍', description: 'Il giocatore riceve un testo/immagine narrativo.' },
+  uovo:     { label: 'Uovo',              icon: '🥚', description: 'Il giocatore ottiene un uovo da incubare e schiudere.' },
+  boss:     { label: 'Capo Palestra',     icon: '👑', description: 'Avvia uno scontro speciale 3v3 contro il Capo Palestra.', color: '#F7C841' },
+  evento:   { label: 'Evento speciale',   icon: '⚡', description: 'Attiva un bonus temporaneo per il giocatore.' },
+  creatura: { label: 'Creatura',          icon: '🐾', description: 'Il giocatore riceve direttamente una creatura nella sua collezione.', color: '#C084FC' },
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -151,6 +152,7 @@ function defaultFields(t: QRCodeType): Fields {
       reward_gold: 200, reward_exp: 100,
     }
     case 'evento':  return { event_type: 'bonus_exp', multiplier: 2, duration_minutes: 10 }
+    case 'creatura': return { creature_id: '' }
   }
 }
 
@@ -181,6 +183,8 @@ function payloadToFields(type: QRCodeType, payload: any): Fields {
     }
     case 'evento':
       return { event_type: String(p.event_type ?? 'bonus_exp'), multiplier: asNumber(p.effect?.multiplier, 2), duration_minutes: asNumber(p.effect?.duration_minutes, 10) }
+    case 'creatura':
+      return { creature_id: String(p.creature_id ?? '') }
   }
 }
 
@@ -200,7 +204,8 @@ function buildPayload(t: QRCodeType, f: Fields): any {
         reward: { gold: Number(f.reward_gold), exp: Number(f.reward_exp) },
       }
     }
-    case 'evento':  return { event_type: f.event_type, effect: { multiplier: Number(f.multiplier), duration_minutes: Number(f.duration_minutes) } }
+    case 'evento':   return { event_type: f.event_type, effect: { multiplier: Number(f.multiplier), duration_minutes: Number(f.duration_minutes) } }
+    case 'creatura': return { creature_id: f.creature_id }
   }
 }
 
@@ -238,6 +243,10 @@ function getQrDescription(qr: any, items: any[], creatures: any[]): string {
     }
     case 'evento': {
       return `${getEventTypeLabel(String(payload.event_type ?? 'bonus_exp'))} ×${asNumber(payload.effect?.multiplier, 2)} · ${asNumber(payload.effect?.duration_minutes, 10)} min`
+    }
+    case 'creatura': {
+      const c = creatures.find(cr => cr.id === payload.creature_id)
+      return c ? `${c.name} (${c.rarity})` : 'Creatura non selezionata'
     }
     default:
       return TYPE_INFO[qr.type as QRCodeType]?.description ?? 'QR speciale'
@@ -820,6 +829,17 @@ export default function QRCodesPage() {
                       <input type="number" value={fields.duration_minutes} min={1} onChange={e => setField('duration_minutes', +e.target.value)} className={cls} />
                     </Field>
                   </>
+                )}
+
+                {type === 'creatura' && (
+                  <Field label="Creatura" hint="La creatura verrà aggiunta alla collezione del giocatore (o incrementa i duplicati se già posseduta)">
+                    <SearchSelect
+                      options={creatures.map(c => ({ value: c.id, label: c.name, sub: `${c.rarity} · ${c.element}` }))}
+                      value={String(fields.creature_id ?? '')}
+                      onChange={v => setField('creature_id', v)}
+                      placeholder="Cerca creatura…"
+                    />
+                  </Field>
                 )}
               </div>
 

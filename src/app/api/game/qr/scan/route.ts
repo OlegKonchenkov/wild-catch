@@ -241,6 +241,51 @@ export async function POST(request: Request) {
       break
     }
 
+    case 'creatura': {
+      const { data: creature } = await supabase
+        .from('creatures')
+        .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def, description')
+        .eq('id', payload.creature_id)
+        .single()
+
+      if (!creature) {
+        result = { ...result, error: 'Creatura non trovata' }
+        break
+      }
+
+      const admin = createAdminClient()
+      const { data: existing } = await admin
+        .from('player_creatures')
+        .select('id, duplicates_count')
+        .eq('user_id', user.id)
+        .eq('session_id', sessionId)
+        .eq('creature_id', creature.id)
+        .maybeSingle()
+
+      if (existing) {
+        await admin.from('player_creatures')
+          .update({ duplicates_count: existing.duplicates_count + 1 })
+          .eq('id', existing.id)
+      } else {
+        await admin.from('player_creatures').upsert({
+          user_id: user.id,
+          creature_id: creature.id,
+          session_id: sessionId,
+          duplicates_count: 1,
+        }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
+      }
+
+      admin.from('player_game_events').insert({
+        user_id: user.id,
+        session_id: sessionId,
+        type: 'catch',
+        payload: { creature_name: (creature as any).name, rarity: (creature as any).rarity, element: (creature as any).element, evolved: false, via_qr: true },
+      }).then(undefined, () => {})
+
+      result = { ...result, creature }
+      break
+    }
+
     case 'evento': {
       result = { ...result, eventType: payload.event_type, effect: payload.effect }
       break

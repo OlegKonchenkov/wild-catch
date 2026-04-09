@@ -14,6 +14,7 @@ interface Mission {
   reward_gold: number
   reward_exp: number
   reward_items: Array<{ item_id: string; quantity: number }>
+  reward_creature_id: string | null
   is_required: boolean
   session_id: string | null
 }
@@ -173,6 +174,7 @@ const EMPTY_FORM = {
   title: '', description: '', type: 'cattura', target: '',
   target_count: 1, reward_gold: 50, reward_exp: 100,
   reward_items: [] as Array<{ item_id: string; quantity: number }>,
+  reward_creature_id: '' as string,
   chapter_order: 1, is_required: false, scope_session_id: '',
 }
 
@@ -267,6 +269,7 @@ export default function AdminMissions() {
       title: m.title, description: m.description, type: m.type, target: m.target,
       target_count: m.target_count, reward_gold: m.reward_gold, reward_exp: m.reward_exp,
       reward_items: m.reward_items ?? [],
+      reward_creature_id: m.reward_creature_id ?? '',
       chapter_order: m.chapter_order, is_required: m.is_required,
       scope_session_id: m.session_id ?? '',
     })
@@ -281,17 +284,18 @@ export default function AdminMissions() {
     setSaving(true); setFormError('')
     const isEdit = panel !== null && panel !== 'new'
 
-    const { scope_session_id, reward_items, ...formFields } = form as any
+    const { scope_session_id, reward_items, reward_creature_id, ...formFields } = form as any
     const sessionIdToSave = scope_session_id || null
     const rewardItems = (reward_items ?? []).filter((ri: any) => ri.item_id)
+    const rewardCreatureId = reward_creature_id || null
     if (isEdit) {
       const { error } = await supabase.from('missions')
-        .update({ ...formFields, session_id: sessionIdToSave, reward_items: rewardItems })
+        .update({ ...formFields, session_id: sessionIdToSave, reward_items: rewardItems, reward_creature_id: rewardCreatureId })
         .eq('id', (panel as Mission).id)
       if (error) { setFormError(error.message); setSaving(false); return }
     } else {
       const { error } = await supabase.from('missions')
-        .insert({ ...formFields, session_id: sessionIdToSave, reward_items: rewardItems })
+        .insert({ ...formFields, session_id: sessionIdToSave, reward_items: rewardItems, reward_creature_id: rewardCreatureId })
       if (error) { setFormError(error.message); setSaving(false); return }
     }
 
@@ -452,6 +456,21 @@ export default function AdminMissions() {
                   <input type="number" className={cls} value={form.reward_exp} min={0}
                     onChange={e => setForm(f => ({ ...f, reward_exp: +e.target.value }))} />
                 </Field>
+              </div>
+
+              {/* Reward creature */}
+              <div>
+                <label className="block text-xs font-semibold text-white/60 mb-1">🐾 Creatura in ricompensa <span className="font-normal text-white/30">(opzionale)</span></label>
+                <select
+                  value={(form as any).reward_creature_id ?? ''}
+                  onChange={e => setForm(f => ({ ...f, reward_creature_id: e.target.value } as any))}
+                  className={cls}
+                >
+                  <option value="">— Nessuna creatura —</option>
+                  {creatures.map((c: Creature) => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.rarity} · {c.element})</option>
+                  ))}
+                </select>
               </div>
 
               {/* Reward items */}

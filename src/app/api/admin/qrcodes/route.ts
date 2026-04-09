@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-const VALID_TYPES = ['oggetto', 'indizio', 'uovo', 'boss', 'evento'] as const
+const VALID_TYPES = ['oggetto', 'indizio', 'uovo', 'boss', 'evento', 'creatura'] as const
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no ambiguous 0/O/1/I
 
 function generateCode(): string {

@@ -24,6 +24,7 @@ export default function PlayersPage() {
   const [loadingSessions, setLoadingSessions] = useState(true)
   const [loadingPlayers, setLoadingPlayers] = useState(false)
   const [items, setItems]               = useState<any[]>([])
+  const [creatures, setCreatures]       = useState<any[]>([])
 
   const [search, setSearch] = useState('')
 
@@ -47,10 +48,11 @@ export default function PlayersPage() {
 
   // Grant resources
   const [grantTarget, setGrantTarget]   = useState<GrantTarget | null>(null)
-  const [grantType, setGrantType]       = useState<'gold' | 'exp' | 'item'>('gold')
+  const [grantType, setGrantType]       = useState<'gold' | 'exp' | 'item' | 'creature'>('gold')
   const [grantAmount, setGrantAmount]   = useState(50)
   const [grantItemId, setGrantItemId]   = useState('')
   const [grantQty, setGrantQty]         = useState(1)
+  const [grantCreatureId, setGrantCreatureId] = useState('')
   const [grantLoading, setGrantLoading] = useState(false)
   const [grantFeedback, setGrantFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -67,6 +69,7 @@ export default function PlayersPage() {
 
   useEffect(() => {
     fetch('/api/admin/items').then(r => r.json()).then(d => setItems(d.items ?? []))
+    fetch('/api/admin/creatures').then(r => r.json()).then(d => setCreatures(d.creatures ?? []))
     supabase.from('sessions')
       .select('id, name, status')
       .then(({ data }) => {
@@ -142,7 +145,7 @@ export default function PlayersPage() {
 
   function openGrant(p: Player) {
     setGrantTarget({ userId: p.userId, label: p.nickname || p.email || p.userId.slice(0, 8) })
-    setGrantType('gold'); setGrantAmount(50); setGrantItemId(''); setGrantQty(1); setGrantFeedback(null)
+    setGrantType('gold'); setGrantAmount(50); setGrantItemId(''); setGrantQty(1); setGrantCreatureId(''); setGrantFeedback(null)
   }
 
   async function sendGrant() {
@@ -152,6 +155,7 @@ export default function PlayersPage() {
       userId: grantTarget.userId, sessionId: selectedId, type: grantType,
     }
     if (grantType === 'item') { body.itemId = grantItemId; body.quantity = grantQty }
+    else if (grantType === 'creature') { body.creatureId = grantCreatureId }
     else { body.amount = grantAmount }
     const res = await fetch('/api/admin/players/grant', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -501,13 +505,13 @@ export default function PlayersPage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-white/50 mb-1">Tipo risorsa</label>
-                <div className="flex gap-2">
-                  {(['gold', 'exp', 'item'] as const).map(t => (
+                <div className="grid grid-cols-2 gap-2">
+                  {(['gold', 'exp', 'item', 'creature'] as const).map(t => (
                     <button key={t} onClick={() => setGrantType(t)}
-                      className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
+                      className={`py-2 rounded-lg text-sm font-bold transition-all ${
                         grantType === t ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/50 border border-white/10'
                       }`}>
-                      {t === 'gold' ? '💰 Oro' : t === 'exp' ? '⭐ EXP' : '🎒 Oggetto'}
+                      {t === 'gold' ? '💰 Oro' : t === 'exp' ? '⭐ EXP' : t === 'item' ? '🎒 Oggetto' : '🐾 Creatura'}
                     </button>
                   ))}
                 </div>
@@ -554,6 +558,19 @@ export default function PlayersPage() {
                 </>
               )}
 
+              {grantType === 'creature' && (
+                <div>
+                  <label className="block text-xs font-semibold text-white/50 mb-1">Creatura</label>
+                  <select value={grantCreatureId} onChange={e => setGrantCreatureId(e.target.value)}
+                    className="w-full bg-[#0F1F2E] text-white border border-white/20 rounded-lg px-3 py-2">
+                    <option value="">— Seleziona creatura —</option>
+                    {creatures.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.rarity} · {c.element})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {grantFeedback && (
                 <p className={`text-sm font-medium px-3 py-2 rounded-lg ${
                   grantFeedback.type === 'success'
@@ -571,14 +588,14 @@ export default function PlayersPage() {
                 </button>
                 <button
                   onClick={sendGrant}
-                  disabled={grantLoading || (grantType === 'item' && !grantItemId) || (grantType !== 'item' && grantAmount === 0)}
+                  disabled={grantLoading || (grantType === 'item' && !grantItemId) || (grantType === 'creature' && !grantCreatureId) || (['gold','exp'].includes(grantType) && grantAmount === 0)}
                   className={`flex-1 font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 ${
-                    grantType !== 'item' && grantAmount < 0
+                    ['gold','exp'].includes(grantType) && grantAmount < 0
                       ? 'bg-red-500 text-white'
                       : 'bg-[#D4A96A] text-[#0F1F2E]'
                   }`}
                 >
-                  {grantLoading ? 'Invio...' : (grantType !== 'item' && grantAmount < 0) ? '🗑 Rimuovi' : '🎁 Assegna'}
+                  {grantLoading ? 'Invio...' : (['gold','exp'].includes(grantType) && grantAmount < 0) ? '🗑 Rimuovi' : '🎁 Assegna'}
                 </button>
               </div>
             </div>
