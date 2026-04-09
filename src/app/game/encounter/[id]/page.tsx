@@ -270,6 +270,9 @@ export default function EncounterPage() {
       if (squad.length > 0) {
         setSquadCreatures(squad)
         setSlotHps(squad.map((c: SquadCreature) => c.hp))
+        const lead = squad[0]
+        setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity })
+        setPlayerHp(lead.hp)
       }
       return
     }
@@ -294,6 +297,9 @@ export default function EncounterPage() {
         if (squad.length > 0) {
           setSquadCreatures(squad)
           setSlotHps(squad.map(c => c.hp))
+          const lead = squad[0]
+          setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity })
+          setPlayerHp(lead.hp)
         }
       })
       .catch(() => {})
