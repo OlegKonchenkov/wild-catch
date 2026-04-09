@@ -316,6 +316,10 @@ export default function BestiaryPage() {
       <style>{`
         .silhouette { filter: brightness(0.15) saturate(0) blur(0.5px) contrast(0.8); }
         .silhouette-soft { filter: brightness(0.12) saturate(0) blur(2px) contrast(0.7); }
+        @keyframes evolvePulse {
+          from { opacity: 0.7; transform: scale(0.95); }
+          to   { opacity: 1;   transform: scale(1.05); }
+        }
         @keyframes shimmer {
           0%   { background-position: -200% center; }
           100% { background-position:  200% center; }
@@ -561,6 +565,8 @@ export default function BestiaryPage() {
             const caught = !!pc
             const rarityColor = RARITY_COLORS[creature.rarity]
 
+            const canEvolve = !!(pc && pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id))
+
             return (
               <motion.div
                 key={creature.id}
@@ -569,16 +575,21 @@ export default function BestiaryPage() {
                 transition={{ delay: i * 0.02 }}
                 whileTap={{ scale: 0.93 }}
                 onClick={() => { setSelected({ creature, pc }); setShowEnigma(false) }}
-                className={`relative rounded-2xl overflow-hidden cursor-pointer border transition-all
-                  ${caught && pc?.id === selectedPcId
-                    ? 'wc-active-card border-2'
-                    : caught
-                      ? 'bg-gradient-to-b from-white/10 to-white/5 border border-white/15 hover:border-white/30'
-                      : 'mystery-shimmer border border-white/5 hover:border-white/10'
+                className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all
+                  ${canEvolve
+                    ? 'border-2 border-[#F7C841]'
+                    : caught && pc?.id === selectedPcId
+                      ? 'wc-active-card border-2'
+                      : caught
+                        ? 'bg-gradient-to-b from-white/10 to-white/5 border border-white/15 hover:border-white/30'
+                        : 'mystery-shimmer border border-white/5 hover:border-white/10'
                   }`}
+                style={canEvolve ? {
+                  boxShadow: '0 0 12px rgba(247,200,65,0.45), 0 0 4px rgba(247,200,65,0.3)',
+                } : undefined}
               >
                 {/* Rarity stripe */}
-                <div className="h-0.5" style={{ background: caught ? rarityColor : 'transparent' }} />
+                <div className="h-0.5" style={{ background: canEvolve ? '#F7C841' : caught ? rarityColor : 'transparent' }} />
 
                 {/* Image area */}
                 <div className="relative aspect-square overflow-hidden flex items-center justify-center p-1">
@@ -609,13 +620,6 @@ export default function BestiaryPage() {
                     </div>
                   )}
 
-                  {/* Evolvibile badge */}
-                  {pc && pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
-                    <div className="absolute top-1 left-1 animate-bounce">
-                      <span className="text-sm">✨</span>
-                    </div>
-                  )}
-
                   {/* Duplicate count */}
                   {pc && pc.duplicates_count > 1 && (
                     <div className="absolute top-1 left-1 bg-[#3A9DBC] text-white text-[9px] font-bold px-1 rounded">
@@ -637,12 +641,20 @@ export default function BestiaryPage() {
                   <p className="text-xs font-bold truncate" style={{ color: caught ? 'white' : '#666' }}>
                     {caught ? creature.name : '???'}
                   </p>
-                  {caught && (
+                  {caught && !canEvolve && (
                     <p className="text-[9px] mt-0.5" style={{ color: rarityColor }}>
                       {ELEMENT_EMOJI[creature.element]}
                     </p>
                   )}
                 </div>
+
+                {/* Evolve banner */}
+                {canEvolve && (
+                  <div className="flex items-center justify-center gap-1 py-1 text-[#0F1F2E] text-[9px] font-black tracking-widest uppercase"
+                    style={{ background: 'linear-gradient(90deg, #F59E0B, #F7C841, #F59E0B)', animation: 'evolvePulse 1.2s ease-in-out infinite alternate' }}>
+                    ✨ EVOLVI
+                  </div>
+                )}
               </motion.div>
             )
           })}
@@ -789,6 +801,20 @@ export default function BestiaryPage() {
                       </div>
                     </div>
 
+                    {/* Evolution callout */}
+                    {pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
+                      <div className="rounded-2xl p-3 mb-3 flex items-center gap-3"
+                        style={{ background: 'linear-gradient(135deg, rgba(247,200,65,0.12) 0%, rgba(245,158,11,0.08) 100%)', border: '1.5px solid rgba(247,200,65,0.35)', boxShadow: '0 0 16px rgba(247,200,65,0.15)' }}>
+                        <span className="text-2xl shrink-0" style={{ animation: 'evolvePulse 1s ease-in-out infinite alternate' }}>✨</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[#F7C841] font-extrabold text-sm leading-tight">Evoluzione disponibile!</p>
+                          <p className="text-white/50 text-xs mt-0.5">
+                            Hai <span className="text-white/80 font-bold">{pc.duplicates_count} copie</span> — consuma 2 per far evolvere questa creatura
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Actions */}
                     <div className="flex gap-2">
                       <button onClick={() => handleSelect(pc)}
@@ -797,8 +823,9 @@ export default function BestiaryPage() {
                       </button>
                       {pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
                         <button onClick={() => handleEvolve(pc)}
-                          className="flex-1 bg-[#F7C841] text-[#0F1F2E] font-bold py-3.5 rounded-xl">
-                          ✨ Evolvi ({pc.duplicates_count} copie)
+                          className="flex-1 font-extrabold py-3.5 rounded-xl text-[#0F1F2E]"
+                          style={{ background: 'linear-gradient(135deg, #F7C841 0%, #F59E0B 100%)', boxShadow: '0 4px 16px rgba(247,200,65,0.4)' }}>
+                          ✨ Evolvi
                         </button>
                       )}
                     </div>
