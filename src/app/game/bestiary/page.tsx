@@ -690,7 +690,7 @@ export default function BestiaryPage() {
                     : caught && pc && squad[0] === pc.id
                       ? 'wc-active-card border-2'
                       : caught && pc && squad.includes(pc.id)
-                        ? 'bg-gradient-to-b from-white/12 to-white/6 border border-white/25'
+                        ? 'wc-active-card border-2'
                         : caught
                           ? 'bg-gradient-to-b from-white/10 to-white/5 border border-white/15 hover:border-white/30'
                           : 'mystery-shimmer border border-white/5 hover:border-white/10'
