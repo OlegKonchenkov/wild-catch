@@ -491,7 +491,7 @@ export default function PlayersPage() {
       {grantTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) setGrantTarget(null) }}>
-          <div className="bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-lg font-bold text-white">🎁 Assegna Risorse</h2>
@@ -699,7 +699,7 @@ export default function PlayersPage() {
       {qrScanTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) closeQrScan() }}>
-          <div className="bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+          <div className="bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-lg font-bold text-white">📷 Scansiona QR</h2>
