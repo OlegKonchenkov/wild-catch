@@ -270,7 +270,7 @@ async function checkAndHatchEggs(
   )
   if (!readyEggs.length) return []
 
-  const hatched: Array<{ name: string; rarity: string; element: string; image_url: string | null }> = []
+  const hatched: Array<{ name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null }> = []
 
   for (const egg of readyEggs) {
     const targetRarity = pickEggRarity(egg.egg_rarity)
