@@ -67,6 +67,7 @@ export default function BestiaryPage() {
   const [evolvableIds, setEvolvableIds]     = useState<Set<string>>(new Set())
   // Reveal card after manual evolution
   const [evolveReveal, setEvolveReveal]     = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null; copiesRemaining: number } | null>(null)
+  const [evolvePhase, setEvolvePhase]       = useState<'charge' | 'flash' | 'reveal'>('charge')
   const [evolveCardVisible, setEvolveCardVisible] = useState(false)
   const supabase   = useMemo(() => createClient(), [])
   const userIdRef  = useRef<string | null>(null)
@@ -206,16 +207,19 @@ export default function BestiaryPage() {
           .eq('session_id', sessionId)
         if (refreshed) setPlayerCreatures(refreshed as unknown as PlayerCreature[])
       }
-      // Close detail panel and show reveal card
+      // Close detail panel and run animation → reveal card
       setSelected(null)
       const cr = data.newCreature
+      setEvolvePhase('charge')
+      setEvolveCardVisible(false)
       setEvolveReveal({
         name: cr.name, rarity: cr.rarity, element: cr.element,
         image_url: cr.image_url ?? null,
         hp: cr.hp, atk: cr.atk, def: cr.def, description: cr.description ?? null,
         copiesRemaining: data.copiesRemaining,
       })
-      setTimeout(() => setEvolveCardVisible(true), 80)
+      setTimeout(() => setEvolvePhase('flash'), 1400)
+      setTimeout(() => { setEvolvePhase('reveal'); setTimeout(() => setEvolveCardVisible(true), 80) }, 1900)
     } else {
       setMessage(data.error)
     }
@@ -892,7 +896,7 @@ export default function BestiaryPage() {
         })()}
       </AnimatePresence>
 
-      {/* ── Evolution reveal card ─────────────────────────────────────── */}
+      {/* ── Evolution animation + reveal card ────────────────────────── */}
       {evolveReveal && (() => {
         const cr = evolveReveal
         const rarityColor = RARITY_COLORS[cr.rarity as keyof typeof RARITY_COLORS] ?? '#9CA3AF'
@@ -902,131 +906,193 @@ export default function BestiaryPage() {
         }
         const glow = elemGlow[cr.element] ?? rarityColor
         return (
-          <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/88 backdrop-blur-sm">
-            {/* Tap backdrop to dismiss */}
-            <div className="absolute inset-0" onClick={() => { setEvolveReveal(null); setEvolveCardVisible(false) }} />
+          <div className="fixed inset-0 z-[1200] flex flex-col items-center justify-center bg-black/92 backdrop-blur-sm">
 
-            {/* Sliding card */}
-            <div
-              className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-y-auto"
-              style={{
-                background: '#080E1A',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderBottom: 'none',
-                maxHeight: '88vh',
-                transform: evolveCardVisible ? 'translateY(0)' : 'translateY(100%)',
-                transition: 'transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1)',
-              }}
-            >
-              {/* Drag handle */}
-              <div className="flex justify-center pt-3 mb-1">
-                <div className="w-10 h-1 rounded-full bg-white/20" />
-              </div>
-
-              {/* Header */}
-              <div className="relative pt-2 pb-2" style={{
-                background: `linear-gradient(180deg, ${glow}18 0%, transparent 100%)`,
-              }}>
-                {/* Badge */}
-                <div className="flex justify-center mb-3">
-                  <div
-                    className="flex items-center gap-2 px-4 py-1.5 rounded-full font-extrabold text-sm"
-                    style={{
-                      background: '#F7C841',
-                      color: '#080E1A',
-                      boxShadow: '0 4px 20px rgba(247,200,65,0.5)',
-                      opacity: evolveCardVisible ? 1 : 0,
-                      transform: evolveCardVisible ? 'scale(1)' : 'scale(0.6)',
-                      transition: 'opacity 0.3s 0.15s, transform 0.4s 0.15s cubic-bezier(0.34,1.56,0.64,1)',
-                    }}
-                  >
-                    ✨ Evoluzione!
-                  </div>
+            {/* ── CHARGE phase: spinning energy rings ── */}
+            {evolvePhase === 'charge' && (
+              <div className="flex flex-col items-center gap-6 select-none">
+                {/* Concentric spinning rings */}
+                <div className="relative flex items-center justify-center" style={{ width: 180, height: 180 }}>
+                  {/* Outer ring */}
+                  <div style={{
+                    position: 'absolute', width: 180, height: 180, borderRadius: '50%',
+                    border: `3px solid ${glow}`,
+                    boxShadow: `0 0 24px ${glow}88, inset 0 0 24px ${glow}22`,
+                    animation: 'evolveRingOuter 1.2s linear infinite',
+                  }} />
+                  {/* Middle ring */}
+                  <div style={{
+                    position: 'absolute', width: 130, height: 130, borderRadius: '50%',
+                    border: `2px solid ${glow}99`,
+                    boxShadow: `0 0 16px ${glow}66`,
+                    animation: 'evolveRingMid 0.8s linear infinite reverse',
+                  }} />
+                  {/* Inner ring */}
+                  <div style={{
+                    position: 'absolute', width: 80, height: 80, borderRadius: '50%',
+                    border: `2px dashed ${glow}cc`,
+                    animation: 'evolveRingInner 0.5s linear infinite',
+                  }} />
+                  {/* Core glow */}
+                  <div style={{
+                    width: 48, height: 48, borderRadius: '50%',
+                    background: `radial-gradient(circle, white 0%, ${glow} 60%, transparent 100%)`,
+                    boxShadow: `0 0 40px ${glow}, 0 0 80px ${glow}66`,
+                    animation: 'evolvePulse 0.6s ease-in-out infinite alternate',
+                  }} />
                 </div>
-
-                {/* Sprite */}
-                <div className="flex justify-center" style={{
-                  opacity: evolveCardVisible ? 1 : 0,
-                  transform: evolveCardVisible ? 'scale(1)' : 'scale(0.5)',
-                  transition: 'opacity 0.35s 0.1s, transform 0.45s 0.1s cubic-bezier(0.34,1.56,0.64,1)',
-                }}>
-                  <CreatureSprite
-                    imageUrl={cr.image_url ?? ''}
-                    name={cr.name}
-                    animState="idle"
-                    size={160}
-                    element={cr.element as any}
-                    rarity={cr.rarity as any}
-                    showAura
-                  />
-                </div>
-              </div>
-
-              {/* Info */}
-              <div className="px-5 pb-8">
-                {/* Name + element + rarity */}
-                <div className="text-center mb-4" style={{
-                  opacity: evolveCardVisible ? 1 : 0,
-                  transition: 'opacity 0.3s 0.25s',
-                }}>
-                  <h3 className="text-2xl font-bold text-white mb-1">{cr.name}</h3>
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-base">{elemEmoji}</span>
-                    <span className="text-xs capitalize text-white/40">{cr.element}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-bold"
-                      style={{ background: `${rarityColor}22`, color: rarityColor, border: `1px solid ${rarityColor}55` }}>
-                      {cr.rarity.replace('_', ' ')}
-                    </span>
-                  </div>
-                  {cr.description && (
-                    <p className="text-sm text-white/45 mt-3 leading-relaxed">{cr.description}</p>
-                  )}
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-2 mb-4" style={{
-                  opacity: evolveCardVisible ? 1 : 0,
-                  transition: 'opacity 0.3s 0.32s',
-                }}>
-                  {[
-                    { label: 'HP',  value: cr.hp,  color: '#F87171' },
-                    { label: 'ATK', value: cr.atk, color: '#FB923C' },
-                    { label: 'DEF', value: cr.def, color: '#60A5FA' },
-                  ].map(s => (
-                    <div key={s.label}
-                      className="rounded-xl p-3 text-center"
-                      style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${s.color}20` }}
-                    >
-                      <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
-                      <p className="text-[10px] text-white/35 mt-0.5 font-semibold uppercase tracking-wider">{s.label}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Copies note */}
-                <p className="text-center text-xs text-white/30 mb-4" style={{
-                  opacity: evolveCardVisible ? 1 : 0,
-                  transition: 'opacity 0.3s 0.38s',
-                }}>
-                  2 copie consumate · {cr.copiesRemaining} {cr.copiesRemaining === 1 ? 'copia' : 'copie'} rimanenti
+                <p className="text-white/60 text-sm font-semibold tracking-widest uppercase"
+                  style={{ animation: 'evolvePulse 0.6s ease-in-out infinite alternate' }}>
+                  Evoluzione in corso...
                 </p>
+              </div>
+            )}
 
-                {/* CTA */}
-                <button
-                  onClick={() => { setEvolveReveal(null); setEvolveCardVisible(false) }}
-                  className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
+            {/* ── FLASH phase: white blast ── */}
+            {evolvePhase === 'flash' && (
+              <div
+                className="absolute inset-0"
+                style={{ background: 'white', animation: 'evolveFlash 0.5s ease-out forwards' }}
+              />
+            )}
+
+            {/* ── REVEAL phase: bottom sheet card ── */}
+            {evolvePhase === 'reveal' && (
+              <>
+                <div className="absolute inset-0" onClick={() => { setEvolveReveal(null); setEvolveCardVisible(false) }} />
+                <div
+                  className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-y-auto"
                   style={{
-                    background: 'linear-gradient(135deg, #F7C841 0%, #F59E0B 100%)',
-                    boxShadow: '0 4px 24px rgba(247,200,65,0.4)',
-                    color: '#0F1F2E',
-                    opacity: evolveCardVisible ? 1 : 0,
-                    transition: 'opacity 0.3s 0.4s',
+                    background: '#080E1A',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderBottom: 'none',
+                    maxHeight: '88vh',
+                    transform: evolveCardVisible ? 'translateY(0)' : 'translateY(100%)',
+                    transition: 'transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1)',
                   }}
                 >
-                  Continua
-                </button>
-              </div>
-            </div>
+                  <div className="flex justify-center pt-3 mb-1">
+                    <div className="w-10 h-1 rounded-full bg-white/20" />
+                  </div>
+
+                  <div className="relative pt-2 pb-2" style={{
+                    background: `linear-gradient(180deg, ${glow}18 0%, transparent 100%)`,
+                  }}>
+                    {/* Badge */}
+                    <div className="flex justify-center mb-3">
+                      <div className="flex items-center gap-2 px-4 py-1.5 rounded-full font-extrabold text-sm"
+                        style={{
+                          background: '#F7C841', color: '#080E1A',
+                          boxShadow: '0 4px 20px rgba(247,200,65,0.5)',
+                          opacity: evolveCardVisible ? 1 : 0,
+                          transform: evolveCardVisible ? 'scale(1)' : 'scale(0.6)',
+                          transition: 'opacity 0.3s 0.15s, transform 0.4s 0.15s cubic-bezier(0.34,1.56,0.64,1)',
+                        }}>
+                        ✨ Evoluzione!
+                      </div>
+                    </div>
+                    {/* Sprite */}
+                    <div className="flex justify-center" style={{
+                      opacity: evolveCardVisible ? 1 : 0,
+                      transform: evolveCardVisible ? 'scale(1)' : 'scale(0.5)',
+                      transition: 'opacity 0.35s 0.1s, transform 0.45s 0.1s cubic-bezier(0.34,1.56,0.64,1)',
+                    }}>
+                      <CreatureSprite
+                        imageUrl={cr.image_url ?? ''}
+                        name={cr.name}
+                        animState="idle"
+                        size={160}
+                        element={cr.element as any}
+                        rarity={cr.rarity as any}
+                        showAura
+                      />
+                    </div>
+                  </div>
+
+                  <div className="px-5 pb-8">
+                    {/* Name + element + rarity */}
+                    <div className="text-center mb-4" style={{
+                      opacity: evolveCardVisible ? 1 : 0, transition: 'opacity 0.3s 0.25s',
+                    }}>
+                      <h3 className="text-2xl font-bold text-white mb-1">{cr.name}</h3>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-base">{elemEmoji}</span>
+                        <span className="text-xs capitalize text-white/40">{cr.element}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                          style={{ background: `${rarityColor}22`, color: rarityColor, border: `1px solid ${rarityColor}55` }}>
+                          {cr.rarity.replace('_', ' ')}
+                        </span>
+                      </div>
+                      {cr.description && (
+                        <p className="text-sm text-white/45 mt-3 leading-relaxed">{cr.description}</p>
+                      )}
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-3 gap-2 mb-4" style={{
+                      opacity: evolveCardVisible ? 1 : 0, transition: 'opacity 0.3s 0.32s',
+                    }}>
+                      {[
+                        { label: 'HP',  value: cr.hp,  color: '#F87171' },
+                        { label: 'ATK', value: cr.atk, color: '#FB923C' },
+                        { label: 'DEF', value: cr.def, color: '#60A5FA' },
+                      ].map(s => (
+                        <div key={s.label} className="rounded-xl p-3 text-center"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${s.color}20` }}>
+                          <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
+                          <p className="text-[10px] text-white/35 mt-0.5 font-semibold uppercase tracking-wider">{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Copies note */}
+                    <p className="text-center text-xs text-white/30 mb-4" style={{
+                      opacity: evolveCardVisible ? 1 : 0, transition: 'opacity 0.3s 0.38s',
+                    }}>
+                      2 copie consumate · {cr.copiesRemaining} {cr.copiesRemaining === 1 ? 'copia' : 'copie'} rimanenti
+                    </p>
+
+                    {/* CTA */}
+                    <button
+                      onClick={() => { setEvolveReveal(null); setEvolveCardVisible(false) }}
+                      className="w-full py-4 rounded-2xl font-extrabold text-base"
+                      style={{
+                        background: 'linear-gradient(135deg, #F7C841 0%, #F59E0B 100%)',
+                        boxShadow: '0 4px 24px rgba(247,200,65,0.4)',
+                        color: '#0F1F2E',
+                        opacity: evolveCardVisible ? 1 : 0,
+                        transition: 'opacity 0.3s 0.4s',
+                      }}
+                    >
+                      Continua
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <style>{`
+              @keyframes evolveRingOuter {
+                from { transform: rotate(0deg); }
+                to   { transform: rotate(360deg); }
+              }
+              @keyframes evolveRingMid {
+                from { transform: rotate(0deg); }
+                to   { transform: rotate(360deg); }
+              }
+              @keyframes evolveRingInner {
+                from { transform: rotate(0deg); }
+                to   { transform: rotate(360deg); }
+              }
+              @keyframes evolvePulse {
+                from { opacity: 0.6; transform: scale(0.92); }
+                to   { opacity: 1;   transform: scale(1.08); }
+              }
+              @keyframes evolveFlash {
+                0%   { opacity: 1; }
+                100% { opacity: 0; }
+              }
+            `}</style>
           </div>
         )
       })()}
