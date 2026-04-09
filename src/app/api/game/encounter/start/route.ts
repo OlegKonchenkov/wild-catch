@@ -74,6 +74,7 @@ export async function POST(request: Request) {
   const { data: creatures } = await supabase
     .from('creatures')
     .select('id, spawn_weight, rarity, min_level, hp, element')
+    .eq('spawnable', true)
 
   if (!creatures?.length) return NextResponse.json({ error: 'Nessuna creatura disponibile' }, { status: 500 })
 

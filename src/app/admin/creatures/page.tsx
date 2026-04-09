@@ -52,6 +52,7 @@ const EMPTY_FORM = {
   name: '', description: '', rarity: 'comune' as Rarity, element: 'armonia' as ElementType,
   hp: 50, atk: 10, def: 5, evolution_of: '', session_id: '', catch_difficulty: 1,
   enigma_title: '', enigma_description: '', enigma_image_url: '', enigma_video_url: '',
+  spawnable: true,
 }
 
 type ImageMode = 'preview' | 'url' | 'upload' | 'ai'
@@ -119,7 +120,8 @@ export default function CreaturesPage() {
       hp: c.hp, atk: c.atk, def: c.def, evolution_of: c.evolution_of ?? '',
       session_id: c.session_id ?? '', catch_difficulty: c.catch_difficulty ?? 1,
       enigma_title: c.enigma_title ?? '', enigma_description: c.enigma_description ?? '',
-      enigma_image_url: c.enigma_image_url ?? '', enigma_video_url: c.enigma_video_url ?? '' })
+      enigma_image_url: c.enigma_image_url ?? '', enigma_video_url: c.enigma_video_url ?? '',
+      spawnable: (c as any).spawnable !== false })
     setFormError(null); setImageMode('preview')
     setManualUrl(c.image_url ?? ''); setAiPrompt(c.description ?? ''); setArtworkError(null)
   }
@@ -142,6 +144,7 @@ export default function CreaturesPage() {
       enigma_description: (formData as any).enigma_description || null,
       enigma_image_url: (formData as any).enigma_image_url || null,
       enigma_video_url: (formData as any).enigma_video_url || null,
+      spawnable: (formData as any).spawnable !== false,
     }
     try {
       const res = await fetch(isEdit ? `/api/admin/creatures/${panel}` : '/api/admin/creatures', {
@@ -401,6 +404,12 @@ export default function CreaturesPage() {
                         style={{ background: em.bg, color: 'rgba(255,255,255,0.85)' }}>
                         {em.emoji}
                       </div>
+                      {/* Non-spawnable badge */}
+                      {(c as any).spawnable === false && (
+                        <div className="absolute top-1.5 left-1.5 text-xs px-1.5 py-0.5 rounded-md font-semibold bg-black/70 text-white/60">
+                          🚫
+                        </div>
+                      )}
                     </div>
 
                     {/* Info */}
@@ -622,6 +631,21 @@ export default function CreaturesPage() {
                           )
                         })()}
                       </div>
+                    </div>
+
+                    {/* Spawnable toggle */}
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <p className="text-xs font-semibold text-white/70">Trovabile in esplorazione</p>
+                        <p className="text-xs text-white/30 mt-0.5">Se disattivato, la creatura non appare negli incontri selvatici</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(f => ({ ...f, spawnable: !(f as any).spawnable } as any))}
+                        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${(formData as any).spawnable !== false ? 'bg-[#3A9DBC]' : 'bg-white/20'}`}
+                      >
+                        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${(formData as any).spawnable !== false ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
                     </div>
 
                     {/* Enigma section */}

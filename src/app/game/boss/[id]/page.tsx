@@ -908,6 +908,7 @@ export default function BossFightPage() {
               .gt('quantity', 0),
           ])
 
+          const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
           const mapped: SquadCreature[] = ((crRes.data ?? []) as any[])
             .filter(pc => pc.creatures)
             .map(pc => ({
@@ -919,6 +920,7 @@ export default function BossFightPage() {
               atk: pc.creatures.atk,
               image_url: pc.creatures.image_url,
             }))
+            .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity))
           setAllCreatures(mapped)
 
           // Patch player lineup with image_url from creature data (fixes resumed fights

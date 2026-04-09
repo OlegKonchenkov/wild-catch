@@ -70,70 +70,178 @@ const RARITY_LABEL: Record<string, string> = {
   mitologico:  'Mitologico',
 }
 
+const ELEMENT_GLOW: Record<string, string> = {
+  fiamma:    '#FF6B35',
+  adriatico: '#3A9DBC',
+  bosco:     '#34D399',
+  terra:     '#A78BFA',
+  armonia:   '#F9A8D4',
+}
+
+const ELEMENT_EMOJI: Record<string, string> = {
+  fiamma: '🔥', adriatico: '🌊', bosco: '🌿', terra: '⚡', armonia: '✨',
+}
+
 function EggHatchModal({
   creature,
   queueRemaining = 0,
   onDone,
 }: {
-  creature: { name: string; rarity: string; element: string; image_url: string | null }
+  creature: { name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number; description?: string | null }
   queueRemaining?: number
   onDone: () => void
 }) {
   const [phase, setPhase] = useState<'shake' | 'crack' | 'reveal'>('shake')
+  const [cardVisible, setCardVisible] = useState(false)
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase('crack'), 900)
-    const t2 = setTimeout(() => setPhase('reveal'), 1900)
+    const t2 = setTimeout(() => { setPhase('reveal'); setTimeout(() => setCardVisible(true), 80) }, 1900)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [])
 
   const rarityColor = RARITY_COLOR[creature.rarity] ?? '#9CA3AF'
+  const glow = ELEMENT_GLOW[creature.element] ?? rarityColor
+  const elemEmoji = ELEMENT_EMOJI[creature.element] ?? '✦'
 
   return (
-    <div
-      className="fixed inset-0 z-[1200] flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm"
-      onClick={phase === 'reveal' ? onDone : undefined}
-    >
-      {phase === 'shake' && (
-        <div className="text-8xl select-none" style={{ animation: 'eggShake 0.85s ease-in-out' }}>🥚</div>
-      )}
-      {phase === 'crack' && (
-        <div className="text-8xl select-none" style={{ animation: 'eggCrack 0.85s ease-out' }}>🐣</div>
-      )}
-      {phase === 'reveal' && (
-        <div className="flex flex-col items-center gap-4 px-8 animate-in fade-in zoom-in-75 duration-300">
-          <div className="text-4xl mb-1">✨</div>
-          {creature.image_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={creature.image_url}
-              alt={creature.name}
-              className="w-32 h-32 object-contain rounded-2xl"
-              style={{ filter: `drop-shadow(0 0 16px ${rarityColor})` }}
-            />
-          ) : (
-            <div
-              className="w-32 h-32 rounded-2xl flex items-center justify-center text-6xl"
-              style={{ background: `${rarityColor}22` }}
-            >
-              🐾
-            </div>
-          )}
-          <div className="text-center">
-            <p className="text-white font-extrabold text-xl">{creature.name}</p>
-            <p className="text-sm font-semibold mt-0.5" style={{ color: rarityColor }}>
-              {RARITY_LABEL[creature.rarity] ?? creature.rarity}
-            </p>
-          </div>
-          {queueRemaining > 0 ? (
-            <p className="text-white/40 text-xs mt-2">
-              Tocca per continuare · ancora {queueRemaining} {queueRemaining === 1 ? 'uovo' : 'uova'}
-            </p>
-          ) : (
-            <p className="text-white/40 text-xs mt-2">Tocca per continuare</p>
-          )}
+    <div className="fixed inset-0 z-[1200] flex flex-col items-center justify-center bg-black/88 backdrop-blur-sm">
+      {/* Egg animation phases — centered */}
+      {phase !== 'reveal' && (
+        <div
+          className="text-8xl select-none"
+          style={{ animation: phase === 'shake' ? 'eggShake 0.85s ease-in-out' : 'eggCrack 0.85s ease-out' }}
+        >
+          {phase === 'shake' ? '🥚' : '🐣'}
         </div>
       )}
+
+      {/* Reveal — bottom sheet card */}
+      {phase === 'reveal' && (
+        <>
+          {/* Tap backdrop to dismiss */}
+          <div className="absolute inset-0" onClick={onDone} />
+
+          {/* Sliding card */}
+          <div
+            className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-y-auto"
+            style={{
+              background: '#080E1A',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderBottom: 'none',
+              maxHeight: '88vh',
+              transform: cardVisible ? 'translateY(0)' : 'translateY(100%)',
+              transition: 'transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}
+          >
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 mb-1">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+
+            {/* Element-tinted header + sprite */}
+            <div className="relative pt-2 pb-2" style={{
+              background: `linear-gradient(180deg, ${glow}18 0%, transparent 100%)`,
+            }}>
+              {/* "Schiuso!" badge */}
+              <div className="flex justify-center mb-3">
+                <div
+                  className="flex items-center gap-2 px-4 py-1.5 rounded-full font-extrabold text-sm"
+                  style={{
+                    background: glow,
+                    color: '#080E1A',
+                    boxShadow: `0 4px 20px ${glow}60`,
+                    opacity: cardVisible ? 1 : 0,
+                    transform: cardVisible ? 'scale(1)' : 'scale(0.6)',
+                    transition: 'opacity 0.3s 0.15s, transform 0.4s 0.15s cubic-bezier(0.34,1.56,0.64,1)',
+                  }}
+                >
+                  🥚 Schiuso!
+                </div>
+              </div>
+
+              {/* Sprite */}
+              <div className="flex justify-center" style={{
+                opacity: cardVisible ? 1 : 0,
+                transform: cardVisible ? 'scale(1)' : 'scale(0.5)',
+                transition: 'opacity 0.35s 0.1s, transform 0.45s 0.1s cubic-bezier(0.34,1.56,0.64,1)',
+              }}>
+                <CreatureSprite
+                  imageUrl={creature.image_url ?? ''}
+                  name={creature.name}
+                  animState="idle"
+                  size={160}
+                  element={creature.element as any}
+                  rarity={creature.rarity as any}
+                  showAura
+                />
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="px-5 pb-8">
+              {/* Name + element + rarity */}
+              <div className="text-center mb-4" style={{
+                opacity: cardVisible ? 1 : 0,
+                transition: 'opacity 0.3s 0.25s',
+              }}>
+                <h3 className="text-2xl font-bold text-white mb-1">{creature.name}</h3>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-base">{elemEmoji}</span>
+                  <span className="text-xs capitalize text-white/40">{creature.element}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                    style={{ background: `${rarityColor}22`, color: rarityColor, border: `1px solid ${rarityColor}55` }}>
+                    {RARITY_LABEL[creature.rarity] ?? creature.rarity}
+                  </span>
+                </div>
+                {creature.description && (
+                  <p className="text-sm text-white/45 mt-3 leading-relaxed">{creature.description}</p>
+                )}
+              </div>
+
+              {/* Stats */}
+              {(creature.hp || creature.atk || creature.def) && (
+                <div className="grid grid-cols-3 gap-2 mb-5" style={{
+                  opacity: cardVisible ? 1 : 0,
+                  transition: 'opacity 0.3s 0.32s',
+                }}>
+                  {[
+                    { label: 'HP',  value: creature.hp,  color: '#F87171' },
+                    { label: 'ATK', value: creature.atk, color: '#FB923C' },
+                    { label: 'DEF', value: creature.def, color: '#60A5FA' },
+                  ].map(s => (
+                    <div key={s.label}
+                      className="rounded-xl p-3 text-center"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${s.color}20` }}
+                    >
+                      <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
+                      <p className="text-[10px] text-white/35 mt-0.5 font-semibold uppercase tracking-wider">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* CTA */}
+              <button
+                onClick={onDone}
+                className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
+                style={{
+                  background: `linear-gradient(135deg, ${glow} 0%, ${glow}99 100%)`,
+                  boxShadow: `0 4px 24px ${glow}45`,
+                  opacity: cardVisible ? 1 : 0,
+                  transition: 'opacity 0.3s 0.4s',
+                }}
+              >
+                {queueRemaining > 0
+                  ? `Continua · ancora ${queueRemaining} ${queueRemaining === 1 ? 'uovo' : 'uova'}`
+                  : 'Continua'
+                }
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       <style>{`
         @keyframes eggShake {
           0%,100% { transform: rotate(0deg) scale(1); }
@@ -166,7 +274,7 @@ function MapPageInner() {
   const [mapPins, setMapPins] = useState<MapPin[]>([])
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
-  const [hatchQueue, setHatchQueue] = useState<{ name: string; rarity: string; element: string; image_url: string | null }[]>([])
+  const [hatchQueue, setHatchQueue] = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number; description?: string | null }[]>([])
   const [missionQueue, setMissionQueue] = useState<CompletedMissionInfo[]>([])
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)

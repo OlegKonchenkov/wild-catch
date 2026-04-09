@@ -255,7 +255,7 @@ async function checkAndHatchEggs(
   userId: string,
   stepsWalked: number,
   supabase: any,
-): Promise<Array<{ name: string; rarity: string; element: string; image_url: string | null }>> {
+): Promise<Array<{ name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null }>> {
   const { data: eggs } = await supabase
     .from('player_eggs')
     .select('id, egg_rarity, steps_required, steps_at_pickup')
@@ -277,14 +277,14 @@ async function checkAndHatchEggs(
 
     const { data: candidates } = await supabase
       .from('creatures')
-      .select('id, name, rarity, element, image_url')
+      .select('id, name, rarity, element, image_url, hp, atk, def, description')
       .eq('rarity', targetRarity)
       .limit(100)
 
     let pool: any[] = candidates ?? []
     if (!pool.length) {
       const { data: fallback } = await supabase
-        .from('creatures').select('id, name, rarity, element, image_url').eq('rarity', 'comune').limit(50)
+        .from('creatures').select('id, name, rarity, element, image_url, hp, atk, def, description').eq('rarity', 'comune').limit(50)
       pool = fallback ?? []
     }
     if (!pool.length) continue
@@ -319,7 +319,7 @@ async function checkAndHatchEggs(
       .update({ hatched_at: new Date().toISOString(), hatched_creature_id: picked.id })
       .eq('id', egg.id)
 
-    hatched.push({ name: picked.name, rarity: picked.rarity, element: picked.element, image_url: picked.image_url ?? null })
+    hatched.push({ name: picked.name, rarity: picked.rarity, element: picked.element, image_url: picked.image_url ?? null, hp: picked.hp, atk: picked.atk, def: picked.def, description: picked.description ?? null })
   }
 
   return hatched

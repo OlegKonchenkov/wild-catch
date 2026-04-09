@@ -113,6 +113,7 @@ export default function DuelLobbyPage() {
         .eq('session_id', sessionId)
         .then(({ data }) => {
           if (!data || data.length === 0) { setNoCreatures(true); setLoadingCreatures(false); return }
+          const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
           const mapped: SquadCreature[] = (data as any[])
             .filter(pc => pc.creatures)
             .map(pc => ({
@@ -124,6 +125,7 @@ export default function DuelLobbyPage() {
               atk: pc.creatures.atk,
               image_url: pc.creatures.image_url,
             }))
+            .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity))
           setCreatures(mapped)
           if (mapped.length === 0) setNoCreatures(true)
           setLoadingCreatures(false)

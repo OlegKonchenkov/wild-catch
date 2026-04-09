@@ -72,7 +72,7 @@ export async function POST(
   let pool: any[] = []
   const { data: candidates } = await supabase
     .from('creatures')
-    .select('id, name, rarity, element, image_url, sprite_url')
+    .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def, description')
     .eq('rarity', targetRarity)
     .limit(100)
   if (candidates?.length) {
@@ -81,7 +81,7 @@ export async function POST(
     // Fallback to comune if targeted rarity has no creatures
     const { data: fallback } = await supabase
       .from('creatures')
-      .select('id, name, rarity, element, image_url, sprite_url')
+      .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def, description')
       .eq('rarity', 'comune')
       .limit(50)
     if (!fallback?.length) {
@@ -130,6 +130,10 @@ export async function POST(
       element: picked.element,
       image_url: picked.image_url,
       sprite_url: picked.sprite_url,
+      hp: picked.hp,
+      atk: picked.atk,
+      def: picked.def,
+      description: picked.description,
     },
   })
 }

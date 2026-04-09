@@ -158,10 +158,12 @@ interface PlayerMissionData {
 }
 
 function MissionDetailModal({
-  mission, playerData, onClose, onScanQR,
+  mission, playerData, creaturePreview, isCaught, onClose, onScanQR,
 }: {
   mission: Mission
   playerData: PlayerMissionData | undefined
+  creaturePreview?: CreaturePreview | null
+  isCaught?: boolean
   onClose: () => void
   onScanQR: () => void
 }) {
@@ -211,6 +213,43 @@ function MissionDetailModal({
         {mission.description && (
           <div className="bg-white/4 border border-white/8 rounded-xl px-4 py-3 mb-4">
             <p className="text-white/70 text-sm leading-relaxed">{mission.description}</p>
+          </div>
+        )}
+
+        {/* Creature preview — cattura missions only */}
+        {mission.type === 'cattura' && creaturePreview?.image_url && (
+          <div className="mb-4 rounded-2xl overflow-hidden border border-white/8 relative">
+            <div className="flex items-center gap-4 p-3">
+              {/* Image — silhouette if not caught */}
+              <div className="relative shrink-0 w-20 h-20 rounded-xl overflow-hidden"
+                style={{ background: 'rgba(255,255,255,0.04)' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={creaturePreview.image_url}
+                  alt={isCaught ? (mission.target ?? '') : '???'}
+                  className="w-full h-full object-contain"
+                  style={isCaught ? undefined : {
+                    filter: 'brightness(0) contrast(1)',
+                    opacity: 0.8,
+                  }}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-base leading-tight">
+                  {isCaught ? mission.target : '???'}
+                </p>
+                {!isCaught && (
+                  <p className="text-xs text-white/35 mt-0.5">
+                    Cattura questa creatura per scoprirla nel Wildex
+                  </p>
+                )}
+                {isCaught && (
+                  <p className="text-xs text-[#34D399] mt-0.5 font-semibold">
+                    ✅ Già nel tuo Wildex
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -302,6 +341,8 @@ function ProgressRing({ pct, color, size = 36 }: { pct: number; color: string; s
 }
 
 /* ── Page ────────────────────────────────────── */
+interface CreaturePreview { image_url: string | null; rarity: string }
+
 export default function MissionsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -314,6 +355,10 @@ export default function MissionsPage() {
   const [scanning, setScanning]       = useState(false)
   const [pendingMissions, setPendingMissions] = useState<CompletedMissionInfo[]>([])
   const [filter, setFilter]           = useState<'all' | 'todo' | 'done'>('all')
+  // creature_name → { image_url, rarity }
+  const [creaturePreviews, setCreaturePreviews] = useState<Record<string, CreaturePreview>>({})
+  // creature_name → whether player has caught it
+  const [caughtNames, setCaughtNames] = useState<Set<string>>(new Set())
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -339,6 +384,31 @@ export default function MissionsPage() {
           .eq('user_id', user.id)
           .in('mission_id', missionIds)
         setPlayerMissions((pm ?? []) as PlayerMissionData[])
+
+        // Load creature previews for cattura missions
+        const captureTargets = [...new Set(
+          missionList.filter(m => m.type === 'cattura' && m.target).map(m => m.target!)
+        )]
+        if (captureTargets.length > 0) {
+          const [crRes, pcRes] = await Promise.all([
+            supabase.from('creatures').select('name, image_url, rarity').in('name', captureTargets),
+            sessionId
+              ? supabase.from('player_creatures')
+                  .select('creatures(name)')
+                  .eq('user_id', user.id)
+                  .eq('session_id', sessionId)
+              : Promise.resolve({ data: [] }),
+          ])
+          const previews: Record<string, CreaturePreview> = {}
+          for (const c of (crRes.data ?? []) as any[]) {
+            previews[c.name] = { image_url: c.image_url, rarity: c.rarity }
+          }
+          setCreaturePreviews(previews)
+          const caught = new Set<string>(
+            ((pcRes.data ?? []) as any[]).map((pc: any) => pc.creatures?.name).filter(Boolean)
+          )
+          setCaughtNames(caught)
+        }
       }
       setLoading(false)
     }
@@ -468,13 +538,34 @@ export default function MissionsPage() {
                   borderColor: completed ? `${meta.color}25` : `${meta.color}28`,
                 }}
               >
-                {/* Progress ring */}
-                <div className="relative shrink-0">
-                  <ProgressRing pct={pct} color={completed ? '#34D399' : meta.color} />
-                  <span className="absolute inset-0 flex items-center justify-center text-base">
-                    {completed ? '✅' : meta.icon}
-                  </span>
-                </div>
+                {/* Progress ring OR creature thumbnail for cattura missions */}
+                {mission.type === 'cattura' && mission.target && creaturePreviews[mission.target]?.image_url ? (
+                  <div className="relative shrink-0 w-[36px] h-[36px]">
+                    <div className="w-9 h-9 rounded-xl overflow-hidden"
+                      style={{ background: 'rgba(255,255,255,0.06)' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={creaturePreviews[mission.target].image_url!}
+                        alt={caughtNames.has(mission.target) ? mission.target : '???'}
+                        className="w-full h-full object-contain"
+                        style={caughtNames.has(mission.target) ? undefined : {
+                          filter: 'brightness(0) contrast(1)',
+                          opacity: 0.7,
+                        }}
+                      />
+                    </div>
+                    {completed && (
+                      <span className="absolute -top-1 -right-1 text-xs leading-none">✅</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="relative shrink-0">
+                    <ProgressRing pct={pct} color={completed ? '#34D399' : meta.color} />
+                    <span className="absolute inset-0 flex items-center justify-center text-base">
+                      {completed ? '✅' : meta.icon}
+                    </span>
+                  </div>
+                )}
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
@@ -559,6 +650,8 @@ export default function MissionsPage() {
         <MissionDetailModal
           mission={detailMission}
           playerData={pmMap[detailMission.id]}
+          creaturePreview={detailMission.target ? creaturePreviews[detailMission.target] : null}
+          isCaught={detailMission.target ? caughtNames.has(detailMission.target) : false}
           onClose={() => setDetailMission(null)}
           onScanQR={() => { setDetailMission(null); setShowScanner(true) }}
         />
