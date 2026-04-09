@@ -400,6 +400,8 @@ export default function QRCodesPage() {
   const [creating, setCreating]     = useState(false)
   const [error, setError]           = useState('')
   const [actionMsg, setActionMsg]   = useState<{ ok: boolean; text: string } | null>(null)
+  const [search, setSearch]         = useState('')
+  const [filterType, setFilterType] = useState('')
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -591,13 +593,43 @@ export default function QRCodesPage() {
         {loadingSessions && <div className="mt-2"><AdminInlineSpinner label="Caricamento sessioni..." /></div>}
       </div>
 
+      {/* Search + type filter */}
+      <div className="flex gap-2 mb-4">
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="🔍 Cerca per etichetta, descrizione…"
+          className="flex-1 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm placeholder:text-white/30 outline-none focus:border-[#3A9DBC]/60"
+        />
+        <select
+          value={filterType}
+          onChange={e => setFilterType(e.target.value)}
+          className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">Tutti i tipi</option>
+          {(Object.entries(TYPE_INFO) as [QRCodeType, typeof TYPE_INFO[QRCodeType]][]).map(([k, v]) => (
+            <option key={k} value={k}>{v.icon} {v.label}</option>
+          ))}
+        </select>
+      </div>
+
       {/* QR list */}
       <div className="space-y-2">
         {loadingQrCodes && qrCodes.length === 0 && <AdminListSkeleton rows={5} itemClassName="h-[78px]" />}
         {!loadingQrCodes && qrCodes.length === 0 && (
           <p className="text-white/30 text-sm">Nessun QR code trovato.</p>
         )}
-        {qrCodes.map(qr => {
+        {qrCodes.filter(qr => {
+          if (filterType && qr.type !== filterType) return false
+          if (!search.trim()) return true
+          const q = search.toLowerCase()
+          const description = getQrDescription(qr, items, creatures)
+          return (
+            (qr.label ?? '').toLowerCase().includes(q) ||
+            description.toLowerCase().includes(q) ||
+            (qr.manual_code ?? '').toLowerCase().includes(q)
+          )
+        }).map(qr => {
           const typeInfo = TYPE_INFO[qr.type as QRCodeType]
           const description = getQrDescription(qr, items, creatures)
           const isBoss = qr.type === 'boss'

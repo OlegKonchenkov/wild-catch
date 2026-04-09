@@ -191,6 +191,9 @@ export default function AdminMissions() {
   const [items, setItems]         = useState<Item[]>([])
   const [qrCodes, setQrCodes]     = useState<QRCode[]>([])
 
+  const [search, setSearch]        = useState('')
+  const [filterType, setFilterType] = useState('')
+
   // panel: null | 'new' | Mission (edit)
   const [panel, setPanel]         = useState<null | 'new' | Mission>(null)
   const [form, setForm]           = useState({ ...EMPTY_FORM })
@@ -337,6 +340,24 @@ export default function AdminMissions() {
         )}
       </div>
 
+      {/* Search + type filter */}
+      <div className="flex gap-2 mb-4">
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="🔍 Cerca per titolo, obiettivo…"
+          className="flex-1 bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm placeholder:text-white/30 outline-none focus:border-[#3A9DBC]/60"
+        />
+        <select
+          value={filterType}
+          onChange={e => setFilterType(e.target.value)}
+          className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">Tutti i tipi</option>
+          {MISSION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+      </div>
+
       {/* Chapter order info box */}
       <div className="bg-[#3A9DBC]/8 border border-[#3A9DBC]/20 rounded-xl px-4 py-3 mb-4">
         <p className="text-xs text-white/50 leading-relaxed">
@@ -352,7 +373,16 @@ export default function AdminMissions() {
         <p className="text-white/40 text-sm">Nessuna missione per questa sessione.</p>
       ) : (
         <div className="space-y-2 mb-6">
-          {missions.map(m => (
+          {missions.filter(m => {
+            if (filterType && m.type !== filterType) return false
+            if (!search.trim()) return true
+            const q = search.toLowerCase()
+            return (
+              m.title.toLowerCase().includes(q) ||
+              m.description?.toLowerCase().includes(q) ||
+              m.target?.toLowerCase().includes(q)
+            )
+          }).map(m => (
             <div key={m.id} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
