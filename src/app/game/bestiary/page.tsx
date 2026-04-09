@@ -610,7 +610,7 @@ export default function BestiaryPage() {
                   )}
 
                   {/* Evolvibile badge */}
-                  {pc && pc.duplicates_count >= 3 && !pc.evolved && evolvableIds.has(pc.creature_id) && (
+                  {pc && pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
                     <div className="absolute top-1 left-1 animate-bounce">
                       <span className="text-sm">✨</span>
                     </div>
@@ -795,7 +795,7 @@ export default function BestiaryPage() {
                         className="flex-1 bg-[#3A9DBC] text-white font-bold py-3.5 rounded-xl">
                         ⚔️ Usa in Battaglia
                       </button>
-                      {pc.duplicates_count >= 3 && !pc.evolved && evolvableIds.has(pc.creature_id) && (
+                      {pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
                         <button onClick={() => handleEvolve(pc)}
                           className="flex-1 bg-[#F7C841] text-[#0F1F2E] font-bold py-3.5 rounded-xl">
                           ✨ Evolvi ({pc.duplicates_count} copie)

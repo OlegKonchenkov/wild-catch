@@ -19,7 +19,6 @@ export async function POST(request: Request) {
     .single()
 
   if (!pc) return NextResponse.json({ error: 'Creatura non trovata' }, { status: 404 })
-  if (pc.evolved) return NextResponse.json({ error: 'Già evoluta' }, { status: 400 })
   if (pc.duplicates_count < 3) {
     return NextResponse.json({
       error: `Servono 3 copie (hai ${pc.duplicates_count})`,
