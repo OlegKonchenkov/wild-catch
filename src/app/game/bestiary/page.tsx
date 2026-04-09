@@ -772,6 +772,7 @@ export default function BestiaryPage() {
         {selected && (() => {
           const { creature, pc } = selected
           const caught = !!pc
+          const rarityColor = RARITY_COLORS[creature.rarity]
           const hint = MYSTERY_HINTS[creature.element] ?? 'Qualcosa si muove nell\'ombra...'
 
           return (
@@ -791,295 +792,325 @@ export default function BestiaryPage() {
                 ✕
               </button>
 
-              <div className="px-6 pt-2 pb-8">
-                {/* Image */}
-                <div className="flex justify-center mb-4">
-                  {caught ? (
-                    <CreatureSprite
-                      imageUrl={creature.image_url ?? ''}
-                      name={creature.name}
-                      animState="idle"
-                      size={164}
-                      element={creature.element}
-                      rarity={creature.rarity}
-                      showAura
-                    />
-                  ) : (
-                    <div className="relative w-36 h-36">
-                      {creature.image_url ? (
-                        <>
-                          <Image src={creature.image_url} alt="???"
-                            fill className="object-contain silhouette-soft" sizes="144px" />
-                          <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#0F1F2E]/30 via-[#0F1F2E]/20 to-[#0F1F2E]/50" />
-                        </>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-6xl opacity-20">?</div>
-                      )}
-                    </div>
-                  )}
-                </div>
+              <div className="pb-8">
 
-                {caught ? (
-                  /* ── CAUGHT: full info ── */
-                  <>
-                    <div className="text-center mb-4">
-                      <h3 className="text-2xl font-bold text-white">{creature.name}</h3>
-                      {squad.includes(pc.id) && (
-                        <div className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-semibold"
+                {/* ── Hero block: atmospheric image + identity ── */}
+                <div className="relative overflow-hidden"
+                  style={{ background: caught ? `radial-gradient(ellipse at 50% 10%, ${rarityColor}28 0%, ${rarityColor}08 45%, transparent 70%), #0C1B29` : '#0C1B29' }}>
+                  {/* Rarity gradient stripe */}
+                  <div className="h-[3px]" style={{ background: caught ? `linear-gradient(90deg, transparent 0%, ${rarityColor}CC 40%, ${rarityColor}CC 60%, transparent 100%)` : 'rgba(255,255,255,0.04)' }} />
+
+                  {/* Creature image */}
+                  <div className="flex justify-center pt-7 pb-5">
+                    {caught ? (
+                      <CreatureSprite
+                        imageUrl={creature.image_url ?? ''}
+                        name={creature.name}
+                        animState="idle"
+                        size={180}
+                        element={creature.element}
+                        rarity={creature.rarity}
+                        showAura
+                      />
+                    ) : (
+                      <div className="relative w-40 h-40 flex items-center justify-center">
+                        {creature.image_url ? (
+                          <>
+                            <Image src={creature.image_url} alt="???"
+                              fill className="object-contain silhouette-soft" sizes="160px" />
+                            <span className="relative text-5xl font-black text-white/15 z-10">?</span>
+                          </>
+                        ) : (
+                          <span className="text-6xl opacity-15">?</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Name + squad badge + pills */}
+                  <div className="px-5 pb-5">
+                    <div className="flex items-start gap-2 mb-2">
+                      <h3 className="text-[22px] font-black text-white leading-tight flex-1 tracking-tight">
+                        {caught ? creature.name : '? ? ?'}
+                      </h3>
+                      {caught && squad.includes(pc.id) && (
+                        <div className="mt-0.5 shrink-0 px-2.5 py-1 rounded-full text-[10px] font-black"
                           style={{
-                            background: squad[0] === pc.id ? 'rgba(58,188,168,0.2)' : 'rgba(255,255,255,0.1)',
-                            border: squad[0] === pc.id ? '1px solid rgba(58,188,168,0.45)' : '1px solid rgba(255,255,255,0.2)',
-                            color: squad[0] === pc.id ? '#3ABCA8' : 'rgba(255,255,255,0.6)',
+                            background: squad[0] === pc.id ? 'rgba(58,188,168,0.18)' : 'rgba(255,255,255,0.08)',
+                            border: squad[0] === pc.id ? '1.5px solid rgba(58,188,168,0.55)' : '1px solid rgba(255,255,255,0.2)',
+                            color: squad[0] === pc.id ? '#3ABCA8' : 'rgba(255,255,255,0.55)',
                           }}>
-                          {squad[0] === pc.id ? '⚔️ Capitano · Slot 1' : `🛡️ Slot ${squad.indexOf(pc.id) + 1}`}
+                          {squad[0] === pc.id ? '⚔ CAP' : `· ${squad.indexOf(pc.id) + 1}`}
                         </div>
                       )}
-                      <div className="flex items-center justify-center gap-2 mt-1">
-                        <span className="text-sm">{ELEMENT_EMOJI[creature.element]}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                          style={{ backgroundColor: `${RARITY_COLORS[creature.rarity]}22`, color: RARITY_COLORS[creature.rarity] }}>
+                    </div>
+
+                    {caught ? (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {/* Element */}
+                        <span className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-semibold"
+                          style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          {ELEMENT_EMOJI[creature.element]}
+                          <span className="capitalize">{creature.element}</span>
+                        </span>
+                        {/* Rarity */}
+                        <span className="text-[11px] px-2.5 py-1 rounded-full font-bold capitalize"
+                          style={{ background: `${rarityColor}1A`, color: rarityColor, border: `1px solid ${rarityColor}40` }}>
                           {creature.rarity.replace('_', ' ')}
                         </span>
+                        {/* Copies */}
                         {pc.duplicates_count > 1 && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-[#3A9DBC]/20 text-[#3A9DBC]">
-                            ×{pc.duplicates_count} duplicati
+                          <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
+                            style={{ background: 'rgba(58,157,188,0.12)', color: '#60CDDD', border: '1px solid rgba(58,157,188,0.25)' }}>
+                            ×{pc.duplicates_count} copie
                           </span>
                         )}
                       </div>
+                    ) : (
+                      <p className="text-xs text-white/30 italic">{hint}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Content ── */}
+                <div className="px-5 pt-5 space-y-4">
+                  {caught ? (
+                    <>
+                      {/* Description */}
                       {creature.description && (
-                        <p className="text-sm text-white/50 mt-3 leading-relaxed">{creature.description}</p>
+                        <p className="text-sm text-white/50 leading-relaxed italic -mt-1">{creature.description}</p>
                       )}
-                    </div>
 
-                    {/* Stats — scaled to player level */}
-                    {(() => {
-                      const lv = Math.max(1, playerLevel)
-                      const delta = lv - 1
-                      const sHP  = Math.max(1, Math.round(creature.hp  * (1 + delta * 0.14)))
-                      const sATK = Math.max(1, Math.round(creature.atk * (1 + delta * 0.10)))
-                      const sDEF = Math.max(0, Math.round((creature.def ?? 0) * (1 + delta * 0.09)))
-                      const stats = [
-                        { label: 'HP',  base: creature.hp,        scaled: sHP,  color: '#F87171' },
-                        { label: 'ATK', base: creature.atk,       scaled: sATK, color: '#FB923C' },
-                        { label: 'DEF', base: creature.def ?? 0,  scaled: sDEF, color: '#60A5FA' },
-                      ]
-                      return (
-                        <div className="mb-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs text-white/35 uppercase tracking-wider font-bold">Statistiche</p>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-                              style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.35)', color: '#FBBF24' }}>
-                              Lv. {lv}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {stats.map(s => (
-                              <div key={s.label} className="rounded-xl p-3 text-center"
-                                style={{ background: `${s.color}10`, border: `1px solid ${s.color}25` }}>
-                                <p className="text-xl font-black" style={{ color: s.color }}>{s.scaled}</p>
-                                <p className="text-[10px] font-bold text-white/50 mt-0.5">{s.label}</p>
-                                {lv > 1 && (
-                                  <>
-                                    <div className="my-1.5 mx-1" style={{ height: '1px', background: `${s.color}20` }} />
-                                    <p className="text-[10px] text-white/40 leading-none">
-                                      <span className="text-white/25">base </span>
-                                      <span className="font-semibold">{s.base}</span>
-                                    </p>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })()}
-
-                    {/* Difficoltà cattura + % base */}
-                    <div className="bg-white/5 rounded-xl px-4 py-2.5 mb-4 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-white/40 mb-0.5">Cattura</p>
-                        <p className="text-sm font-bold text-[#34D399]">
-                          {Math.round((RARITY_CATCH_RATES[creature.rarity] ?? 0.5) * 100)}% base
-                        </p>
-                        <p className="text-[10px] text-white/30">
-                          {['Molto facile','Facile','Normale','Difficile','Molto difficile'][((creature as any).catch_difficulty ?? 1) - 1]}
-                        </p>
-                      </div>
-                      <div className="flex gap-0.5">
-                        {[1,2,3,4,5].map(n => (
-                          <span key={n} className={`text-base ${n <= ((creature as any).catch_difficulty ?? 1) ? 'opacity-100' : 'opacity-20'}`}>⭐</span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Evolution callout */}
-                    {pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
-                      <div className="rounded-2xl p-3 mb-3 flex items-center gap-3"
-                        style={{ background: 'linear-gradient(135deg, rgba(247,200,65,0.12) 0%, rgba(245,158,11,0.08) 100%)', border: '1.5px solid rgba(247,200,65,0.35)', boxShadow: '0 0 16px rgba(247,200,65,0.15)' }}>
-                        <span className="text-2xl shrink-0" style={{ animation: 'evolvePulse 1s ease-in-out infinite alternate' }}>✨</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[#F7C841] font-extrabold text-sm leading-tight">Evoluzione disponibile!</p>
-                          <p className="text-white/50 text-xs mt-0.5">
-                            Hai <span className="text-white/80 font-bold">{pc.duplicates_count} copie</span> — consuma 2 per far evolvere questa creatura
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Squad assignment */}
-                    <div className="mb-3">
-                      <p className="text-[10px] font-bold text-white/35 uppercase tracking-wider mb-2">Squadra da battaglia</p>
-                      <div className="flex gap-2">
-                        {[0, 1, 2].map(slotIdx => {
-                          const inSlot = squad[slotIdx] === pc.id
-                          const occupantId = squad[slotIdx]
-                          const slotTaken = !!occupantId && !inSlot
-                          const occupantPc = slotTaken ? playerCreatures.find(p => p.id === occupantId) : null
-                          const occupantCr = occupantPc ? creatures.find(c => c.id === occupantPc.creature_id) : null
-                          const isLead = slotIdx === 0
-                          return (
-                            <button
-                              key={slotIdx}
-                              disabled={squadSaving}
-                              onClick={() => inSlot ? handleSquadSlot(-1, pc.id) : handleSquadSlot(slotIdx, pc.id)}
-                              className="flex-1 relative rounded-xl overflow-hidden transition-all disabled:opacity-50"
-                              style={{
-                                height: 80,
-                                background: inSlot
-                                  ? isLead ? 'rgba(58,188,168,0.18)' : 'rgba(255,255,255,0.12)'
-                                  : slotTaken ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
-                                border: inSlot
-                                  ? isLead ? '1.5px solid rgba(58,188,168,0.7)' : '1.5px solid rgba(255,255,255,0.3)'
-                                  : '1px dashed rgba(255,255,255,0.15)',
-                              }}
-                            >
-                              {/* Image fills full button */}
-                              {inSlot ? (
-                                creature.image_url
-                                  ? <img src={creature.image_url} alt={creature.name} className="absolute inset-0 w-full h-full object-contain p-2" />
-                                  : <span className="absolute inset-0 flex items-center justify-center text-3xl">{ELEMENT_EMOJI[creature.element]}</span>
-                              ) : occupantCr ? (
-                                occupantCr.image_url
-                                  ? <img src={occupantCr.image_url} alt={occupantCr.name} className="absolute inset-0 w-full h-full object-contain p-2 opacity-40" />
-                                  : <span className="absolute inset-0 flex items-center justify-center text-3xl opacity-30">{ELEMENT_EMOJI[occupantCr.element]}</span>
-                              ) : (
-                                <span className="absolute inset-0 flex items-center justify-center text-xl font-bold" style={{ color: 'rgba(255,255,255,0.15)' }}>+</span>
-                              )}
-                              {/* Bottom label overlay */}
-                              <div className="absolute bottom-0 left-0 right-0 px-1 pb-1 pt-4"
-                                style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}>
-                                <span className="text-[8px] font-bold leading-none block text-center"
-                                  style={{ color: inSlot ? (isLead ? '#3ABCA8' : 'white') : slotTaken ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.35)' }}>
-                                  {isLead ? (inSlot ? 'Capitano' : 'Slot 1') : `Slot ${slotIdx + 1}`}
-                                </span>
-                              </div>
-                              {/* Checkmark top-right when assigned */}
-                              {inSlot && (
-                                <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black"
-                                  style={{ background: isLead ? '#3ABCA8' : 'rgba(255,255,255,0.75)', color: '#0A1520' }}>✓</span>
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Evolve button */}
-                    {pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
-                      <button onClick={() => handleEvolve(pc)}
-                        className="w-full font-extrabold py-3.5 rounded-xl text-[#0F1F2E] mb-3"
-                        style={{ background: 'linear-gradient(135deg, #F7C841 0%, #F59E0B 100%)', boxShadow: '0 4px 16px rgba(247,200,65,0.4)' }}>
-                        ✨ Evolvi
-                      </button>
-                    )}
-
-                    {/* Enigma button */}
-                    <button
-                      onClick={() => setShowEnigma(v => !v)}
-                      disabled={!creature.enigma_title && !creature.enigma_description}
-                      className={`w-full font-bold py-3 rounded-xl text-sm transition-all
-                        ${creature.enigma_title || creature.enigma_description
-                          ? 'bg-[#4A1D7A]/60 border border-[#7B4DB8]/50 text-[#C084FC] hover:bg-[#4A1D7A]/90'
-                          : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'}`}>
-                      🧩 Frammento Enigma
-                      {(creature.enigma_title || creature.enigma_description) && (
-                        <span className="ml-2 text-white/40 text-xs">{showEnigma ? '▲' : '▼'}</span>
-                      )}
-                    </button>
-
-                    {/* Enigma reveal */}
-                    <AnimatePresence>
-                      {showEnigma && (creature.enigma_title || creature.enigma_description) && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.25 }}
-                          className="overflow-hidden">
-                          <div className="bg-[#1A0D2E] border border-[#7B4DB8]/30 rounded-2xl p-4 space-y-3">
-                            {creature.enigma_title && (
-                              <h4 className="text-sm font-bold text-[#C084FC]">{creature.enigma_title}</h4>
-                            )}
-                            {creature.enigma_description && (
-                              <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{creature.enigma_description}</p>
-                            )}
-                            {creature.enigma_image_url && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={creature.enigma_image_url} alt="Enigma"
-                                className="w-full rounded-xl object-cover max-h-48" />
-                            )}
-                            {creature.enigma_video_url && (() => {
-                              const embed = getVideoEmbed(creature.enigma_video_url)
-                              if (!embed) return null
-                              return (
-                                <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                                  {embed.type === 'iframe' ? (
-                                    <iframe
-                                      src={embed.src}
-                                      className="absolute inset-0 w-full h-full"
-                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                      allowFullScreen
-                                    />
-                                  ) : (
-                                    <video src={embed.src} controls className="absolute inset-0 w-full h-full" />
+                      {/* Stats */}
+                      {(() => {
+                        const lv = Math.max(1, playerLevel)
+                        const delta = lv - 1
+                        const sHP  = Math.max(1, Math.round(creature.hp  * (1 + delta * 0.14)))
+                        const sATK = Math.max(1, Math.round(creature.atk * (1 + delta * 0.10)))
+                        const sDEF = Math.max(0, Math.round((creature.def ?? 0) * (1 + delta * 0.09)))
+                        const stats = [
+                          { label: 'HP',  base: creature.hp,       scaled: sHP,  color: '#F87171' },
+                          { label: 'ATK', base: creature.atk,      scaled: sATK, color: '#FB923C' },
+                          { label: 'DEF', base: creature.def ?? 0, scaled: sDEF, color: '#60A5FA' },
+                        ]
+                        return (
+                          <div>
+                            <div className="flex items-center justify-between mb-2.5">
+                              <p className="text-[11px] text-white/35 uppercase tracking-widest font-bold">Statistiche</p>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                                style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.3)', color: '#FBBF24' }}>
+                                Lv. {lv}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              {stats.map(s => (
+                                <div key={s.label} className="rounded-xl p-3 text-center"
+                                  style={{ background: `${s.color}10`, border: `1px solid ${s.color}25` }}>
+                                  <p className="text-xl font-black" style={{ color: s.color }}>{s.scaled}</p>
+                                  <p className="text-[10px] font-bold text-white/50 mt-0.5">{s.label}</p>
+                                  {lv > 1 && (
+                                    <>
+                                      <div className="my-1.5 mx-1" style={{ height: '1px', background: `${s.color}20` }} />
+                                      <p className="text-[10px] text-white/40 leading-none">
+                                        <span className="text-white/25">base </span>
+                                        <span className="font-semibold">{s.base}</span>
+                                      </p>
+                                    </>
                                   )}
                                 </div>
-                              )
-                            })()}
+                              ))}
+                            </div>
                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </>
-                ) : (
-                  /* ── NOT CAUGHT: mystery view ── */
-                  <>
-                    <div className="text-center mb-6">
-                      <h3 className="text-2xl font-bold text-white/20 tracking-widest">? ? ?</h3>
-                      <p className="text-xs text-white/30 mt-2 italic">{hint}</p>
-                    </div>
+                        )
+                      })()}
 
-                    {/* Hidden stats */}
-                    <div className="grid grid-cols-3 gap-2 mb-5">
-                      {['HP', 'ATK', 'DEF'].map(label => (
-                        <div key={label} className="bg-white/3 border border-white/5 rounded-xl p-3 text-center">
-                          <p className="text-lg font-bold text-white/15">—</p>
-                          <p className="text-xs text-white/20 mt-0.5">{label}</p>
+                      {/* Catch difficulty */}
+                      {(() => {
+                        const diff = (creature as any).catch_difficulty ?? 1
+                        const diffLabel = ['Molto facile','Facile','Normale','Difficile','Molto difficile'][diff - 1]
+                        const catchPct = Math.round((RARITY_CATCH_RATES[creature.rarity] ?? 0.5) * 100)
+                        return (
+                          <div className="flex items-center justify-between rounded-xl px-4 py-3"
+                            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xl">🎯</span>
+                              <div>
+                                <p className="text-xs font-bold text-white/75 leading-tight">{diffLabel}</p>
+                                <p className="text-[10px] text-white/35 mt-0.5">difficoltà di cattura</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1.5">
+                              <div className="flex gap-0.5">
+                                {[1,2,3,4,5].map(n => (
+                                  <span key={n} className={`text-sm leading-none ${n <= diff ? 'opacity-90' : 'opacity-15'}`}>⭐</span>
+                                ))}
+                              </div>
+                              <span className="text-[11px] font-bold leading-none" style={{ color: '#34D399' }}>{catchPct}% base</span>
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* Evolution callout */}
+                      {pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
+                        <div className="rounded-2xl p-3 flex items-center gap-3"
+                          style={{ background: 'linear-gradient(135deg, rgba(247,200,65,0.12) 0%, rgba(245,158,11,0.08) 100%)', border: '1.5px solid rgba(247,200,65,0.35)', boxShadow: '0 0 16px rgba(247,200,65,0.15)' }}>
+                          <span className="text-2xl shrink-0" style={{ animation: 'evolvePulse 1s ease-in-out infinite alternate' }}>✨</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[#F7C841] font-extrabold text-sm leading-tight">Evoluzione disponibile!</p>
+                            <p className="text-white/50 text-xs mt-0.5">
+                              Hai <span className="text-white/80 font-bold">{pc.duplicates_count} copie</span> — consuma 2 per far evolvere questa creatura
+                            </p>
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      )}
 
-                    {/* Element hint only */}
-                    <div className="bg-white/5 rounded-2xl p-4 text-center mb-5">
-                      <p className="text-3xl mb-1">{ELEMENT_EMOJI[creature.element]}</p>
-                      <p className="text-xs text-white/30">Elemento rilevato</p>
-                    </div>
+                      {/* Squad assignment */}
+                      <div>
+                        <p className="text-[11px] font-bold text-white/35 uppercase tracking-widest mb-2.5">Squadra da battaglia</p>
+                        <div className="flex gap-2">
+                          {[0, 1, 2].map(slotIdx => {
+                            const inSlot = squad[slotIdx] === pc.id
+                            const occupantId = squad[slotIdx]
+                            const slotTaken = !!occupantId && !inSlot
+                            const occupantPc = slotTaken ? playerCreatures.find(p => p.id === occupantId) : null
+                            const occupantCr = occupantPc ? creatures.find(c => c.id === occupantPc.creature_id) : null
+                            const isLead = slotIdx === 0
+                            return (
+                              <button
+                                key={slotIdx}
+                                disabled={squadSaving}
+                                onClick={() => inSlot ? handleSquadSlot(-1, pc.id) : handleSquadSlot(slotIdx, pc.id)}
+                                className="flex-1 relative rounded-xl overflow-hidden transition-all disabled:opacity-50"
+                                style={{
+                                  height: 80,
+                                  background: inSlot
+                                    ? isLead ? 'rgba(58,188,168,0.18)' : 'rgba(255,255,255,0.12)'
+                                    : slotTaken ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
+                                  border: inSlot
+                                    ? isLead ? '1.5px solid rgba(58,188,168,0.7)' : '1.5px solid rgba(255,255,255,0.3)'
+                                    : '1px dashed rgba(255,255,255,0.15)',
+                                }}
+                              >
+                                {inSlot ? (
+                                  creature.image_url
+                                    ? <img src={creature.image_url} alt={creature.name} className="absolute inset-0 w-full h-full object-contain p-2" />
+                                    : <span className="absolute inset-0 flex items-center justify-center text-3xl">{ELEMENT_EMOJI[creature.element]}</span>
+                                ) : occupantCr ? (
+                                  occupantCr.image_url
+                                    ? <img src={occupantCr.image_url} alt={occupantCr.name} className="absolute inset-0 w-full h-full object-contain p-2 opacity-40" />
+                                    : <span className="absolute inset-0 flex items-center justify-center text-3xl opacity-30">{ELEMENT_EMOJI[occupantCr.element]}</span>
+                                ) : (
+                                  <span className="absolute inset-0 flex items-center justify-center text-xl font-bold" style={{ color: 'rgba(255,255,255,0.15)' }}>+</span>
+                                )}
+                                <div className="absolute bottom-0 left-0 right-0 px-1 pb-1 pt-4"
+                                  style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}>
+                                  <span className="text-[8px] font-bold leading-none block text-center"
+                                    style={{ color: inSlot ? (isLead ? '#3ABCA8' : 'white') : slotTaken ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.35)' }}>
+                                    {isLead ? (inSlot ? 'Capitano' : 'Slot 1') : `Slot ${slotIdx + 1}`}
+                                  </span>
+                                </div>
+                                {inSlot && (
+                                  <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black"
+                                    style={{ background: isLead ? '#3ABCA8' : 'rgba(255,255,255,0.75)', color: '#0A1520' }}>✓</span>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
 
-                    <div className="bg-[#E85D2F]/10 border border-[#E85D2F]/20 rounded-xl px-4 py-3 text-center">
-                      <p className="text-sm font-bold text-[#E85D2F]">🎯 Catturala per scoprire tutto!</p>
-                    </div>
-                  </>
-                )}
+                      {/* Evolve button */}
+                      {pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
+                        <button onClick={() => handleEvolve(pc)}
+                          className="w-full font-extrabold py-3.5 rounded-xl text-[#0F1F2E]"
+                          style={{ background: 'linear-gradient(135deg, #F7C841 0%, #F59E0B 100%)', boxShadow: '0 4px 16px rgba(247,200,65,0.4)' }}>
+                          ✨ Evolvi
+                        </button>
+                      )}
+
+                      {/* Enigma button */}
+                      <button
+                        onClick={() => setShowEnigma(v => !v)}
+                        disabled={!creature.enigma_title && !creature.enigma_description}
+                        className={`w-full font-bold py-3 rounded-xl text-sm transition-all
+                          ${creature.enigma_title || creature.enigma_description
+                            ? 'bg-[#4A1D7A]/60 border border-[#7B4DB8]/50 text-[#C084FC] hover:bg-[#4A1D7A]/90'
+                            : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'}`}>
+                        🧩 Frammento Enigma
+                        {(creature.enigma_title || creature.enigma_description) && (
+                          <span className="ml-2 text-white/40 text-xs">{showEnigma ? '▲' : '▼'}</span>
+                        )}
+                      </button>
+
+                      {/* Enigma reveal */}
+                      <AnimatePresence>
+                        {showEnigma && (creature.enigma_title || creature.enigma_description) && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.25 }}
+                            className="overflow-hidden">
+                            <div className="bg-[#1A0D2E] border border-[#7B4DB8]/30 rounded-2xl p-4 space-y-3">
+                              {creature.enigma_title && (
+                                <h4 className="text-sm font-bold text-[#C084FC]">{creature.enigma_title}</h4>
+                              )}
+                              {creature.enigma_description && (
+                                <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{creature.enigma_description}</p>
+                              )}
+                              {creature.enigma_image_url && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={creature.enigma_image_url} alt="Enigma"
+                                  className="w-full rounded-xl object-cover max-h-48" />
+                              )}
+                              {creature.enigma_video_url && (() => {
+                                const embed = getVideoEmbed(creature.enigma_video_url)
+                                if (!embed) return null
+                                return (
+                                  <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                                    {embed.type === 'iframe' ? (
+                                      <iframe
+                                        src={embed.src}
+                                        className="absolute inset-0 w-full h-full"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                      />
+                                    ) : (
+                                      <video src={embed.src} controls className="absolute inset-0 w-full h-full" />
+                                    )}
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </>
+                  ) : (
+                    /* ── NOT CAUGHT: mystery view ── */
+                    <>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['HP', 'ATK', 'DEF'].map(label => (
+                          <div key={label} className="bg-white/3 border border-white/5 rounded-xl p-3 text-center">
+                            <p className="text-lg font-bold text-white/15">—</p>
+                            <p className="text-xs text-white/20 mt-0.5">{label}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="rounded-xl p-4 text-center"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                        <p className="text-3xl mb-1">{ELEMENT_EMOJI[creature.element]}</p>
+                        <p className="text-xs text-white/30">Elemento rilevato</p>
+                      </div>
+
+                      <div className="bg-[#E85D2F]/10 border border-[#E85D2F]/20 rounded-xl px-4 py-3 text-center">
+                        <p className="text-sm font-bold text-[#E85D2F]">🎯 Catturala per scoprire tutto!</p>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </motion.div>
           )
