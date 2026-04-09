@@ -561,7 +561,7 @@ export default function BestiaryPage() {
           <div className="flex items-center gap-1 mb-1.5">
             <span className="text-[10px] font-bold text-white/35 uppercase tracking-wider">Squadra</span>
             {squad.length > 0 && (
-              <span className="text-[9px] text-white/25">· tocca uno slot per gestire</span>
+              <span className="text-[9px] text-white/25">· tocca per dettagli · ✕ per rimuovere</span>
             )}
           </div>
           <div className="flex gap-2">
@@ -571,43 +571,67 @@ export default function BestiaryPage() {
               const cr = pc ? creatures.find(c => c.id === pc.creature_id) : null
               const isLead = slotIdx === 0
               return (
-                <button
-                  key={slotIdx}
-                  onClick={() => {
-                    if (pc && cr) {
-                      setSelected({ creature: cr, pc })
-                    }
-                  }}
-                  className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded-xl transition-all"
-                  style={{
-                    background: pc
-                      ? isLead ? 'rgba(58,188,168,0.14)' : 'rgba(255,255,255,0.07)'
-                      : 'rgba(255,255,255,0.03)',
-                    border: pc
-                      ? isLead ? '1px solid rgba(58,188,168,0.45)' : '1px solid rgba(255,255,255,0.12)'
-                      : '1px dashed rgba(255,255,255,0.1)',
-                  }}
-                >
-                  {/* Slot number */}
-                  <span className="text-[10px] font-black shrink-0"
-                    style={{ color: pc ? (isLead ? '#3ABCA8' : 'rgba(255,255,255,0.4)') : 'rgba(255,255,255,0.15)' }}>
-                    {slotIdx + 1}
-                  </span>
-                  {pc && cr ? (
-                    <>
-                      {cr.image_url ? (
-                        <div className="w-6 h-6 shrink-0">
-                          <img src={cr.image_url} alt={cr.name} className="w-full h-full object-contain" />
-                        </div>
-                      ) : (
-                        <span className="text-sm shrink-0">{ELEMENT_EMOJI[cr.element]}</span>
-                      )}
-                      <span className="text-[10px] font-semibold text-white/70 truncate">{cr.name}</span>
-                    </>
-                  ) : (
-                    <span className="text-[10px] text-white/20 truncate">vuoto</span>
+                <div key={slotIdx} className="relative flex-1">
+                  {/* Main tap target — open detail */}
+                  <button
+                    onClick={() => { if (pc && cr) setSelected({ creature: cr, pc }) }}
+                    className="w-full rounded-xl overflow-hidden transition-all"
+                    style={{
+                      background: pc
+                        ? isLead ? 'rgba(58,188,168,0.14)' : 'rgba(255,255,255,0.07)'
+                        : 'rgba(255,255,255,0.03)',
+                      border: pc
+                        ? isLead ? '1px solid rgba(58,188,168,0.45)' : '1px solid rgba(255,255,255,0.12)'
+                        : '1px dashed rgba(255,255,255,0.1)',
+                      aspectRatio: '1 / 1',
+                    }}
+                  >
+                    {pc && cr ? (
+                      <div className="relative w-full h-full flex items-center justify-center p-1">
+                        {cr.image_url ? (
+                          <img src={cr.image_url} alt={cr.name}
+                            className="w-full h-full object-contain" />
+                        ) : (
+                          <span className="text-2xl">{ELEMENT_EMOJI[cr.element]}</span>
+                        )}
+                        {/* Slot number badge bottom-left */}
+                        <span
+                          className="absolute bottom-1 left-1 text-[9px] font-black px-1 rounded"
+                          style={{
+                            background: isLead ? 'rgba(58,188,168,0.85)' : 'rgba(0,0,0,0.55)',
+                            color: isLead ? '#0A1520' : 'rgba(255,255,255,0.55)',
+                          }}
+                        >
+                          {isLead ? '⚔' : slotIdx + 1}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-0.5">
+                        <span className="text-lg font-bold" style={{ color: 'rgba(255,255,255,0.1)' }}>+</span>
+                        <span className="text-[9px] font-bold" style={{ color: 'rgba(255,255,255,0.15)' }}>Slot {slotIdx + 1}</span>
+                      </div>
+                    )}
+                  </button>
+
+                  {/* ✕ remove button — only when occupied */}
+                  {pc && (
+                    <button
+                      onClick={e => { e.stopPropagation(); handleSquadSlot(-1, pc.id) }}
+                      disabled={squadSaving}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black transition-all disabled:opacity-40 z-10"
+                      style={{ background: 'rgba(239,68,68,0.85)', color: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.4)' }}
+                      aria-label="Rimuovi dalla squadra"
+                    >
+                      ✕
+                    </button>
                   )}
-                </button>
+
+                  {/* Name label below */}
+                  <p className="text-[9px] font-semibold text-center mt-1 truncate px-0.5"
+                    style={{ color: pc ? (isLead ? '#3ABCA8' : 'rgba(255,255,255,0.45)') : 'rgba(255,255,255,0.1)' }}>
+                    {pc && cr ? cr.name : '—'}
+                  </p>
+                </div>
               )
             })}
           </div>
