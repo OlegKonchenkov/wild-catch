@@ -571,65 +571,56 @@ export default function BestiaryPage() {
               const cr = pc ? creatures.find(c => c.id === pc.creature_id) : null
               const isLead = slotIdx === 0
               return (
-                <div key={slotIdx} className="relative flex-1">
+                <div key={slotIdx} className="relative" style={{ width: 56 }}>
                   {/* Main tap target — open detail */}
                   <button
                     onClick={() => { if (pc && cr) setSelected({ creature: cr, pc }) }}
-                    className="w-full rounded-xl overflow-hidden transition-all"
+                    className="rounded-xl overflow-hidden transition-all"
                     style={{
+                      width: 56, height: 56,
                       background: pc
                         ? isLead ? 'rgba(58,188,168,0.14)' : 'rgba(255,255,255,0.07)'
                         : 'rgba(255,255,255,0.03)',
                       border: pc
                         ? isLead ? '1px solid rgba(58,188,168,0.45)' : '1px solid rgba(255,255,255,0.12)'
                         : '1px dashed rgba(255,255,255,0.1)',
-                      aspectRatio: '1 / 1',
                     }}
                   >
                     {pc && cr ? (
                       <div className="relative w-full h-full flex items-center justify-center p-1">
                         {cr.image_url ? (
-                          <img src={cr.image_url} alt={cr.name}
-                            className="w-full h-full object-contain" />
+                          <img src={cr.image_url} alt={cr.name} className="w-full h-full object-contain" />
                         ) : (
-                          <span className="text-2xl">{ELEMENT_EMOJI[cr.element]}</span>
+                          <span className="text-xl">{ELEMENT_EMOJI[cr.element]}</span>
                         )}
-                        {/* Slot number badge bottom-left */}
-                        <span
-                          className="absolute bottom-1 left-1 text-[9px] font-black px-1 rounded"
-                          style={{
-                            background: isLead ? 'rgba(58,188,168,0.85)' : 'rgba(0,0,0,0.55)',
-                            color: isLead ? '#0A1520' : 'rgba(255,255,255,0.55)',
-                          }}
-                        >
+                        <span className="absolute bottom-0.5 left-0.5 text-[8px] font-black px-0.5 rounded"
+                          style={{ background: isLead ? 'rgba(58,188,168,0.9)' : 'rgba(0,0,0,0.6)', color: isLead ? '#0A1520' : 'rgba(255,255,255,0.6)' }}>
                           {isLead ? '⚔' : slotIdx + 1}
                         </span>
                       </div>
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center gap-0.5">
-                        <span className="text-lg font-bold" style={{ color: 'rgba(255,255,255,0.1)' }}>+</span>
-                        <span className="text-[9px] font-bold" style={{ color: 'rgba(255,255,255,0.15)' }}>Slot {slotIdx + 1}</span>
+                      <div className="w-full h-full flex flex-col items-center justify-center">
+                        <span className="text-base font-bold" style={{ color: 'rgba(255,255,255,0.1)' }}>+</span>
+                        <span className="text-[8px]" style={{ color: 'rgba(255,255,255,0.12)' }}>{slotIdx + 1}</span>
                       </div>
                     )}
                   </button>
 
-                  {/* ✕ remove button — only when occupied */}
+                  {/* ✕ remove — only when occupied */}
                   {pc && (
                     <button
                       onClick={e => { e.stopPropagation(); handleSquadSlot(-1, pc.id) }}
                       disabled={squadSaving}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black transition-all disabled:opacity-40 z-10"
-                      style={{ background: 'rgba(239,68,68,0.85)', color: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.4)' }}
-                      aria-label="Rimuovi dalla squadra"
-                    >
-                      ✕
-                    </button>
+                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black disabled:opacity-40 z-10"
+                      style={{ background: 'rgba(239,68,68,0.9)', color: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }}
+                      aria-label="Rimuovi"
+                    >✕</button>
                   )}
 
-                  {/* Name label below */}
-                  <p className="text-[9px] font-semibold text-center mt-1 truncate px-0.5"
-                    style={{ color: pc ? (isLead ? '#3ABCA8' : 'rgba(255,255,255,0.45)') : 'rgba(255,255,255,0.1)' }}>
-                    {pc && cr ? cr.name : '—'}
+                  {/* Name below */}
+                  <p className="text-[8px] font-semibold text-center mt-1 truncate"
+                    style={{ color: pc ? (isLead ? '#3ABCA8' : 'rgba(255,255,255,0.4)') : 'rgba(255,255,255,0.1)' }}>
+                    {cr ? cr.name : '—'}
                   </p>
                 </div>
               )
@@ -951,15 +942,17 @@ export default function BestiaryPage() {
                       <div className="flex gap-2">
                         {[0, 1, 2].map(slotIdx => {
                           const inSlot = squad[slotIdx] === pc.id
-                          const slotTaken = !!squad[slotIdx] && squad[slotIdx] !== pc.id
-                          const mySlot = squad.indexOf(pc.id)
+                          const occupantId = squad[slotIdx]
+                          const slotTaken = !!occupantId && !inSlot
+                          const occupantPc = slotTaken ? playerCreatures.find(p => p.id === occupantId) : null
+                          const occupantCr = occupantPc ? creatures.find(c => c.id === occupantPc.creature_id) : null
                           const isLead = slotIdx === 0
                           return (
                             <button
                               key={slotIdx}
                               disabled={squadSaving}
                               onClick={() => inSlot ? handleSquadSlot(-1, pc.id) : handleSquadSlot(slotIdx, pc.id)}
-                              className="flex-1 flex flex-col items-center py-2.5 rounded-xl font-bold text-xs transition-all disabled:opacity-50"
+                              className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl font-bold text-xs transition-all disabled:opacity-50"
                               style={{
                                 background: inSlot
                                   ? isLead ? 'rgba(58,188,168,0.22)' : 'rgba(255,255,255,0.14)'
@@ -969,26 +962,37 @@ export default function BestiaryPage() {
                                   : '1px dashed rgba(255,255,255,0.15)',
                               }}
                             >
-                              <span className="text-lg leading-none mb-0.5">
-                                {inSlot ? (isLead ? '⚔️' : '🛡️') : slotTaken ? '🔒' : '+'}
+                              {/* Thumbnail area */}
+                              <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center relative"
+                                style={{ background: inSlot ? (isLead ? 'rgba(58,188,168,0.15)' : 'rgba(255,255,255,0.1)') : 'rgba(255,255,255,0.05)' }}>
+                                {inSlot ? (
+                                  creature.image_url
+                                    ? <img src={creature.image_url} alt={creature.name} className="w-full h-full object-contain p-0.5" />
+                                    : <span className="text-xl">{ELEMENT_EMOJI[creature.element]}</span>
+                                ) : occupantCr ? (
+                                  occupantCr.image_url
+                                    ? <img src={occupantCr.image_url} alt={occupantCr.name} className="w-full h-full object-contain p-0.5 opacity-50" />
+                                    : <span className="text-xl opacity-40">{ELEMENT_EMOJI[occupantCr.element]}</span>
+                                ) : (
+                                  <span className="text-base font-bold" style={{ color: 'rgba(255,255,255,0.2)' }}>+</span>
+                                )}
+                                {/* checkmark overlay when this creature is in slot */}
+                                {inSlot && (
+                                  <div className="absolute inset-0 flex items-end justify-end p-0.5">
+                                    <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black"
+                                      style={{ background: isLead ? '#3ABCA8' : 'rgba(255,255,255,0.7)', color: '#0A1520' }}>✓</span>
+                                  </div>
+                                )}
+                              </div>
+                              {/* Slot label */}
+                              <span className="text-[9px] leading-none"
+                                style={{ color: inSlot ? (isLead ? '#3ABCA8' : 'white') : slotTaken ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.4)' }}>
+                                {isLead ? (inSlot ? 'Capitano' : 'Slot 1') : `Slot ${slotIdx + 1}`}
                               </span>
-                              <span style={{ color: inSlot ? (isLead ? '#3ABCA8' : 'white') : slotTaken ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.45)' }}>
-                                {inSlot ? (mySlot === slotIdx ? 'Slot ' + (slotIdx + 1) : '—') : 'Slot ' + (slotIdx + 1)}
-                              </span>
-                              {isLead && <span className="text-[8px] text-white/30 mt-0.5">Capitano</span>}
                             </button>
                           )
                         })}
                       </div>
-                      {squad.includes(pc.id) && (
-                        <button
-                          onClick={() => handleSquadSlot(-1, pc.id)}
-                          disabled={squadSaving}
-                          className="w-full mt-2 text-[10px] text-red-400/60 hover:text-red-400 transition-colors py-1 disabled:opacity-40"
-                        >
-                          Rimuovi dalla squadra
-                        </button>
-                      )}
                     </div>
 
                     {/* Evolve button */}
