@@ -72,9 +72,11 @@ const RARITY_LABEL: Record<string, string> = {
 
 function EggHatchModal({
   creature,
+  queueRemaining = 0,
   onDone,
 }: {
   creature: { name: string; rarity: string; element: string; image_url: string | null }
+  queueRemaining?: number
   onDone: () => void
 }) {
   const [phase, setPhase] = useState<'shake' | 'crack' | 'reveal'>('shake')
@@ -123,7 +125,13 @@ function EggHatchModal({
               {RARITY_LABEL[creature.rarity] ?? creature.rarity}
             </p>
           </div>
-          <p className="text-white/40 text-xs mt-2">Tocca per continuare</p>
+          {queueRemaining > 0 ? (
+            <p className="text-white/40 text-xs mt-2">
+              Tocca per continuare · ancora {queueRemaining} {queueRemaining === 1 ? 'uovo' : 'uova'}
+            </p>
+          ) : (
+            <p className="text-white/40 text-xs mt-2">Tocca per continuare</p>
+          )}
         </div>
       )}
       <style>{`
@@ -158,7 +166,7 @@ function MapPageInner() {
   const [mapPins, setMapPins] = useState<MapPin[]>([])
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
-  const [hatchedCreature, setHatchedCreature] = useState<{ name: string; rarity: string; element: string; image_url: string | null } | null>(null)
+  const [hatchQueue, setHatchQueue] = useState<{ name: string; rarity: string; element: string; image_url: string | null }[]>([])
   const [missionQueue, setMissionQueue] = useState<CompletedMissionInfo[]>([])
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
@@ -356,9 +364,9 @@ function MapPageInner() {
       setStepsWalked(data.stepsWalked)
     }
 
-    // Show hatching modal for the first egg that hatched (auto-hatched server-side)
+    // Enqueue all auto-hatched eggs — shown one at a time
     if (data.eggsHatched?.length > 0) {
-      setHatchedCreature(data.eggsHatched[0])
+      setHatchQueue(prev => [...prev, ...data.eggsHatched])
     }
 
     // Queue walk mission completions for the modal
@@ -535,11 +543,13 @@ function MapPageInner() {
         )}
       </div>
 
-      {/* Egg hatched modal */}
-      {hatchedCreature && (
+      {/* Egg hatched modal — shows one at a time, queue advances on dismiss */}
+      {hatchQueue.length > 0 && (
         <EggHatchModal
-          creature={hatchedCreature}
-          onDone={() => setHatchedCreature(null)}
+          key={hatchQueue[0].name + hatchQueue.length}
+          creature={hatchQueue[0]}
+          queueRemaining={hatchQueue.length - 1}
+          onDone={() => setHatchQueue(prev => prev.slice(1))}
         />
       )}
 

@@ -22,13 +22,13 @@ export async function POST(request: Request) {
   // Get inventory item
   const { data: invItem } = await supabase
     .from('player_inventory')
-    .select('id, quantity, items(id, name, type, effect_value)')
+    .select('id, quantity, items(id, name, type, effect_value, description)')
     .eq('id', inventoryId)
     .eq('user_id', user.id)
     .eq('session_id', sessionId)
     .single()
 
-  const inv = invItem as { id: string; quantity: number; items: { id: string; name: string; type: string; effect_value: number } } | null
+  const inv = invItem as { id: string; quantity: number; items: { id: string; name: string; type: string; effect_value: number; description: string } } | null
 
   if (!inv || inv.quantity <= 0) {
     return NextResponse.json({ error: 'Oggetto non disponibile' }, { status: 404 })
@@ -71,8 +71,13 @@ export async function POST(request: Request) {
       nameLower.includes('non_comune') || nameLower.includes('non comune') ? 'non_comune' :
       'comune'
 
-    // steps_required from effect_value; default 500 if not configured
-    const stepsRequired = inv.items.effect_value > 0 ? inv.items.effect_value : 500
+    // steps_required: effect_value → parse from description → 500 fallback
+    let stepsRequired = Number(inv.items.effect_value) > 0 ? Number(inv.items.effect_value) : 0
+    if (stepsRequired === 0) {
+      const match = (inv.items.description ?? '').match(/(\d+)\s*pass/i)
+      if (match) stepsRequired = parseInt(match[1], 10)
+    }
+    if (stepsRequired === 0) stepsRequired = 500
 
     // Current steps for this player in this session
     const { data: ps } = await supabase
