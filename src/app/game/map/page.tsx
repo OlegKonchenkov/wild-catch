@@ -627,6 +627,7 @@ function MapPageInner() {
           wildHpMax: data.wildHp,
           catchBonus: 0,
           turns: 0,
+          squadCreatures: data.squadCreatures ?? [],
         }))
         // Persist popup so it survives tab switches (valid for 3 min, matching DB auto-expire)
         sessionStorage.setItem('wc:pending_popup', JSON.stringify({
