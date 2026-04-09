@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -416,6 +416,35 @@ function BattleScreen({
   fortuneNotice: { id: number; text: string; tone: CombatFortuneInfo['tone'] } | null
 }) {
   const [showItemsModal, setShowItemsModal] = useState(false)
+  const [turnTimer, setTurnTimer] = useState(30)
+  const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoFightRef = useRef(false)
+  const onAttackRef  = useRef(onAttack)
+  useEffect(() => { onAttackRef.current = onAttack })
+
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    setTurnTimer(30)
+    autoFightRef.current = false
+    timerRef.current = setInterval(() => {
+      setTurnTimer(prev => {
+        if (prev <= 1) {
+          if (!autoFightRef.current) { autoFightRef.current = true; onAttackRef.current() }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
+
+  useEffect(() => {
+    if (!attacking && !bossAttacking) {
+      resetTimer()
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [attacking, bossAttacking]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeBoss   = bossLineup[bossActiveSlot]
   const activePlayer = playerLineup.find(c => c.is_active && !c.fainted)
@@ -714,6 +743,29 @@ function BattleScreen({
           </div>
         </div>
       )}
+
+      {/* ── TIMER BAR ── */}
+      {(() => {
+        const timerPct    = (turnTimer / 30) * 100
+        const timerUrgent = turnTimer <= 10
+        return (
+          <div className="shrink-0 px-4 pb-1 z-10">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ width: `${timerPct}%`, background: bossAttacking ? 'rgba(247,200,65,0.4)' : timerUrgent ? '#EF4444' : '#34D399' }}
+                  animate={timerUrgent && !bossAttacking ? { opacity: [1, 0.4, 1] } : {}}
+                  transition={timerUrgent && !bossAttacking ? { duration: 0.5, repeat: Infinity } : {}}
+                />
+              </div>
+              {!bossAttacking && (
+                <span className={`text-[11px] font-mono font-bold w-6 text-right shrink-0 ${timerUrgent ? 'text-red-400' : 'text-white/35'}`}>{turnTimer}</span>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── ACTIONS ── */}
       <div className="shrink-0 px-4 pb-5 pt-1 z-10 flex gap-2">

@@ -226,6 +226,10 @@ export default function DuelPage() {
   const [completedMissions, setCompletedMissions] = useState<CompletedMissionInfo[]>([])
   const [showMissionModal, setShowMissionModal] = useState(false)
 
+  const [turnTimer, setTurnTimer] = useState(30)
+  const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoFightRef = useRef(false)
+
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
   const duelStatusRef      = useRef<string | null>(null)
@@ -423,8 +427,37 @@ export default function DuelPage() {
     }
   }, [myLineup, result, waiting, id])
 
+  // ── Turn timer ────────────────────────────────────────────────────────────────
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    setTurnTimer(30)
+    autoFightRef.current = false
+    timerRef.current = setInterval(() => {
+      setTurnTimer(prev => {
+        if (prev <= 1) {
+          if (!autoFightRef.current) { autoFightRef.current = true; document.getElementById('wc-duel-atk-btn')?.click() }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
+
+  useEffect(() => {
+    if (isMyTurn && !result && !waiting) {
+      resetTimer()
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current)
+      setTurnTimer(30)
+      autoFightRef.current = false
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [isMyTurn, result, waiting]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleAttack() {
     if (attackingRef.current || !isMyTurn) return
+    if (timerRef.current) clearInterval(timerRef.current)
+    autoFightRef.current = true
     attackingRef.current = true
     setAttacking(true)
     setAnimState('attack')
@@ -828,6 +861,27 @@ export default function DuelPage() {
         </div>
       )}
 
+      {/* ── TIMER BAR ── */}
+      {!result && !waiting && isMyTurn && (() => {
+        const timerPct    = (turnTimer / 30) * 100
+        const timerUrgent = turnTimer <= 10
+        return (
+          <div className="shrink-0 px-4 pb-1 z-10">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ width: `${timerPct}%`, background: timerUrgent ? '#EF4444' : '#34D399' }}
+                  animate={timerUrgent ? { opacity: [1, 0.4, 1] } : {}}
+                  transition={timerUrgent ? { duration: 0.5, repeat: Infinity } : {}}
+                />
+              </div>
+              <span className={`text-[11px] font-mono font-bold w-6 text-right shrink-0 ${timerUrgent ? 'text-red-400' : 'text-white/35'}`}>{turnTimer}</span>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* ── ACTIONS ── */}
       {!result && !waiting && (
         <div className="shrink-0 px-4 pb-5 pt-1 z-10 flex gap-2">
@@ -851,6 +905,7 @@ export default function DuelPage() {
 
           {/* Attack button */}
           <motion.button
+            id="wc-duel-atk-btn"
             onClick={handleAttack}
             disabled={attacking || !isMyTurn}
             whileTap={isMyTurn ? { scale: 0.95 } : {}}
