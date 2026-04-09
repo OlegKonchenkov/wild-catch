@@ -136,12 +136,13 @@ export async function POST(request: Request) {
       }
     }
   } else {
-    await supabase.from('player_creatures').insert({
+    // ignoreDuplicates guards against the rare concurrent-catch race condition
+    await supabase.from('player_creatures').upsert({
       user_id: user.id,
       creature_id: creature.id,
       session_id: encounter.session_id,
       duplicates_count: 1,
-    })
+    }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
   }
 
   // Award EXP and score — new catch=15 EXP, duplicate=5 EXP

@@ -306,12 +306,12 @@ async function checkAndHatchEggs(
         .update({ duplicates_count: existing.duplicates_count + 1 })
         .eq('id', existing.id)
     } else {
-      await supabase.from('player_creatures').insert({
+      await supabase.from('player_creatures').upsert({
         user_id: userId,
         creature_id: picked.id,
         session_id: sessionId,
         duplicates_count: 1,
-      })
+      }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
     }
 
     await supabase

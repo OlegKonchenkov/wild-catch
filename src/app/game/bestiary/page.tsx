@@ -201,7 +201,7 @@ export default function BestiaryPage() {
     comune: 'Comune', non_comune: 'Non Com.', raro: 'Raro', epico: 'Epico', leggendario: 'Legg.', mitologico: 'Mito',
   }
 
-  const caughtCount = playerCreatures.length
+  const caughtCount = new Set(playerCreatures.map(pc => pc.creature_id)).size
   const activeFilterCount = (filter !== 'all' ? 1 : 0) + (rarityFilter !== 'all' ? 1 : 0) + (elementFilter !== 'all' ? 1 : 0)
 
   function resetFilters() {

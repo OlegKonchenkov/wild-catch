@@ -107,12 +107,12 @@ export async function POST(
       .update({ duplicates_count: (existing as any).duplicates_count + 1 })
       .eq('id', (existing as any).id)
   } else {
-    await supabase.from('player_creatures').insert({
+    await supabase.from('player_creatures').upsert({
       user_id: user.id,
       creature_id: picked.id,
       session_id: sessionId,
       duplicates_count: 1,
-    })
+    }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
   }
 
   // Mark egg as hatched
