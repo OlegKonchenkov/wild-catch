@@ -9,6 +9,7 @@ import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
+import { scaleCombatStats } from '@/lib/game/combat'
 
 interface BossSlot {
   slot: number
@@ -48,6 +49,7 @@ interface SquadCreature {
   rarity: Rarity
   hp: number
   atk: number
+  def: number
   image_url: string
 }
 
@@ -232,6 +234,7 @@ function SquadSelector({
   bossName,
   bossLineup,
   starting,
+  playerLevel,
 }: {
   creatures: SquadCreature[]
   lineup: (SquadCreature | null)[]
@@ -241,6 +244,7 @@ function SquadSelector({
   bossName: string
   bossLineup: BossSlot[]
   starting: boolean
+  playerLevel: number
 }) {
   const filledCount = lineup.filter(Boolean).length
 
@@ -324,6 +328,7 @@ function SquadSelector({
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {creatures.map(c => {
           const inLineup = lineup.some(l => l?.playerCreatureId === c.playerCreatureId)
+          const scaled = scaleCombatStats({ hp: c.hp, atk: c.atk, def: c.def }, playerLevel)
           return (
             <button
               key={c.playerCreatureId}
@@ -343,11 +348,20 @@ function SquadSelector({
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <p className="font-bold text-white text-sm truncate">{c.name}</p>
-                <p className="text-xs" style={{ color: RARITY_COLORS[c.rarity] }}>{c.rarity}</p>
+                <p className="text-xs" style={{ color: RARITY_COLORS[c.rarity] }}>{c.rarity.replace('_',' ')}</p>
               </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs text-white/40">HP {c.hp}</p>
-                <p className="text-xs text-white/40">ATK {c.atk}</p>
+              <div className="flex gap-1.5 shrink-0">
+                {([
+                  { label: 'HP',  val: scaled.hp,  color: '#F87171' },
+                  { label: 'ATK', val: scaled.atk, color: '#FB923C' },
+                  { label: 'DEF', val: scaled.def, color: '#60A5FA' },
+                ] as const).map(s => (
+                  <div key={s.label} className="flex flex-col items-center rounded-lg px-1.5 py-1 min-w-[32px]"
+                    style={{ background: `${s.color}12`, border: `1px solid ${s.color}22` }}>
+                    <span className="text-[11px] font-black leading-none" style={{ color: s.color }}>{s.val}</span>
+                    <span className="text-[8px] font-bold text-white/35 leading-none mt-0.5">{s.label}</span>
+                  </div>
+                ))}
               </div>
               {inLineup && (
                 <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
@@ -923,6 +937,7 @@ export default function BossFightPage() {
   const [lineup, setLineup]             = useState<(SquadCreature | null)[]>([null, null, null])
   const [starting, setStarting]         = useState(false)
   const [loadingCreatures, setLoadingCreatures] = useState(true)
+  const [playerLevel, setPlayerLevel]   = useState(1)
 
   // Battle state
   const [bossLineup, setBossLineup]       = useState<BossSlot[]>([])
@@ -985,9 +1000,9 @@ export default function BossFightPage() {
       if (sessionId) {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
-          const [crRes, invRes] = await Promise.all([
+          const [crRes, invRes, lvRes] = await Promise.all([
             supabase.from('player_creatures')
-              .select('id, creatures(name, element, rarity, hp, atk, image_url)')
+              .select('id, creatures(name, element, rarity, hp, atk, def, image_url)')
               .eq('user_id', user.id)
               .eq('session_id', sessionId),
             supabase.from('player_inventory')
@@ -995,7 +1010,13 @@ export default function BossFightPage() {
               .eq('user_id', user.id)
               .eq('session_id', sessionId)
               .gt('quantity', 0),
+            supabase.from('player_sessions')
+              .select('level')
+              .eq('user_id', user.id)
+              .eq('session_id', sessionId)
+              .single(),
           ])
+          if (lvRes.data) setPlayerLevel((lvRes.data as any).level ?? 1)
 
           const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
           const mapped: SquadCreature[] = ((crRes.data ?? []) as any[])
@@ -1007,6 +1028,7 @@ export default function BossFightPage() {
               rarity: pc.creatures.rarity,
               hp: pc.creatures.hp,
               atk: pc.creatures.atk,
+              def: pc.creatures.def ?? 0,
               image_url: pc.creatures.image_url,
             }))
             .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity))
@@ -1272,6 +1294,7 @@ export default function BossFightPage() {
               bossName={fight?.boss_lineup?.[0]?.name ?? 'Boss'}
               bossLineup={fight?.boss_lineup ?? []}
               starting={starting}
+              playerLevel={playerLevel}
             />
           </div>
         )
