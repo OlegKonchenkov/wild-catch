@@ -87,7 +87,7 @@ function EggHatchModal({
   queueRemaining = 0,
   onDone,
 }: {
-  creature: { name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number; description?: string | null }
+  creature: { name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number; description?: string | null; isStarter?: boolean }
   queueRemaining?: number
   onDone: () => void
 }) {
@@ -95,6 +95,11 @@ function EggHatchModal({
   const [cardVisible, setCardVisible] = useState(false)
 
   useEffect(() => {
+    if (creature.isStarter) {
+      setPhase('reveal')
+      const t = setTimeout(() => setCardVisible(true), 80)
+      return () => clearTimeout(t)
+    }
     const t1 = setTimeout(() => setPhase('crack'), 900)
     const t2 = setTimeout(() => { setPhase('reveal'); setTimeout(() => setCardVisible(true), 80) }, 1900)
     return () => { clearTimeout(t1); clearTimeout(t2) }
@@ -143,7 +148,7 @@ function EggHatchModal({
             <div className="relative pt-2 pb-2" style={{
               background: `linear-gradient(180deg, ${glow}18 0%, transparent 100%)`,
             }}>
-              {/* "Schiuso!" badge */}
+              {/* Badge */}
               <div className="flex justify-center mb-3">
                 <div
                   className="flex items-center gap-2 px-4 py-1.5 rounded-full font-extrabold text-sm"
@@ -156,7 +161,7 @@ function EggHatchModal({
                     transition: 'opacity 0.3s 0.15s, transform 0.4s 0.15s cubic-bezier(0.34,1.56,0.64,1)',
                   }}
                 >
-                  🥚 Schiuso!
+                  {creature.isStarter ? '🌟 Il tuo Starter!' : '🥚 Schiuso!'}
                 </div>
               </div>
 
@@ -232,9 +237,11 @@ function EggHatchModal({
                   transition: 'opacity 0.3s 0.4s',
                 }}
               >
-                {queueRemaining > 0
-                  ? `Continua · ancora ${queueRemaining} ${queueRemaining === 1 ? 'uovo' : 'uova'}`
-                  : 'Continua'
+                {creature.isStarter
+                  ? 'Inizia l\'avventura!'
+                  : queueRemaining > 0
+                    ? `Continua · ancora ${queueRemaining} ${queueRemaining === 1 ? 'uovo' : 'uova'}`
+                    : 'Continua'
                 }
               </button>
             </div>
@@ -263,6 +270,209 @@ function EggHatchModal({
   )
 }
 
+interface StarterCreature {
+  id: string
+  name: string
+  rarity: string
+  element: string
+  image_url: string | null
+  sprite_url: string | null
+  hp: number
+  atk: number
+  def: number
+  description: string | null
+}
+
+function StarterSelect({
+  starters,
+  onPicked,
+}: {
+  starters: StarterCreature[]
+  onPicked: (creature: StarterCreature) => void
+}) {
+  const [selected, setSelected] = useState<StarterCreature | null>(null)
+  const [confirming, setConfirming] = useState(false)
+
+  const glow = selected ? (ELEMENT_GLOW[selected.element] ?? '#3A9DBC') : '#3A9DBC'
+  const rarityColor = selected ? (RARITY_COLOR[selected.rarity] ?? '#9CA3AF') : '#9CA3AF'
+
+  return (
+    <div
+      className="fixed inset-0 z-[1300] flex flex-col"
+      style={{ background: 'linear-gradient(180deg, #020810 0%, #080E1A 100%)' }}
+    >
+      {/* Header */}
+      <div className="shrink-0 px-5 pt-10 pb-4 text-center">
+        <div
+          className="inline-block text-4xl mb-3"
+          style={{ animation: 'starterFloat 3s ease-in-out infinite' }}
+        >
+          🌟
+        </div>
+        <h1 className="text-2xl font-black text-white tracking-tight">Scegli il tuo Starter!</h1>
+        <p className="text-sm text-white/45 mt-1">La tua prima creatura compagna di avventura</p>
+      </div>
+
+      {/* Creature grid */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
+        <div className="grid grid-cols-2 gap-3">
+          {starters.map(c => {
+            const isSelected = selected?.id === c.id
+            const cGlow = ELEMENT_GLOW[c.element] ?? '#3A9DBC'
+            return (
+              <button
+                key={c.id}
+                onClick={() => setSelected(c)}
+                className="relative rounded-2xl p-3 flex flex-col items-center gap-2 transition-all active:scale-95"
+                style={{
+                  background: isSelected
+                    ? `linear-gradient(135deg, ${cGlow}22 0%, ${cGlow}10 100%)`
+                    : 'rgba(255,255,255,0.04)',
+                  border: isSelected
+                    ? `2px solid ${cGlow}`
+                    : '1.5px solid rgba(255,255,255,0.08)',
+                  boxShadow: isSelected ? `0 0 18px ${cGlow}40` : 'none',
+                }}
+              >
+                {/* Sprite */}
+                <div className="w-24 h-24 flex items-center justify-center">
+                  <CreatureSprite
+                    imageUrl={c.image_url ?? ''}
+                    name={c.name}
+                    animState="idle"
+                    size={88}
+                    element={c.element as any}
+                    rarity={c.rarity as any}
+                    showAura={isSelected}
+                  />
+                </div>
+                <p className="text-sm font-bold text-white text-center leading-tight">{c.name}</p>
+                <div
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                  style={{ background: `${cGlow}22`, color: cGlow }}
+                >
+                  {ELEMENT_EMOJI[c.element] ?? '✦'} {c.element}
+                </div>
+                {isSelected && (
+                  <div
+                    className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
+                    style={{ background: cGlow }}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path d="M2 5l2.5 2.5L8 3" stroke="#080E1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Detail panel — slides up when a creature is selected */}
+      <div
+        className="shrink-0 rounded-t-3xl overflow-hidden"
+        style={{
+          background: '#080E1A',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderBottom: 'none',
+          transform: selected ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
+          maxHeight: '55vh',
+        }}
+      >
+        {selected && (
+          <div className="overflow-y-auto max-h-full">
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 mb-2">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+
+            {/* Element header + sprite */}
+            <div
+              className="relative px-5 pt-2 pb-3"
+              style={{ background: `linear-gradient(180deg, ${glow}18 0%, transparent 100%)` }}
+            >
+              <div className="flex items-center gap-4">
+                <CreatureSprite
+                  imageUrl={selected.image_url ?? ''}
+                  name={selected.name}
+                  animState="idle"
+                  size={96}
+                  element={selected.element as any}
+                  rarity={selected.rarity as any}
+                  showAura
+                />
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl font-black text-white leading-tight">{selected.name}</h2>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-bold"
+                      style={{ background: `${rarityColor}22`, color: rarityColor, border: `1px solid ${rarityColor}44` }}
+                    >
+                      {RARITY_LABEL[selected.rarity] ?? selected.rarity}
+                    </span>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                      style={{ background: `${glow}22`, color: glow }}
+                    >
+                      {ELEMENT_EMOJI[selected.element] ?? '✦'} {selected.element}
+                    </span>
+                  </div>
+                  {/* Stats row */}
+                  <div className="flex gap-2 mt-2">
+                    {[
+                      { label: 'HP',  value: selected.hp,  color: '#F87171' },
+                      { label: 'ATK', value: selected.atk, color: '#FB923C' },
+                      { label: 'DEF', value: selected.def, color: '#60A5FA' },
+                    ].map(s => (
+                      <div key={s.label} className="flex flex-col items-center">
+                        <span className="text-base font-bold" style={{ color: s.color }}>{s.value}</span>
+                        <span className="text-[9px] text-white/35 font-semibold uppercase tracking-wide">{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {selected.description && (
+                <p className="text-xs text-white/45 mt-3 leading-relaxed">{selected.description}</p>
+              )}
+            </div>
+
+            {/* CTA */}
+            <div className="px-5 pb-6 pt-2">
+              <button
+                disabled={confirming}
+                onClick={async () => {
+                  if (!selected || confirming) return
+                  setConfirming(true)
+                  onPicked(selected)
+                }}
+                className="w-full py-4 rounded-2xl font-extrabold text-white text-base disabled:opacity-70 transition-all active:scale-95"
+                style={{
+                  background: `linear-gradient(135deg, ${glow} 0%, ${glow}99 100%)`,
+                  boxShadow: `0 4px 24px ${glow}45`,
+                  color: '#080E1A',
+                }}
+              >
+                {confirming ? 'Scelgo...' : `Scegli ${selected.name}!`}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes starterFloat {
+          0%, 100% { transform: translateY(0) rotate(-5deg); }
+          50% { transform: translateY(-8px) rotate(5deg); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 function MapPageInner() {
   const [session, setSession] = useState<Session | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -274,8 +484,12 @@ function MapPageInner() {
   const [mapPins, setMapPins] = useState<MapPin[]>([])
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
-  const [hatchQueue, setHatchQueue] = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number; description?: string | null }[]>([])
+  const [hatchQueue, setHatchQueue] = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number; description?: string | null; isStarter?: boolean }[]>([])
   const [missionQueue, setMissionQueue] = useState<CompletedMissionInfo[]>([])
+  const [showStarterSelect, setShowStarterSelect] = useState(false)
+  const [starters, setStarters] = useState<StarterCreature[]>([])
+  const [starterPicked, setStarterPicked] = useState<StarterCreature | null>(null)
+  const starterCheckedRef = useRef(false)
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
@@ -559,6 +773,21 @@ function MapPageInner() {
     return () => clearInterval(t)
   }, [escaActiveUntil])
 
+  // Check if player needs to pick a starter (first time in session)
+  useEffect(() => {
+    if (!sessionId || starterCheckedRef.current) return
+    starterCheckedRef.current = true
+    fetch(`/api/game/starters?sessionId=${sessionId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!d.alreadyHasCreatures && d.starters?.length > 0) {
+          setStarters(d.starters)
+          setShowStarterSelect(true)
+        }
+      })
+      .catch(() => {})
+  }, [sessionId])
+
   // Realtime broadcast: session_ended / session_restarted from admin
   useEffect(() => {
     if (!sessionId) return
@@ -650,6 +879,38 @@ function MapPageInner() {
           </div>
         )}
       </div>
+
+      {/* Starter selection — shown when player has no creatures in this session */}
+      {showStarterSelect && !starterPicked && (
+        <StarterSelect
+          starters={starters}
+          onPicked={async (creature) => {
+            const sid = sessionId
+            if (!sid) return
+            const res = await fetch('/api/game/starter/pick', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId: sid, creatureId: creature.id }),
+            })
+            if (res.ok) {
+              setStarterPicked(creature)
+              setShowStarterSelect(false)
+              // Show the reveal card via the hatch queue (same bottom-sheet UI)
+              setHatchQueue(prev => [{
+                name: creature.name,
+                rarity: creature.rarity,
+                element: creature.element,
+                image_url: creature.image_url,
+                hp: creature.hp,
+                atk: creature.atk,
+                def: creature.def,
+                description: creature.description,
+                isStarter: true,
+              }, ...prev])
+            }
+          }}
+        />
+      )}
 
       {/* Egg hatched modal — shows one at a time, queue advances on dismiss */}
       {hatchQueue.length > 0 && (
