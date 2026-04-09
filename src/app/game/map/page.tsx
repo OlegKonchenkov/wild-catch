@@ -159,6 +159,26 @@ function MapPageInner() {
     }
   }, [])
 
+  // Restore pending encounter popup after tab switch / navigation away and back
+  // The DB auto-expires encounters older than 3 minutes, so we use the same window.
+  useEffect(() => {
+    const POPUP_MAX_AGE_MS = 3 * 60 * 1000
+    try {
+      const raw = sessionStorage.getItem('wc:pending_popup')
+      if (!raw) return
+      const { encounterId, creature, shownAt } = JSON.parse(raw)
+      if (Date.now() - shownAt < POPUP_MAX_AGE_MS && encounterId && creature) {
+        setPendingEncounter({ encounterId, creature })
+        setShowEncounterPopup(true)
+        encounterPopupRef.current = true
+      } else {
+        sessionStorage.removeItem('wc:pending_popup')
+      }
+    } catch {
+      sessionStorage.removeItem('wc:pending_popup')
+    }
+  }, [])
+
   const triggerEncounter = useCallback(async (trigger: 'gps' | 'timer' = 'gps'): Promise<boolean> => {
     // Mutex: skip if another trigger is in-flight or popup already showing
     if (triggeringEncounterRef.current) return false
@@ -182,6 +202,12 @@ function MapPageInner() {
           wildHpMax: data.wildHp,
           catchBonus: 0,
           turns: 0,
+        }))
+        // Persist popup so it survives tab switches (valid for 3 min, matching DB auto-expire)
+        sessionStorage.setItem('wc:pending_popup', JSON.stringify({
+          encounterId: data.encounterId,
+          creature: data.creature,
+          shownAt: Date.now(),
         }))
         setPendingEncounter(data)
         setShowEncounterPopup(true)
@@ -490,6 +516,7 @@ function MapPageInner() {
               onClick={() => {
                 setShowEncounterPopup(false)
                 encounterPopupRef.current = false
+                sessionStorage.removeItem('wc:pending_popup')
                 router.push(`/game/encounter/${pendingEncounter.encounterId}`)
               }}
               className="flex-1 bg-[#E85D2F] text-white font-bold py-3 rounded-xl"
@@ -500,6 +527,7 @@ function MapPageInner() {
               onClick={() => {
                 setShowEncounterPopup(false)
                 encounterPopupRef.current = false
+                sessionStorage.removeItem('wc:pending_popup')
                 lastEncounterRef.current = 0  // reset cooldown so GPS works immediately
                 // Mark encounter as fled so DB doesn't block future encounters
                 if (pendingEncounter) {
