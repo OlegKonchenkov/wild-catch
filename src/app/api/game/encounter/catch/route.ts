@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { rollCatch, calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
+import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
+import { RARITY_CATCH_RATES, CATCH_DIFFICULTY_MULT } from '@/lib/types'
 import { incrementMissionProgress } from '@/lib/game/missions'
 
 export async function POST(request: Request) {
@@ -55,13 +56,28 @@ export async function POST(request: Request) {
   // HP weakness multiplier × item multiplier — both scale the base catch rate
   const hpMultiplier = getCatchHealthMultiplier(encounter.wild_creature_hp, creature.hp) * itemMult
 
-  // RNG catch — server-side only
-  const caught = rollCatch(
-    creature.rarity,
-    0,
-    creature.catch_difficulty ?? 3,
-    hpMultiplier,
-  )
+  // Fetch player level and global catch config in parallel
+  const { createAdminClient: adminFactory } = await import('@/lib/supabase/admin')
+  const adminCatch = adminFactory()
+  const [psResult, cfgResult] = await Promise.all([
+    supabase.from('player_sessions').select('level').eq('user_id', user.id).eq('session_id', encounter.session_id).single(),
+    adminCatch.from('global_catch_config').select('*').eq('id', 1).maybeSingle(),
+  ])
+  const playerLevel = (psResult.data as any)?.level ?? 1
+  const cfg = cfgResult.data
+
+  // Base catch rate: DB config overrides hardcoded defaults if present
+  const rarity = creature.rarity as string
+  const baseRate: number = cfg
+    ? (cfg[`${rarity}_rate`] ?? RARITY_CATCH_RATES[rarity as keyof typeof RARITY_CATCH_RATES] ?? 0.10)
+    : (RARITY_CATCH_RATES[rarity as keyof typeof RARITY_CATCH_RATES] ?? 0.10)
+
+  // Level bonus: +X catch probability per level (0 by default = no scaling)
+  const levelBonus: number = cfg ? ((cfg[`${rarity}_level_bonus`] ?? 0) * playerLevel) : 0
+
+  const diffMult = CATCH_DIFFICULTY_MULT[creature.catch_difficulty ?? 3] ?? 1.0
+  const catchRate = Math.min(1.0, baseRate * diffMult * hpMultiplier + levelBonus)
+  const caught = Math.random() < catchRate
 
   if (!caught) {
     // 40% chance the creature flees immediately, 60% chance it counter-attacks and stays
