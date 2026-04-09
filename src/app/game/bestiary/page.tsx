@@ -700,7 +700,7 @@ export default function BestiaryPage() {
                 } : undefined}
               >
                 {/* Rarity stripe */}
-                <div className="h-0.5" style={{ background: canEvolve ? '#F7C841' : caught ? rarityColor : 'transparent' }} />
+                <div className="h-[3px]" style={{ background: canEvolve ? '#F7C841' : caught ? rarityColor : 'rgba(255,255,255,0.04)' }} />
 
                 {/* Image area */}
                 <div className="relative aspect-square overflow-hidden flex items-center justify-center p-1">
@@ -724,52 +724,42 @@ export default function BestiaryPage() {
                     </div>
                   )}
 
-                  {/* Caught badge */}
-                  {caught && (
-                    <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#34D399] flex items-center justify-center">
-                      <span className="text-[9px] font-black text-white">✓</span>
-                    </div>
-                  )}
-
-                  {/* Duplicate count */}
-                  {pc && pc.duplicates_count > 1 && (
-                    <div className="absolute top-1 left-1 bg-[#3A9DBC] text-white text-[9px] font-bold px-1 rounded">
-                      ×{pc.duplicates_count}
-                    </div>
-                  )}
-
-                  {/* Squad slot badge */}
+                  {/* Squad slot badge — top-left */}
                   {pc && squad.includes(pc.id) && (() => {
                     const slotIdx = squad.indexOf(pc.id)
                     const isLead = slotIdx === 0
                     return (
-                      <div className="wc-active-badge absolute bottom-0 left-0 right-0 text-[#0A1520] text-[8px] font-black text-center py-1 tracking-widest uppercase"
-                        style={{ background: isLead ? 'linear-gradient(90deg, #2BBFAC, #3ABCA8, #2BBFAC)' : 'linear-gradient(90deg, #4A5568, #6B7280, #4A5568)' }}>
-                        {isLead ? '⚔ CAP.' : `· ${slotIdx + 1}`}
+                      <div className="absolute top-1 left-1 text-[8px] font-black px-1 py-0.5 rounded-md leading-none"
+                        style={{ background: isLead ? '#3ABCA8' : 'rgba(100,116,139,0.85)', color: isLead ? '#0A1520' : 'white' }}>
+                        {isLead ? '⚔' : slotIdx + 1}
                       </div>
                     )
                   })()}
+
+                  {/* Copy count — top-right */}
+                  {pc && (
+                    <div className="absolute top-1 right-1 text-[8px] font-bold px-1 py-0.5 rounded-md leading-none"
+                      style={{ background: 'rgba(0,0,0,0.55)', color: pc.duplicates_count > 1 ? '#60CDDD' : 'rgba(255,255,255,0.45)' }}>
+                      ×{pc.duplicates_count}
+                    </div>
+                  )}
                 </div>
 
-                {/* Name */}
-                <div className={`px-2 pb-2 text-center ${caught ? '' : 'opacity-40'}`}>
-                  <p className="text-xs font-bold truncate" style={{ color: caught ? 'white' : '#666' }}>
-                    {caught ? creature.name : '???'}
-                  </p>
-                  {caught && !canEvolve && (
-                    <p className="text-[9px] mt-0.5" style={{ color: rarityColor }}>
-                      {ELEMENT_EMOJI[creature.element]}
+                {/* Name + element + rarity */}
+                <div className={`px-1.5 pb-1.5 ${caught ? '' : 'opacity-40'}`}>
+                  <div className="flex items-center gap-1">
+                    <p className="text-[11px] font-bold truncate flex-1 leading-tight" style={{ color: caught ? 'white' : '#666' }}>
+                      {caught ? creature.name : '???'}
+                    </p>
+                    {caught && <span className="text-[10px] shrink-0 leading-none">{ELEMENT_EMOJI[creature.element]}</span>}
+                  </div>
+                  {caught && (
+                    <p className="text-[8px] font-semibold mt-0.5 leading-none capitalize truncate" style={{ color: canEvolve ? '#F7C841' : rarityColor }}>
+                      {canEvolve ? '✨ evolvi' : creature.rarity.replace('_', ' ')}
                     </p>
                   )}
                 </div>
 
-                {/* Evolve banner */}
-                {canEvolve && (
-                  <div className="flex items-center justify-center gap-1 py-1 text-[#0F1F2E] text-[9px] font-black tracking-widest uppercase"
-                    style={{ background: 'linear-gradient(90deg, #F59E0B, #F7C841, #F59E0B)', animation: 'evolvePulse 1.2s ease-in-out infinite alternate' }}>
-                    ✨ EVOLVI
-                  </div>
-                )}
               </motion.div>
             )
           })}
