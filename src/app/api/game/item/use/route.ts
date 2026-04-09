@@ -61,47 +61,43 @@ export async function POST(request: Request) {
   }
 
   if (itemType === 'uovo') {
-    // Pick a random common/non-common creature in this session's available pool
-    const { data: creatures } = await supabase
-      .from('creatures')
-      .select('id, name, rarity, element')
-      .in('rarity', ['comune', 'non_comune'])
-      .limit(50)
+    // Derive egg rarity from item name keywords
+    const nameLower = (inv.items.name ?? '').toLowerCase()
+    const eggRarity =
+      nameLower.includes('mitologico') ? 'mitologico' :
+      nameLower.includes('leggendario') ? 'leggendario' :
+      nameLower.includes('epico') ? 'epico' :
+      nameLower.includes('raro') ? 'raro' :
+      nameLower.includes('non_comune') || nameLower.includes('non comune') ? 'non_comune' :
+      'comune'
 
-    if (!creatures || creatures.length === 0) {
-      return NextResponse.json({ used: true, type: 'uovo', message: 'Nessuna creatura disponibile per la schiusa.' })
-    }
+    // steps_required from effect_value; default 500 if not configured
+    const stepsRequired = inv.items.effect_value > 0 ? inv.items.effect_value : 500
 
-    const picked = creatures[Math.floor(Math.random() * creatures.length)]
-
-    // Check for existing
-    const { data: existing } = await supabase
-      .from('player_creatures')
-      .select('id, duplicates_count, evolved')
+    // Current steps for this player in this session
+    const { data: ps } = await supabase
+      .from('player_sessions')
+      .select('steps_walked')
       .eq('user_id', user.id)
-      .eq('creature_id', picked.id)
       .eq('session_id', sessionId)
-      .maybeSingle()
+      .single()
+    const stepsAtPickup = (ps as any)?.steps_walked ?? 0
 
-    if (existing) {
-      await supabase
-        .from('player_creatures')
-        .update({ duplicates_count: existing.duplicates_count + 1 })
-        .eq('id', existing.id)
-    } else {
-      await supabase.from('player_creatures').insert({
-        user_id: user.id,
-        creature_id: picked.id,
-        session_id: sessionId,
-        duplicates_count: 1,
-      })
-    }
+    await supabase.from('player_eggs').insert({
+      user_id: user.id,
+      session_id: sessionId,
+      egg_rarity: eggRarity,
+      steps_required: stepsRequired,
+      steps_at_pickup: stepsAtPickup,
+    })
 
     return NextResponse.json({
       used: true,
       type: 'uovo',
-      creature: { id: picked.id, name: picked.name, rarity: picked.rarity, element: picked.element },
-      message: `🐣 Schiuso! È uscita: ${picked.name}!`,
+      incubating: true,
+      eggRarity,
+      stepsRequired,
+      message: `Uovo in incubazione! Cammina per ${stepsRequired} passi per schiuderlo.`,
     })
   }
 

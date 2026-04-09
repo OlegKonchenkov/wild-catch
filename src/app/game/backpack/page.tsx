@@ -287,6 +287,10 @@ export default function BackpackPage() {
         setInventory(prev => prev.map(r =>
           r.id === row.id ? { ...r, quantity: r.quantity - 1 } : r
         ).filter(r => r.quantity > 0))
+        if (data.incubating) {
+          // Uovo started incubating — refresh egg list so it appears immediately
+          fetchEggs()
+        }
         if (data.activatedUntil) {
           localStorage.setItem('esca_active_until', data.activatedUntil)
           window.dispatchEvent(new CustomEvent('wc:esca-activated', { detail: { until: data.activatedUntil } }))

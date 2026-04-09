@@ -52,6 +52,101 @@ function GPSErrorBanner({ message }: { message: string }) {
   )
 }
 
+const RARITY_COLOR: Record<string, string> = {
+  comune:      '#9CA3AF',
+  non_comune:  '#34D399',
+  raro:        '#3A9DBC',
+  epico:       '#C084FC',
+  leggendario: '#FBBF24',
+  mitologico:  '#FF4D6D',
+}
+
+const RARITY_LABEL: Record<string, string> = {
+  comune:      'Comune',
+  non_comune:  'Non Comune',
+  raro:        'Raro',
+  epico:       'Epico',
+  leggendario: 'Leggendario',
+  mitologico:  'Mitologico',
+}
+
+function EggHatchModal({
+  creature,
+  onDone,
+}: {
+  creature: { name: string; rarity: string; element: string; image_url: string | null }
+  onDone: () => void
+}) {
+  const [phase, setPhase] = useState<'shake' | 'crack' | 'reveal'>('shake')
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase('crack'), 900)
+    const t2 = setTimeout(() => setPhase('reveal'), 1900)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [])
+
+  const rarityColor = RARITY_COLOR[creature.rarity] ?? '#9CA3AF'
+
+  return (
+    <div
+      className="fixed inset-0 z-[950] flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm"
+      onClick={phase === 'reveal' ? onDone : undefined}
+    >
+      {phase === 'shake' && (
+        <div className="text-8xl select-none" style={{ animation: 'eggShake 0.85s ease-in-out' }}>🥚</div>
+      )}
+      {phase === 'crack' && (
+        <div className="text-8xl select-none" style={{ animation: 'eggCrack 0.85s ease-out' }}>🐣</div>
+      )}
+      {phase === 'reveal' && (
+        <div className="flex flex-col items-center gap-4 px-8 animate-in fade-in zoom-in-75 duration-300">
+          <div className="text-4xl mb-1">✨</div>
+          {creature.image_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={creature.image_url}
+              alt={creature.name}
+              className="w-32 h-32 object-contain rounded-2xl"
+              style={{ filter: `drop-shadow(0 0 16px ${rarityColor})` }}
+            />
+          ) : (
+            <div
+              className="w-32 h-32 rounded-2xl flex items-center justify-center text-6xl"
+              style={{ background: `${rarityColor}22` }}
+            >
+              🐾
+            </div>
+          )}
+          <div className="text-center">
+            <p className="text-white font-extrabold text-xl">{creature.name}</p>
+            <p className="text-sm font-semibold mt-0.5" style={{ color: rarityColor }}>
+              {RARITY_LABEL[creature.rarity] ?? creature.rarity}
+            </p>
+          </div>
+          <p className="text-white/40 text-xs mt-2">Tocca per continuare</p>
+        </div>
+      )}
+      <style>{`
+        @keyframes eggShake {
+          0%,100% { transform: rotate(0deg) scale(1); }
+          15% { transform: rotate(-10deg) scale(1.05); }
+          30% { transform: rotate(10deg) scale(1.05); }
+          45% { transform: rotate(-8deg) scale(1.08); }
+          60% { transform: rotate(8deg) scale(1.08); }
+          75% { transform: rotate(-5deg) scale(1.1); }
+          90% { transform: rotate(5deg) scale(1.1); }
+        }
+        @keyframes eggCrack {
+          0% { transform: scale(1); }
+          30% { transform: scale(1.3); }
+          60% { transform: scale(0.9); }
+          100% { transform: scale(1.4); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 function MapPageInner() {
   const [session, setSession] = useState<Session | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -63,7 +158,7 @@ function MapPageInner() {
   const [mapPins, setMapPins] = useState<MapPin[]>([])
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
-  const [hatchedCreature, setHatchedCreature] = useState<{ name: string; rarity: string } | null>(null)
+  const [hatchedCreature, setHatchedCreature] = useState<{ name: string; rarity: string; element: string; image_url: string | null } | null>(null)
   const [missionQueue, setMissionQueue] = useState<CompletedMissionInfo[]>([])
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
@@ -261,10 +356,9 @@ function MapPageInner() {
       setStepsWalked(data.stepsWalked)
     }
 
-    // Show hatch notification for the first egg that hatched (auto-hatched server-side)
+    // Show hatching modal for the first egg that hatched (auto-hatched server-side)
     if (data.eggsHatched?.length > 0) {
       setHatchedCreature(data.eggsHatched[0])
-      setTimeout(() => setHatchedCreature(null), 5000)
     }
 
     // Queue walk mission completions for the modal
@@ -441,15 +535,12 @@ function MapPageInner() {
         )}
       </div>
 
-      {/* Egg hatched notification */}
+      {/* Egg hatched modal */}
       {hatchedCreature && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-[#C084FC]/20 border border-[#C084FC]/40 text-[#E9D5FF] text-sm px-4 py-2.5 rounded-2xl z-[900] flex items-center gap-2 backdrop-blur-sm whitespace-nowrap shadow-lg">
-          <span className="text-lg">🥚</span>
-          <div>
-            <div className="font-bold leading-tight">Uovo schiuso!</div>
-            <div className="text-xs text-[#C084FC]">{hatchedCreature.name} · {hatchedCreature.rarity}</div>
-          </div>
-        </div>
+        <EggHatchModal
+          creature={hatchedCreature}
+          onDone={() => setHatchedCreature(null)}
+        />
       )}
 
       {/* QR scan button — dark glass, game-themed */}
