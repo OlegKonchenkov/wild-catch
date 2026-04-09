@@ -581,7 +581,7 @@ export default function BestiaryPage() {
                         ? isLead ? 'rgba(58,188,168,0.12)' : 'rgba(255,255,255,0.06)'
                         : 'rgba(255,255,255,0.03)',
                       border: pc
-                        ? isLead ? '1.5px solid rgba(58,188,168,0.5)' : '1px solid rgba(255,255,255,0.1)'
+                        ? isLead ? '1.5px solid rgba(58,188,168,0.5)' : '1.5px solid rgba(255,255,255,0.3)'
                         : '1px dashed rgba(255,255,255,0.08)',
                     }}
                   >
