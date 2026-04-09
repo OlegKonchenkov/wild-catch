@@ -91,7 +91,7 @@ function EggHatchModal({
 
   return (
     <div
-      className="fixed inset-0 z-[950] flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm"
+      className="fixed inset-0 z-[1200] flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm"
       onClick={phase === 'reveal' ? onDone : undefined}
     >
       {phase === 'shake' && (
