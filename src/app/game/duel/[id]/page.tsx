@@ -789,6 +789,45 @@ export default function DuelPage() {
         <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.06), transparent)' }} />
       </div>
 
+      {/* ── SQUAD BAR ── */}
+      {!result && !waiting && myLineup.length >= 2 && (
+        <div className="shrink-0 px-3 pb-1.5 z-10">
+          <div className="flex gap-1.5">
+            {[...myLineup].sort((a, b) => a.slot - b.slot).map(entry => {
+              const cr = entry.player_creatures?.creatures
+              if (!cr) return null
+              const hpPct = Math.max(0, Math.min(100, (entry.current_hp / cr.hp) * 100))
+              const hpColor = hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444'
+              const isActive = entry.is_active
+              const isFainted = !!entry.fainted_at
+              return (
+                <div key={entry.id} className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-xl transition-all"
+                  style={{
+                    background: isActive ? 'rgba(255,255,255,0.1)' : isFainted ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
+                    border: isActive ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.07)',
+                    opacity: isFainted ? 0.35 : 1,
+                  }}>
+                  {cr.image_url ? (
+                    <img src={cr.image_url} alt={cr.name} className="w-6 h-6 object-contain shrink-0"
+                      style={{ filter: isFainted ? 'grayscale(1)' : 'none' }} />
+                  ) : (
+                    <span className="text-sm shrink-0 leading-none">{ELEMENT_EMOJI[cr.element as keyof typeof ELEMENT_EMOJI] ?? '✦'}</span>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] font-bold text-white/50 truncate leading-none mb-0.5">{cr.name}</p>
+                    <div className="h-[4px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                      <motion.div className="h-full rounded-full" animate={{ width: `${hpPct}%` }} transition={{ duration: 0.4 }} style={{ background: hpColor }} />
+                    </div>
+                  </div>
+                  {isActive && !isFainted && <div className="w-1.5 h-1.5 rounded-full bg-white/60 shrink-0" />}
+                  {isFainted && <span className="text-[9px] text-red-400/60 shrink-0 font-bold">✕</span>}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── ACTIONS ── */}
       {!result && !waiting && (
         <div className="shrink-0 px-4 pb-5 pt-1 z-10 flex gap-2">
