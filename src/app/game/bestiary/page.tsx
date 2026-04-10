@@ -978,10 +978,21 @@ export default function BestiaryPage() {
                                   height: 80,
                                   background: inSlot
                                     ? isLead ? 'rgba(58,188,168,0.18)' : 'rgba(255,255,255,0.12)'
-                                    : slotTaken ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
+                                    : slotTaken
+                                    ? 'rgba(255,255,255,0.04)'
+                                    : isLead
+                                    ? 'rgba(58,188,168,0.08)'
+                                    : 'rgba(58,188,168,0.04)',
                                   border: inSlot
                                     ? isLead ? '1.5px solid rgba(58,188,168,0.7)' : '1.5px solid rgba(255,255,255,0.3)'
-                                    : '1px dashed rgba(255,255,255,0.15)',
+                                    : slotTaken
+                                    ? '1px dashed rgba(255,255,255,0.12)'
+                                    : '1.5px dashed rgba(58,188,168,0.55)',
+                                  boxShadow: !inSlot && !slotTaken
+                                    ? isLead
+                                      ? '0 0 12px rgba(58,188,168,0.2), inset 0 0 12px rgba(58,188,168,0.08)'
+                                      : '0 0 8px rgba(58,188,168,0.12), inset 0 0 8px rgba(58,188,168,0.05)'
+                                    : undefined,
                                 }}
                               >
                                 {inSlot ? (
@@ -993,15 +1004,35 @@ export default function BestiaryPage() {
                                     ? <img src={occupantCr.image_url} alt={occupantCr.name} className="absolute inset-0 w-full h-full object-contain p-2 opacity-40" />
                                     : <span className="absolute inset-0 flex items-center justify-center text-3xl opacity-30">{ELEMENT_EMOJI[occupantCr.element]}</span>
                                 ) : (
-                                  <span className="absolute inset-0 flex items-center justify-center text-xl font-bold" style={{ color: 'rgba(255,255,255,0.15)' }}>+</span>
-                                )}
-                                <div className="absolute bottom-0 left-0 right-0 px-1 pb-1 pt-4"
-                                  style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}>
-                                  <span className="text-[8px] font-bold leading-none block text-center"
-                                    style={{ color: inSlot ? (isLead ? '#3ABCA8' : 'white') : slotTaken ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.35)' }}>
-                                    {isLead ? (inSlot ? 'Capitano' : 'Slot 1') : `Slot ${slotIdx + 1}`}
+                                  /* Empty slot — visible call-to-action */
+                                  <span className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                                    <span
+                                      className="animate-pulse w-8 h-8 rounded-full flex items-center justify-center"
+                                      style={{
+                                        background: 'rgba(58,188,168,0.18)',
+                                        border: '1.5px solid rgba(58,188,168,0.7)',
+                                        boxShadow: '0 0 10px rgba(58,188,168,0.4)',
+                                      }}
+                                    >
+                                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                        <path d="M7 2v10M2 7h10" stroke="#3ABCA8" strokeWidth="2.2" strokeLinecap="round"/>
+                                      </svg>
+                                    </span>
+                                    <span className="text-[8px] font-extrabold tracking-wide" style={{ color: 'rgba(58,188,168,0.85)' }}>
+                                      {isLead ? 'Capitano' : 'Riserva'}
+                                    </span>
                                   </span>
-                                </div>
+                                )}
+                                {/* Bottom label for filled/taken slots */}
+                                {(inSlot || slotTaken) && (
+                                  <div className="absolute bottom-0 left-0 right-0 px-1 pb-1 pt-4"
+                                    style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}>
+                                    <span className="text-[8px] font-bold leading-none block text-center"
+                                      style={{ color: inSlot ? (isLead ? '#3ABCA8' : 'white') : 'rgba(255,255,255,0.25)' }}>
+                                      {isLead ? 'Capitano' : `Slot ${slotIdx + 1}`}
+                                    </span>
+                                  </div>
+                                )}
                                 {inSlot && (
                                   <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black"
                                     style={{ background: isLead ? '#3ABCA8' : 'rgba(255,255,255,0.75)', color: '#0A1520' }}>✓</span>
