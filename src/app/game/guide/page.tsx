@@ -845,11 +845,15 @@ const cardVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: 'easeOut' as const } },
 }
 
-function SectionCard({ section }: { section: Section }) {
+function SectionCard({ section, forceOpen }: { section: Section; forceOpen?: boolean }) {
   const [open, setOpen] = useState(true)
+
+  // When forceOpen fires, ensure section is open
+  useState(() => { if (forceOpen) setOpen(true) })
 
   return (
     <motion.div
+      id={section.id}
       variants={cardVariants}
       initial="hidden"
       whileInView="visible"
@@ -893,11 +897,38 @@ function SectionCard({ section }: { section: Section }) {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
+const QUICK_LINKS = [
+  { tag: '🗺️ Mappa',       id: 'mappa'      },
+  { tag: '⚔️ Incontri',    id: 'incontri'   },
+  { tag: '🔥 Elementi',    id: 'elementi'   },
+  { tag: '📖 DaimonDex',   id: 'daimondex'  },
+  { tag: '🐾 Squadra',     id: 'squadra'    },
+  { tag: '⚔️ Duelli',      id: 'duelli'     },
+  { tag: '💀 Boss',        id: 'boss'       },
+  { tag: '🥚 Uova',        id: 'uova'       },
+  { tag: '🎯 Missioni',    id: 'missioni'   },
+  { tag: '🎒 Oggetti',     id: 'oggetti'    },
+  { tag: '✨ Evoluzione',  id: 'evoluzione' },
+  { tag: '📷 QR Scanner',  id: 'qrscanner'  },
+  { tag: '🏆 Classifica',  id: 'profilo'    },
+]
+
 export default function GuidePage() {
   const allSections = buildSections()
   const [query, setQuery]           = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  function scrollToSection(id: string) {
+    const container = containerRef.current
+    const el = document.getElementById(id)
+    if (!container || !el) return
+    const containerTop = container.getBoundingClientRect().top
+    const elTop = el.getBoundingClientRect().top
+    const offset = elTop - containerTop + container.scrollTop - 72
+    container.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' })
+  }
 
   const sections = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -918,7 +949,7 @@ export default function GuidePage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#0F1F2E]">
+    <div ref={containerRef} className="h-full overflow-y-auto bg-[#0F1F2E]">
       <div className="sticky top-0 z-20 bg-[#0F1F2E]/95 backdrop-blur-md border-b border-white/8">
         <div className="px-4 py-3 flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-[#3A9DBC]/20 border border-[#3A9DBC]/40 flex items-center justify-center text-lg flex-shrink-0">
@@ -1001,11 +1032,18 @@ export default function GuidePage() {
               Avventura nella natura adriatica e nei boschi appenninici.<br />
               Cattura, evolvi, combatti — diventa il miglior cacciatore!
             </p>
-            <div className="flex gap-2 mt-3 flex-wrap">
-              {['📍 GPS Reale', '🔥 Elementi', '⚔️ Duelli', '🥚 Uova', '💀 Boss', '🏆 Classifica'].map(tag => (
-                <span key={tag} className="text-[10px] px-2.5 py-1 rounded-full bg-white/8 border border-white/12 text-white/70">
+            <div className="flex gap-2 mt-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+              {QUICK_LINKS.map(({ tag, id }) => (
+                <button
+                  key={id}
+                  onClick={() => scrollToSection(id)}
+                  className="text-[10px] px-2.5 py-1 rounded-full bg-white/8 border border-white/12 text-white/70 whitespace-nowrap shrink-0 transition-all active:scale-95"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.14)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.9)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.7)' }}
+                >
                   {tag}
-                </span>
+                </button>
               ))}
             </div>
           </div>
