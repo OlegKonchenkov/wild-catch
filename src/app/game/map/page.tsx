@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { useGPS } from '@/hooks/useGPS'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import { GameMapSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import type { Session } from '@/lib/types'
@@ -808,7 +809,7 @@ function MapPageInner() {
   }, [sessionId, supabase, router])
 
   if (!session) {
-    return <div className="flex items-center justify-center h-full text-white">Caricamento mappa...</div>
+    return <GameMapSkeleton />
   }
 
   return (

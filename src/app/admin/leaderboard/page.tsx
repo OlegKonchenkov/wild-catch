@@ -211,7 +211,7 @@ export default function AdminLeaderboard() {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-extrabold text-white text-sm truncate">{row.nickname}</p>
+                      <p className="font-extrabold text-white text-sm">{row.nickname}</p>
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
                         style={{ background: MEDAL_BORDER[rank], color: MEDAL_COLOR[rank], border: `1px solid ${MEDAL_BORDER[rank]}` }}>
                         Lv {row.level}
@@ -236,46 +236,27 @@ export default function AdminLeaderboard() {
             )
           })}
 
-          {/* Positions 4+ — compact table */}
+          {/* Positions 4+ — flex rows */}
           {rest.length > 0 && (
             <div className="rounded-2xl border border-white/8 overflow-hidden">
-              {/* Column headers */}
-              <div className="grid px-4 py-2 border-b border-white/8 text-[9px] uppercase tracking-widest text-white/25 font-bold"
-                style={{ gridTemplateColumns: '2.2rem 1fr 5.5rem 4rem 2.5rem 2.5rem 2.5rem' }}>
-                <span>#</span>
-                <span>Giocatore</span>
-                <span className="text-right">Punti</span>
-                <span className="text-right">EXP</span>
-                <span className="text-center">🐾</span>
-                <span className="text-center">⚔️</span>
-                <span className="text-center">👟</span>
-              </div>
-
               {rest.map((row, i) => (
                 <div key={row.user_id}
-                  className="grid items-center px-4 py-2.5 border-b border-white/5 last:border-0 text-sm"
-                  style={{
-                    gridTemplateColumns: '2.2rem 1fr 5.5rem 4rem 2.5rem 2.5rem 2.5rem',
-                    background: i % 2 === 0 ? 'rgba(255,255,255,0.025)' : 'transparent',
-                  }}>
-                  <span className="text-white/30 font-bold text-xs text-center">#{i + 4}</span>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-white truncate text-[13px]">{row.nickname}</p>
-                    <p className="text-[10px] text-white/30">Lv {row.level}</p>
+                  className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0"
+                  style={{ background: i % 2 === 0 ? 'rgba(255,255,255,0.025)' : 'transparent' }}>
+                  <span className="text-white/30 font-bold text-xs w-7 text-center shrink-0">#{i + 4}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-white text-[13px] truncate">{row.nickname}</p>
+                    <div className="flex gap-x-2 mt-0.5 text-[10px] text-white/35 flex-wrap">
+                      <span>Lv {row.level}</span>
+                      <span>{row.exp.toLocaleString('it-IT')} EXP</span>
+                      <span>🐾 {row.creatures}</span>
+                      {row.duel_played > 0 && <span>⚔️ {row.duel_wins}/{row.duel_played}</span>}
+                      {row.steps_walked > 0 && <span>👟 {row.steps_walked.toLocaleString('it-IT')} m</span>}
+                    </div>
                   </div>
-                  <span className="text-right font-bold text-[#F7C841] text-[13px]">
-                    {row.score.toLocaleString('it-IT')}
-                  </span>
-                  <span className="text-right text-white/45 text-xs">
-                    {row.exp.toLocaleString('it-IT')}
-                  </span>
-                  <span className="text-center text-white/55 text-xs">{row.creatures}</span>
-                  <span className="text-center text-white/55 text-xs">
-                    {row.duel_played > 0 ? `${row.duel_wins}/${row.duel_played}` : '—'}
-                  </span>
-                  <span className="text-center text-white/45 text-[11px]">
-                    {row.steps_walked > 0 ? row.steps_walked.toLocaleString('it-IT') : '—'}
-                  </span>
+                  <div className="text-right shrink-0">
+                    <p className="font-bold text-[#F7C841] text-[13px]">{row.score.toLocaleString('it-IT')} pt</p>
+                  </div>
                 </div>
               ))}
             </div>
