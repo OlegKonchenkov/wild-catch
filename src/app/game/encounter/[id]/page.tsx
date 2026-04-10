@@ -149,7 +149,7 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
               className="text-[10px] font-bold px-2 py-0.5 rounded-full"
               style={{ background: `${rarityColor}22`, border: `1px solid ${rarityColor}55`, color: rarityColor }}
             >
-              {rarity?.replace('_', ' ')}
+              {RARITY_LABELS[rarity as Rarity]}
             </span>
             <span className="text-[13px] leading-none">{elemEmoji}</span>
             <span className="text-[10px] text-white/35 capitalize">{element}</span>
@@ -987,7 +987,7 @@ export default function EncounterPage() {
                   <span className="text-base text-white/50">{state.creature.name}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full font-bold"
                     style={{ background: `${wildRarityColor}25`, color: wildRarityColor, border: `1px solid ${wildRarityColor}50` }}>
-                    {state.creature.rarity?.replace('_', ' ')}
+                    {RARITY_LABELS[state.creature.rarity as Rarity]}
                   </span>
                 </div>
               )}
@@ -1093,7 +1093,7 @@ export default function EncounterPage() {
                       <span className="text-xs capitalize text-white/40">{crElem}</span>
                       <span className="text-xs px-2 py-0.5 rounded-full font-bold"
                         style={{ background: `${crRarityColor}22`, color: crRarityColor, border: `1px solid ${crRarityColor}55` }}>
-                        {crRarity?.replace('_', ' ')}
+                        {RARITY_LABELS[crRarity as Rarity]}
                       </span>
                     </div>
                     {cr?.description && (

@@ -126,7 +126,7 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
               className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
               style={{ background: `${rarityColor}22`, border: `1px solid ${rarityColor}55`, color: rarityColor }}
             >
-              {rarity?.replace('_', ' ')}
+              {RARITY_LABELS[rarity as Rarity]}
             </span>
             <span className="text-[11px] leading-none">{elemEmoji}</span>
             <span className="text-[9px] text-white/35 capitalize">{element}</span>
