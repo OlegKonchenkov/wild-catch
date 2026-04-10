@@ -48,6 +48,10 @@ const CATCH_STARS: Record<string, number> = {
   comune: 1, non_comune: 2, raro: 3, epico: 4, leggendario: 5, mitologico: 6
 }
 
+const THROW_MESSAGES = ['Lancio la rete!', 'Prendila!', 'Vai, cattura!', 'Ora o mai più!', 'È il momento!']
+const FAIL_RESIST_MESSAGES = ['Ha rotto la rete!', 'Troppo forte, resiste...', 'Ha evitato la rete!', 'Si è liberata con un balzo!', 'Non era abbastanza...']
+const FAIL_COUNTER_MESSAGES = ['Si è liberata e contrattacca!', 'Si è arrabbiata e risponde!', 'Ha sfondato la rete — attacca!']
+
 // ── Creature card (unified image + info) ──────────────────────────────────────
 interface CardProps {
   imageUrl: string
@@ -227,6 +231,7 @@ export default function EncounterPage() {
   const [loadError, setLoadError] = useState(false)
   const [wildAnim, setWildAnim]     = useState<'idle' | 'damage' | 'catch' | 'flee'>('idle')
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
+  const [catchPhase, setCatchPhase] = useState<'idle' | 'throwing' | 'hit'>('idle')
   const [message, setMessage]   = useState('')
   const [loading, setLoading]   = useState(false)
   const [pendingAction, setPendingAction] = useState<'fight' | 'catch' | 'heal' | null>(null)
@@ -483,18 +488,34 @@ export default function EncounterPage() {
     if (!state || loading) return
     resetTimer(); setLoading(true); setPendingAction('catch'); setShowItemsModal(false)
 
-    const res = await fetch('/api/game/encounter/catch', {
+    // ── Avvia animazione rete immediatamente ──────────────────────────────────
+    const throwMsg = THROW_MESSAGES[Math.floor(Math.random() * THROW_MESSAGES.length)]
+    setMessage(throwMsg)
+    setCatchPhase('throwing')
+
+    // Fetch parallelo all'animazione; aspetta almeno 700 ms perché la rete arrivi
+    const fetchPromise = fetch('/api/game/encounter/catch', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ encounterId: state.encounterId, itemId: selectedReteId }),
     })
+    const [res] = await Promise.all([fetchPromise, new Promise<void>(r => setTimeout(r, 700))])
     const data = await res.json()
+
     setSelectedReteId(null)
     if (selectedReteId) setReteItems(prev => prev.map(i => i.id === selectedReteId ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))
 
+    if (!res.ok) {
+      setCatchPhase('idle')
+      setMessage(data.error ?? 'Errore durante la cattura')
+      finishPendingAction(); return
+    }
+
     if (data.caught) {
+      // Rete sparisce, parte l'animazione di cattura esistente
+      setCatchPhase('idle')
+      setMessage('')
       setWildAnim('catch')
       await new Promise(r => setTimeout(r, 1800))
-      // Fetch full creature data for the reveal card (atk, def, description)
       const creatureId = data.newCreatureId ?? state.creature.id
       supabase.from('creatures')
         .select('name, hp, atk, def, element, rarity, image_url, description')
@@ -507,8 +528,18 @@ export default function EncounterPage() {
       window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       window.dispatchEvent(new CustomEvent('wc:refresh-bestiary'))
     } else if (data.fled) {
+      setCatchPhase('idle')
       setWildAnim('flee'); setMessage('La creatura è fuggita...'); setResult('fled')
     } else {
+      // ── Cattura fallita: shake della rete + messaggio casuale ─────────────
+      const failMsg = data.wildDamage > 0
+        ? FAIL_COUNTER_MESSAGES[Math.floor(Math.random() * FAIL_COUNTER_MESSAGES.length)]
+        : FAIL_RESIST_MESSAGES[Math.floor(Math.random() * FAIL_RESIST_MESSAGES.length)]
+      setCatchPhase('hit')
+      setMessage(failMsg)
+      await new Promise(r => setTimeout(r, 550))
+      setCatchPhase('idle')
+
       if (data.wildDamage > 0) {
         const newHp = Math.max(0, (playerHp ?? playerCreature?.maxHp ?? 100) - data.wildDamage)
         if (squadCreatures.length > 0) {
@@ -542,9 +573,6 @@ export default function EncounterPage() {
           finishPendingAction()
           return
         }
-        setMessage(`Cattura fallita! Contrattacco (-${data.wildDamage} HP)`)
-      } else {
-        setMessage('Cattura fallita! La creatura resiste...')
       }
     }
     finishPendingAction()
@@ -702,6 +730,44 @@ export default function EncounterPage() {
             </AnimatePresence>
           </div>
         </div>
+
+        {/* ── NET THROW OVERLAY ── */}
+        <AnimatePresence>
+          {catchPhase !== 'idle' && (
+            <motion.div
+              key="net-overlay"
+              className="absolute inset-0 z-20 pointer-events-none overflow-hidden"
+              initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div
+                className="absolute"
+                style={{ width: 52, height: 52, borderRadius: '50%', border: '2.5px dashed rgba(58,188,168,0.95)', boxShadow: '0 0 20px rgba(58,188,168,0.75), inset 0 0 10px rgba(58,188,168,0.25)' }}
+                initial={{ top: '72%', left: '18%', scale: 0.4, opacity: 0, rotate: 0 }}
+                animate={
+                  catchPhase === 'throwing'
+                    ? { top: '16%', left: '62%', scale: 1, opacity: 1, rotate: 180 }
+                    : { x: [0, -11, 11, -7, 7, 0], scale: [1, 1.25, 0.85, 1.1, 0.9, 0], opacity: [1, 1, 1, 1, 0.5, 0] }
+                }
+                transition={
+                  catchPhase === 'throwing'
+                    ? { duration: 0.62, ease: [0.4, 0, 0.2, 1] }
+                    : { duration: 0.5, ease: 'easeOut' }
+                }
+              >
+                {/* Net grid lines */}
+                <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'rgba(58,188,168,0.55)', transform: 'translateY(-50%)' }} />
+                  <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'rgba(58,188,168,0.55)', transform: 'translateX(-50%)' }} />
+                  <div style={{ position: 'absolute', top: '25%', left: 0, right: 0, height: 1, background: 'rgba(58,188,168,0.28)' }} />
+                  <div style={{ position: 'absolute', top: '75%', left: 0, right: 0, height: 1, background: 'rgba(58,188,168,0.28)' }} />
+                  <div style={{ position: 'absolute', left: '25%', top: 0, bottom: 0, width: 1, background: 'rgba(58,188,168,0.28)' }} />
+                  <div style={{ position: 'absolute', left: '75%', top: 0, bottom: 0, width: 1, background: 'rgba(58,188,168,0.28)' }} />
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── SQUAD BAR (only if 2+ creatures) ── */}
