@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
 import type { Creature, PlayerCreature, Element } from '@/lib/types'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import { GameGridSkeleton } from '@/components/game/GameLoading'
 
 const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
 
@@ -638,16 +639,7 @@ export default function BestiaryPage() {
         )}
 
         {loading && (
-          <div className="grid grid-cols-3 gap-2 pb-24">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <div key={i} className="rounded-xl bg-white/5 border border-white/8 p-2 flex flex-col items-center gap-1.5"
-                style={{ animationDelay: `${i * 60}ms` }}>
-                <div className="w-14 h-14 rounded-lg bg-white/10 animate-pulse" />
-                <div className="w-12 h-2.5 rounded bg-white/10 animate-pulse" />
-                <div className="w-8 h-2 rounded bg-white/5 animate-pulse" />
-              </div>
-            ))}
-          </div>
+          <GameGridSkeleton items={9} />
         )}
 
         {!loading && filtered.length === 0 && (

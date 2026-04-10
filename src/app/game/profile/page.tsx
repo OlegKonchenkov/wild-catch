@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
+import { GameProfileSkeleton } from '@/components/game/GameLoading'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,29 +82,71 @@ function ProfileContent() {
       ? localStorage.getItem('current_session_id')
       : null
 
-    fetch('/api/game/sessions')
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then((d: { sessions: SessionSummary[] }) => {
-        const list: SessionSummary[] = d.sessions ?? []
-        // Pick current session or fall back to most recent
-        const s: SessionSummary | null = (currentId ? list.find(x => x.id === currentId) : null)
+    async function loadProfile() {
+      try {
+        const sessionsPromise = fetch('/api/game/sessions')
+          .then(r => r.ok ? r.json() : Promise.reject())
+
+        const eagerProfilePromise = currentId
+          ? fetch(`/api/game/profile?sessionId=${currentId}`)
+              .then(r => r.ok ? r.json() : null)
+              .catch(() => null)
+          : Promise.resolve(null)
+
+        const eagerBoardPromise = currentId
+          ? fetch(`/api/game/leaderboard?sessionId=${currentId}`)
+              .then(r => r.ok ? r.json() : null)
+              .catch(() => null)
+          : Promise.resolve(null)
+
+        const [sessionsData, eagerProfile, eagerBoard] = await Promise.all([
+          sessionsPromise,
+          eagerProfilePromise,
+          eagerBoardPromise,
+        ])
+
+        const list: SessionSummary[] = sessionsData.sessions ?? []
+        const selectedSession: SessionSummary | null = (currentId ? list.find(x => x.id === currentId) : null)
           ?? list[0]
           ?? null
-        setSession(s)
 
-        // Load profile identity
-        const firstId = s?.id ?? list[0]?.id
-        if (firstId) {
-          fetch(`/api/game/profile?sessionId=${firstId}`)
-            .then(r => r.ok ? r.json() : null)
-            .then(p => { if (p?.nickname) { setNickname(p.nickname); setAvatarUrl(p.avatar_url) } })
-            .catch(() => {})
+        setSession(selectedSession)
+
+        const selectedId = selectedSession?.id ?? null
+        if (!selectedId) return
+
+        if (selectedId === currentId) {
+          if (eagerProfile?.nickname) {
+            setNickname(eagerProfile.nickname)
+            setAvatarUrl(eagerProfile.avatar_url)
+          }
+          if (eagerBoard?.leaderboard) {
+            setLeaderboard(eagerBoard.leaderboard)
+          } else {
+            fetchBoard(selectedId)
+          }
+          return
         }
 
-        if (s) fetchBoard(s.id)
-      })
-      .catch(() => setError('Impossibile caricare i dati'))
-      .finally(() => setLoading(false))
+        const [profileData] = await Promise.all([
+          fetch(`/api/game/profile?sessionId=${selectedId}`)
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null),
+          fetchBoard(selectedId),
+        ])
+
+        if (profileData?.nickname) {
+          setNickname(profileData.nickname)
+          setAvatarUrl(profileData.avatar_url)
+        }
+      } catch {
+        setError('Impossibile caricare i dati')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProfile()
   }, [fetchBoard])
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -156,10 +199,7 @@ function ProfileContent() {
       )}
 
       {loading ? (
-        <div className="px-4 space-y-3">
-          <div className="h-32 rounded-2xl bg-white/5 animate-pulse" />
-          <div className="h-48 rounded-2xl bg-white/5 animate-pulse" />
-        </div>
+        <GameProfileSkeleton />
       ) : !session ? (
         <div className="text-center py-16 text-white/30 text-sm px-8">
           <p className="text-4xl mb-3">🎮</p>

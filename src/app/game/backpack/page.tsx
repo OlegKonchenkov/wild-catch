@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import type { ItemType } from '@/lib/types'
+import { GameListSkeleton } from '@/components/game/GameLoading'
 
 const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
 
@@ -436,9 +437,7 @@ export default function BackpackPage() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {loading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map(i => <div key={i} className="bg-white/5 rounded-2xl h-20 animate-pulse" />)}
-          </div>
+          <GameListSkeleton rows={4} />
         ) : (
           <>
             {/* ── Eggs section ─────────────────────────────────── */}

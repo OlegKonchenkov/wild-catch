@@ -173,6 +173,36 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     active?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
   }, [pathname])
 
+  useEffect(() => {
+    const inEncounter = pathname.startsWith('/game/encounter/')
+    const inDuelFight = pathname.startsWith('/game/duel/') && pathname !== '/game/duel'
+    const inBossFight = pathname.startsWith('/game/boss/')
+    if (inEncounter || inDuelFight || inBossFight) return
+
+    const prefetchRoutes = NAV_ITEMS
+      .map(item => item.href)
+      .filter(href => href !== pathname)
+
+    const runPrefetch = () => {
+      prefetchRoutes.forEach(href => {
+        router.prefetch(href)
+      })
+    }
+
+    const browserWindow = window as Window & typeof globalThis & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+
+    if (typeof browserWindow.requestIdleCallback === 'function') {
+      const idleId = browserWindow.requestIdleCallback(runPrefetch, { timeout: 1200 })
+      return () => browserWindow.cancelIdleCallback?.(idleId)
+    }
+
+    const timeoutId = globalThis.setTimeout(runPrefetch, 250)
+    return () => globalThis.clearTimeout(timeoutId)
+  }, [pathname, router])
+
   const timer = useSessionTimer({
     endAt,
     onExpired: () => setSessionEnded(true),

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Item, ItemType } from '@/lib/types'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
+import { GameListSkeleton } from '@/components/game/GameLoading'
 
 const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; color: string }> = {
   rete:      { icon: '🎯', label: 'Rete',       hint: 'Aumenta la probabilità di cattura',       color: '#3A9DBC' },
@@ -141,7 +142,7 @@ export default function ShopPage() {
       {/* Item list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {loading ? (
-          <div className="text-center text-white/30 py-16 text-sm">Caricamento...</div>
+          <GameListSkeleton rows={5} itemClassName="h-[78px]" />
         ) : filtered.length === 0 ? (
           <div className="text-center text-white/25 py-16 text-sm">Nessun oggetto disponibile</div>
         ) : (

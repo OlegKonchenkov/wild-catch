@@ -228,6 +228,7 @@ export default function EncounterPage() {
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [message, setMessage]   = useState('')
   const [loading, setLoading]   = useState(false)
+  const [pendingAction, setPendingAction] = useState<'fight' | 'catch' | 'heal' | null>(null)
   const [result, setResult]     = useState<'caught' | 'fled' | 'evolved' | 'ko' | 'lost' | null>(null)
   const [caughtCreatureData, setCaughtCreatureData] = useState<any>(null)
   const [caughtExpGain, setCaughtExpGain]           = useState(0)
@@ -377,10 +378,19 @@ export default function EncounterPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [state?.encounterId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  function finishPendingAction() {
+    setPendingAction(null)
+    setLoading(false)
+  }
+
   // ── Handlers ─────────────────────────────────────────────────────────────────
   async function handleFight() {
     if (!state || loading) return
-    resetTimer(); setLoading(true); setMessage(''); setShowItemsModal(false)
+    resetTimer(); setLoading(true); setPendingAction('fight'); setMessage(''); setShowItemsModal(false)
+
+    const actionStartedAt = Date.now()
+    setPlayerAnim('attack')
+    const attackReset = setTimeout(() => setPlayerAnim('idle'), 260)
 
     const activeItemId = selectedPozioneId ?? selectedBattagliaId ?? null
     const activeSquadPcId = squadCreatures.length > 0 ? squadCreatures[activeSlot]?.pcId : undefined
@@ -398,12 +408,13 @@ export default function EncounterPage() {
     if (selectedPozioneId)   setPozioneItems(prev => prev.map(i => i.id === selectedPozioneId   ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))
     setSelectedBattagliaId(null); setSelectedPozioneId(null)
 
-    if (!res.ok) { setMessage(data.error); setLoading(false); return }
-
-    // Sequential: player attacks → wild shakes → (optional) wild counter → player shakes
-    setPlayerAnim('attack')
-    await new Promise(r => setTimeout(r, 350))
+    clearTimeout(attackReset)
     setPlayerAnim('idle')
+
+    if (!res.ok) { setMessage(data.error); finishPendingAction(); return }
+
+    const remainingAttackMs = Math.max(0, 260 - (Date.now() - actionStartedAt))
+    if (remainingAttackMs > 0) await new Promise(r => setTimeout(r, remainingAttackMs))
 
     setWildAnim('damage')
     await new Promise(r => setTimeout(r, 380))
@@ -412,7 +423,7 @@ export default function EncounterPage() {
     setState(prev => prev ? { ...prev, wildHp: data.wildHpRemaining, catchMultiplier: data.catchMultiplier, turns: prev.turns + 1 } : null)
 
     if (data.fightResult === 'fled') {
-      setWildAnim('flee'); setMessage(''); setResult('ko'); setLoading(false); return
+      setWildAnim('flee'); setMessage(''); setResult('ko'); finishPendingAction(); return
     }
 
     const bonusPct = Math.round((data.catchMultiplier - 1) * 100)
@@ -452,24 +463,24 @@ export default function EncounterPage() {
             })
             setPlayerHp(slotHps[nextSlot] ?? next.hp)
             setMessage(`${squadCreatures[activeSlot].name} è svenuta! Entra ${next.name}!`)
-            setLoading(false)
+            finishPendingAction()
             return
           }
         }
         setResult('lost')
-        setLoading(false)
+        finishPendingAction()
         return
       }
     }
 
     if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
     window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
-    setLoading(false)
+    finishPendingAction()
   }
 
   async function handleCatch() {
     if (!state || loading) return
-    resetTimer(); setLoading(true); setShowItemsModal(false)
+    resetTimer(); setLoading(true); setPendingAction('catch'); setShowItemsModal(false)
 
     const res = await fetch('/api/game/encounter/catch', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -522,12 +533,12 @@ export default function EncounterPage() {
               })
               setPlayerHp(slotHps[nextSlot] ?? next.hp)
               setMessage(`${squadCreatures[activeSlot].name} è svenuta! Entra ${next.name}!`)
-              setLoading(false)
+              finishPendingAction()
               return
             }
           }
           setResult('lost')
-          setLoading(false)
+          finishPendingAction()
           return
         }
         setMessage(`Cattura fallita! Contrattacco (-${data.wildDamage} HP)`)
@@ -535,12 +546,12 @@ export default function EncounterPage() {
         setMessage('Cattura fallita! La creatura resiste...')
       }
     }
-    setLoading(false)
+    finishPendingAction()
   }
 
   async function handleHeal(itemId: string) {
     if (!state || loading) return
-    resetTimer(); setLoading(true); setShowItemsModal(false)
+    resetTimer(); setLoading(true); setPendingAction('heal'); setShowItemsModal(false)
     const res = await fetch('/api/game/encounter/heal', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ encounterId: state.encounterId, itemId }),
@@ -551,7 +562,7 @@ export default function EncounterPage() {
       setPlayerHp(prev => prev !== null ? Math.min(data.maxHp, prev + data.healAmount) : data.healAmount)
       setMessage(`+${data.healAmount} HP ripristinati`)
     } else { setMessage(data.error ?? 'Cura fallita') }
-    setLoading(false)
+    finishPendingAction()
   }
 
   async function handleFlee() {
@@ -783,7 +794,9 @@ export default function EncounterPage() {
             <motion.button onClick={handleCatch} disabled={loading} whileTap={{ scale: 0.93 }}
               className="rounded-2xl py-[14px] flex flex-col items-center justify-center gap-0.5 disabled:opacity-50"
               style={{ background: 'linear-gradient(145deg,#E85D2F,#c94a20)', boxShadow: '0 4px 18px rgba(232,93,47,0.4)' }}>
-              <span className="text-base leading-none">🎯</span>
+              {pendingAction === 'catch'
+                ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : <span className="text-base leading-none">🎯</span>}
               <span className="text-[10px] font-extrabold text-white tracking-wide">CATTURA</span>
               {catchInfoParts.length > 0 && (
                 <span className="text-[8px] text-[#F7C841] font-bold">
@@ -795,7 +808,7 @@ export default function EncounterPage() {
             <motion.button id="wc-fight-btn" onClick={handleFight} disabled={loading || state.turns >= 5} whileTap={{ scale: 0.93 }}
               className="rounded-2xl py-[14px] flex flex-col items-center justify-center gap-0.5 disabled:opacity-50"
               style={{ background: 'linear-gradient(145deg,#7B4DB8,#5c3a8c)', boxShadow: '0 4px 18px rgba(123,77,184,0.4)' }}>
-              {loading
+              {pendingAction === 'fight'
                 ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 : <span className="text-base leading-none">⚔️</span>}
               <span className="text-[10px] font-extrabold text-white tracking-wide">LOTTA</span>
