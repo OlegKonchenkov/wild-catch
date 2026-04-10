@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
+import { GameScreenLoading } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { scaleCombatStats } from '@/lib/game/combat'
@@ -203,6 +204,7 @@ export default function DuelPage() {
   const { id } = useParams<{ id: string }>()
   const router  = useRouter()
 
+  const [loading, setLoading]               = useState(true)
   const [duel, setDuel]                     = useState<any>(null)
   const [myLineup, setMyLineup]             = useState<LineupEntry[]>([])
   const [oppLineup, setOppLineup]           = useState<LineupEntry[]>([])
@@ -229,6 +231,9 @@ export default function DuelPage() {
   const [turnTimer, setTurnTimer] = useState(30)
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoFightRef = useRef(false)
+  const attackStartedAtRef = useRef(0)
+  const attackFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const attackReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
@@ -264,54 +269,119 @@ export default function DuelPage() {
     }))
   }, [supabase])
 
-  useEffect(() => {
-    async function init() {
-      const { data: duelData } = await supabase
-        .from('duels')
-        .select('*')
-        .eq('id', id)
-        .single()
+  const clearAttackFeedbackTimers = useCallback(() => {
+    if (attackFallbackTimerRef.current) {
+      clearTimeout(attackFallbackTimerRef.current)
+      attackFallbackTimerRef.current = null
+    }
+    if (attackReleaseTimerRef.current) {
+      clearTimeout(attackReleaseTimerRef.current)
+      attackReleaseTimerRef.current = null
+    }
+  }, [])
 
-      if (!duelData) return
-      setDuel(duelData)
-      duelStatusRef.current = duelData.status
-      if (!realtimeUpdatedRef.current) setWaiting(duelData.status === 'waiting')
+  const releaseAttackFeedback = useCallback((minVisibleMs = 0) => {
+    if (!attackingRef.current) return
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      setUserId(user.id)
+    const elapsed = Date.now() - attackStartedAtRef.current
+    const remaining = Math.max(0, minVisibleMs - elapsed)
 
-      const role: 'challenger' | 'opponent' = duelData.challenger_id === user.id ? 'challenger' : 'opponent'
-      setMyRole(role)
-      await loadPlayerLevels(duelData.session_id, [duelData.challenger_id, duelData.opponent_id])
-
-      if (duelData.status === 'active') setIsMyTurn(duelData.current_turn === role)
-
-      const { data: lineups } = await supabase
-        .from('duel_lineups')
-        .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url))')
-        .eq('duel_id', id)
-        .order('slot', { ascending: true })
-
-      if (lineups) {
-        const mine = lineups.filter((l: LineupEntry) => l.user_id === user.id)
-        const opp  = lineups.filter((l: LineupEntry) => l.user_id !== user.id)
-        setMyLineup(mine)
-        setOppLineup(opp)
+    if (attackReleaseTimerRef.current) clearTimeout(attackReleaseTimerRef.current)
+    attackReleaseTimerRef.current = setTimeout(() => {
+      attackingRef.current = false
+      setAttacking(false)
+      if (attackFallbackTimerRef.current) {
+        clearTimeout(attackFallbackTimerRef.current)
+        attackFallbackTimerRef.current = null
       }
+      attackReleaseTimerRef.current = null
+    }, remaining)
+  }, [])
 
-      const sessionId = localStorage.getItem('current_session_id')
-      if (sessionId) {
-        const { data: inv } = await supabase
-          .from('player_inventory')
-          .select('id, quantity, items(name, effect_value, type)')
-          .eq('user_id', user.id)
-          .eq('session_id', sessionId)
-          .gt('quantity', 0)
+  const startAttackFeedback = useCallback(() => {
+    clearAttackFeedbackTimers()
+    attackStartedAtRef.current = Date.now()
+    attackingRef.current = true
+    setAttacking(true)
+    attackFallbackTimerRef.current = setTimeout(() => {
+      attackingRef.current = false
+      setAttacking(false)
+      attackFallbackTimerRef.current = null
+      if (attackReleaseTimerRef.current) {
+        clearTimeout(attackReleaseTimerRef.current)
+        attackReleaseTimerRef.current = null
+      }
+    }, 4000)
+  }, [clearAttackFeedbackTimers])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function init() {
+      try {
+        const sessionId = localStorage.getItem('current_session_id')
+        const [
+          { data: duelData },
+          { data: { user } },
+        ] = await Promise.all([
+          supabase.from('duels').select('*').eq('id', id).single(),
+          supabase.auth.getUser(),
+        ])
+
+        if (cancelled || !duelData) return
+
+        setDuel(duelData)
+        duelStatusRef.current = duelData.status
+        if (!realtimeUpdatedRef.current) setWaiting(duelData.status === 'waiting')
+
+        if (!user) return
+
+        setUserId(user.id)
+
+        const role: 'challenger' | 'opponent' = duelData.challenger_id === user.id ? 'challenger' : 'opponent'
+        setMyRole(role)
+
+        if (duelData.status === 'active') setIsMyTurn(duelData.current_turn === role)
+
+        const lineupsPromise = supabase
+          .from('duel_lineups')
+          .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url))')
+          .eq('duel_id', id)
+          .order('slot', { ascending: true })
+
+        const inventoryPromise = sessionId
+          ? supabase
+              .from('player_inventory')
+              .select('id, quantity, items(name, effect_value, type)')
+              .eq('user_id', user.id)
+              .eq('session_id', sessionId)
+              .gt('quantity', 0)
+          : Promise.resolve({ data: [] as any[] })
+
+        const [
+          { data: lineups },
+          { data: inv },
+        ] = await Promise.all([
+          lineupsPromise,
+          inventoryPromise,
+          loadPlayerLevels(duelData.session_id, [duelData.challenger_id, duelData.opponent_id]),
+        ])
+
+        if (cancelled) return
+
+        if (lineups) {
+          const mine = lineups.filter((l: LineupEntry) => l.user_id === user.id)
+          const opp  = lineups.filter((l: LineupEntry) => l.user_id !== user.id)
+          setMyLineup(mine)
+          setOppLineup(opp)
+        }
+
         const filtered = ((inv ?? []) as any[])
           .filter(r => r.items?.type === 'battaglia')
           .map(r => ({ inventoryId: r.id, name: r.items.name, effectValue: r.items.effect_value, quantity: r.quantity }))
         setBattagliaItems(filtered)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
 
@@ -328,6 +398,7 @@ export default function DuelPage() {
             setOppAnimState('damage')
             setLastDamage({ amount: damage, target: 'opp', id: Date.now() })
             setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 900)
+            releaseAttackFeedback(450)
           } else {
             setAnimState('damage')
             setLastDamage({ amount: damage, target: 'me', id: Date.now() })
@@ -363,12 +434,14 @@ export default function DuelPage() {
             if (prev.some(l => l.id === updated.id)) return updateLineup(prev)
             return prev
           })
+          if (attackingRef.current) releaseAttackFeedback(450)
         })
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${id}` },
         ({ new: updated }) => {
           duelStatusRef.current = updated.status
           if (updated.status === 'ended') {
+            releaseAttackFeedback(250)
             supabase.auth.getUser().then(({ data: { user } }) => {
               setResult(updated.winner_id === user?.id ? 'won' : 'lost')
               setIsMyTurn(false)
@@ -401,6 +474,8 @@ export default function DuelPage() {
       .subscribe()
 
     return () => {
+      cancelled = true
+      clearAttackFeedbackTimers()
       supabase.removeChannel(channel)
       if (duelStatusRef.current === 'waiting') {
         fetch('/api/game/duel/connect', {
@@ -411,7 +486,7 @@ export default function DuelPage() {
         }).catch(() => {})
       }
     }
-  }, [id, loadPlayerLevels, supabase])
+  }, [clearAttackFeedbackTimers, id, loadPlayerLevels, releaseAttackFeedback, supabase])
 
   useEffect(() => {
     if (myLineup.length === 0 || result || waiting || surrenderedRef.current) return
@@ -458,8 +533,7 @@ export default function DuelPage() {
     if (attackingRef.current || !isMyTurn) return
     if (timerRef.current) clearInterval(timerRef.current)
     autoFightRef.current = true
-    attackingRef.current = true
-    setAttacking(true)
+    startAttackFeedback()
     setAnimState('attack')
     setTimeout(() => setAnimState('idle'), 400)
 
@@ -472,8 +546,15 @@ export default function DuelPage() {
       body: JSON.stringify(body),
     })
 
+    if (!res.ok) {
+      clearAttackFeedbackTimers()
+      attackingRef.current = false
+      setAttacking(false)
+      return
+    }
+
+    const data = await res.json()
     if (res.ok) {
-      const data = await res.json()
       if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
       if (data.duelOver) {
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
@@ -489,8 +570,6 @@ export default function DuelPage() {
       setSelectedItemId(null)
       setShowItemsModal(false)
     }
-    attackingRef.current = false
-    setAttacking(false)
   }
 
   async function handleSurrender() {
@@ -533,6 +612,10 @@ export default function DuelPage() {
   const turnLabel = isMyTurn ? 'Il tuo turno' : 'Turno avversario'
 
   const selectedItem = battagliaItems.find(it => it.inventoryId === selectedItemId)
+
+  if (loading) {
+    return <GameScreenLoading label="Preparazione duello..." />
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative"

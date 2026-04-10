@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
+import { GameListSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
@@ -395,6 +396,63 @@ function SquadSelector({
 }
 
 /* ── Battle Screen ──────────────────────────────────────────────────────────── */
+
+function SquadSelectorSkeleton() {
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="px-4 pt-4 pb-3 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className="w-10 h-10 rounded-xl shrink-0 animate-pulse"
+            style={{ background: 'rgba(247,200,65,0.12)', border: '1px solid rgba(247,200,65,0.2)' }}
+          />
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="h-4 w-36 rounded bg-white/10 animate-pulse" />
+            <div className="h-2.5 w-48 max-w-full rounded bg-white/5 animate-pulse" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-xl px-2 py-1.5"
+              style={{ background: 'rgba(247,200,65,0.05)', border: '1px solid rgba(247,200,65,0.15)' }}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-white/10 animate-pulse shrink-0" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="h-2.5 w-4/5 rounded bg-white/10 animate-pulse" />
+                  <div className="h-2 w-1/3 rounded bg-white/5 animate-pulse" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="px-4 py-3 border-b border-white/10 shrink-0">
+        <div className="h-3 w-28 rounded bg-white/10 animate-pulse mb-2" />
+        <div className="flex gap-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.03]"
+              style={{ height: 64 }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3">
+        <GameListSkeleton rows={5} itemClassName="h-[72px]" />
+      </div>
+
+      <div className="p-4 border-t border-white/10 shrink-0">
+        <div className="h-12 rounded-xl bg-white/10 animate-pulse" />
+      </div>
+    </div>
+  )
+}
 
 function BattleScreen({
   bossLineup,
@@ -975,31 +1033,33 @@ export default function BossFightPage() {
     const sessionId = localStorage.getItem('current_session_id')
 
     async function load() {
-      const fightRes = await fetch(`/api/game/boss/${id}`)
-      if (!fightRes.ok) { setError('Boss fight non trovato'); setLoading(false); return }
-      const { fight: f } = await fightRes.json()
-      setFight(f)
+      try {
+        const [fightRes, authRes] = await Promise.all([
+          fetch(`/api/game/boss/${id}`),
+          sessionId ? supabase.auth.getUser() : Promise.resolve({ data: { user: null } }),
+        ])
+        if (!fightRes.ok) { setError('Boss fight non trovato'); return }
+        const { fight: f } = await fightRes.json()
+        setFight(f)
 
-      if (f.status === 'won' || f.status === 'lost') {
-        setFinalResult({
-          won: f.status === 'won',
-          reward: f.status === 'won' && !f.reward_claimed ? f.reward : null,
-          levelUp: null,
-        })
-        setLoading(false)
-        return
-      }
+        if (f.status === 'won' || f.status === 'lost') {
+          setFinalResult({
+            won: f.status === 'won',
+            reward: f.status === 'won' && !f.reward_claimed ? f.reward : null,
+            levelUp: null,
+          })
+          return
+        }
 
-      if (f.status === 'active') {
-        setBossLineup(f.boss_lineup)
-        setPlayerLineup(f.player_lineup)
-        setBossActiveSlot(f.boss_active_slot)
-        addLog('La battaglia è in corso...')
-      }
+        if (f.status === 'active') {
+          setBossLineup(f.boss_lineup)
+          setPlayerLineup(f.player_lineup)
+          setBossActiveSlot(f.boss_active_slot)
+          addLog('Battaglia in corso...')
+        }
 
-      if (sessionId) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
+        const user = authRes.data.user
+        if (sessionId && user) {
           const [crRes, invRes, lvRes] = await Promise.all([
             supabase.from('player_creatures')
               .select('id, creatures(name, element, rarity, hp, atk, def, image_url)')
@@ -1054,10 +1114,10 @@ export default function BossFightPage() {
             }))
           setBattagliaItems(bItems)
         }
+      } finally {
+        setLoadingCreatures(false)
+        setLoading(false)
       }
-
-      setLoadingCreatures(false)
-      setLoading(false)
     }
 
     load()
@@ -1223,8 +1283,9 @@ export default function BossFightPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ background: BOSS_THEME.bg }}>
+      <div className="flex flex-col items-center justify-center h-full gap-3" style={{ background: BOSS_THEME.bg }}>
         <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'rgba(247,200,65,0.4)', borderTopColor: '#F7C841' }} />
+        <p className="text-sm text-white/45">Preparazione boss...</p>
       </div>
     )
   }
@@ -1280,8 +1341,8 @@ export default function BossFightPage() {
 
       {fight?.status === 'selecting' || fight?.status === undefined ? (
         loadingCreatures ? (
-          <div className="flex items-center justify-center flex-1">
-            <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'rgba(247,200,65,0.3)', borderTopColor: '#F7C841' }} />
+          <div className="flex-1 overflow-hidden">
+            <SquadSelectorSkeleton />
           </div>
         ) : (
           <div className="flex-1 overflow-hidden">
