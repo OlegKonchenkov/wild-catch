@@ -64,9 +64,9 @@ const DEFAULT_CATCH: CatchConfig = {
 }
 
 const SPAWN_LABELS: Record<keyof SpawnConfig, { label: string; color: string }> = {
-  non_comune_bonus: { label: '🟢 Non comune', color: '#4ade80' },
-  raro_bonus:       { label: '🔵 Raro',        color: '#60a5fa' },
-  epico_bonus:      { label: '🟣 Epico',        color: '#c084fc' },
+  non_comune_bonus: { label: '🟢 Arcaico',     color: '#4ade80' },
+  raro_bonus:       { label: '🔵 Eroico',      color: '#60a5fa' },
+  epico_bonus:      { label: '🟣 Mostruoso',   color: '#c084fc' },
   leggendario_bonus:{ label: '🟡 Leggendario',  color: '#fbbf24' },
 }
 
@@ -88,7 +88,7 @@ const RARITY_BONUS_KEY: Partial<Record<string, keyof SpawnConfig>> = {
 
 const RARITY_DISPLAY: Record<string, { label: string; color: string }> = {
   comune:      { label: 'Terrestre',      color: '#9ca3af' },
-  non_comune:  { label: 'Non comune',  color: '#4ade80' },
+  non_comune:  { label: 'Arcaico',     color: '#4ade80' },
   raro:        { label: 'Eroico',        color: '#60a5fa' },
   epico:       { label: 'Mostruoso',       color: '#c084fc' },
   leggendario: { label: 'Leggendario', color: '#fbbf24' },
