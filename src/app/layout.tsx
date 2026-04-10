@@ -14,13 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'WildCatch',
+  title: 'Daimon',
   description: 'Cattura creature nell\'avventura outdoor!',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'WildCatch',
+    title: 'Daimon',
   },
   formatDetection: { telephone: false },
 };
@@ -43,7 +43,7 @@ export default function RootLayout({
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="WildCatch" />
+        <meta name="apple-mobile-web-app-title" content="Daimon" />
         {/* Android */}
         <meta name="mobile-web-app-capable" content="yes" />
       </head>

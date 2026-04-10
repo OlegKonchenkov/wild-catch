@@ -7,7 +7,7 @@ import CreatureSprite from '@/components/creature/CreatureSprite'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
-import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
+import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 import { scaleCombatStats } from '@/lib/game/combat'
 
@@ -348,7 +348,7 @@ function SquadSelector({
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <p className="font-bold text-white text-sm truncate">{c.name}</p>
-                <p className="text-xs" style={{ color: RARITY_COLORS[c.rarity] }}>{c.rarity.replace('_',' ')}</p>
+                <p className="text-xs" style={{ color: RARITY_COLORS[c.rarity] }}>{RARITY_LABELS[c.rarity]}</p>
               </div>
               <div className="flex gap-1.5 shrink-0">
                 {([

@@ -76,7 +76,7 @@ export default function OnboardingPage() {
       {/* Logo / title */}
       <div className="mb-8 text-center">
         <div className="text-6xl mb-4">🌿</div>
-        <h1 className="text-3xl font-black tracking-tight mb-1">WildCatch</h1>
+        <h1 className="text-3xl font-black tracking-tight mb-1">Daimon</h1>
         <p className="text-white/45 text-sm">Un'avventura outdoor nel mondo reale</p>
       </div>
 

@@ -216,6 +216,15 @@ export const RARITY_COLORS: Record<Rarity, string> = {
   mitologico: '#FF4D6D',
 }
 
+export const RARITY_LABELS: Record<Rarity, string> = {
+  comune: 'Terrestre',
+  non_comune: 'Arcaico',
+  raro: 'Eroico',
+  epico: 'Mostruoso',
+  leggendario: 'Leggendario',
+  mitologico: 'Mitologico',
+}
+
 export const ELEMENT_EMOJI: Record<Element, string> = {
   fiamma: '🔥',
   adriatico: '🌊',

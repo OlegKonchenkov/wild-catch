@@ -91,10 +91,10 @@ function BattleDiagram() {
 
 function RarityBadges() {
   const rarities = [
-    { label: 'Comune',      color: '#7AB87A' },
-    { label: 'Non Comune',  color: '#4A9FD4' },
-    { label: 'Raro',        color: '#E8A820' },
-    { label: 'Epico',       color: '#7B4DB8' },
+    { label: 'Terrestre',      color: '#7AB87A' },
+    { label: 'Arcaico',  color: '#4A9FD4' },
+    { label: 'Eroico',        color: '#E8A820' },
+    { label: 'Mostruoso',       color: '#7B4DB8' },
     { label: 'Leggendario', color: '#C8352A' },
     { label: 'Mitologico',  color: '#F0A0FF' },
   ]
@@ -225,10 +225,10 @@ function ItemsGrid() {
 // ─── Egg section ─────────────────────────────────────────────────────────────
 
 const EGG_RARITIES = [
-  { icon: '🥚', label: 'Comune',     color: '#9CA3AF', pool: 'Creature comuni' },
-  { icon: '🪺', label: 'Non Comune', color: '#34D399', pool: 'Comune 70% · Non comune 30%' },
-  { icon: '💎', label: 'Raro',       color: '#3A9DBC', pool: 'Comune 50% · Non comune 30% · Raro 20%' },
-  { icon: '🔮', label: 'Epico',      color: '#C084FC', pool: 'Comune 40% · Non com. 30% · Raro 20% · Epico 10%' },
+  { icon: '🥚', label: 'Terrestre',     color: '#9CA3AF', pool: 'Creature comuni' },
+  { icon: '🪺', label: 'Arcaico', color: '#34D399', pool: 'Terrestre 70% · Arcaico 30%' },
+  { icon: '💎', label: 'Eroico',       color: '#3A9DBC', pool: 'Terrestre 50% · Arcaico 30% · Eroico 20%' },
+  { icon: '🔮', label: 'Mostruoso',      color: '#C084FC', pool: 'Terrestre 40% · Arcaico 30% · Eroico 20% · Mostruoso 10%' },
   { icon: '⭐', label: 'Leggendario',color: '#FBBF24', pool: '35% · 25% · 20% · 15% · Legg. 5%' },
 ]
 
@@ -298,10 +298,10 @@ function SquadGuide() {
       {/* How to set up */}
       <div className="space-y-1.5 text-xs">
         {[
-          { icon: '🦎', text: 'Apri il WildDex → tocca una creatura → sezione "Squadra da battaglia"' },
+          { icon: '📖', text: 'Apri il DaimonDex → tocca una creatura → sezione "Squadra da battaglia"' },
           { icon: '1️⃣', text: 'Slot 1 = Capitano — combatte per primo in ogni battaglia' },
           { icon: '🔄', text: 'Slots 2 e 3 = Riserve — entrano in automatico quando la precedente sviene' },
-          { icon: '✕',  text: 'Per rimuovere una creatura dalla squadra: tocca la X rossa nello slot in alto nel WildDex' },
+          { icon: '✕',  text: 'Per rimuovere una creatura dalla squadra: tocca la X rossa nello slot in alto nel DaimonDex' },
           { icon: '⚔️', text: 'Con meno di 3 creature un avviso ti chiede conferma prima di ogni battaglia' },
         ].map(row => (
           <div key={row.text} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
@@ -345,7 +345,7 @@ function BossGuide() {
       {/* Rules */}
       <div className="space-y-2 text-xs">
         {[
-          { icon: '🐾', text: 'Seleziona la tua squadra dal WildDex prima di iniziare (fino a 3 creature). Con meno di 3 comparirà un avviso di conferma.' },
+          { icon: '🐾', text: 'Seleziona la tua squadra dal DaimonDex prima di iniziare (fino a 3 creature). Con meno di 3 comparirà un avviso di conferma.' },
           { icon: '⚔️', text: 'Il boss schiera fino a 3 creature. Il combattimento è a turni: tu attacchi, poi il boss risponde immediatamente.' },
           { icon: '⏱️', text: 'Hai 30 secondi per attaccare ogni turno — allo scadere parte un attacco automatico.' },
           { icon: '🔄', text: 'Quando una creatura è KO entra automaticamente la prossima della squadra.' },
@@ -391,7 +391,7 @@ function DuelDiagram() {
       </div>
       <div className="space-y-1.5 text-xs">
         {[
-          { t: '🐾 Seleziona la squadra dal WildDex (slot 1 = Capitano, 2 e 3 = Riserve) — fino a 3 creature' },
+          { t: '🐾 Seleziona la squadra dal DaimonDex (slot 1 = Capitano, 2 e 3 = Riserve) — fino a 3 creature' },
           { t: '🔄 Quando una creatura è KO entra la successiva in automatico' },
           { t: '⏱️ Hai 30 secondi per attaccare ogni tuo turno — allo scadere parte un attacco automatico' },
           { t: '💤 Quando non è il tuo turno il timer è fermo — attendi la risposta dell\'avversario' },
@@ -412,14 +412,14 @@ function DuelDiagram() {
 
 function TipChips() {
   const tips = [
-    { text: 'Configura la squadra nel WildDex prima di partire — Slot 1 = Capitano, Slot 2-3 = Riserve. Senza squadra non puoi combattere!', color: '#3ABCA8' },
+    { text: 'Configura la squadra nel DaimonDex prima di partire — Slot 1 = Capitano, Slot 2-3 = Riserve. Senza squadra non puoi combattere!', color: '#3ABCA8' },
     { text: 'Usa un\'Esca prima di esplorare — aumenta la frequenza di creature rare per 10 minuti', color: '#34D399' },
     { text: 'Controlla l\'elemento del boss QR prima di scegliere la squadra — il vantaggio vale ×1.5!', color: '#E85D2F' },
     { text: 'Accumula 3 duplicati della stessa creatura per sbloccare l\'evoluzione automatica', color: '#F7C841' },
     { text: 'Abbassa gli HP prima di lanciare la rete: ogni 10% di vita tolta aggiunge +20% al moltiplicatore di cattura (fino a ×3.0 a 0 HP)!', color: '#3A9DBC' },
     { text: 'Cammina per far schiudere le uova — ogni passo conta anche se non incontri creature!', color: '#C084FC' },
     { text: 'Completa le missioni QR e di cattura per guadagnare monete extra da spendere nel negozio', color: '#FBBF24' },
-    { text: 'Dopo una cattura apri il WildDex e cerca il pulsante 🧩 — alcune creature nascondono frammenti enigma segreti!', color: '#C084FC' },
+    { text: 'Dopo una cattura apri il DaimonDex e cerca il pulsante 🧩 — alcune creature nascondono frammenti enigma segreti!', color: '#C084FC' },
   ]
   return (
     <div className="flex flex-col gap-2 mt-3">
@@ -445,12 +445,12 @@ function buildSections(): Section[] {
     {
       id: 'benvenuto',
       icon: '🌍',
-      title: 'Benvenuto in WildCatch',
+      title: 'Benvenuto in Daimon',
       accent: '#3A9DBC',
       content: (
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
-            Esplora la natura reale, cattura creature fantastiche! WildCatch usa il tuo GPS per
+            Esplora la natura reale, cattura creature fantastiche! Daimon usa il tuo GPS per
             nascondere creature nel mondo reale. Cammina, avvicinati, cattura.
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -512,7 +512,7 @@ function buildSections(): Section[] {
           <div className="mt-3 rounded-xl border border-white/10 bg-white/4 px-3 py-2 text-xs text-white/55">
             <strong className="text-white/80">Probabilità base di cattura per rarità:</strong>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {[['Comune','#7AB87A','70%'], ['Non Comune','#4A9FD4','45%'], ['Raro','#E8A820','25%'], ['Epico','#7B4DB8','12%'], ['Leggendario','#C8352A','5%'], ['Mitologico','#F0A0FF','2%']].map(([r, c, p]) => (
+              {[['Terrestre','#7AB87A','70%'], ['Arcaico','#4A9FD4','45%'], ['Eroico','#E8A820','25%'], ['Mostruoso','#7B4DB8','12%'], ['Leggendario','#C8352A','5%'], ['Mitologico','#F0A0FF','2%']].map(([r, c, p]) => (
                 <span key={r} className="px-2 py-0.5 rounded-full text-[10px] font-bold"
                   style={{ background: (c as string) + '22', color: c as string, border: `1px solid ${c}44` }}>
                   {r}: {p}
@@ -584,14 +584,14 @@ function buildSections(): Section[] {
       ),
     },
     {
-      id: 'wilddex',
-      icon: '🦎',
-      title: 'WildDex',
+      id: 'daimondex',
+      icon: '📖',
+      title: 'DaimonDex',
       accent: '#7B4DB8',
       content: (
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
-            Ogni creatura catturata viene registrata nel WildDex. Le creature non ancora catturate
+            Ogni creatura catturata viene registrata nel DaimonDex. Le creature non ancora catturate
             appaiono come sagome misteriose — solo l&apos;elemento è visibile. Collezionale tutte!
           </p>
           <p className="text-white/60 text-xs mt-2">5 rarità in ordine crescente:</p>
@@ -608,7 +608,7 @@ function buildSections(): Section[] {
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
             Prima di ogni battaglia devi avere una <span className="text-[#3ABCA8] font-bold">squadra</span> pronta.
-            Puoi schierare fino a 3 creature dal WildDex: lo <span className="text-[#3ABCA8] font-bold">Slot 1</span> è il
+            Puoi schierare fino a 3 creature dal DaimonDex: lo <span className="text-[#3ABCA8] font-bold">Slot 1</span> è il
             Capitano che combatte per primo, gli Slot 2 e 3 sono le Riserve che entrano in automatico se il Capitano sviene.
             Vale per incontri selvatici, duelli PvP e boss fight.
           </p>
@@ -626,12 +626,12 @@ function buildSections(): Section[] {
           <p className="text-white/80 text-sm leading-relaxed">
             Alcune creature nascondono un <span className="text-[#C084FC] font-bold">Frammento Enigma</span> —
             un indizio, un segreto o un dettaglio speciale sbloccato dopo la cattura.
-            Trovalo nel WildDex toccando la creatura e premendo il pulsante viola 🧩.
+            Trovalo nel DaimonDex toccando la creatura e premendo il pulsante viola 🧩.
           </p>
           <div className="mt-3 space-y-2 text-xs">
             {[
               { icon: '🐾', text: 'Cattura la creatura — solo le creature nel tuo bestiario svelano l\'enigma' },
-              { icon: '🦎', text: 'Vai nel WildDex → tocca la creatura → premi "🧩 Frammento Enigma"' },
+              { icon: '📖', text: 'Vai nel DaimonDex → tocca la creatura → premi "🧩 Frammento Enigma"' },
               { icon: '✨', text: 'L\'enigma si rivela con un\'animazione: titolo, testo, immagine o video' },
               { icon: '🔒', text: 'Il pulsante è disattivato se la creatura non ha un enigma assegnato dall\'admin' },
             ].map(row => (
@@ -740,7 +740,7 @@ function buildSections(): Section[] {
               { icon: '🎒', label: 'Oggetto',  desc: 'Aggiunge direttamente l\'oggetto al tuo zaino' },
               { icon: '🥚', label: 'Uovo',     desc: 'Crea un uovo nel tuo zaino da schiudere dopo X passi' },
               { icon: '💀', label: 'Boss',     desc: 'Avvia il boss fight — scegli la squadra e combatti!' },
-              { icon: '🐾', label: 'Creatura', desc: 'Aggiunge direttamente una creatura speciale al tuo WildDex' },
+              { icon: '🐾', label: 'Creatura', desc: 'Aggiunge direttamente una creatura speciale al tuo DaimonDex' },
               { icon: '📖', label: 'Indizio',  desc: 'Sblocca un capitolo narrativo della storia' },
               { icon: '✨', label: 'Evento',   desc: 'Attiva un bonus temporaneo (EXP, spawn, oro)' },
             ].map(row => (
@@ -926,7 +926,7 @@ export default function GuidePage() {
           </div>
           <div className="flex-1">
             <h1 className="text-base font-bold text-white leading-tight">Guida Giocatore</h1>
-            <p className="text-xs text-[#3A9DBC]/80">Come funziona WildCatch</p>
+            <p className="text-xs text-[#3A9DBC]/80">Come funziona Daimon</p>
           </div>
           {/* Search toggle icon */}
           <button
@@ -995,7 +995,7 @@ export default function GuidePage() {
           <div className="relative px-5 py-5">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-3xl">🐾</span>
-              <span className="text-xl font-black text-white tracking-tight">WildCatch</span>
+              <span className="text-xl font-black text-white tracking-tight">Daimon</span>
             </div>
             <p className="text-sm text-white/60 leading-relaxed">
               Avventura nella natura adriatica e nei boschi appenninici.<br />

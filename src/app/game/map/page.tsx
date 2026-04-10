@@ -8,6 +8,7 @@ import CreatureSprite from '@/components/creature/CreatureSprite'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import type { Session } from '@/lib/types'
+import { RARITY_LABELS } from '@/lib/types'
 import type { MapPin } from '@/components/map/GameMap'
 
 // Dynamic import — Leaflet is not SSR-safe
@@ -978,7 +979,7 @@ function MapPageInner() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35">Creatura selvatica</p>
               <p className="font-bold text-white truncate">{pendingEncounter.creature.name}</p>
               <p className="text-sm text-[#3A9DBC]">
-                {pendingEncounter.creature.element} · {pendingEncounter.creature.rarity.replace('_', ' ')}
+                {pendingEncounter.creature.element} · {RARITY_LABELS[pendingEncounter.creature.rarity as keyof typeof RARITY_LABELS]}
               </p>
             </div>
           </div>

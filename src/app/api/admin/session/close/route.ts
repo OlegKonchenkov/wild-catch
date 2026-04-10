@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   if (players) {
     // Get current session name for season label
     const { data: session } = await admin.from('sessions').select('name').eq('id', sessionId).single()
-    const seasonLabel = session?.name ?? 'Evento WildCatch'
+    const seasonLabel = session?.name ?? 'Evento Daimon'
 
     // Count creatures per player
     const hofEntries = await Promise.all(players.slice(0, 10).map(async (p, i) => {

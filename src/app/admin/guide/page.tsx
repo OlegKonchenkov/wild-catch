@@ -418,7 +418,7 @@ export default function AdminGuidePage() {
                 Guida per l&rsquo;Amministratore
               </h1>
               <p style={{ color: '#64748b', fontSize: '0.92rem', margin: '0.2rem 0 0' }}>
-                Manuale operativo &mdash; WildCatch Game Master Handbook
+                Manuale operativo &mdash; Daimon Game Master Handbook
               </p>
             </div>
             {/* Search toggle icon */}
@@ -637,7 +637,7 @@ export default function AdminGuidePage() {
 
               <SubHeader>Rarità e probabilità catch base</SubHeader>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', margin: '0.5rem 0' }}>
-                {[['comune','#7AB87A','70%'], ['non_comune','#4A9FD4','45%'], ['raro','#E8A820','25%'], ['epico','#7B4DB8','12%'], ['leggendario','#C8352A','5%'], ['mitologico','#FF4D6D','1.25%']].map(([r, c, p]) => (
+                {[['Terrestre','#7AB87A','70%'], ['Arcaico','#4A9FD4','45%'], ['Eroico','#E8A820','25%'], ['Mostruoso','#7B4DB8','12%'], ['Leggendario','#C8352A','5%'], ['Mitologico','#FF4D6D','1.25%']].map(([r, c, p]) => (
                   <div key={r} style={{ background: `${c}12`, border: `1px solid ${c}30`, borderRadius: '8px',
                     padding: '0.4rem 0.75rem', textAlign: 'center' }}>
                     <div style={{ color: c as string, fontWeight: 700, fontSize: '0.82rem' }}>{r}</div>
@@ -695,7 +695,7 @@ export default function AdminGuidePage() {
               <SubHeader>Squadra da battaglia</SubHeader>
               <Prose>
                 Ogni giocatore può selezionare una <strong style={{ color: '#3ABCA8' }}>squadra da 1 a 3 creature</strong>
-                dal proprio WildDex. La squadra è configurabile dalla schermata WildDex nell&rsquo;app &rarr;
+                dal proprio DaimonDex. La squadra è configurabile dalla schermata DaimonDex nell&rsquo;app &rarr;
                 bottoni <em>Slot 1 / Slot 2 / Slot 3</em> nella scheda dettaglio di ogni creatura.
               </Prose>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0.5rem 0' }}>
@@ -939,7 +939,7 @@ export default function AdminGuidePage() {
               <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#ffffff05',
                 border: '1px solid #ffffff0e', borderRadius: '10px', fontSize: '0.83rem',
                 color: '#475569', textAlign: 'center' }}>
-                WildCatch Admin Handbook &mdash; versione 2026 &nbsp;·&nbsp;
+                Daimon Admin Handbook &mdash; versione 2026 &nbsp;·&nbsp;
                 <span style={{ color: '#3A9DBC' }}>wildcat.game</span>
               </div>
             </section>

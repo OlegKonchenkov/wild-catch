@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { createClient } from '@/lib/supabase/client'
-import { RARITY_COLORS, ELEMENT_EMOJI } from '@/lib/types'
+import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import type { Creature, Element, Rarity } from '@/lib/types'
 

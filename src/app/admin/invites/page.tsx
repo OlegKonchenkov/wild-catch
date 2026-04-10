@@ -127,11 +127,11 @@ export default function InvitesPage() {
   }
 
   async function shareInviteCode(code: string) {
-    const text = `Codice invito Wild Catch: ${code}`
+    const text = `Codice invito Daimon: ${code}`
     try {
       if (navigator.share) {
         await navigator.share({
-          title: 'Codice invito Wild Catch',
+          title: 'Codice invito Daimon',
           text,
         })
         pushActionMsg(true, 'Codice condiviso')

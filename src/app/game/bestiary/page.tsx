@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
-import { RARITY_COLORS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
+import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
 import type { Creature, PlayerCreature, Element } from '@/lib/types'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 
@@ -394,7 +394,7 @@ export default function BestiaryPage() {
         {/* Row 1: title + progress */}
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-white tracking-tight">WildDex</h1>
+            <h1 className="text-lg font-bold text-white tracking-tight">DaimonDex</h1>
             <button
               onClick={() => setShowWeakness(true)}
               aria-label="Forze e debolezze"
@@ -755,7 +755,7 @@ export default function BestiaryPage() {
                   </div>
                   {caught && (
                     <p className="text-[8px] font-semibold mt-0.5 leading-none capitalize truncate" style={{ color: canEvolve ? '#F7C841' : rarityColor }}>
-                      {canEvolve ? '✨ evolvi' : creature.rarity.replace('_', ' ')}
+                      {canEvolve ? '✨ evolvi' : RARITY_LABELS[creature.rarity]}
                     </p>
                   )}
                 </div>
@@ -856,7 +856,7 @@ export default function BestiaryPage() {
                         {/* Rarity */}
                         <span className="text-[11px] px-2.5 py-1 rounded-full font-bold capitalize"
                           style={{ background: `${rarityColor}1A`, color: rarityColor, border: `1px solid ${rarityColor}40` }}>
-                          {creature.rarity.replace('_', ' ')}
+                          {RARITY_LABELS[creature.rarity]}
                         </span>
                         {/* Copies */}
                         {pc.duplicates_count > 1 && (
@@ -1241,7 +1241,7 @@ export default function BestiaryPage() {
                         <span className="text-xs capitalize text-white/40">{cr.element}</span>
                         <span className="text-xs px-2 py-0.5 rounded-full font-bold"
                           style={{ background: `${rarityColor}22`, color: rarityColor, border: `1px solid ${rarityColor}55` }}>
-                          {cr.rarity.replace('_', ' ')}
+                          {RARITY_LABELS[cr.rarity]}
                         </span>
                       </div>
                       {cr.description && (

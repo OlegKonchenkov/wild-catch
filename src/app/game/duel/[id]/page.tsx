@@ -8,7 +8,7 @@ import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { scaleCombatStats } from '@/lib/game/combat'
-import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
+import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 
 interface LineupEntry {

@@ -146,7 +146,7 @@ function Landing() {
 
         <div className="card">
           <div className="logo-icon">🌿</div>
-          <div className="title">WildCatch</div>
+          <div className="title">Daimon</div>
           <div className="sub">La prima avventura outdoor italiana.<br />Cattura creature, esplora, sfida gli altri.</div>
 
           <div className="features">

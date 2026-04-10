@@ -572,7 +572,7 @@ export default function SessionsPage() {
               <div>
                 <label className="block text-xs text-white/50 mb-1 font-semibold">Nome evento <span className="text-red-400">*</span></label>
                 <input value={sessionName} onChange={e => setSessionName(e.target.value)}
-                  placeholder="es. WildCatch Estate 2026"
+                  placeholder="es. Daimon Estate 2026"
                   className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
               </div>
               <div>

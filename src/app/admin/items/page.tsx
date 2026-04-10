@@ -87,8 +87,8 @@ const TYPE_META: Record<ItemType, TypeMeta> = {
 
 const EGG_RARITIES: EggRarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
 const EGG_RARITY_LABEL: Record<EggRarity, string> = {
-  comune: '⚪ Comune', non_comune: '🟢 Non comune', raro: '🔵 Raro',
-  epico: '🟣 Epico', leggendario: '🟡 Leggendario', mitologico: '🌌 Mitologico',
+  comune: '⚪ Terrestre', non_comune: '🟢 Arcaico', raro: '🔵 Eroico',
+  epico: '🟣 Mostruoso', leggendario: '🟡 Leggendario', mitologico: '🌌 Mitologico',
 }
 
 const EMPTY_FORM = {

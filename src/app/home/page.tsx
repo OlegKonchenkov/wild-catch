@@ -254,7 +254,7 @@ function HomeLobby() {
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: "'Cinzel', serif", fontSize: 20, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.06em', marginBottom: 8 }}>
-            WildCatch
+            Daimon
           </div>
           <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }} className="wc-dots">
             <span /><span /><span />
@@ -345,7 +345,7 @@ function HomeLobby() {
 
         {/* ── Top bar ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ fontFamily: "'Cinzel', serif", fontSize: 18, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.04em' }}>WildCatch</span>
+          <span style={{ fontFamily: "'Cinzel', serif", fontSize: 18, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.04em' }}>Daimon</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
               onClick={() => { setShowSettings(v => !v); setSettingMsg(null); setEditingNickInline(false) }}
