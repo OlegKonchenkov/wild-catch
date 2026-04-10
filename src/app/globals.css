@@ -29,6 +29,18 @@ body {
 /* Hide scrollbar on nav overflow while keeping scrollability */
 .nav-scrollable::-webkit-scrollbar { display: none; }
 
+/* Leaflet attribution — required by license, styled to be unobtrusive */
+.leaflet-control-attribution {
+  font-size: 8px !important;
+  opacity: 0.4 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 1px 4px !important;
+}
+.leaflet-control-attribution:hover {
+  opacity: 0.85 !important;
+}
+
 /* Fix select dropdown on dark backgrounds — options inherit browser default white bg */
 select {
   background-color: #0d1e2e;
