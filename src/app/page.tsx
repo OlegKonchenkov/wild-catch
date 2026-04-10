@@ -199,16 +199,22 @@ function Landing() {
         .tagline em { font-style: normal; color: rgba(58,188,168,0.85); font-weight: 500; }
 
         .feat-row {
-          display: flex; gap: 8px; justify-content: center;
+          display: flex; gap: 16px; justify-content: center;
           margin-bottom: 28px;
         }
         .feat {
-          font-size: 11px; font-weight: 500;
-          color: rgba(255,255,255,0.4);
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 20px; padding: 5px 12px;
-          letter-spacing: 0.03em;
+          display: flex; flex-direction: column; align-items: center; gap: 5px;
+          font-size: 10px; font-weight: 500;
+          color: rgba(255,255,255,0.35);
+          letter-spacing: 0.05em; text-transform: uppercase;
+        }
+        .feat-icon {
+          width: 36px; height: 36px;
+          background: rgba(58,188,168,0.08);
+          border: 1px solid rgba(58,188,168,0.2);
+          border-radius: 12px;
+          display: flex; align-items: center; justify-content: center;
+          color: rgba(58,188,168,0.75);
         }
 
         .btn-google {
@@ -305,9 +311,33 @@ function Landing() {
           </p>
 
           <div className="feat-row">
-            <span className="feat">📍 GPS</span>
-            <span className="feat">🐾 Daimon</span>
-            <span className="feat">⚔️ Duelli</span>
+            <div className="feat">
+              <div className="feat-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="1.6"/>
+                  <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.6"/>
+                </svg>
+              </div>
+              Esplora
+            </div>
+            <div className="feat">
+              <div className="feat-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              Daimon
+            </div>
+            <div className="feat">
+              <div className="feat-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M14.5 2.5l-5 5M9.5 2.5l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  <path d="M5 8h14l-1.5 9.5a2 2 0 01-2 1.5h-7a2 2 0 01-2-1.5L5 8z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+                  <path d="M9 12l1.5 1.5L15 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              Duelli
+            </div>
           </div>
 
           <button className="btn-google" onClick={handleGoogleLogin}>
