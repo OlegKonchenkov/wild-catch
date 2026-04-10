@@ -218,35 +218,42 @@ function MissionDetailModal({
 
         {/* Creature preview — cattura missions only */}
         {mission.type === 'cattura' && creaturePreview?.image_url && (
-          <div className="mb-4 rounded-2xl overflow-hidden border border-white/8 relative">
-            <div className="flex items-center gap-4 p-3">
-              {/* Image — silhouette if not caught */}
-              <div className="relative shrink-0 w-20 h-20 rounded-xl overflow-hidden"
-                style={{ background: 'rgba(255,255,255,0.04)' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={creaturePreview.image_url}
-                  alt={isCaught ? (mission.target ?? '') : '???'}
-                  className="w-full h-full object-contain"
-                  style={isCaught ? undefined : {
-                    filter: 'brightness(0) contrast(1)',
-                    opacity: 0.8,
-                  }}
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-bold text-base leading-tight">
-                  {isCaught ? mission.target : '???'}
-                </p>
-                {!isCaught && (
-                  <p className="text-xs text-white/35 mt-0.5">
-                    Cattura questa creatura per scoprirla nel Wildex
+          <div className="mb-4 rounded-2xl overflow-hidden border border-white/10 relative" style={{ background: 'rgba(255,255,255,0.03)' }}>
+            {/* Hero image */}
+            <div className="relative w-full h-36 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={creaturePreview.image_url}
+                alt={mission.target ?? ''}
+                className="w-full h-full object-contain scale-110"
+                style={isCaught ? undefined : {
+                  filter: 'blur(5px) brightness(0.55) saturate(0.3)',
+                }}
+              />
+              {/* gradient overlay */}
+              <div className="absolute inset-0" style={{
+                background: isCaught
+                  ? 'linear-gradient(to top, rgba(13,30,46,0.85) 0%, transparent 55%)'
+                  : 'linear-gradient(to top, rgba(13,30,46,0.92) 0%, rgba(13,30,46,0.4) 55%, transparent 100%)',
+              }} />
+              {/* Name + badge anchored bottom */}
+              <div className="absolute bottom-0 left-0 right-0 px-4 pb-3 flex items-end justify-between">
+                <div>
+                  <p className="text-white font-extrabold text-base leading-tight drop-shadow">
+                    {mission.target}
                   </p>
-                )}
-                {isCaught && (
-                  <p className="text-xs text-[#34D399] mt-0.5 font-semibold">
-                    ✅ Già nel tuo Wildex
-                  </p>
+                  {!isCaught && (
+                    <p className="text-xs text-white/45 mt-0.5">Trovala e catturala!</p>
+                  )}
+                </div>
+                {isCaught ? (
+                  <span className="text-xs bg-[#34D399]/20 text-[#34D399] border border-[#34D399]/35 px-2 py-1 rounded-lg font-semibold shrink-0">
+                    ✅ Nel DaimonDex
+                  </span>
+                ) : (
+                  <span className="text-xs bg-white/8 text-white/40 border border-white/12 px-2 py-1 rounded-lg font-semibold shrink-0">
+                    🔍 Da trovare
+                  </span>
                 )}
               </div>
             </div>
@@ -540,20 +547,17 @@ export default function MissionsPage() {
               >
                 {/* Progress ring OR creature thumbnail for cattura missions */}
                 {mission.type === 'cattura' && mission.target && creaturePreviews[mission.target]?.image_url ? (
-                  <div className="relative shrink-0 w-[36px] h-[36px]">
-                    <div className="w-9 h-9 rounded-xl overflow-hidden"
-                      style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={creaturePreviews[mission.target].image_url!}
-                        alt={caughtNames.has(mission.target) ? mission.target : '???'}
-                        className="w-full h-full object-contain"
-                        style={caughtNames.has(mission.target) ? undefined : {
-                          filter: 'brightness(0) contrast(1)',
-                          opacity: 0.7,
-                        }}
-                      />
-                    </div>
+                  <div className="relative shrink-0 w-12 h-12 rounded-xl overflow-hidden"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={creaturePreviews[mission.target].image_url!}
+                      alt={mission.target}
+                      className="w-full h-full object-contain"
+                      style={caughtNames.has(mission.target) ? undefined : {
+                        filter: 'blur(3px) brightness(0.5) saturate(0.2)',
+                      }}
+                    />
                     {completed && (
                       <span className="absolute -top-1 -right-1 text-xs leading-none">✅</span>
                     )}
@@ -586,11 +590,15 @@ export default function MissionsPage() {
                   <p className="font-bold text-white text-sm leading-tight truncate">
                     {mission.title}
                   </p>
-                  {mission.description && (
+                  {mission.type === 'cattura' && mission.target ? (
+                    <p className="text-xs text-white/40 mt-0.5 leading-relaxed line-clamp-1">
+                      Cattura: <span className="text-white/65 font-semibold">{mission.target}</span>
+                    </p>
+                  ) : mission.description ? (
                     <p className="text-xs text-white/40 mt-0.5 leading-relaxed line-clamp-1">
                       {mission.description}
                     </p>
-                  )}
+                  ) : null}
                   {/* Progress text + rewards */}
                   <div className="flex items-center gap-2 mt-1.5">
                     <span className="text-xs font-semibold" style={{ color: completed ? '#34D399' : meta.color }}>
