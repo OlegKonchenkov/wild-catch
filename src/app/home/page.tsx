@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
+import PrivacyPolicyModal from '@/components/legal/PrivacyPolicyModal'
 
 interface SessionStats {
   id: string
@@ -73,6 +74,7 @@ function HomeLobby() {
   const [showJoin, setShowJoin]   = useState(!!searchParams.get('code'))
   const [joining, setJoining]     = useState(false)
   const [joinError, setJoinError] = useState('')
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false)
 
   // Nickname prompt
   const [nickInput, setNickInput] = useState('')
@@ -106,6 +108,7 @@ function HomeLobby() {
       setNickname(profile.nickname)
       setEditNick(profile.nickname ?? '')
     }
+    if (profile.gdprAccepted) setGdpr(true)
 
     const { sessionId } = restore as { sessionId: string | null }
     if (sessionId) localStorage.setItem('current_session_id', sessionId)
@@ -151,6 +154,19 @@ function HomeLobby() {
     if (!code || code.length < 4 || !gdpr || joining) return
     if (!nickname) { setJoinError('Imposta prima il tuo nickname (vedi sopra)'); return }
     setJoining(true); setJoinError('')
+
+    const consentRes = await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acceptGdpr: true }),
+    })
+    if (!consentRes.ok) {
+      const consentData = await consentRes.json().catch(() => ({}))
+      setJoinError(consentData.error ?? "Impossibile registrare l'accettazione privacy")
+      setJoining(false)
+      return
+    }
+
     const res = await fetch('/api/auth/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -202,6 +218,8 @@ function HomeLobby() {
   const avatarUrl   = user?.user_metadata?.avatar_url
   const initials    = displayName.slice(0, 2).toUpperCase()
   const needsNickname  = nickname === null || nickname === ''
+  const privacyController = process.env.NEXT_PUBLIC_PRIVACY_CONTROLLER
+  const privacyEmail = process.env.NEXT_PUBLIC_PRIVACY_EMAIL
 
   const selected = sessions.find(s => s.id === selectedId) ?? null
   const isPlayable = selected && (selected.status === 'active' || selected.status === 'ready' || selected.status === 'ended')
@@ -656,7 +674,30 @@ function HomeLobby() {
                     {gdpr && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                   </div>
                   <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
-                    Accetto il trattamento dei dati personali ai sensi del GDPR (art. 6) per partecipare all&apos;evento
+                    Ho letto l&apos;
+                    <button
+                      type="button"
+                      onClick={event => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        setShowPrivacyPolicy(true)
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        margin: 0,
+                        color: '#3ABCA8',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        fontSize: 'inherit',
+                        lineHeight: 'inherit',
+                      }}
+                    >
+                      Informativa Privacy
+                    </button>
+                    {' '}e acconsento al trattamento dei dati necessari per partecipare all&apos;evento.
                   </span>
                 </label>
 
@@ -682,6 +723,13 @@ function HomeLobby() {
         </Section>
 
       </div>
+
+      <PrivacyPolicyModal
+        open={showPrivacyPolicy}
+        onClose={() => setShowPrivacyPolicy(false)}
+        controllerName={privacyController}
+        contactEmail={privacyEmail}
+      />
     </>
   )
 }
