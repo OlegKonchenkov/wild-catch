@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { AdminListSkeleton, AdminPanelSkeleton } from '@/components/admin/AdminLoading'
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -147,18 +148,34 @@ export default function LevelRewardsPage() {
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/admin/level-rewards').then(r => r.json()),
-      fetch('/api/admin/items').then(r => r.json()),
-      fetch('/api/admin/exp-config').then(r => r.json()),
-    ]).then(([rwData, itData, expData]) => {
-      setRewards(rwData.rewards ?? [])
-      setItems(itData.items ?? [])
-      setExpConfig(expData.config ?? [])
-      setLoading(false)
-    })
-    supabase.from('sessions').select('id, name').order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) { setSessions(data); if (data[0]) setSpawnSessionId(data[0].id) } })
+    let cancelled = false
+
+    async function loadInitialData() {
+      setLoading(true)
+      try {
+        const [rwData, itData, expData, sessionRes] = await Promise.all([
+          fetch('/api/admin/level-rewards').then(r => r.json()),
+          fetch('/api/admin/items').then(r => r.json()),
+          fetch('/api/admin/exp-config').then(r => r.json()),
+          supabase.from('sessions').select('id, name').order('created_at', { ascending: false }),
+        ])
+
+        if (cancelled) return
+
+        setRewards(rwData.rewards ?? [])
+        setItems(itData.items ?? [])
+        setExpConfig(expData.config ?? [])
+
+        const data = sessionRes.data ?? []
+        setSessions(data)
+        if (data[0]) setSpawnSessionId(data[0].id)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadInitialData()
+    return () => { cancelled = true }
   }, [supabase])
 
   useEffect(() => {
@@ -332,9 +349,7 @@ export default function LevelRewardsPage() {
           </div>
 
           {loading ? (
-            <div className="space-y-2">
-              {[1,2,3,4,5].map(i => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)}
-            </div>
+            <AdminListSkeleton rows={5} itemClassName="h-14" />
           ) : (
             <div className="space-y-2">
               {rewards.map(reward => {
@@ -380,7 +395,7 @@ export default function LevelRewardsPage() {
                             </button>
                           </div>
                           {form.bonus_items.length === 0 ? (
-                            <p className="text-xs text-white/25 italic">Nessun oggetto bonus · tocca "Aggiungi oggetto"</p>
+                            <p className="text-xs text-white/25 italic">Nessun oggetto bonus · tocca &quot;Aggiungi oggetto&quot;</p>
                           ) : (
                             <div className="space-y-2">
                               {form.bonus_items.map((bi, idx) => (
@@ -560,7 +575,7 @@ export default function LevelRewardsPage() {
           </div>
 
           {spawnLoading ? (
-            <div className="h-32 bg-white/5 rounded-xl animate-pulse" />
+            <AdminPanelSkeleton rows={4} lineClassName="h-11" />
           ) : (
             <>
               <div className="space-y-3 mb-4">
@@ -684,9 +699,7 @@ export default function LevelRewardsPage() {
           </div>
 
           {catchLoading ? (
-            <div className="space-y-3">
-              {[1,2,3,4,5,6].map(i => <div key={i} className="h-16 rounded-xl bg-white/5 animate-pulse" />)}
-            </div>
+            <AdminListSkeleton rows={6} itemClassName="h-16" className="space-y-3" />
           ) : (
             <>
               {/* Per-rarity sliders */}
@@ -811,3 +824,4 @@ export default function LevelRewardsPage() {
     </div>
   )
 }
+

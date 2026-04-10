@@ -83,25 +83,23 @@ export default function AdminLeaderboard() {
 
       const userIds = players.map(p => p.user_id)
 
-      // 2. Nicknames — single query
-      const { data: profiles } = await supabase
-        .from('profiles').select('user_id, nickname').in('user_id', userIds)
+      const [{ data: profiles }, { data: creatures }, { data: duels }] = await Promise.all([
+        supabase.from('profiles').select('user_id, nickname').in('user_id', userIds),
+        supabase.from('player_creatures').select('user_id').eq('session_id', sid),
+        supabase
+          .from('duels')
+          .select('winner_id, challenger_id, opponent_id')
+          .eq('session_id', sid)
+          .eq('status', 'ended'),
+      ])
+
       const nickMap: Record<string, string> = Object.fromEntries(
         (profiles ?? []).map(p => [p.user_id, p.nickname ?? 'Anonimo'])
       )
 
-      // 3. Creature counts — single query, aggregate client-side
-      const { data: creatures } = await supabase
-        .from('player_creatures').select('user_id').eq('session_id', sid)
       const creatureMap: Record<string, number> = {}
       for (const c of creatures ?? []) creatureMap[c.user_id] = (creatureMap[c.user_id] ?? 0) + 1
 
-      // 4. Duel stats — single query, aggregate client-side
-      const { data: duels } = await supabase
-        .from('duels')
-        .select('winner_id, challenger_id, opponent_id')
-        .eq('session_id', sid)
-        .eq('status', 'ended')
       const duelPlayed: Record<string, number> = {}
       const duelWins: Record<string, number>   = {}
       for (const d of duels ?? []) {
@@ -153,7 +151,7 @@ export default function AdminLeaderboard() {
 
       {/* Session selector */}
       {loadingSessions ? (
-        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
+        <AdminListSkeleton rows={1} itemClassName="h-10" />
       ) : (
         <div className="space-y-1.5">
           <div className="flex gap-2 flex-wrap">

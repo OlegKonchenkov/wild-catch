@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV = [
@@ -22,6 +22,20 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const pathname = usePathname()
   const router   = useRouter()
   const supabase = useMemo(() => createClient(), [])
+
+  useEffect(() => {
+    const prefetchRoutes = NAV
+      .map(item => item.href)
+      .filter(href => href !== pathname)
+
+    const timer = window.setTimeout(() => {
+      prefetchRoutes.forEach(href => {
+        router.prefetch(href)
+      })
+    }, 120)
+
+    return () => window.clearTimeout(timer)
+  }, [pathname, router])
 
   async function handleLogout() {
     await supabase.auth.signOut()

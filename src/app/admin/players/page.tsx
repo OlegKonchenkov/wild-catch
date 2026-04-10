@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { AdminInlineSpinner, AdminTableSkeleton } from '@/components/admin/AdminLoading'
+import { AdminInlineSpinner, AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/AdminLoading'
 
 interface Player {
   userId: string
@@ -627,9 +627,7 @@ export default function PlayersPage() {
 
             <div className="flex-1 overflow-y-auto min-h-0">
               {inventoryLoading ? (
-                <div className="space-y-2">
-                  {[1,2,3].map(i => <div key={i} className="h-12 rounded-xl bg-white/5 animate-pulse" />)}
-                </div>
+                <AdminListSkeleton rows={3} itemClassName="h-12" />
               ) : inventory.length === 0 ? (
                 <p className="text-white/40 text-sm text-center py-8">Inventario vuoto</p>
               ) : (

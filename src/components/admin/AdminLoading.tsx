@@ -47,6 +47,29 @@ export function AdminTableSkeleton({ rows = 4, columns = 5 }: AdminTableSkeleton
   )
 }
 
+interface AdminPanelSkeletonProps {
+  rows?: number
+  className?: string
+  lineClassName?: string
+  showHeader?: boolean
+}
+
+export function AdminPanelSkeleton({
+  rows = 3,
+  className = '',
+  lineClassName = 'h-10',
+  showHeader = true,
+}: AdminPanelSkeletonProps) {
+  return (
+    <div className={`rounded-xl border border-white/10 bg-white/5 p-4 space-y-3 ${className}`}>
+      {showHeader && <div className="h-4 w-40 rounded bg-white/10 animate-pulse" />}
+      {Array.from({ length: rows }).map((_, idx) => (
+        <div key={idx} className={`rounded-lg bg-white/10 animate-pulse ${lineClassName}`} />
+      ))}
+    </div>
+  )
+}
+
 export function AdminInlineSpinner({ label = 'Caricamento...' }: { label?: string }) {
   return (
     <div className="flex items-center gap-2 text-white/50 text-sm">
