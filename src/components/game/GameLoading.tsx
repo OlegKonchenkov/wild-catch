@@ -18,6 +18,76 @@ interface GameGridSkeletonProps {
   className?: string
 }
 
+export function GameMapSkeleton() {
+  return (
+    <div className="min-h-screen overflow-hidden" style={{ background: '#060C18' }}>
+      <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/8">
+        <div className="space-y-2">
+          <div className="h-5 w-14 rounded bg-[#F7C841]/20 animate-pulse" />
+          <div className="h-2.5 w-28 rounded-full bg-white/8 overflow-hidden">
+            <div className="h-full w-2/3 rounded-full bg-[#F7C841]/40 animate-pulse" />
+          </div>
+        </div>
+        <div className="h-8 w-20 rounded-xl bg-white/8 animate-pulse" />
+        <div className="h-8 w-8 rounded-full bg-white/8 animate-pulse" />
+      </div>
+
+      <div className="relative h-[calc(100svh-66px)]">
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(58,157,188,0.12),transparent_35%),radial-gradient(circle_at_75%_20%,rgba(52,211,153,0.08),transparent_28%),linear-gradient(180deg,#101922_0%,#060C18_100%)]" />
+          <div className="absolute inset-x-0 top-[14%] h-px bg-white/6" />
+          <div className="absolute inset-x-0 top-[34%] h-px bg-white/6" />
+          <div className="absolute inset-x-0 top-[58%] h-px bg-white/6" />
+          <div className="absolute inset-x-0 top-[78%] h-px bg-white/6" />
+          <div className="absolute inset-y-0 left-[22%] w-px bg-white/6" />
+          <div className="absolute inset-y-0 left-[48%] w-px bg-white/6" />
+          <div className="absolute inset-y-0 left-[74%] w-px bg-white/6" />
+          <div className="absolute left-[18%] top-[22%] h-24 w-px rotate-45 bg-white/8 origin-top" />
+          <div className="absolute left-[58%] top-[8%] h-40 w-px -rotate-12 bg-white/8 origin-top" />
+          <div className="absolute left-[42%] top-[44%] h-32 w-px rotate-[28deg] bg-white/8 origin-top" />
+        </div>
+
+        <div className="absolute right-4 top-4 flex flex-col gap-3">
+          <div className="rounded-2xl border border-white/8 bg-[#0D1E2E]/90 px-4 py-3 w-32 animate-pulse">
+            <div className="h-3 w-14 rounded bg-white/10 mb-2" />
+            <div className="h-2.5 w-20 rounded bg-white/6" />
+          </div>
+          <div className="h-10 w-28 rounded-full border border-[#34D399]/20 bg-[#34D399]/10 animate-pulse" />
+          <div className="h-10 w-32 rounded-full border border-[#34D399]/20 bg-[#34D399]/10 animate-pulse" />
+        </div>
+
+        <div className="absolute left-1/2 top-[48%] -translate-x-1/2 -translate-y-1/2">
+          <div className="relative flex h-24 w-24 items-center justify-center">
+            <div className="absolute inset-0 rounded-full bg-[#3A9DBC]/10 animate-ping" />
+            <div className="absolute inset-[10px] rounded-full border border-[#3A9DBC]/25 bg-[#0D1E2E] animate-pulse" />
+            <div className="absolute inset-[22px] rounded-full bg-[#3A9DBC]/40 animate-pulse" />
+          </div>
+        </div>
+
+        <div className="absolute inset-x-4 bottom-24 rounded-[28px] border border-[#3A9DBC]/40 bg-[#0D1E2E]/96 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.35)]">
+          <div className="flex items-center gap-3">
+            <div className="h-14 w-14 rounded-2xl bg-white/8 animate-pulse" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-40 rounded bg-white/10 animate-pulse" />
+              <div className="h-3 w-28 rounded bg-[#3A9DBC]/20 animate-pulse" />
+            </div>
+          </div>
+          <div className="mt-4 flex gap-3">
+            <div className="h-14 flex-1 rounded-2xl bg-[#E85D2F]/80 animate-pulse" />
+            <div className="h-14 w-24 rounded-2xl bg-white/10 animate-pulse" />
+          </div>
+        </div>
+
+        <div className="absolute bottom-28 right-4 rounded-[26px] border border-[#3A9DBC]/35 bg-[#0D1E2E]/92 p-3 w-[88px]">
+          <div className="mx-auto h-8 w-8 rounded-lg bg-[#3A9DBC]/18 animate-pulse" />
+          <div className="mt-2 h-2.5 w-12 mx-auto rounded bg-white/10 animate-pulse" />
+          <div className="mt-1 h-2.5 w-9 mx-auto rounded bg-white/6 animate-pulse" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function GameScreenLoading({ label = 'Caricamento...' }: GameScreenLoadingProps) {
   return (
     <div className="flex h-full items-center justify-center" style={{ background: '#060C18' }}>

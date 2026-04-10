@@ -1,5 +1,5 @@
-import { GameSectionSkeleton } from '@/components/game/GameLoading'
+import { GameMapSkeleton } from '@/components/game/GameLoading'
 
 export default function Loading() {
-  return <GameSectionSkeleton />
+  return <GameMapSkeleton />
 }

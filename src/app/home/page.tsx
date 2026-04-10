@@ -65,6 +65,7 @@ function HomeLobby() {
   const [nickname, setNickname]   = useState<string | null>(null)
   const [sessions, setSessions]   = useState<SessionStats[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [enteringSessionId, setEnteringSessionId] = useState<string | null>(null)
 
   // Invite code form
   const [code, setCode]           = useState(searchParams.get('code') ?? '')
@@ -87,15 +88,7 @@ function HomeLobby() {
   const [deleting, setDeleting]   = useState(false)
   const [settingMsg, setSettingMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { router.replace('/'); return }
-      setUser(user)
-      loadData(user.id)
-    })
-  }, [supabase, router])
-
-  async function loadData(_userId: string) {
+  async function loadData() {
     // Phase 1 — profile + restore + sessions all in parallel
     const [profileRes, restoreRes, sessionsRes] = await Promise.all([
       fetch('/api/profile'),
@@ -129,6 +122,18 @@ function HomeLobby() {
 
     setLoading(false)
   }
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { router.replace('/'); return }
+      setUser(user)
+      loadData()
+    })
+  }, [supabase, router])
+
+  useEffect(() => {
+    router.prefetch('/game/map')
+  }, [router])
 
   async function saveNickname(nick: string) {
     setNickSaving(true); setNickError('')
@@ -186,8 +191,10 @@ function HomeLobby() {
   }
 
   function enterSession(sess: SessionStats) {
+    if (enteringSessionId) return
+    setEnteringSessionId(sess.id)
     localStorage.setItem('current_session_id', sess.id)
-    window.location.href = `/game/map?restored=${sess.id}`
+    router.push(`/game/map?restored=${sess.id}`)
   }
 
   const googleName  = user?.user_metadata?.full_name ?? user?.email ?? 'Giocatore'
@@ -602,9 +609,12 @@ function HomeLobby() {
                       <button
                         className="btn btn-teal"
                         style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.03em', padding: '14px 16px', boxShadow: '0 4px 20px rgba(58,188,168,0.35)' }}
+                        disabled={enteringSessionId !== null}
                         onClick={() => enterSession(selected)}
                       >
-                        {selected.status === 'ended' ? '🏁 Visualizza sessione' : selected.status === 'active' ? '▶ Entra nella sessione' : '▶ Rientra nella sessione'}
+                        {enteringSessionId === selected.id ? (
+                          <><span className="spinner" /> Apertura...</>
+                        ) : selected.status === 'ended' ? '🏁 Visualizza sessione' : selected.status === 'active' ? '▶ Entra nella sessione' : '▶ Rientra nella sessione'}
                       </button>
                     </div>
                   )}
@@ -622,7 +632,7 @@ function HomeLobby() {
                 <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(247,200,65,0.12)', border: '1px solid rgba(247,200,65,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎟️</div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>Inserisci codice invito</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Ricevuto dall'organizzatore dell'evento</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Ricevuto dall&apos;organizzatore dell&apos;evento</div>
                 </div>
               </div>
               <em className={`chevron ${showJoin ? 'open' : ''}`}>⌄</em>
@@ -646,7 +656,7 @@ function HomeLobby() {
                     {gdpr && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                   </div>
                   <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
-                    Accetto il trattamento dei dati personali ai sensi del GDPR (art. 6) per partecipare all'evento
+                    Accetto il trattamento dei dati personali ai sensi del GDPR (art. 6) per partecipare all&apos;evento
                   </span>
                 </label>
 
