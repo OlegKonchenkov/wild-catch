@@ -45,12 +45,20 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  await admin.from('player_creatures').insert({
+  const { data: pc } = await admin.from('player_creatures').insert({
     user_id: user.id,
     creature_id: creature.id,
     session_id: sessionId,
     duplicates_count: 1,
-  })
+  }).select('id').single()
+
+  // Auto-assign starter as captain (squad slot 0)
+  if (pc?.id) {
+    await admin.from('player_sessions')
+      .update({ squad_ids: [pc.id], selected_creature_id: pc.id })
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId)
+  }
 
   // Save a game event for bell history
   admin.from('player_game_events').insert({
