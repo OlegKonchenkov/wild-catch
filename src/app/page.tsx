@@ -299,7 +299,14 @@ function Landing() {
 
         {/* Logo — sits above the card */}
         <div className="logo-wrap" style={{ paddingBottom: 32 }}>
-          <div className="logo-emblem">⚔️</div>
+          <div className="logo-emblem">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+              <path d="M14.5 9.5L20 4M20 4h-4M20 4v4" stroke="rgba(58,188,168,0.9)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9.5 14.5L4 20M4 20h4M4 20v-4" stroke="rgba(58,188,168,0.9)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M14.5 9.5l-5 5" stroke="rgba(58,188,168,0.7)" strokeWidth="1.6" strokeLinecap="round"/>
+              <circle cx="12" cy="12" r="1.2" fill="rgba(58,188,168,0.6)"/>
+            </svg>
+          </div>
           <div className="logo-title">DAIMON</div>
           <div className="logo-sub">Adriatic Creature Hunt</div>
         </div>
