@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import { GameBattleSkeleton } from '@/components/game/GameLoading'
 import { createClient } from '@/lib/supabase/client'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
@@ -592,12 +593,7 @@ export default function EncounterPage() {
       </div>
     )
     return (
-      <div className="flex items-center justify-center h-full" style={{ background: '#060C18' }}>
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-2 border-[#3A9DBC] border-t-transparent rounded-full animate-spin" />
-          <p className="text-white/50 text-sm">Caricamento incontro...</p>
-        </div>
-      </div>
+      <GameBattleSkeleton />
     )
   }
 

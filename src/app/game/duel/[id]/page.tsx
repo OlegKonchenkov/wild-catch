@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
-import { GameScreenLoading } from '@/components/game/GameLoading'
+import { GameBattleSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { scaleCombatStats } from '@/lib/game/combat'
@@ -614,7 +614,7 @@ export default function DuelPage() {
   const selectedItem = battagliaItems.find(it => it.inventoryId === selectedItemId)
 
   if (loading) {
-    return <GameScreenLoading label="Preparazione duello..." />
+    return <GameBattleSkeleton />
   }
 
   return (

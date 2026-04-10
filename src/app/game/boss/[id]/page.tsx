@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
-import { GameListSkeleton } from '@/components/game/GameLoading'
+import { GameBattleSkeleton, GameListSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
@@ -1282,12 +1282,7 @@ export default function BossFightPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-3" style={{ background: BOSS_THEME.bg }}>
-        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'rgba(247,200,65,0.4)', borderTopColor: '#F7C841' }} />
-        <p className="text-sm text-white/45">Preparazione boss...</p>
-      </div>
-    )
+    return <GameBattleSkeleton background={BOSS_THEME.bg} accent="rgba(247,200,65,0.16)" />
   }
 
   if (error) {
