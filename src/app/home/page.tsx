@@ -298,6 +298,8 @@ function HomeLobby() {
         .btn-gold { background: linear-gradient(135deg, #F7C841, #E0B020); color: #0F1F2E; box-shadow: 0 3px 14px rgba(247,200,65,0.3); }
         .btn-red  { background: rgba(232,93,47,0.15); color: #E85D2F; border: 1px solid rgba(232,93,47,0.3); box-shadow: none; }
         .btn-ghost { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5); box-shadow: none; border: 1px solid rgba(255,255,255,0.08); }
+        .btn-logout { background: rgba(232,93,47,0.1); color: #E8724F; border: 1.5px solid rgba(232,93,47,0.38); box-shadow: 0 2px 10px rgba(232,93,47,0.1); font-weight: 600; }
+        .btn-logout:hover:not(:disabled) { background: rgba(232,93,47,0.18); border-color: rgba(232,93,47,0.58); box-shadow: 0 4px 16px rgba(232,93,47,0.22); opacity: 1; transform: translateY(-1px); }
         .msg { border-radius: 8px; padding: 9px 12px; font-size: 12.5px; margin-top: 8px; }
         .msg.err { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
         .msg.ok  { background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: #6ee7b7; }
@@ -478,8 +480,13 @@ function HomeLobby() {
 
               {/* Sign out */}
               <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <button className="btn btn-ghost" onClick={handleSignOut}>
-                  🚪 Disconnetti
+                <button className="btn btn-logout" onClick={handleSignOut} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                  Disconnetti
                 </button>
               </div>
 
