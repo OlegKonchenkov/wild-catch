@@ -301,10 +301,18 @@ function Landing() {
         <div className="logo-wrap" style={{ paddingBottom: 32 }}>
           <div className="logo-emblem">
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
-              <path d="M14.5 9.5L20 4M20 4h-4M20 4v4" stroke="rgba(58,188,168,0.9)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M9.5 14.5L4 20M4 20h4M4 20v-4" stroke="rgba(58,188,168,0.9)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M14.5 9.5l-5 5" stroke="rgba(58,188,168,0.7)" strokeWidth="1.6" strokeLinecap="round"/>
-              <circle cx="12" cy="12" r="1.2" fill="rgba(58,188,168,0.6)"/>
+              {/* Sword 1: blade tip NW → handle SE */}
+              <path d="M4.5 4.5L19.5 19.5" stroke="rgba(58,188,168,0.8)" strokeWidth="1.4" strokeLinecap="round"/>
+              {/* Guard 1: perpendicular to NW-SE at ~(15,15) */}
+              <path d="M13 17L17 13" stroke="rgba(58,188,168,1)" strokeWidth="2" strokeLinecap="round"/>
+              {/* Pommel 1 */}
+              <circle cx="19.5" cy="19.5" r="1.3" fill="rgba(58,188,168,0.7)"/>
+              {/* Sword 2: blade tip NE → handle SW */}
+              <path d="M19.5 4.5L4.5 19.5" stroke="rgba(58,188,168,0.8)" strokeWidth="1.4" strokeLinecap="round"/>
+              {/* Guard 2: perpendicular to NE-SW at ~(9,15) */}
+              <path d="M7 13L11 17" stroke="rgba(58,188,168,1)" strokeWidth="2" strokeLinecap="round"/>
+              {/* Pommel 2 */}
+              <circle cx="4.5" cy="19.5" r="1.3" fill="rgba(58,188,168,0.7)"/>
             </svg>
           </div>
           <div className="logo-title">DAIMON</div>
