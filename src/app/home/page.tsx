@@ -159,7 +159,7 @@ function HomeLobby() {
     const data = await res.json()
     if (!res.ok) { setJoinError(data.error ?? 'Codice non valido'); setJoining(false); return }
     localStorage.setItem('current_session_id', data.sessionId)
-    router.push('/game/map')
+    window.location.assign(`/game/map?restored=${data.sessionId}`)
   }
 
   async function handleUpdateNick() {

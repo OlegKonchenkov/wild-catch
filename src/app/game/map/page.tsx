@@ -491,7 +491,9 @@ function MapPageInner() {
   const [showStarterSelect, setShowStarterSelect] = useState(false)
   const [starters, setStarters] = useState<StarterCreature[]>([])
   const [starterPicked, setStarterPicked] = useState<StarterCreature | null>(null)
+  const [starterCheckPending, setStarterCheckPending] = useState(true)
   const starterCheckedRef = useRef(false)
+  const starterFlowLockedRef = useRef(true)
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
@@ -518,9 +520,17 @@ function MapPageInner() {
 
   useEffect(() => {
     function init(sid: string) {
+      starterCheckedRef.current = false
+      starterFlowLockedRef.current = true
       setSessionId(sid)
       sessionIdRef.current = sid
       localStorage.setItem('current_session_id', sid)
+      setSession(null)
+      setStarterCheckPending(true)
+      setShowStarterSelect(false)
+      setStarters([])
+      setStarterPicked(null)
+      setCreatureImageUrl(null)
       supabase.from('sessions').select('*').eq('id', sid).single()
         .then(({ data }) => { if (data) setSession(data as unknown as Session) })
       // Load esca status
@@ -586,6 +596,13 @@ function MapPageInner() {
     }
   }, [])
 
+  useEffect(() => {
+    starterFlowLockedRef.current =
+      starterCheckPending ||
+      (showStarterSelect && !starterPicked) ||
+      hatchQueue.some(entry => entry.isStarter)
+  }, [starterCheckPending, showStarterSelect, starterPicked, hatchQueue])
+
   // Restore pending encounter popup after tab switch / navigation away and back
   // The DB auto-expires encounters older than 3 minutes, so we use the same window.
   useEffect(() => {
@@ -610,6 +627,7 @@ function MapPageInner() {
     // Mutex: skip if another trigger is in-flight or popup already showing
     if (triggeringEncounterRef.current) return false
     if (encounterPopupRef.current) return false
+    if (starterFlowLockedRef.current) return false
 
     triggeringEncounterRef.current = true
     try {
@@ -699,6 +717,8 @@ function MapPageInner() {
       setMissionQueue(prev => [...prev, ...data.completedMissions])
     }
 
+    if (starterFlowLockedRef.current) return
+
     // Accumulate distance for walk-based encounter trigger
     if (typeof data.distanceMoved === 'number' && data.distanceMoved > 0 && data.distanceMoved < 500) {
       cumDistRef.current += data.distanceMoved
@@ -733,6 +753,7 @@ function MapPageInner() {
       const delay = minMs + Math.random() * (maxMs - minMs)
       timeout = setTimeout(async () => {
         if (sessionEndedRef.current) return
+        if (starterFlowLockedRef.current) { scheduleTimerEncounter(); return }
         if (!inBoundsRef.current) { scheduleTimerEncounter(); return }
         const now = Date.now()
         if (now - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS) {
@@ -780,6 +801,7 @@ function MapPageInner() {
   useEffect(() => {
     if (!sessionId || starterCheckedRef.current) return
     starterCheckedRef.current = true
+    setStarterCheckPending(true)
     fetch(`/api/game/starters?sessionId=${sessionId}`)
       .then(r => r.json())
       .then(d => {
@@ -789,6 +811,7 @@ function MapPageInner() {
         }
       })
       .catch(() => {})
+      .finally(() => setStarterCheckPending(false))
   }, [sessionId])
 
   // Realtime broadcast: session_ended / session_restarted from admin
@@ -808,7 +831,7 @@ function MapPageInner() {
     return () => { supabase.removeChannel(channel) }
   }, [sessionId, supabase, router])
 
-  if (!session) {
+  if (!session || starterCheckPending) {
     return <GameMapSkeleton />
   }
 
@@ -898,6 +921,7 @@ function MapPageInner() {
             if (res.ok) {
               setStarterPicked(creature)
               setShowStarterSelect(false)
+              setCreatureImageUrl(creature.image_url)
               // Show the reveal card via the hatch queue (same bottom-sheet UI)
               setHatchQueue(prev => [{
                 name: creature.name,
