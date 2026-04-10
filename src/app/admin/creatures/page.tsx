@@ -32,10 +32,10 @@ const RARITIES: Rarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendari
 const ELEMENTS: ElementType[] = ['fiamma', 'adriatico', 'bosco', 'terra', 'armonia']
 
 const RARITY_META: Record<Rarity, { label: string; color: string; glow: string }> = {
-  comune:      { label: 'Comune',      color: '#9CA3AF', glow: 'rgba(156,163,175,0.25)' },
-  non_comune:  { label: 'Non Comune',  color: '#34D399', glow: 'rgba(52,211,153,0.25)' },
-  raro:        { label: 'Raro',        color: '#38BDF8', glow: 'rgba(56,189,248,0.25)' },
-  epico:       { label: 'Epico',       color: '#C084FC', glow: 'rgba(192,132,252,0.25)' },
+  comune:      { label: 'Terrestre',   color: '#9CA3AF', glow: 'rgba(156,163,175,0.25)' },
+  non_comune:  { label: 'Arcaico',     color: '#34D399', glow: 'rgba(52,211,153,0.25)' },
+  raro:        { label: 'Eroico',      color: '#38BDF8', glow: 'rgba(56,189,248,0.25)' },
+  epico:       { label: 'Mostruoso',   color: '#C084FC', glow: 'rgba(192,132,252,0.25)' },
   leggendario: { label: 'Leggendario', color: '#FBBF24', glow: 'rgba(251,191,36,0.35)' },
   mitologico:  { label: 'Mitologico',  color: '#FF4D6D', glow: 'rgba(255,77,109,0.35)' },
 }

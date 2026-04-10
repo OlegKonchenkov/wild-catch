@@ -792,8 +792,8 @@ export default function QRCodesPage() {
                   <>
                     <Field label="Rarità dell'uovo" hint="Determina il pool di creature ottenibili dalla schiusura">
                       <select value={String(fields.egg_rarity)} onChange={e => setField('egg_rarity', e.target.value)} className={cls}>
-                        <option value="comune">⚪ Comune</option>
-                        <option value="non_comune">🟢 Non Comune</option>
+                        <option value="comune">⚪ Terrestre</option>
+                        <option value="non_comune">🟢 Arcaico</option>
                         <option value="raro">🔵 Raro</option>
                         <option value="epico">🟣 Epico</option>
                         <option value="leggendario">🟡 Leggendario</option>

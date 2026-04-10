@@ -87,10 +87,10 @@ const RARITY_BONUS_KEY: Partial<Record<string, keyof SpawnConfig>> = {
 }
 
 const RARITY_DISPLAY: Record<string, { label: string; color: string }> = {
-  comune:      { label: 'Comune',      color: '#9ca3af' },
+  comune:      { label: 'Terrestre',      color: '#9ca3af' },
   non_comune:  { label: 'Non comune',  color: '#4ade80' },
-  raro:        { label: 'Raro',        color: '#60a5fa' },
-  epico:       { label: 'Epico',       color: '#c084fc' },
+  raro:        { label: 'Eroico',        color: '#60a5fa' },
+  epico:       { label: 'Mostruoso',       color: '#c084fc' },
   leggendario: { label: 'Leggendario', color: '#fbbf24' },
   mitologico:  { label: 'Mitologico',  color: '#FF4D6D' },
 }
@@ -613,7 +613,7 @@ export default function LevelRewardsPage() {
                         </tr>
                       ))}
                       <tr>
-                        <td className="px-3 py-2 text-white/30">Comune</td>
+                        <td className="px-3 py-2 text-white/30">Terrestre</td>
                         {PREVIEW_LEVELS.map(lv => (
                           <td key={lv} className="text-center px-2 py-2 text-white/30 font-mono">×1.00</td>
                         ))}
@@ -781,7 +781,7 @@ export default function LevelRewardsPage() {
                   </table>
                 </div>
                 <p className="text-[10px] text-white/20 px-3 pb-3 mt-1">
-                  Il bonus livello si applica solo alle rarità superiori a Comune. Valori sopra 100% vengono troncati a 100%.
+                  Il bonus livello si applica solo alle rarità superiori a Terrestre. Valori sopra 100% vengono troncati a 100%.
                 </p>
               </div>
 

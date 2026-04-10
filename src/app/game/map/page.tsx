@@ -63,10 +63,10 @@ const RARITY_COLOR: Record<string, string> = {
 }
 
 const RARITY_LABEL: Record<string, string> = {
-  comune:      'Comune',
-  non_comune:  'Non Comune',
-  raro:        'Raro',
-  epico:       'Epico',
+  comune:      'Terrestre',
+  non_comune:  'Arcaico',
+  raro:        'Eroico',
+  epico:       'Mostruoso',
   leggendario: 'Leggendario',
   mitologico:  'Mitologico',
 }

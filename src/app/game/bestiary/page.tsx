@@ -262,8 +262,8 @@ export default function BestiaryPage() {
     }
   }
 
-  const RARITY_LABELS: Record<string, string> = {
-    comune: 'Comune', non_comune: 'Non Com.', raro: 'Raro', epico: 'Epico', leggendario: 'Legg.', mitologico: 'Mito',
+  const RARITY_FILTER_LABELS: Record<string, string> = {
+    comune: 'Terr.', non_comune: 'Arcaico', raro: 'Eroico', epico: 'Mostr.', leggendario: 'Legg.', mitologico: 'Mito',
   }
 
   const caughtCount = new Set(playerCreatures.map(pc => pc.creature_id)).size
@@ -519,7 +519,7 @@ export default function BestiaryPage() {
                           color: active ? (color ?? 'white') : 'rgba(255,255,255,0.28)',
                           border: `1px solid ${active ? (color ? `${color}50` : 'rgba(255,255,255,0.25)') : 'rgba(255,255,255,0.07)'}`,
                         }}>
-                        {r === 'all' ? '★ Rarità' : RARITY_LABELS[r]}
+                        {r === 'all' ? '★ Rarità' : RARITY_FILTER_LABELS[r]}
                       </button>
                     )
                   })}
@@ -1241,7 +1241,7 @@ export default function BestiaryPage() {
                         <span className="text-xs capitalize text-white/40">{cr.element}</span>
                         <span className="text-xs px-2 py-0.5 rounded-full font-bold"
                           style={{ background: `${rarityColor}22`, color: rarityColor, border: `1px solid ${rarityColor}55` }}>
-                          {RARITY_LABELS[cr.rarity]}
+                          {RARITY_LABELS[cr.rarity as keyof typeof RARITY_LABELS]}
                         </span>
                       </div>
                       {cr.description && (
