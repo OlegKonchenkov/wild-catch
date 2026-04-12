@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
   }
 
-  if (!['draft', 'ready', 'active'].includes(session.status)) {
+  if (!['draft', 'ready', 'active', 'ended'].includes(session.status)) {
     return NextResponse.json({ error: "L'evento non è ancora disponibile" }, { status: 403 })
   }
 
@@ -65,6 +65,7 @@ export async function POST(request: Request) {
       alreadyJoined: true,
       sessionStatus: session.status,
       pendingStart: session.status === 'draft',
+      viewOnly: session.status === 'ended',
     })
   }
 
@@ -122,6 +123,7 @@ export async function POST(request: Request) {
     sessionId,
     sessionStatus: session.status,
     pendingStart: session.status === 'draft',
+    viewOnly: session.status === 'ended',
   })
 }
 

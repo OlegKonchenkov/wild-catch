@@ -221,4 +221,42 @@ describe('POST /api/auth/join', () => {
       quantity: 5,
     })
   })
+  it('allows joining ended sessions in view-only mode', async () => {
+    const state: AdminMockState = {
+      invite: { id: 'invite2', session_id: 'sess2', is_active: true, used_by_user_id: null },
+      session: { id: 'sess2', status: 'ended', starter_kit: [] },
+      existingPlayerSession: null,
+      reteBase: { id: 'rete-base' },
+    }
+
+    vi.mocked(createAdminClient).mockReturnValue(
+      createAdminMock(state) as unknown as ReturnType<typeof createAdminClient>
+    )
+
+    const req = new Request('http://localhost/api/auth/join', {
+      method: 'POST',
+      body: JSON.stringify({ code: 'ENDED123' }),
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    const res = await POST(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body).toMatchObject({
+      sessionId: 'sess2',
+      sessionStatus: 'ended',
+      pendingStart: false,
+      viewOnly: true,
+    })
+    expect(state.inviteUpdatePayload).toMatchObject({
+      used_by_user_id: 'user1',
+      is_active: false,
+    })
+    expect(state.insertedPlayerSession).toMatchObject({
+      user_id: 'user1',
+      session_id: 'sess2',
+      gold: 100,
+    })
+  })
 })

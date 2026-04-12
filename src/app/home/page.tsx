@@ -176,13 +176,15 @@ function HomeLobby() {
     const data = await res.json()
     if (!res.ok) { setJoinError(data.error ?? 'Codice non valido'); setJoining(false); return }
 
-    if (data.pendingStart) {
+    if (data.pendingStart || data.viewOnly || data.sessionStatus === 'ended') {
       await loadData()
       setSelectedId(data.sessionId)
       setCode('')
       setJoinNotice({
         ok: true,
-        text: "Sessione aggiunta alle tue sessioni. Potrai entrare quando l'evento verrà avviato.",
+        text: data.pendingStart
+          ? "Sessione aggiunta alle tue sessioni. Potrai entrare quando l'evento verrà avviato."
+          : 'Sessione aggiunta alle tue sessioni. Puoi aprirla in modalità visualizzazione.',
       })
       setJoining(false)
       return
@@ -756,3 +758,4 @@ export default function HomePage() {
     </Suspense>
   )
 }
+
