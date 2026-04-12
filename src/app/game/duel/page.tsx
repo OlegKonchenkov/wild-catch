@@ -6,6 +6,7 @@ import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Rarity, Element } from '@/lib/types'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { motion, AnimatePresence } from 'framer-motion'
+import { scaleCombatStats } from '@/lib/game/combat'
 
 interface HistoryEntry {
   id: string
@@ -84,6 +85,7 @@ interface SquadCreature {
   rarity: Rarity
   hp: number
   atk: number
+  def: number
   image_url: string
 }
 
@@ -99,6 +101,7 @@ export default function DuelLobbyPage() {
   const [error, setError] = useState<string | null>(null)
   const [loadingCreatures, setLoadingCreatures] = useState(true)
   const [pendingConnect, setPendingConnect] = useState<{ roomCode?: string } | null>(null)
+  const [playerLevel, setPlayerLevel] = useState(1)
   const { history, loading: historyLoading } = useHistory(supabase)
 
   useEffect(() => {
@@ -106,12 +109,21 @@ export default function DuelLobbyPage() {
     if (!sessionId) { setLoadingCreatures(false); return }
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoadingCreatures(false); return }
-      supabase
-        .from('player_creatures')
-        .select('id, creatures(name, element, rarity, hp, atk, image_url)')
-        .eq('user_id', user.id)
-        .eq('session_id', sessionId)
-        .then(({ data }) => {
+      Promise.all([
+        supabase
+          .from('player_creatures')
+          .select('id, creatures(name, element, rarity, hp, atk, def, image_url)')
+          .eq('user_id', user.id)
+          .eq('session_id', sessionId),
+        supabase
+          .from('player_sessions')
+          .select('level')
+          .eq('user_id', user.id)
+          .eq('session_id', sessionId)
+          .single(),
+      ]).then(([creaturesRes, levelRes]) => {
+        const data = creaturesRes.data
+        if (levelRes.data) setPlayerLevel((levelRes.data as { level?: number | null }).level ?? 1)
           if (!data || data.length === 0) { setNoCreatures(true); setLoadingCreatures(false); return }
           const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
           const mapped: SquadCreature[] = (data as any[])
@@ -123,6 +135,7 @@ export default function DuelLobbyPage() {
               rarity: pc.creatures.rarity,
               hp: pc.creatures.hp,
               atk: pc.creatures.atk,
+              def: pc.creatures.def ?? 0,
               image_url: pc.creatures.image_url,
             }))
             .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity))
@@ -297,6 +310,7 @@ export default function DuelLobbyPage() {
         <div className="flex gap-2">
           {lineup.map((cr, i) => {
             const color = cr ? RARITY_COLORS[cr.rarity] : null
+            const scaled = cr ? scaleCombatStats({ hp: cr.hp, atk: cr.atk, def: cr.def }, playerLevel) : null
             return (
               <motion.button
                 key={i}
@@ -324,7 +338,27 @@ export default function DuelLobbyPage() {
                       rarity={cr.rarity}
                     />
                     <span className="text-[9px] text-white/75 truncate w-full text-center px-1 leading-tight font-semibold">{cr.name}</span>
-                    <span className="text-[8px] text-white/30 font-mono">HP {cr.hp}</span>
+                    {scaled && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        {([
+                          { label: 'HP', value: scaled.hp, color: '#F87171' },
+                          { label: 'ATK', value: scaled.atk, color: '#FB923C' },
+                          { label: 'DEF', value: scaled.def, color: '#60A5FA' },
+                        ] as const).map(stat => (
+                          <span
+                            key={stat.label}
+                            className="text-[8px] font-bold px-1 py-0.5 rounded-md"
+                            style={{
+                              color: stat.color,
+                              background: `${stat.color}14`,
+                              border: `1px solid ${stat.color}22`,
+                            }}
+                          >
+                            {stat.label} {stat.value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-[88px] gap-1">
@@ -361,6 +395,7 @@ export default function DuelLobbyPage() {
               const inLineup = slotIdx !== -1
               const canAdd = !inLineup && filledCount < 3
               const rarityColor = RARITY_COLORS[cr.rarity]
+              const scaled = scaleCombatStats({ hp: cr.hp, atk: cr.atk, def: cr.def }, playerLevel)
               return (
                 <motion.button
                   key={cr.playerCreatureId}
@@ -396,7 +431,25 @@ export default function DuelLobbyPage() {
                     <p className="text-sm font-bold text-white truncate">{cr.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px]">{ELEMENT_EMOJI[cr.element]}</span>
-                      <span className="text-[10px] text-white/35">HP {cr.hp} · ATK {cr.atk}</span>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {([
+                          { label: 'HP', value: scaled.hp, color: '#F87171' },
+                          { label: 'ATK', value: scaled.atk, color: '#FB923C' },
+                          { label: 'DEF', value: scaled.def, color: '#60A5FA' },
+                        ] as const).map(stat => (
+                          <span
+                            key={stat.label}
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                            style={{
+                              color: stat.color,
+                              background: `${stat.color}14`,
+                              border: `1px solid ${stat.color}22`,
+                            }}
+                          >
+                            {stat.label} {stat.value}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   {inLineup ? (
@@ -506,7 +559,7 @@ export default function DuelLobbyPage() {
               </p>
               <p className="text-white/50 text-sm text-center mb-5 leading-relaxed">
                 Stai usando solo <span className="text-[#FBBF24] font-bold">{filledCount}/3</span> creature.
-                L'avversario potrebbe averne di più — sei sicuro di voler combattere così?
+                L&apos;avversario potrebbe averne di più — sei sicuro di voler combattere così?
               </p>
               <div className="flex flex-col gap-2">
                 <button
@@ -535,3 +588,4 @@ export default function DuelLobbyPage() {
     </div>
   )
 }
+

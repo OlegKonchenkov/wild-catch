@@ -74,6 +74,7 @@ function HomeLobby() {
   const [showJoin, setShowJoin]   = useState(!!searchParams.get('code'))
   const [joining, setJoining]     = useState(false)
   const [joinError, setJoinError] = useState('')
+  const [joinNotice, setJoinNotice] = useState<{ ok: boolean; text: string } | null>(null)
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false)
 
   // Nickname prompt
@@ -153,7 +154,7 @@ function HomeLobby() {
   async function handleJoin() {
     if (!code || code.length < 4 || !gdpr || joining) return
     if (!nickname) { setJoinError('Imposta prima il tuo nickname (vedi sopra)'); return }
-    setJoining(true); setJoinError('')
+    setJoining(true); setJoinError(''); setJoinNotice(null)
 
     const consentRes = await fetch('/api/profile', {
       method: 'PUT',
@@ -174,6 +175,19 @@ function HomeLobby() {
     })
     const data = await res.json()
     if (!res.ok) { setJoinError(data.error ?? 'Codice non valido'); setJoining(false); return }
+
+    if (data.pendingStart) {
+      await loadData()
+      setSelectedId(data.sessionId)
+      setCode('')
+      setJoinNotice({
+        ok: true,
+        text: "Sessione aggiunta alle tue sessioni. Potrai entrare quando l'evento verrà avviato.",
+      })
+      setJoining(false)
+      return
+    }
+
     localStorage.setItem('current_session_id', data.sessionId)
     window.location.assign(`/game/map?restored=${data.sessionId}`)
   }
@@ -717,6 +731,7 @@ function HomeLobby() {
                 </button>
 
                 {joinError && <div className="msg err">⚠ {joinError}</div>}
+                {joinNotice && <div className={`msg ${joinNotice.ok ? 'ok' : 'err'}`}>{joinNotice.ok ? '✓' : '⚠'} {joinNotice.text}</div>}
               </div>
             )}
           </Card>

@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
   }
 
-  if (!['ready', 'active'].includes(session.status)) {
+  if (!['draft', 'ready', 'active'].includes(session.status)) {
     return NextResponse.json({ error: "L'evento non è ancora disponibile" }, { status: 403 })
   }
 
@@ -60,7 +60,12 @@ export async function POST(request: Request) {
 
   if (existing) {
     // Already joined — just return sessionId (idempotent)
-    return NextResponse.json({ sessionId, alreadyJoined: true })
+    return NextResponse.json({
+      sessionId,
+      alreadyJoined: true,
+      sessionStatus: session.status,
+      pendingStart: session.status === 'draft',
+    })
   }
 
   // Mark invite as used (set is_active false + record who used it)
@@ -113,5 +118,10 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ sessionId })
+  return NextResponse.json({
+    sessionId,
+    sessionStatus: session.status,
+    pendingStart: session.status === 'draft',
+  })
 }
+

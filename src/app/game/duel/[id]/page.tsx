@@ -67,13 +67,14 @@ interface CardProps {
   currentHp: number
   maxHp: number
   atk?: number
+  def?: number
   animState?: 'idle' | 'attack' | 'damage'
   side: 'left' | 'right'
   lineup?: Array<{ color: string; isActive: boolean; fainted: boolean }>
   lineupLabel?: string
 }
 
-function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, animState = 'idle', side, lineup, lineupLabel }: CardProps) {
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, def, animState = 'idle', side, lineup, lineupLabel }: CardProps) {
   const spriteSize = typeof window !== 'undefined'
     ? Math.round(Math.min(window.innerWidth * 0.35, window.innerHeight * 0.2, 158))
     : 122
@@ -153,11 +154,21 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
           </div>
         )}
 
-        {/* ATK stat (player only) */}
-        {atk !== undefined && (
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-[8px] font-bold text-white/30 uppercase tracking-wider">ATK</span>
-            <span className="text-[11px] font-extrabold" style={{ color: '#E85D2F' }}>{atk}</span>
+        {/* Combat stats */}
+        {(atk !== undefined || def !== undefined) && (
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            {atk !== undefined && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                style={{ color: '#FB923C', background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.22)' }}>
+                ATK {atk}
+              </span>
+            )}
+            {def !== undefined && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                style={{ color: '#60A5FA', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.22)' }}>
+                DEF {def}
+              </span>
+            )}
           </div>
         )}
 
@@ -591,6 +602,10 @@ export default function DuelPage() {
   const myHpMax     = myCombatStats?.hp ?? myActiveCr?.hp ?? 100
   const oppHp       = oppActive?.current_hp ?? 0
   const oppHpMax    = oppCombatStats?.hp ?? oppActiveCr?.hp ?? 100
+  const myAtk       = myCombatStats?.atk ?? myActiveCr?.atk ?? 0
+  const myDef       = myCombatStats?.def ?? myActiveCr?.def ?? 0
+  const oppAtk      = oppCombatStats?.atk ?? oppActiveCr?.atk ?? 0
+  const oppDef      = oppCombatStats?.def ?? oppActiveCr?.def ?? 0
 
   // ── Element-themed background ──────────────────────────────────────────────
   const myTheme  = ELEMENT_THEME[myActiveCr?.element ?? '']  ?? DEFAULT_THEME
@@ -657,7 +672,7 @@ export default function DuelPage() {
               </div>
             </motion.div>
             <p className="text-xl font-extrabold text-white mb-1">In attesa...</p>
-            <p className="text-white/40 text-sm mb-6">L'avversario sta per entrare</p>
+            <p className="text-white/40 text-sm mb-6">L&apos;avversario sta per entrare</p>
             {duel?.room_code && (
               <div className="rounded-2xl px-6 py-4 text-center"
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -801,6 +816,8 @@ export default function DuelPage() {
               rarity={oppActiveCr.rarity}
               currentHp={oppHp}
               maxHp={oppHpMax}
+              atk={oppAtk}
+              def={oppDef}
               animState={oppAnimState}
               side="right"
               lineup={oppLineupDots}
@@ -856,7 +873,8 @@ export default function DuelPage() {
               rarity={myActiveCr.rarity}
               currentHp={myHp}
               maxHp={myHpMax}
-              atk={myCombatStats?.atk ?? myActiveCr.atk}
+              atk={myAtk}
+              def={myDef}
               animState={animState}
               side="left"
               lineup={myLineupDots}
@@ -1036,3 +1054,4 @@ export default function DuelPage() {
     </div>
   )
 }
+
