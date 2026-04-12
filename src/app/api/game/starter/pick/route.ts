@@ -10,14 +10,14 @@ export async function POST(request: Request) {
   const { sessionId, creatureId } = await request.json()
   if (!sessionId || !creatureId) return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
 
-  // Verify session is active
+  // Starter choice is only valid once the player can actually enter gameplay.
   const { data: session } = await supabase
     .from('sessions')
     .select('status')
     .eq('id', sessionId)
     .single()
 
-  if (!session || session.status === 'ended') {
+  if (!session || !['ready', 'active'].includes(session.status)) {
     return NextResponse.json({ error: 'Sessione non valida' }, { status: 400 })
   }
 

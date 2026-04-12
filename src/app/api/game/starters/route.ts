@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const sessionId = searchParams.get('sessionId')
   if (!sessionId) return NextResponse.json({ error: 'sessionId mancante' }, { status: 400 })
 
-  // Verify session exists and is active
+  // Only sessions that are about to start or currently active can offer a starter.
   const { data: session } = await supabase
     .from('sessions')
     .select('status')
@@ -18,6 +18,15 @@ export async function GET(request: Request) {
     .single()
 
   if (!session) return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
+
+  if (!['ready', 'active'].includes(session.status)) {
+    return NextResponse.json({
+      alreadyHasCreatures: true,
+      starters: [],
+      starterAvailable: false,
+      sessionStatus: session.status,
+    })
+  }
 
   // Check player already has creatures in this session
   const { count } = await supabase
@@ -27,7 +36,12 @@ export async function GET(request: Request) {
     .eq('session_id', sessionId)
 
   if ((count ?? 0) > 0) {
-    return NextResponse.json({ alreadyHasCreatures: true, starters: [] })
+    return NextResponse.json({
+      alreadyHasCreatures: true,
+      starters: [],
+      starterAvailable: false,
+      sessionStatus: session.status,
+    })
   }
 
   // Return all comune spawnable creatures
@@ -38,5 +52,10 @@ export async function GET(request: Request) {
     .eq('spawnable', true)
     .order('name')
 
-  return NextResponse.json({ alreadyHasCreatures: false, starters: creatures ?? [] })
+  return NextResponse.json({
+    alreadyHasCreatures: false,
+    starters: creatures ?? [],
+    starterAvailable: true,
+    sessionStatus: session.status,
+  })
 }

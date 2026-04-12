@@ -799,20 +799,28 @@ function MapPageInner() {
 
   // Check if player needs to pick a starter (first time in session)
   useEffect(() => {
-    if (!sessionId || starterCheckedRef.current) return
+    if (!sessionId || !session || starterCheckedRef.current) return
+
+    if (!['ready', 'active'].includes(session.status)) {
+      starterCheckedRef.current = true
+      setStarterCheckPending(false)
+      setShowStarterSelect(false)
+      return
+    }
+
     starterCheckedRef.current = true
     setStarterCheckPending(true)
     fetch(`/api/game/starters?sessionId=${sessionId}`)
       .then(r => r.json())
       .then(d => {
-        if (!d.alreadyHasCreatures && d.starters?.length > 0) {
+        if (d.starterAvailable && !d.alreadyHasCreatures && d.starters?.length > 0) {
           setStarters(d.starters)
           setShowStarterSelect(true)
         }
       })
       .catch(() => {})
       .finally(() => setStarterCheckPending(false))
-  }, [sessionId])
+  }, [sessionId, session?.status])
 
   // Realtime broadcast: session_ended / session_restarted from admin
   useEffect(() => {
