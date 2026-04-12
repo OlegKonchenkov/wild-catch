@@ -844,9 +844,6 @@ function MapPageInner() {
     return <GameMapSkeleton />
   }
 
-  const isSessionEndedView = session.status === 'ended' || sessionEnded
-  const isSessionWaitingView = session.status === 'ready' && !isSessionEndedView
-
   return (
     <div className="relative w-full h-full">
       <GameMap
@@ -872,16 +869,6 @@ function MapPageInner() {
       <div className="absolute top-2 left-2 right-20 z-[1500] flex flex-col gap-1.5" style={{ pointerEvents: gpsError ? 'auto' : 'none' }}>
         {gpsError && (
           <GPSErrorBanner message={gpsError} />
-        )}
-        {isSessionWaitingView && (
-          <div className="bg-[#F7C841]/15 text-[#F7C841] text-xs px-3 py-2 rounded-xl backdrop-blur-sm font-semibold border border-[#F7C841]/35">
-            Evento in attesa: il gioco non e ancora iniziato
-          </div>
-        )}
-        {isSessionEndedView && (
-          <div className="bg-white/10 text-white/75 text-xs px-3 py-2 rounded-xl backdrop-blur-sm font-semibold border border-white/15">
-            Evento terminato: stai visualizzando la sessione
-          </div>
         )}
         {!inBounds && (
           <div className="bg-red-900/90 text-red-200 text-xs px-3 py-2 rounded-xl backdrop-blur-sm font-semibold">

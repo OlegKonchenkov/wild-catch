@@ -82,6 +82,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const [gold, setGold]             = useState<number | null>(null)
   const [level, setLevel]           = useState<number | null>(null)
   const [exp, setExp]               = useState<number | null>(null)
+  const [sessionStatus, setSessionStatus] = useState<string | null>(null)
   const [endAt, setEndAt]           = useState<string | null>(null)
   const [sessionEnded, setSessionEnded] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
@@ -109,7 +110,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
           .eq('session_id', sid)
           .single(),
         supabase.from('sessions')
-          .select('end_at, start_at, duration_minutes')
+          .select('end_at, start_at, duration_minutes, status')
           .eq('id', sid)
           .single(),
       ]).then(([psResult, sessResult]) => {
@@ -120,6 +121,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         }
         const sess = sessResult.data
         if (sess) {
+          setSessionStatus(sess.status ?? null)
           if (sess.end_at) {
             setEndAt(sess.end_at)
           } else if (sess.start_at && sess.duration_minutes) {
@@ -418,7 +420,12 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div ref={rootRef} className="flex flex-col bg-[#0F1F2E] text-white overflow-hidden" style={{ height: '100dvh' }}>
-      {/* Session-ended banner */}
+      {/* Session status banner */}
+      {!sessionEnded && sessionStatus === 'ready' && (
+        <div className="flex-none bg-[#F7C841]/15 border-b border-[#F7C841]/35 px-4 py-1.5 text-center">
+          <p className="text-[11px] text-[#F7C841] font-semibold">⏳ Sessione in attesa — il gioco non è ancora iniziato</p>
+        </div>
+      )}
       {sessionEnded && (
         <div className="flex-none bg-[#7B4DB8]/20 border-b border-[#7B4DB8]/40 px-4 py-1.5 text-center">
           <p className="text-[11px] text-[#C084FC] font-semibold">🏁 Sessione terminata — modalità visualizzazione</p>
