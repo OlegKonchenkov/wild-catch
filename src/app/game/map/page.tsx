@@ -783,6 +783,7 @@ function MapPageInner() {
   }, [])
 
   const [escaSecondsLeft, setEscaSecondsLeft] = useState(0)
+  const starterSessionStatus = session?.status
 
   // Countdown tick — updates every second while esca is active
   useEffect(() => {
@@ -799,9 +800,9 @@ function MapPageInner() {
 
   // Check if player needs to pick a starter (first time in session)
   useEffect(() => {
-    if (!sessionId || !session || starterCheckedRef.current) return
+    if (!sessionId || !starterSessionStatus || starterCheckedRef.current) return
 
-    if (!['ready', 'active'].includes(session.status)) {
+    if (!['ready', 'active'].includes(starterSessionStatus)) {
       starterCheckedRef.current = true
       setStarterCheckPending(false)
       setShowStarterSelect(false)
@@ -820,7 +821,7 @@ function MapPageInner() {
       })
       .catch(() => {})
       .finally(() => setStarterCheckPending(false))
-  }, [sessionId, session?.status])
+  }, [sessionId, starterSessionStatus])
 
   // Realtime broadcast: session_ended / session_restarted from admin
   useEffect(() => {
