@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/client'
 import { ImageInput } from '@/components/admin/ImageInput'
 import { AdminInlineSpinner, AdminListSkeleton } from '@/components/admin/AdminLoading'
 import type { QRCodeType } from '@/lib/types'
+import { GameToast } from '@/components/game/GameToast'
+import { useGameToast } from '@/components/game/useGameToast'
 
 /* ── Searchable select ───────────────────────── */
 function SearchSelect({
@@ -398,8 +400,8 @@ export default function QRCodesPage() {
   const [uniquePerUser, setUniquePerUser]   = useState(false)
   const [manualCode, setManualCode] = useState('')
   const [creating, setCreating]     = useState(false)
-  const [error, setError]           = useState('')
-  const [actionMsg, setActionMsg]   = useState<{ ok: boolean; text: string } | null>(null)
+  const [error, setError]           = useState('') // form-level validation errors (inline)
+  const { toast, showSuccess, showError: showToastError, dismiss } = useGameToast()
   const [search, setSearch]         = useState('')
   const [filterType, setFilterType] = useState('')
   const supabase = useMemo(() => createClient(), [])
@@ -491,13 +493,12 @@ export default function QRCodesPage() {
     if (res.ok) {
       if (isEditing) {
         setQrCodes(prev => prev.map(qr => qr.id === editingQrId ? data.qrCode : qr))
-        setActionMsg({ ok: true, text: 'QR aggiornato' })
+        showSuccess('QR aggiornato')
       } else {
         setQrCodes(prev => [data.qrCode, ...prev])
-        setActionMsg({ ok: true, text: 'QR creato' })
+        showSuccess('QR creato')
       }
       clearEditor()
-      setTimeout(() => setActionMsg(null), 2400)
     } else {
       setError(data.error ?? (isEditing ? 'Errore nel salvataggio' : 'Errore nella creazione'))
     }
@@ -512,14 +513,12 @@ export default function QRCodesPage() {
     })
     const data = await res.json()
     if (!res.ok) {
-      setActionMsg({ ok: false, text: data.error ?? 'Eliminazione non riuscita' })
-      setTimeout(() => setActionMsg(null), 2400); return
+      showToastError(data.error ?? 'Eliminazione non riuscita'); return
     }
     setQrCodes(prev => prev.filter(row => row.id !== qr.id))
     if (previewQr?.id === qr.id) setPreviewQr(null)
     if (editingQrId === qr.id) clearEditor()
-    setActionMsg({ ok: true, text: 'QR eliminato' })
-    setTimeout(() => setActionMsg(null), 2400)
+    showSuccess('QR eliminato')
   }
 
   async function downloadQR(qrId: string, qrLabel: string) {
@@ -529,8 +528,7 @@ export default function QRCodesPage() {
     const link = document.createElement('a')
     link.download = `qr_${(qrLabel || qrId).replace(/\s+/g, '_')}.png`
     link.href = canvas.toDataURL(); link.click()
-    setActionMsg({ ok: true, text: 'QR scaricato in PNG' })
-    setTimeout(() => setActionMsg(null), 2400)
+    showSuccess('QR scaricato in PNG')
   }
 
   async function handleShare(qr: any) {
@@ -540,12 +538,10 @@ export default function QRCodesPage() {
       if (navigator.share) { await navigator.share({ title, text }) }
       else {
         const ok = await copyText(text)
-        setActionMsg({ ok, text: ok ? 'Testo copiato' : 'Condivisione non riuscita' })
+        if (ok) showSuccess('Testo copiato'); else showToastError('Condivisione non riuscita')
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
-    } finally {
-      setTimeout(() => setActionMsg(null), 2600)
     }
   }
 
@@ -575,11 +571,7 @@ export default function QRCodesPage() {
         </button>
       </div>
 
-      {actionMsg && (
-        <p className={`mb-4 text-sm rounded-lg px-3 py-2 border ${actionMsg.ok ? 'text-[#34d399] bg-[#34d399]/10 border-[#34d399]/30' : 'text-red-400 bg-red-400/10 border-red-400/30'}`}>
-          {actionMsg.text}
-        </p>
-      )}
+      <GameToast toast={toast} onDismiss={dismiss} />
 
       {/* Session selector — includes "all sessions" option */}
       <div className="mb-4">

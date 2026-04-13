@@ -2,6 +2,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AdminInlineSpinner, AdminListSkeleton } from '@/components/admin/AdminLoading'
+import { GameToast } from '@/components/game/GameToast'
+import { useGameToast } from '@/components/game/useGameToast'
 
 interface Stats {
   sessionName: string; sessionStatus: string
@@ -388,7 +390,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loadingSessions, setLoadingSessions] = useState(true)
   const [loadingStats, setLoadingStats] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { toast, showError, dismiss } = useGameToast()
   const [notifText, setNotifText] = useState('')
   const [activeDetail, setActiveDetail] = useState<DetailType | null>(null)
   const supabase = useMemo(() => createClient(), [])
@@ -412,8 +414,8 @@ export default function AdminDashboard() {
       setLoadingStats(true)
       fetch(`/api/admin/dashboard?sessionId=${selectedId}`)
         .then(r => r.ok ? r.json() : Promise.reject(r.status))
-        .then(data => { setStats(data); setError(null) })
-        .catch(e => setError(`Errore caricamento stats (${e})`))
+        .then(data => { setStats(data) })
+        .catch(e => showError(`Errore caricamento stats (${e})`))
         .finally(() => setLoadingStats(false))
     }
     fetchStats()
@@ -450,9 +452,7 @@ export default function AdminDashboard() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-4">Dashboard Admin</h1>
-      {error && (
-        <p className="text-red-400 text-sm mb-4 bg-red-400/10 rounded-lg p-2">{error}</p>
-      )}
+      <GameToast toast={toast} onDismiss={dismiss} />
 
       {/* Session selector */}
       <div className="mb-4">

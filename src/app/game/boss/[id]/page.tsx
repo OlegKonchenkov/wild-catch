@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import { GameBattleSkeleton, GameListSkeleton } from '@/components/game/GameLoading'
+import { GameToast } from '@/components/game/GameToast'
+import { useGameToast } from '@/components/game/useGameToast'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
@@ -988,7 +990,8 @@ export default function BossFightPage() {
 
   const [fight, setFight]             = useState<any>(null)
   const [loading, setLoading]         = useState(true)
-  const [error, setError]             = useState<string | null>(null)
+  const [error, setError]             = useState<string | null>(null) // load-time errors (full-page screen)
+  const { toast: actionToast, showApiError: showActionError, dismiss: dismissActionToast } = useGameToast()
 
   // Squad selector state
   const [allCreatures, setAllCreatures] = useState<SquadCreature[]>([])
@@ -1158,7 +1161,7 @@ export default function BossFightPage() {
       }),
     })
     const data = await res.json()
-    if (!res.ok) { setError(data.error); setStarting(false); return }
+    if (!res.ok) { showActionError(res.status, data.error ?? 'Errore avvio'); setStarting(false); return }
 
     setBossLineup(data.bossLineup)
     setPlayerLineup(data.playerLineup)
@@ -1182,7 +1185,7 @@ export default function BossFightPage() {
     })
     const data = await res.json()
 
-    if (!res.ok) { setError(data.error); attackingRef.current = false; setAttacking(false); return }
+    if (!res.ok) { showActionError(res.status, data.error ?? 'Errore attacco'); attackingRef.current = false; setAttacking(false); return }
 
     setSelectedItemId(null)
     if (selectedItemId) {
@@ -1323,6 +1326,13 @@ export default function BossFightPage() {
 
   return (
     <div className="h-full text-white flex flex-col overflow-hidden relative" style={{ background: BOSS_THEME.bg }}>
+      {/* Action toast — always on top during combat */}
+      <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="pointer-events-auto">
+          <GameToast toast={actionToast} onDismiss={dismissActionToast} />
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0 z-10 relative"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>

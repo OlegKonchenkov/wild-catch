@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { GameProfileSkeleton } from '@/components/game/GameLoading'
+import { GameToast } from '@/components/game/GameToast'
+import { useGameToast } from '@/components/game/useGameToast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,7 +63,7 @@ function ProfileContent() {
   const [avatarUrl, setAvatarUrl]       = useState<string | null>(null)
   const [loading, setLoading]           = useState(true)
   const [loadingBoard, setLoadingBoard] = useState(false)
-  const [error, setError]               = useState<string | null>(null)
+  const { toast, showError, dismiss }   = useGameToast()
 
   const searchParams = useSearchParams()
   const sessionEnded = searchParams.get('ended') === '1'
@@ -140,7 +142,7 @@ function ProfileContent() {
           setAvatarUrl(profileData.avatar_url)
         }
       } catch {
-        setError('Impossibile caricare i dati')
+        showError('Impossibile caricare i dati')
       } finally {
         setLoading(false)
       }
@@ -192,11 +194,7 @@ function ProfileContent() {
         </div>
       </div>
 
-      {error && (
-        <div className="mx-4 mb-3 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-red-400 text-sm">
-          {error}
-        </div>
-      )}
+      <GameToast toast={toast} onDismiss={dismiss} />
 
       {loading ? (
         <GameProfileSkeleton />

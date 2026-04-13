@@ -7,6 +7,8 @@ import type { Rarity, Element } from '@/lib/types'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { motion, AnimatePresence } from 'framer-motion'
 import { scaleCombatStats } from '@/lib/game/combat'
+import { GameToast } from '@/components/game/GameToast'
+import { useGameToast } from '@/components/game/useGameToast'
 
 interface HistoryEntry {
   id: string
@@ -98,8 +100,8 @@ export default function DuelLobbyPage() {
   const [noCreatures, setNoCreatures] = useState(false)
   const [joinCode, setJoinCode] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [loadingCreatures, setLoadingCreatures] = useState(true)
+  const { toast, showApiError, dismiss } = useGameToast()
   const [pendingConnect, setPendingConnect] = useState<{ roomCode?: string } | null>(null)
   const [playerLevel, setPlayerLevel] = useState(1)
   const { history, loading: historyLoading } = useHistory(supabase)
@@ -186,7 +188,6 @@ export default function DuelLobbyPage() {
     const sessionId = localStorage.getItem('current_session_id')
     if (!sessionId) return
     setLoading(true)
-    setError(null)
     setPendingConnect(null)
     try {
       const lineupPayload = filledLineup.map((cr, i) => ({
@@ -204,11 +205,11 @@ export default function DuelLobbyPage() {
       if (res.ok) {
         router.push(`/game/duel/${data.duelId}`)
       } else {
-        setError(data.error ?? 'Errore connessione')
+        showApiError(res.status, data.error ?? 'Errore connessione')
         setLoading(false)
       }
     } catch {
-      setError('Errore di rete')
+      showApiError(0, 'Errore di rete')
       setLoading(false)
     }
   }
@@ -218,6 +219,13 @@ export default function DuelLobbyPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
+      {/* Toast — fixed above everything */}
+      <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="pointer-events-auto">
+          <GameToast toast={toast} onDismiss={dismiss} />
+        </div>
+      </div>
+
       {/* Header + tabs — single compact row */}
       <div className="flex-none px-4 pt-3 pb-2 flex items-center gap-3">
         <h1 className="text-base font-extrabold text-white shrink-0 flex items-center gap-1.5">
@@ -500,7 +508,7 @@ export default function DuelLobbyPage() {
         <div className="flex gap-2">
           <input
             value={joinCode}
-            onChange={e => { setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 4)); setError(null) }}
+            onChange={e => { setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 4)) }}
             placeholder="ABCD"
             maxLength={4}
             autoCapitalize="characters"
@@ -523,16 +531,6 @@ export default function DuelLobbyPage() {
           </button>
         </div>
 
-        <AnimatePresence>
-          {error && (
-            <motion.p
-              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="text-red-400 text-sm text-center bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2"
-            >
-              {error}
-            </motion.p>
-          )}
-        </AnimatePresence>
       </div>
       </>)}
       </>)}

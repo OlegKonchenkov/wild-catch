@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
 import { AdminListSkeleton } from '@/components/admin/AdminLoading'
+import { GameToast } from '@/components/game/GameToast'
+import { useGameToast } from '@/components/game/useGameToast'
 import { RARITY_CATCH_RATES, CATCH_DIFFICULTY_MULT } from '@/lib/types'
 
 type Rarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario' | 'mitologico'
@@ -60,7 +62,7 @@ type ImageMode = 'preview' | 'url' | 'upload' | 'ai'
 export default function CreaturesPage() {
   const [creatures, setCreatures] = useState<Creature[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { toast, showError, dismiss } = useGameToast()
   const supabase = useMemo(() => createClient(), [])
 
   // Panel state
@@ -97,13 +99,13 @@ export default function CreaturesPage() {
   }, [supabase])
 
   const loadCreatures = useCallback(async () => {
-    setLoading(true); setError(null)
+    setLoading(true)
     try {
       const res = await fetch('/api/admin/creatures')
       const d = await res.json()
-      if (!res.ok) { setError(d.error ?? 'Errore caricamento'); return }
+      if (!res.ok) { showError(d.error ?? 'Errore caricamento'); return }
       setCreatures(d.creatures ?? [])
-    } catch { setError('Errore di rete') }
+    } catch { showError('Errore di rete') }
     finally { setLoading(false) }
   }, [])
 
@@ -164,9 +166,9 @@ export default function CreaturesPage() {
     setDeletingId(c.id)
     try {
       const res = await fetch(`/api/admin/creatures/${c.id}`, { method: 'DELETE' })
-      if (!res.ok) { const d = await res.json(); setError(d.error ?? 'Errore eliminazione') }
+      if (!res.ok) { const d = await res.json(); showError(d.error ?? 'Errore eliminazione') }
       else { if (panel === c.id) closePanel(); await loadCreatures() }
-    } catch { setError('Errore di rete') }
+    } catch { showError('Errore di rete') }
     finally { setDeletingId(null) }
   }
 
@@ -266,9 +268,7 @@ export default function CreaturesPage() {
           </button>
         </div>
 
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm mb-4">{error}</div>
-        )}
+        <GameToast toast={toast} onDismiss={dismiss} />
 
         {/* Grid */}
         <div>
