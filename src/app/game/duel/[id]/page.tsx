@@ -686,6 +686,16 @@ export default function DuelPage() {
                 </motion.p>
               </div>
             )}
+            {myRole === 'challenger' && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/game/duel')}
+                className="mt-6 px-6 py-2.5 rounded-2xl text-sm font-bold"
+                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#F87171' }}
+              >
+                Annulla sfida
+              </motion.button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
