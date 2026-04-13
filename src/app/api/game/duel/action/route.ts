@@ -26,7 +26,9 @@ export async function POST(request: Request) {
   // Guard: session must still be active
   const { data: sessionCheck } = await supabase.from('sessions').select('status').eq('id', duel.session_id).single()
   if (!sessionCheck || sessionCheck.status !== 'active') {
-    return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
+    const notStarted = sessionCheck?.status === 'draft' || sessionCheck?.status === 'ready'
+    const errMsg = notStarted ? 'La sessione non è ancora iniziata' : 'La sessione è terminata'
+    return NextResponse.json({ error: errMsg }, { status: 403 })
   }
 
   const isChallenger = duel.challenger_id === user.id
