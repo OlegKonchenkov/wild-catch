@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, Suspense } from 'react'
+import { useEffect, useMemo, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -7,18 +7,30 @@ function Landing() {
   const supabase = useMemo(() => createClient(), [])
   const router   = useRouter()
   const searchParams = useSearchParams()
+  // true while we're checking whether a saved auth session exists.
+  // Starts true so we never flash the login UI for returning users.
+  const [authChecking, setAuthChecking] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return
-      const res = await fetch('/api/auth/restore')
-      const { sessionId } = await res.json()
-      if (sessionId) {
-        localStorage.setItem('current_session_id', sessionId)
-        router.replace('/game/map')
-      } else {
-        router.replace('/home')
+    // getSession() reads from localStorage/cookies — no network, effectively instant.
+    // If there's no token at all we can show the login UI immediately.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        setAuthChecking(false)
+        return
       }
+      // Token exists — keep the splash while we validate server-side and restore.
+      supabase.auth.getUser().then(async ({ data: { user } }) => {
+        if (!user) { setAuthChecking(false); return }
+        const res = await fetch('/api/auth/restore')
+        const { sessionId } = await res.json()
+        if (sessionId) {
+          localStorage.setItem('current_session_id', sessionId)
+          router.replace('/game/map')
+        } else {
+          router.replace('/home')
+        }
+      })
     })
   }, [supabase, router])
 
@@ -33,6 +45,78 @@ function Landing() {
   }
 
   const authError = searchParams.get('error')
+
+  // ── Splash: shown while validating a stored auth token ───────────────────────
+  if (authChecking) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: '#040a14',
+        fontFamily: "'DM Sans', sans-serif",
+      }}>
+        {/* Background image */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: "url('/login-bg.webp')",
+          backgroundSize: 'cover', backgroundPosition: 'center top',
+          opacity: 0.35,
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(to top, rgba(4,10,20,0.97) 0%, rgba(4,10,20,0.6) 60%, rgba(4,10,20,0.3) 100%)',
+        }} />
+
+        {/* Logo */}
+        <div style={{ position: 'relative', zIndex: 10, textAlign: 'center' }}>
+          <div style={{
+            width: 64, height: 64, margin: '0 auto 14px',
+            borderRadius: 20,
+            background: 'linear-gradient(135deg, rgba(58,188,168,0.15), rgba(58,188,168,0.05))',
+            border: '1px solid rgba(58,188,168,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 32,
+            boxShadow: '0 0 40px rgba(58,188,168,0.25)',
+          }}>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+              <path d="M4.5 4.5L19.5 19.5" stroke="rgba(58,188,168,0.8)" strokeWidth="1.4" strokeLinecap="round"/>
+              <path d="M13 17L17 13" stroke="rgba(58,188,168,1)" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="19.5" cy="19.5" r="1.3" fill="rgba(58,188,168,0.7)"/>
+              <path d="M19.5 4.5L4.5 19.5" stroke="rgba(58,188,168,0.8)" strokeWidth="1.4" strokeLinecap="round"/>
+              <path d="M7 13L11 17" stroke="rgba(58,188,168,1)" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="4.5" cy="19.5" r="1.3" fill="rgba(58,188,168,0.7)"/>
+            </svg>
+          </div>
+          <div style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: 36, fontWeight: 700, color: '#fff',
+            letterSpacing: '0.12em',
+            textShadow: '0 2px 30px rgba(58,188,168,0.4)',
+          }}>DAIMON</div>
+          <div style={{
+            fontSize: 11, color: 'rgba(255,255,255,0.35)',
+            letterSpacing: '0.35em', textTransform: 'uppercase', marginTop: 4,
+          }}>Adriatic Creature Hunt</div>
+
+          {/* Spinner */}
+          <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center' }}>
+            <div style={{
+              width: 24, height: 24,
+              border: '2px solid rgba(58,188,168,0.2)',
+              borderTopColor: 'rgba(58,188,168,0.8)',
+              borderRadius: '50%',
+              animation: 'spin 0.9s linear infinite',
+            }} />
+          </div>
+        </div>
+
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=DM+Sans&display=swap');
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+    )
+  }
 
   return (
     <>
