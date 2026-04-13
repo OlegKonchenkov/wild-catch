@@ -48,14 +48,35 @@ function useHistory(supabase: ReturnType<typeof createClient>) {
           .limit(20),
       ])
 
-      const duelEntries: HistoryEntry[] = (duelsRes.data ?? []).map((d: any) => ({
-        id: d.id,
-        type: 'duel',
-        date: d.ended_at ?? d.started_at ?? '',
-        result: d.status === 'ended' ? (d.winner_id === user.id ? 'won' : 'lost') : 'unknown',
-        label: `Duello · ${d.room_code ?? '—'}`,
-        detail: d.status === 'cancelled' ? 'Annullato' : d.winner_id === user.id ? 'Vittoria' : 'Sconfitta',
-      }))
+      // Resolve opponent nicknames for duels
+      interface DuelRow { id: string; status: string; winner_id: string | null; challenger_id: string; opponent_id: string | null; started_at: string | null; ended_at: string | null; room_code: string | null }
+      const duels = (duelsRes.data ?? []) as DuelRow[]
+      const opponentIds = Array.from(new Set(
+        duels.map(d => d.challenger_id === user.id ? d.opponent_id : d.challenger_id).filter((v): v is string => Boolean(v))
+      ))
+      const nicknameMap: Record<string, string> = {}
+      if (opponentIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, nickname')
+          .in('user_id', opponentIds)
+        for (const p of (profiles ?? []) as Array<{ user_id: string; nickname: string | null }>) {
+          if (p.nickname) nicknameMap[p.user_id] = p.nickname
+        }
+      }
+
+      const duelEntries: HistoryEntry[] = duels.map(d => {
+        const oppId = d.challenger_id === user.id ? d.opponent_id : d.challenger_id
+        const oppNick = oppId ? nicknameMap[oppId] : null
+        return {
+          id: d.id,
+          type: 'duel',
+          date: d.ended_at ?? d.started_at ?? '',
+          result: d.status === 'ended' ? (d.winner_id === user.id ? 'won' : 'lost') : 'unknown',
+          label: oppNick ? `⚔️ vs ${oppNick}` : `Duello · ${d.room_code ?? '—'}`,
+          detail: d.status === 'cancelled' ? 'Annullato' : d.winner_id === user.id ? 'Vittoria' : 'Sconfitta',
+        }
+      })
 
       const bossEntries: HistoryEntry[] = (bossRes.data ?? []).map((b: any) => {
         const bossName = b.boss_lineup?.[0]?.name ?? 'Boss'
@@ -108,9 +129,8 @@ export default function DuelLobbyPage() {
 
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
-    if (!sessionId) { setLoadingCreatures(false); return }
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { setLoadingCreatures(false); return }
+      if (!user || !sessionId) { setLoadingCreatures(false); return }
       Promise.all([
         supabase
           .from('player_creatures')

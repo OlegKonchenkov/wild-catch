@@ -102,8 +102,12 @@ const DETAIL_CONFIG: Record<DetailType, { title: string; icon: string; emptyLabe
 }
 
 const RARITY_COLOR: Record<string, string> = {
-  comune: '#94a3b8', non_comune: '#34d399', raro: '#3A9DBC',
-  epico: '#7B4DB8', leggendario: '#F7C841', mitologico: '#FF4D6D',
+  comune: '#7AB87A', non_comune: '#4A9FD4', raro: '#E8A820',
+  epico: '#7B4DB8', leggendario: '#C8352A', mitologico: '#FF4D6D',
+}
+const RARITY_LABEL: Record<string, string> = {
+  comune: 'Terrestre', non_comune: 'Arcaico', raro: 'Eroico',
+  epico: 'Mostruoso', leggendario: 'Leggendario', mitologico: 'Mitologico',
 }
 
 function fmtDateTime(iso: string) {
@@ -129,7 +133,7 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
               color: RARITY_COLOR[creature.rarity] ?? '#94a3b8',
               background: `${RARITY_COLOR[creature.rarity] ?? '#94a3b8'}20`,
-            }}>{creature.rarity}</span>
+            }}>{RARITY_LABEL[creature.rarity] ?? creature.rarity}</span>
           )}
           <span className="text-[10px] text-white/30">{fmtDateTime(row.resolved_at)}</span>
         </div>
@@ -154,7 +158,7 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
               color: RARITY_COLOR[creature.rarity] ?? '#94a3b8',
               background: `${RARITY_COLOR[creature.rarity] ?? '#94a3b8'}20`,
-            }}>{creature.rarity}</span>
+            }}>{RARITY_LABEL[creature.rarity] ?? creature.rarity}</span>
           )}
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
             color: statusColor[row.status] ?? '#94a3b8',
