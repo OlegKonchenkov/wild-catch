@@ -13,18 +13,19 @@ export interface ToastState {
   message: string
 }
 
-const META: Record<ToastVariant, {
-  bg: string; border: string; color: string; icon: string; label: string
-}> = {
-  success:           { bg: 'rgba(52,211,153,0.08)',  border: 'rgba(52,211,153,0.35)',  color: '#34D399', icon: '✓',  label: '' },
-  error:             { bg: 'rgba(239,68,68,0.10)',   border: 'rgba(239,68,68,0.40)',   color: '#EF4444', icon: '✕',  label: '' },
-  warning:           { bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.40)',  color: '#FBBF24', icon: '⚠',  label: '' },
-  'session-ended':   { bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.55)',   color: '#EF4444', icon: '🔒', label: 'Sessione terminata' },
-  'session-waiting': { bg: 'rgba(58,157,188,0.10)',  border: 'rgba(58,157,188,0.50)',  color: '#3A9DBC', icon: '⏳', label: 'In attesa di inizio' },
-}
+// Dark solid base so the toast always contrasts against any background.
+// The variant color is expressed via the left border + icon — not the bg.
+const BASE_BG = 'rgba(8, 17, 28, 0.97)'
 
-/** Variants that stay on screen until explicitly dismissed */
-const PERSISTENT: ToastVariant[] = ['session-ended', 'session-waiting']
+const META: Record<ToastVariant, {
+  border: string; color: string; icon: string; label: string
+}> = {
+  success:           { border: '#34D399', color: '#34D399', icon: '✓',  label: '' },
+  error:             { border: '#EF4444', color: '#EF4444', icon: '✕',  label: '' },
+  warning:           { border: '#FBBF24', color: '#FBBF24', icon: '⚠',  label: '' },
+  'session-ended':   { border: '#EF4444', color: '#EF4444', icon: '🔒', label: 'Sessione terminata' },
+  'session-waiting': { border: '#3A9DBC', color: '#3A9DBC', icon: '⏳', label: 'In attesa di inizio' },
+}
 
 interface Props {
   toast: ToastState | null
@@ -32,28 +33,34 @@ interface Props {
 }
 
 export function GameToast({ toast, onDismiss }: Props) {
-  const persistent = toast ? PERSISTENT.includes(toast.variant) : false
-
   return (
     <AnimatePresence>
       {toast && (() => {
         const m = META[toast.variant]
+        const isSession = toast.variant === 'session-ended' || toast.variant === 'session-waiting'
+
         return (
           <motion.div
             key={toast.variant + toast.message}
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.18 }}
-            onClick={persistent ? onDismiss : undefined}
-            className={`mx-4 mt-3 rounded-xl overflow-hidden ${persistent && onDismiss ? 'cursor-pointer' : ''}`}
-            style={{ background: m.bg, border: `1px solid ${m.border}` }}
+            initial={{ opacity: 0, y: -12, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            onClick={isSession ? onDismiss : undefined}
+            className={`mx-4 mt-3 rounded-xl overflow-hidden shadow-2xl ${isSession && onDismiss ? 'cursor-pointer' : ''}`}
+            style={{
+              background: BASE_BG,
+              borderLeft: `4px solid ${m.border}`,
+              border: `1px solid rgba(255,255,255,0.08)`,
+              borderLeftWidth: '4px',
+              borderLeftColor: m.border,
+            }}
           >
-            <div className="flex items-start gap-2.5 px-3.5 py-2.5">
+            <div className="flex items-start gap-3 px-3.5 py-3">
               {/* Icon badge */}
               <span
-                className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold mt-0.5"
-                style={{ background: `${m.color}25`, color: m.color }}
+                className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold mt-0.5"
+                style={{ background: `${m.color}22`, color: m.color }}
               >
                 {m.icon}
               </span>
@@ -68,25 +75,22 @@ export function GameToast({ toast, onDismiss }: Props) {
                     {m.label}
                   </p>
                 )}
-                <p className="text-sm font-medium text-white/90 leading-snug">{toast.message}</p>
-                {persistent && (
-                  <p className="text-[11px] text-white/30 mt-1">Tocca per chiudere</p>
-                )}
+                <p className="text-sm font-semibold text-white leading-snug">{toast.message}</p>
               </div>
 
-              {/* Dismiss × for persistent */}
-              {persistent && onDismiss && (
+              {/* Dismiss × always visible */}
+              {onDismiss && (
                 <button
                   onClick={e => { e.stopPropagation(); onDismiss() }}
-                  className="shrink-0 text-white/25 hover:text-white/60 transition-colors text-sm mt-0.5"
+                  className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-white/30 hover:text-white/70 hover:bg-white/10 transition-all text-xs mt-0.5"
                 >
                   ✕
                 </button>
               )}
             </div>
 
-            {/* Accent line at bottom */}
-            <div className="h-[2px]" style={{ background: `${m.color}45` }} />
+            {/* Bottom accent */}
+            <div className="h-[2px]" style={{ background: `${m.border}60` }} />
           </motion.div>
         )
       })()}
