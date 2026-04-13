@@ -106,6 +106,12 @@ const RARITY_COLOR: Record<string, string> = {
   epico: '#7B4DB8', leggendario: '#F7C841', mitologico: '#FF4D6D',
 }
 
+function fmtDateTime(iso: string) {
+  return new Date(iso).toLocaleString('it-IT', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+  })
+}
+
 function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
   if (detail === 'catches') {
     const creature = row.creatures as any
@@ -125,9 +131,7 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
               background: `${RARITY_COLOR[creature.rarity] ?? '#94a3b8'}20`,
             }}>{creature.rarity}</span>
           )}
-          <span className="text-[10px] text-white/30">
-            {new Date(row.resolved_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-          </span>
+          <span className="text-[10px] text-white/30">{fmtDateTime(row.resolved_at)}</span>
         </div>
       </div>
     )
@@ -146,13 +150,17 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {creature?.rarity && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
+              color: RARITY_COLOR[creature.rarity] ?? '#94a3b8',
+              background: `${RARITY_COLOR[creature.rarity] ?? '#94a3b8'}20`,
+            }}>{creature.rarity}</span>
+          )}
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
             color: statusColor[row.status] ?? '#94a3b8',
             background: `${statusColor[row.status] ?? '#94a3b8'}20`,
           }}>{statusLabel[row.status] ?? row.status}</span>
-          <span className="text-[10px] text-white/30">
-            {new Date(row.started_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-          </span>
+          <span className="text-[10px] text-white/30">{fmtDateTime(row.started_at)}</span>
         </div>
       </div>
     )
@@ -178,9 +186,7 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
             color: statusColor[row.status] ?? '#94a3b8',
             background: `${statusColor[row.status] ?? '#94a3b8'}20`,
           }}>{statusLabel[row.status] ?? row.status}</span>
-          <span className="text-[10px] text-white/30">
-            {new Date(row.started_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-          </span>
+          <span className="text-[10px] text-white/30">{fmtDateTime(row.started_at)}</span>
         </div>
       </div>
     )
@@ -204,9 +210,7 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
             color: statusColor[row.status] ?? '#94a3b8',
             background: `${statusColor[row.status] ?? '#94a3b8'}20`,
           }}>{statusLabel[row.status] ?? row.status}</span>
-          <span className="text-[10px] text-white/30">
-            {new Date(row.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-          </span>
+          <span className="text-[10px] text-white/30">{fmtDateTime(row.created_at)}</span>
         </div>
       </div>
     )
