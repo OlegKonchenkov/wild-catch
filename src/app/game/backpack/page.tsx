@@ -386,8 +386,10 @@ export default function BackpackPage() {
       </AnimatePresence>
 
       {/* Toast */}
-      <div className="absolute top-2 left-0 right-0 z-40">
-        <GameToast toast={toast} onDismiss={dismiss} />
+      <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="pointer-events-auto">
+          <GameToast toast={toast} onDismiss={dismiss} />
+        </div>
       </div>
 
       {/* Header */}

@@ -126,7 +126,11 @@ export default function ShopPage() {
       </div>
 
       {/* Toast */}
-      <GameToast toast={toast} onDismiss={dismiss} />
+      <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="pointer-events-auto">
+          <GameToast toast={toast} onDismiss={dismiss} />
+        </div>
+      </div>
 
       {/* Item list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">

@@ -157,7 +157,7 @@ function ProfileContent() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full overflow-y-auto pb-8">
+    <div className="h-full overflow-y-auto pb-8 relative">
 
       {/* Session-ended banner */}
       {sessionEnded && (
@@ -194,7 +194,11 @@ function ProfileContent() {
         </div>
       </div>
 
-      <GameToast toast={toast} onDismiss={dismiss} />
+      <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="pointer-events-auto">
+          <GameToast toast={toast} onDismiss={dismiss} />
+        </div>
+      </div>
 
       {loading ? (
         <GameProfileSkeleton />

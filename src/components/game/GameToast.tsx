@@ -24,7 +24,7 @@ const META: Record<ToastVariant, {
   error:             { border: '#EF4444', color: '#EF4444', icon: '✕',  label: '' },
   warning:           { border: '#FBBF24', color: '#FBBF24', icon: '⚠',  label: '' },
   'session-ended':   { border: '#EF4444', color: '#EF4444', icon: '🔒', label: 'Sessione terminata' },
-  'session-waiting': { border: '#3A9DBC', color: '#3A9DBC', icon: '⏳', label: 'In attesa di inizio' },
+  'session-waiting': { border: '#22D3EE', color: '#22D3EE', icon: '⏳', label: 'In attesa di inizio' },
 }
 
 interface Props {
