@@ -212,6 +212,135 @@ function DetailRow({ detail, row }: { detail: DetailType; row: any }) {
   return null
 }
 
+// ── Session Error Log ─────────────────────────────────────────────────────────
+
+interface SessionError {
+  id: string
+  source: string
+  error_code: string
+  message: string
+  context: Record<string, unknown>
+  created_at: string
+}
+
+const ERROR_CODE_META: Record<string, { label: string; color: string; icon: string }> = {
+  session_ended:       { label: 'Sessione terminata', color: '#EF4444', icon: '🔒' },
+  session_not_started: { label: 'Non ancora iniziata', color: '#3A9DBC', icon: '⏳' },
+  insufficient_gold:   { label: 'Oro insufficiente',  color: '#FBBF24', icon: '💰' },
+  transaction_conflict:{ label: 'Conflitto transazione', color: '#F97316', icon: '⚡' },
+  server_error:        { label: 'Errore server',      color: '#EF4444', icon: '✕' },
+  not_found:           { label: 'Non trovato',        color: '#94a3b8', icon: '?' },
+  unauthorized:        { label: 'Non autorizzato',    color: '#C084FC', icon: '🚫' },
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  shop: 'Negozio', item: 'Zaino', encounter: 'Incontro', boss: 'Boss', duel: 'Duello',
+}
+
+function SessionErrorLog({ sessionId, supabase }: { sessionId: string; supabase: ReturnType<typeof import('@/lib/supabase/client').createClient> }) {
+  const [errors, setErrors] = useState<SessionError[]>([])
+  const [loading, setLoading] = useState(true)
+  const [open, setOpen] = useState(false)
+
+  const fetchErrors = () => {
+    supabase
+      .from('session_errors')
+      .select('id, source, error_code, message, context, created_at')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (data) setErrors(data as SessionError[])
+        setLoading(false)
+      })
+  }
+
+  useEffect(() => {
+    setLoading(true)
+    setErrors([])
+    fetchErrors()
+
+    const channel = supabase
+      .channel(`admin-errors-${sessionId}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'session_errors',
+        filter: `session_id=eq.${sessionId}`,
+      }, payload => {
+        setErrors(prev => [payload.new as SessionError, ...prev].slice(0, 50))
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (loading) return null
+  if (errors.length === 0) return null
+
+  return (
+    <div className="mt-5">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-base">🚨</span>
+          <span className="text-sm font-bold text-white">Log errori sessione</span>
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+            {errors.length}
+          </span>
+        </div>
+        <span className="text-white/30 text-sm">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="mt-2 rounded-xl border border-white/10 overflow-hidden">
+          {errors.map((err, i) => {
+            const meta = ERROR_CODE_META[err.error_code] ?? {
+              label: err.error_code, color: '#94a3b8', icon: '⚠',
+            }
+            return (
+              <div
+                key={err.id}
+                className={`flex items-start gap-3 px-4 py-3 ${i !== errors.length - 1 ? 'border-b border-white/6' : ''}`}
+                style={{ background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}
+              >
+                {/* Icon */}
+                <span
+                  className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold mt-0.5"
+                  style={{ background: `${meta.color}20`, color: meta.color }}
+                >
+                  {meta.icon}
+                </span>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold" style={{ color: meta.color }}>{meta.label}</span>
+                    <span className="text-[10px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded-md">
+                      {SOURCE_LABEL[err.source] ?? err.source}
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/70 mt-0.5 leading-snug">{err.message}</p>
+                  {Object.keys(err.context ?? {}).length > 0 && (
+                    <p className="text-[10px] text-white/25 mt-0.5 font-mono truncate">
+                      {JSON.stringify(err.context)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Time */}
+                <span className="shrink-0 text-[10px] text-white/25 mt-0.5">
+                  {new Date(err.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function DetailModal({ detail, sessionId, onClose }: {
   detail: DetailType; sessionId: string; onClose: () => void
 }) {
@@ -460,6 +589,9 @@ export default function AdminDashboard() {
               </button>
             )}
           </div>
+
+          {/* Session error log */}
+          <SessionErrorLog sessionId={selectedId!} supabase={supabase} />
         </>
       )}
 

@@ -5,6 +5,8 @@ import type { Item, ItemType } from '@/lib/types'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { GameListSkeleton } from '@/components/game/GameLoading'
+import { GameToast } from '@/components/game/GameToast'
+import { useGameToast } from '@/components/game/useGameToast'
 
 const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; color: string }> = {
   rete:      { icon: '🎯', label: 'Rete',       hint: 'Aumenta la probabilità di cattura',       color: '#3A9DBC' },
@@ -15,22 +17,15 @@ const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; c
   cura:      { icon: '💊', label: 'Cura',        hint: 'Ripristina HP creatura in battaglia',     color: '#34D399' },
 }
 
-type Toast = { ok: boolean; text: string }
-
 export default function ShopPage() {
   const [items, setItems]         = useState<Item[]>([])
   const [gold, setGold]           = useState(0)
   const [filter, setFilter]       = useState<ItemType | 'all'>('all')
-  const [buying, setBuying]         = useState<string | null>(null)  // itemId being purchased
-  const [toast, setToast]           = useState<Toast | null>(null)
+  const [buying, setBuying]         = useState<string | null>(null)
   const [loading, setLoading]       = useState(true)
   const [missionQueue, setMissionQueue] = useState<CompletedMissionInfo[]>([])
+  const { toast, showSuccess, showApiError, dismiss } = useGameToast()
   const supabase = useMemo(() => createClient(), [])
-
-  function showToast(ok: boolean, text: string) {
-    setToast({ ok, text })
-    setTimeout(() => setToast(null), 3000)
-  }
 
   const loadShop = useCallback(async () => {
     const sessionId = localStorage.getItem('current_session_id')
@@ -67,17 +62,17 @@ export default function ShopPage() {
       const data = await res.json()
       if (res.ok) {
         setGold(data.remainingGold)
-        showToast(true, `${TYPE_META[item.type].icon} ${item.name} acquistato!`)
+        showSuccess(`${TYPE_META[item.type].icon} ${item.name} acquistato!`)
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
         window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
         if (data.completedMissions?.length) {
           setMissionQueue(prev => [...prev, ...data.completedMissions])
         }
       } else {
-        showToast(false, data.error ?? 'Errore acquisto')
+        showApiError(res.status, data.error ?? 'Errore acquisto')
       }
     } catch {
-      showToast(false, 'Errore di rete')
+      showApiError(0, 'Errore di rete')
     } finally {
       setBuying(null)
     }
@@ -131,13 +126,7 @@ export default function ShopPage() {
       </div>
 
       {/* Toast */}
-      {toast && (
-        <div className={`mx-4 mt-3 px-3 py-2 rounded-xl text-sm font-semibold text-center transition-all ${
-          toast.ok ? 'bg-green-500/15 text-green-300 border border-green-500/30' : 'bg-red-500/15 text-red-400 border border-red-500/30'
-        }`}>
-          {toast.ok ? '✓' : '⚠'} {toast.text}
-        </div>
-      )}
+      <GameToast toast={toast} onDismiss={dismiss} />
 
       {/* Item list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">

@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import type { ItemType } from '@/lib/types'
 import { GameListSkeleton } from '@/components/game/GameLoading'
+import { GameToast } from '@/components/game/GameToast'
+import { useGameToast } from '@/components/game/useGameToast'
 
 const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
 
@@ -240,15 +242,10 @@ export default function BackpackPage() {
   const [usingId, setUsingId]     = useState<string | null>(null)
   const [hatchingId, setHatchingId] = useState<string | null>(null)
   const [hatchResult, setHatchResult] = useState<HatchResult | null>(null)
-  const [toast, setToast]         = useState<string | null>(null)
+  const { toast, showSuccess, showApiError, showError, dismiss } = useGameToast()
   const supabase   = useMemo(() => createClient(), [])
   const userIdRef  = useRef<string | null>(null)
   const sessionRef = useRef<string | null>(null)
-
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3500)
-  }
 
   function fetchInventory() {
     const uid = userIdRef.current
@@ -284,12 +281,11 @@ export default function BackpackPage() {
       })
       const data = await res.json()
       if (data.used) {
-        showToast(data.message ?? 'Oggetto usato!')
+        showSuccess(data.message ?? 'Oggetto usato!')
         setInventory(prev => prev.map(r =>
           r.id === row.id ? { ...r, quantity: r.quantity - 1 } : r
         ).filter(r => r.quantity > 0))
         if (data.incubating) {
-          // Uovo started incubating — refresh egg list so it appears immediately
           fetchEggs()
         }
         if (data.activatedUntil) {
@@ -298,10 +294,10 @@ export default function BackpackPage() {
         }
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       } else {
-        showToast(data.error ?? 'Errore nell\'uso dell\'oggetto')
+        showApiError(res.status, data.error ?? 'Errore nell\'uso dell\'oggetto')
       }
     } catch {
-      showToast('Errore di rete')
+      showApiError(0, 'Errore di rete')
     }
     setUsingId(null)
   }
@@ -322,10 +318,10 @@ export default function BackpackPage() {
         setHatchResult(data.creature)
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       } else {
-        showToast(data.error ?? 'Schiusura fallita')
+        showApiError(res.status, data.error ?? 'Schiusura fallita')
       }
     } catch {
-      showToast('Errore di rete')
+      showError('Errore di rete')
     }
     setHatchingId(null)
   }
@@ -390,11 +386,9 @@ export default function BackpackPage() {
       </AnimatePresence>
 
       {/* Toast */}
-      {toast && (
-        <div className="absolute top-4 left-4 right-4 z-40 bg-[#0F1F2E] border border-[#3A9DBC]/40 text-white text-sm px-4 py-3 rounded-xl shadow-xl text-center animate-in fade-in slide-in-from-top-2">
-          {toast}
-        </div>
-      )}
+      <div className="absolute top-2 left-0 right-0 z-40">
+        <GameToast toast={toast} onDismiss={dismiss} />
+      </div>
 
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-white/10 bg-[#0A1520]/80">

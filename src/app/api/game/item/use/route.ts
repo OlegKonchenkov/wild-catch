@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logSessionError } from '@/lib/logSessionError'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -16,7 +17,15 @@ export async function POST(request: Request) {
   // Guard: session must still be active
   const { data: sessionCheck } = await supabase.from('sessions').select('status').eq('id', sessionId).single()
   if (!sessionCheck || sessionCheck.status !== 'active') {
-    return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
+    const notStarted = sessionCheck?.status === 'ready' || sessionCheck?.status === 'draft'
+    const errMsg = notStarted ? 'La sessione non è ancora iniziata' : 'La sessione è terminata'
+    logSessionError({
+      sessionId, userId: user.id, source: 'item',
+      errorCode: notStarted ? 'session_not_started' : 'session_ended',
+      message: `Tentativo uso oggetto: ${errMsg}`,
+      context: { inventoryId, sessionStatus: sessionCheck?.status ?? 'missing' },
+    })
+    return NextResponse.json({ error: errMsg }, { status: 403 })
   }
 
   // Get inventory item

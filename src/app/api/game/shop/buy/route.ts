@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { incrementMissionProgress } from '@/lib/game/missions'
+import { logSessionError } from '@/lib/logSessionError'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -17,7 +18,15 @@ export async function POST(request: Request) {
   // Guard: session must still be active
   const { data: sessionCheck } = await supabase.from('sessions').select('status').eq('id', sessionId).single()
   if (!sessionCheck || sessionCheck.status !== 'active') {
-    return NextResponse.json({ error: 'La sessione è terminata' }, { status: 403 })
+    const notStarted = sessionCheck?.status === 'ready' || sessionCheck?.status === 'draft'
+    const errMsg = notStarted ? 'La sessione non è ancora iniziata' : 'La sessione è terminata'
+    logSessionError({
+      sessionId, userId: user.id, source: 'shop',
+      errorCode: notStarted ? 'session_not_started' : 'session_ended',
+      message: `Tentativo acquisto: ${errMsg}`,
+      context: { itemId, sessionStatus: sessionCheck?.status ?? 'missing' },
+    })
+    return NextResponse.json({ error: errMsg }, { status: 403 })
   }
 
   // Get item price
@@ -40,7 +49,15 @@ export async function POST(request: Request) {
     .single()
 
   if (!ps) return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
-  if (ps.gold < totalCost) return NextResponse.json({ error: 'Oro insufficiente' }, { status: 402 })
+  if (ps.gold < totalCost) {
+    logSessionError({
+      sessionId, userId: user.id, source: 'shop',
+      errorCode: 'insufficient_gold',
+      message: `Oro insufficiente per "${item.name}"`,
+      context: { itemId, itemName: item.name, have: ps.gold, need: totalCost },
+    })
+    return NextResponse.json({ error: 'Oro insufficiente' }, { status: 402 })
+  }
 
   // Atomic: deduct gold + add item
   const { data: goldUpdateResult, error: goldError } = await supabase
