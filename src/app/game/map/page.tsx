@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { useGPS } from '@/hooks/useGPS'
+import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { GameMapSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
@@ -741,6 +742,21 @@ function MapPageInner() {
   }, [triggerEncounter])
 
   const { position, error: gpsError } = useGPS(onGPSPosition)
+
+  // Log GPS errors to session_errors once per session (avoid DB spam on repeated callbacks)
+  const gpsErrorLoggedRef = useRef<string | null>(null)
+  useEffect(() => {
+    const sid = sessionIdRef.current
+    if (!gpsError || !sid || gpsErrorLoggedRef.current === gpsError) return
+    gpsErrorLoggedRef.current = gpsError
+    const isDenied = gpsError.includes('Abilita il GPS')
+    logSessionErrorClient({
+      sessionId: sid,
+      source: 'map',
+      errorCode: isDenied ? 'gps_denied' : 'gps_unavailable',
+      message: gpsError,
+    })
+  }, [gpsError])
 
   // Timer-based encounter fallback
   useEffect(() => {

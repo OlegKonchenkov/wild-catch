@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Mission } from '@/lib/types'
+import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import dynamic from 'next/dynamic'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
@@ -623,6 +624,16 @@ export default function MissionsPage() {
         <QrScanner
           onScan={handleScanResult}
           onClose={() => setShowScanner(false)}
+          onPermissionError={(code) => {
+            const sid = localStorage.getItem('current_session_id')
+            if (!sid) return
+            logSessionErrorClient({
+              sessionId: sid,
+              source: 'missions',
+              errorCode: code,
+              message: code === 'camera_denied' ? 'Permesso fotocamera negato durante scansione QR' : 'Fotocamera non disponibile durante scansione QR',
+            })
+          }}
         />
       )}
 

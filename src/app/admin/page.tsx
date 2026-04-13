@@ -227,12 +227,16 @@ interface SessionError {
 
 const ERROR_CODE_META: Record<string, { label: string; color: string; icon: string }> = {
   session_ended:       { label: 'Sessione terminata', color: '#EF4444', icon: '🔒' },
-  session_not_started: { label: 'Non ancora iniziata', color: '#3A9DBC', icon: '⏳' },
+  session_not_started: { label: 'Non ancora iniziata', color: '#22D3EE', icon: '⏳' },
   insufficient_gold:   { label: 'Oro insufficiente',  color: '#FBBF24', icon: '💰' },
   transaction_conflict:{ label: 'Conflitto transazione', color: '#F97316', icon: '⚡' },
   server_error:        { label: 'Errore server',      color: '#EF4444', icon: '✕' },
   not_found:           { label: 'Non trovato',        color: '#94a3b8', icon: '?' },
   unauthorized:        { label: 'Non autorizzato',    color: '#C084FC', icon: '🚫' },
+  gps_denied:          { label: 'GPS negato',         color: '#F97316', icon: '📍' },
+  gps_unavailable:     { label: 'GPS non disponibile', color: '#FBBF24', icon: '📡' },
+  camera_denied:       { label: 'Fotocamera negata',  color: '#F97316', icon: '📷' },
+  camera_unavailable:  { label: 'Fotocamera non disponibile', color: '#FBBF24', icon: '📷' },
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -276,7 +280,6 @@ function SessionErrorLog({ sessionId, supabase }: { sessionId: string; supabase:
   }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return null
-  if (errors.length === 0) return null
 
   return (
     <div className="mt-5">
@@ -287,15 +290,27 @@ function SessionErrorLog({ sessionId, supabase }: { sessionId: string; supabase:
         <div className="flex items-center gap-2">
           <span className="text-base">🚨</span>
           <span className="text-sm font-bold text-white">Log errori sessione</span>
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
-            {errors.length}
-          </span>
+          {errors.length > 0 ? (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+              {errors.length}
+            </span>
+          ) : (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">
+              nessuno
+            </span>
+          )}
         </div>
         <span className="text-white/30 text-sm">{open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
         <div className="mt-2 rounded-xl border border-white/10 overflow-hidden">
+          {errors.length === 0 && (
+            <div className="flex items-center gap-3 px-4 py-4 text-white/30">
+              <span className="text-lg">✅</span>
+              <p className="text-sm">Nessun errore registrato per questa sessione.</p>
+            </div>
+          )}
           {errors.map((err, i) => {
             const meta = ERROR_CODE_META[err.error_code] ?? {
               label: err.error_code, color: '#94a3b8', icon: '⚠',

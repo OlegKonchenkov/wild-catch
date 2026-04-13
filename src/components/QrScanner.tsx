@@ -4,9 +4,10 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 interface Props {
   onScan: (data: string) => void
   onClose: () => void
+  onPermissionError?: (errorCode: 'camera_denied' | 'camera_unavailable') => void
 }
 
-export default function QrScanner({ onScan, onClose }: Props) {
+export default function QrScanner({ onScan, onClose, onPermissionError }: Props) {
   const videoRef  = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -50,8 +51,10 @@ export default function QrScanner({ onScan, onClose }: Props) {
         }
       } catch (e: any) {
         if (!cancelled) {
-          setCamError(e.name === 'NotAllowedError' ? 'Permesso fotocamera negato' : 'Fotocamera non disponibile')
+          const isDenied = e.name === 'NotAllowedError'
+          setCamError(isDenied ? 'Permesso fotocamera negato' : 'Fotocamera non disponibile')
           setPhase('error')
+          onPermissionError?.(isDenied ? 'camera_denied' : 'camera_unavailable')
         }
       }
     }
