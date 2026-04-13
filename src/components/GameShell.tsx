@@ -73,6 +73,15 @@ function formatGameEvent(ev: any): { icon: string; title: string; body: string }
   }
 }
 
+const RARITY_DISPLAY: Record<string, { label: string; color: string }> = {
+  comune:      { label: 'Terrestre',   color: '#7AB87A' },
+  non_comune:  { label: 'Arcaico',     color: '#4A9FD4' },
+  raro:        { label: 'Eroico',      color: '#E8A820' },
+  epico:       { label: 'Mostruoso',   color: '#7B4DB8' },
+  leggendario: { label: 'Leggendario', color: '#C8352A' },
+  mitologico:  { label: 'Mitologico',  color: '#FF4D6D' },
+}
+
 export default function GameShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
@@ -96,6 +105,8 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [gameEvents, setGameEvents] = useState<any[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
+  const [expandedNotifId, setExpandedNotifId] = useState<string | null>(null)
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
 
   const initRef = useRef(false)
 
@@ -691,18 +702,84 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                           })()
                         : (n.payload?.message ?? '')
                       const time = new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+                      const fullDate = new Date(n.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                      const isExpanded = expandedNotifId === n.id
                       return (
-                        <div key={n.id}
-                          className={`flex gap-3 px-4 py-3 border-b border-white/5 ${n.read ? 'opacity-60' : ''}`}>
-                          <span className="text-xl shrink-0 mt-0.5">{icon}</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="text-sm font-medium text-white leading-snug">{title}</p>
-                              <span className="text-[10px] text-white/30 shrink-0 mt-0.5">{time}</span>
+                        <div key={n.id} className={n.read ? 'opacity-60' : ''}>
+                          <button
+                            onClick={() => setExpandedNotifId(isExpanded ? null : n.id)}
+                            className="w-full flex gap-3 px-4 py-3 border-b border-white/5 text-left active:bg-white/5 transition-colors cursor-pointer"
+                          >
+                            <span className="text-xl shrink-0 mt-0.5">{icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-medium text-white leading-snug">{title}</p>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="text-[10px] text-white/30">{time}</span>
+                                  <motion.span
+                                    animate={{ rotate: isExpanded ? 90 : 0 }}
+                                    transition={{ duration: 0.18 }}
+                                    className="text-white/25 text-sm leading-none"
+                                  >›</motion.span>
+                                </div>
+                              </div>
+                              {body && <p className="text-xs text-white/50 mt-0.5 truncate">{body}</p>}
                             </div>
-                            {body && <p className="text-xs text-white/50 mt-0.5">{body}</p>}
-                          </div>
-                          {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-[#3A9DBC] shrink-0 mt-2" />}
+                            {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-[#3A9DBC] shrink-0 mt-2" />}
+                          </button>
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: 'easeOut' }}
+                                className="overflow-hidden"
+                              >
+                                <div className="mx-4 mb-3 mt-1 rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                                  {isRedeemed ? (
+                                    <>
+                                      <p className="text-[10px] text-white/35 uppercase tracking-wider mb-2">Dettagli riscatto</p>
+                                      {n.payload?.item_name && (
+                                        <p className="text-sm font-bold text-white mb-2">📦 {n.payload.item_name}</p>
+                                      )}
+                                      {(() => {
+                                        const r = n.payload?.reward ?? {}
+                                        const bonusItems: Array<{ quantity: number }> = r.bonus_items ?? []
+                                        return (
+                                          <>
+                                            {(r.gold || r.exp) && (
+                                              <div className="flex gap-2 flex-wrap mb-2">
+                                                {r.gold ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{r.gold} 💰</span> : null}
+                                                {r.exp  ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841' }}>+{r.exp} ⭐</span>  : null}
+                                              </div>
+                                            )}
+                                            {bonusItems.length > 0 && (
+                                              <div className="flex flex-wrap gap-1 mb-2">
+                                                {bonusItems.map((bi, i) => (
+                                                  <span key={i} className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                    🎁 ×{bi.quantity} oggetto
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </>
+                                        )
+                                      })()}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <p className="text-[10px] text-white/35 uppercase tracking-wider mb-2">Messaggio admin</p>
+                                      {n.payload?.message && (
+                                        <p className="text-xs text-white/70 leading-relaxed mb-2">{n.payload.message}</p>
+                                      )}
+                                    </>
+                                  )}
+                                  <p className="text-[10px] text-white/25">{fullDate}</p>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       )
                     })
@@ -725,16 +802,99 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                     gameEvents.map((ev: any) => {
                       const { icon, title, body } = formatGameEvent(ev)
                       const time = new Date(ev.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+                      const fullDate = new Date(ev.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                      const isExpanded = expandedEventId === ev.id
+                      const p = ev.payload ?? {}
+                      const rarityInfo = p.rarity ? RARITY_DISPLAY[p.rarity as string] : null
                       return (
-                        <div key={ev.id} className="flex gap-3 px-4 py-3 border-b border-white/5">
-                          <span className="text-xl shrink-0 mt-0.5">{icon}</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="text-sm font-medium text-white leading-snug">{title}</p>
-                              <span className="text-[10px] text-white/30 shrink-0 mt-0.5">{time}</span>
+                        <div key={ev.id}>
+                          <button
+                            onClick={() => setExpandedEventId(isExpanded ? null : ev.id)}
+                            className="w-full flex gap-3 px-4 py-3 border-b border-white/5 text-left active:bg-white/5 transition-colors cursor-pointer"
+                          >
+                            <span className="text-xl shrink-0 mt-0.5">{icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-medium text-white leading-snug">{title}</p>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="text-[10px] text-white/30">{time}</span>
+                                  <motion.span
+                                    animate={{ rotate: isExpanded ? 90 : 0 }}
+                                    transition={{ duration: 0.18 }}
+                                    className="text-white/25 text-sm leading-none"
+                                  >›</motion.span>
+                                </div>
+                              </div>
+                              {body && <p className="text-xs text-white/50 mt-0.5 truncate">{body}</p>}
                             </div>
-                            {body && <p className="text-xs text-white/50 mt-0.5">{body}</p>}
-                          </div>
+                          </button>
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: 'easeOut' }}
+                                className="overflow-hidden"
+                              >
+                                <div className="mx-4 mb-3 mt-1 rounded-xl p-3 space-y-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                                  {/* catch */}
+                                  {ev.type === 'catch' && (
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {rarityInfo && (
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${rarityInfo.color}20`, color: rarityInfo.color, border: `1px solid ${rarityInfo.color}40` }}>
+                                          {rarityInfo.label}
+                                        </span>
+                                      )}
+                                      {p.element && <span className="text-xs text-white/50 capitalize">{p.element}</span>}
+                                      {p.evolved && <span className="text-xs font-semibold" style={{ color: '#34D399' }}>✨ Evoluta</span>}
+                                    </div>
+                                  )}
+                                  {/* duel */}
+                                  {(ev.type === 'duel_won' || ev.type === 'duel_lost') && (
+                                    <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full" style={{
+                                      background: ev.type === 'duel_won' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.12)',
+                                      color:      ev.type === 'duel_won' ? '#34D399' : '#F87171',
+                                    }}>
+                                      {ev.type === 'duel_won' ? '🏆 Vittoria duello' : '💀 Sconfitta duello'}
+                                    </span>
+                                  )}
+                                  {/* boss */}
+                                  {(ev.type === 'boss_won' || ev.type === 'boss_lost') && (
+                                    <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full" style={{
+                                      background: ev.type === 'boss_won' ? 'rgba(247,200,65,0.15)' : 'rgba(239,68,68,0.12)',
+                                      color:      ev.type === 'boss_won' ? '#F7C841' : '#F87171',
+                                    }}>
+                                      {ev.type === 'boss_won' ? '👑 Boss sconfitto' : '💀 Sconfitta dal boss'}
+                                    </span>
+                                  )}
+                                  {/* mission */}
+                                  {ev.type === 'mission_completed' && (
+                                    <div>
+                                      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">Missione completata</p>
+                                      {p.mission_target && <p className="text-xs font-semibold text-white/80">📋 {p.mission_target}</p>}
+                                    </div>
+                                  )}
+                                  {/* level up */}
+                                  {ev.type === 'level_up' && p.new_level && (
+                                    <p className="text-sm font-extrabold" style={{ color: '#F7C841' }}>⭐ Livello {p.new_level} raggiunto</p>
+                                  )}
+                                  {/* qr */}
+                                  {ev.type === 'qr_redeemed' && p.item_name && (
+                                    <p className="text-xs font-bold text-white">📱 {p.item_name}</p>
+                                  )}
+                                  {/* rewards (gold/exp) — shown for all types that carry them */}
+                                  {(p.gold || p.exp || p.gold_reward) && (
+                                    <div className="flex gap-2 flex-wrap">
+                                      {(p.gold || p.gold_reward) ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{p.gold ?? p.gold_reward} 💰</span> : null}
+                                      {p.exp ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)', color: '#F7C841' }}>+{p.exp} ⭐</span> : null}
+                                    </div>
+                                  )}
+                                  <p className="text-[10px] text-white/25">{fullDate}</p>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       )
                     })

@@ -126,11 +126,15 @@ export default function DuelLobbyPage() {
   const [pendingConnect, setPendingConnect] = useState<{ roomCode?: string } | null>(null)
   const [playerLevel, setPlayerLevel] = useState(1)
   const { history, loading: historyLoading } = useHistory(supabase)
+  const [myUserId, setMyUserId] = useState<string | null>(null)
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
+  const [duelLineupCache, setDuelLineupCache] = useState<Record<string, { userId: string; slot: number; name: string; rarity: string; element: string }[]>>({})
 
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user || !sessionId) { setLoadingCreatures(false); return }
+      setMyUserId(user.id)
       Promise.all([
         supabase
           .from('player_creatures')
@@ -237,6 +241,34 @@ export default function DuelLobbyPage() {
   const filledCount = lineup.filter(Boolean).length
   const lineupReady = filledCount >= 1
 
+  const RARITY_DISPLAY: Record<string, { label: string; color: string }> = {
+    comune:      { label: 'Terrestre',   color: '#7AB87A' },
+    non_comune:  { label: 'Arcaico',     color: '#4A9FD4' },
+    raro:        { label: 'Eroico',      color: '#E8A820' },
+    epico:       { label: 'Mostruoso',   color: '#7B4DB8' },
+    leggendario: { label: 'Leggendario', color: '#C8352A' },
+    mitologico:  { label: 'Mitologico',  color: '#FF4D6D' },
+  }
+
+  async function loadDuelLineup(duelId: string) {
+    if (duelLineupCache[duelId]) return
+    const { data } = await supabase
+      .from('duel_lineups')
+      .select('user_id, slot, player_creatures(creatures(name, element, rarity))')
+      .eq('duel_id', duelId)
+      .order('slot', { ascending: true })
+    if (data) {
+      const mapped = (data as unknown as Array<{ user_id: string; slot: number; player_creatures: { creatures: { name: string; element: string; rarity: string } | null } | null }>).map(r => ({
+        userId: r.user_id as string,
+        slot: r.slot as number,
+        name: (r.player_creatures?.creatures?.name ?? '?') as string,
+        rarity: (r.player_creatures?.creatures?.rarity ?? '') as string,
+        element: (r.player_creatures?.creatures?.element ?? '') as string,
+      }))
+      setDuelLineupCache(prev => ({ ...prev, [duelId]: mapped }))
+    }
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
       {/* Toast — fixed above everything */}
@@ -287,29 +319,113 @@ export default function DuelLobbyPage() {
                 const isWon  = entry.result === 'won'
                 const isLost = entry.result === 'lost'
                 const time   = entry.date ? new Date(entry.date).toLocaleString('it-IT', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+                const isExpanded = expandedHistoryId === entry.id
+                const cachedLineup = duelLineupCache[entry.id]
+                const myCreatures  = cachedLineup?.filter(r => r.userId === myUserId) ?? []
+                const oppCreatures = cachedLineup?.filter(r => r.userId !== myUserId) ?? []
+
                 return (
-                  <div
-                    key={entry.id}
-                    className="flex items-center gap-3 px-3 py-3 rounded-xl"
-                    style={{
-                      background: isWon ? 'rgba(52,211,153,0.08)' : isLost ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${isWon ? 'rgba(52,211,153,0.25)' : isLost ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.08)'}`,
-                    }}
-                  >
-                    <span className="text-2xl shrink-0">{isBoss ? '👑' : '⚔️'}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white truncate">{entry.label}</p>
-                      <p className="text-[11px] text-white/40 mt-0.5">{time}</p>
-                    </div>
-                    <span
-                      className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0"
-                      style={{
-                        background: isWon ? 'rgba(52,211,153,0.15)' : isLost ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.08)',
-                        color: isWon ? '#34D399' : isLost ? '#F87171' : 'rgba(255,255,255,0.3)',
+                  <div key={entry.id} className="rounded-xl overflow-hidden" style={{
+                    border: `1px solid ${isWon ? 'rgba(52,211,153,0.25)' : isLost ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.08)'}`,
+                  }}>
+                    {/* Row header — clickable */}
+                    <button
+                      onClick={() => {
+                        setExpandedHistoryId(isExpanded ? null : entry.id)
+                        if (!isExpanded && entry.type === 'duel') loadDuelLineup(entry.id)
                       }}
+                      className="w-full flex items-center gap-3 px-3 py-3 text-left active:bg-white/5 transition-colors"
+                      style={{ background: isWon ? 'rgba(52,211,153,0.08)' : isLost ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)' }}
                     >
-                      {entry.detail}
-                    </span>
+                      <span className="text-2xl shrink-0">{isBoss ? '👑' : '⚔️'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{entry.label}</p>
+                        <p className="text-[11px] text-white/40 mt-0.5">{time}</p>
+                      </div>
+                      <span
+                        className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0"
+                        style={{
+                          background: isWon ? 'rgba(52,211,153,0.15)' : isLost ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.08)',
+                          color: isWon ? '#34D399' : isLost ? '#F87171' : 'rgba(255,255,255,0.3)',
+                        }}
+                      >
+                        {entry.detail}
+                      </span>
+                      <motion.span
+                        animate={{ rotate: isExpanded ? 90 : 0 }}
+                        transition={{ duration: 0.18 }}
+                        className="text-white/25 text-sm leading-none shrink-0 ml-1"
+                      >›</motion.span>
+                    </button>
+
+                    {/* Expanded detail */}
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2, ease: 'easeOut' }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-3 pb-3 pt-1" style={{ background: isWon ? 'rgba(52,211,153,0.04)' : isLost ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)' }}>
+                            {entry.type === 'duel' && (
+                              <>
+                                {!cachedLineup ? (
+                                  <div className="flex gap-1.5 py-1">
+                                    {[1,2,3].map(i => <div key={i} className="h-6 w-16 rounded-lg bg-white/5 animate-pulse" />)}
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2 mt-1">
+                                    {/* My creatures */}
+                                    {myCreatures.length > 0 && (
+                                      <div>
+                                        <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">La tua squadra</p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {myCreatures.map((cr, i) => {
+                                            const rd = RARITY_DISPLAY[cr.rarity]
+                                            return (
+                                              <span key={i} className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                                style={{ background: rd ? `${rd.color}18` : 'rgba(255,255,255,0.07)', color: rd?.color ?? 'rgba(255,255,255,0.5)', border: `1px solid ${rd ? rd.color + '35' : 'rgba(255,255,255,0.1)'}` }}>
+                                                {cr.name}
+                                              </span>
+                                            )
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Opponent creatures */}
+                                    {oppCreatures.length > 0 && (
+                                      <div>
+                                        <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">Avversario</p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {oppCreatures.map((cr, i) => {
+                                            const rd = RARITY_DISPLAY[cr.rarity]
+                                            return (
+                                              <span key={i} className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                {cr.name}
+                                                {rd && <span className="ml-1 opacity-60" style={{ color: rd.color }}>·</span>}
+                                              </span>
+                                            )
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {myCreatures.length === 0 && oppCreatures.length === 0 && (
+                                      <p className="text-[11px] text-white/25">Dettagli squadra non disponibili</p>
+                                    )}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {entry.type === 'boss' && (
+                              <p className="text-[11px] text-white/40 mt-1">Sfida al Boss</p>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 )
               })}
