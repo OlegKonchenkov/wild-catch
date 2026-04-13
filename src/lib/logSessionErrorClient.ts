@@ -23,7 +23,7 @@ export function logSessionErrorClient(opts: LogOpts): void {
         error_code: opts.errorCode,
         message:    opts.message,
         context:    opts.context ?? {},
-      }).then(() => {}).catch(() => {})
+      }).then(() => {}, () => {})
     }).catch(() => {})
   } catch {
     // Intentionally silent

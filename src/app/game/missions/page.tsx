@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Mission } from '@/lib/types'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
+import { GameToast } from '@/components/game/GameToast'
+import { useGameToast } from '@/components/game/useGameToast'
 import dynamic from 'next/dynamic'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
@@ -358,6 +360,7 @@ export default function MissionsPage() {
   const [playerMissions, setPlayerMissions] = useState<PlayerMissionData[]>([])
   const [loading, setLoading]         = useState(true)
   const [detailMission, setDetailMission] = useState<Mission | null>(null)
+  const { toast, showApiError, dismiss } = useGameToast()
   const [showScanner, setShowScanner] = useState(() => searchParams.get('qr') === '1')
   const [scanResult, setScanResult]   = useState<ScanResult | null>(null)
   const [scanning, setScanning]       = useState(false)
@@ -436,6 +439,11 @@ export default function MissionsPage() {
         body: JSON.stringify({ qrId: qrData, sessionId }),
       })
       const data = await res.json()
+      if (res.status === 403) {
+        // Session not active — show unified toast, skip scan result card
+        showApiError(res.status, data.error ?? 'Sessione non attiva')
+        return
+      }
       setScanResult(res.ok ? data : { error: data.error ?? 'Errore sconosciuto', success: false })
       if (res.ok && data.success) {
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
@@ -466,7 +474,14 @@ export default function MissionsPage() {
   const totalCount = missions.length
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden relative">
+      {/* Toast overlay */}
+      <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="pointer-events-auto">
+          <GameToast toast={toast} onDismiss={dismiss} />
+        </div>
+      </div>
+
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-white/10 bg-[#0A1520]/80 shrink-0">
         <div className="flex items-center justify-between mb-3">
