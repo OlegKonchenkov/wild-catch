@@ -493,64 +493,92 @@ export default function BackpackPage() {
                   const item = row.items
                   if (!item) return null
                   const meta = TYPE_META[item.type] ?? { icon: '📦', label: item.type, hint: '', color: '#9CA3AF' }
+                  const usable = USABLE_FROM_BACKPACK.includes(item.type as ItemType)
+                  const isUsing = usingId === row.id
+
                   return (
-                    <div
+                    <motion.div
                       key={row.id}
-                      className="flex items-center gap-3 rounded-2xl p-3 border transition-all"
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-stretch rounded-2xl border overflow-hidden"
                       style={{ background: `${meta.color}0a`, borderColor: `${meta.color}28` }}
                     >
-                      {/* Icon */}
-                      <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
-                        style={{ background: `${meta.color}18` }}
-                      >
-                        {meta.icon}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                          <p className="font-bold text-white text-sm">{item.name}</p>
-                          <span
-                            className="text-xs px-1.5 py-0.5 rounded-md font-semibold shrink-0"
-                            style={{ background: `${meta.color}20`, color: meta.color }}
-                          >
-                            {meta.label}
-                          </span>
-                        </div>
-                        {item.description && (
-                          <p className="text-xs text-white/45 leading-relaxed">{item.description}</p>
-                        )}
-                        {item.effect_value > 0 && (
-                          <p className="text-xs mt-0.5" style={{ color: meta.color }}>
-                            {(item.type === 'rete' || item.type === 'esca') ? `×${item.effect_value}` : `+${item.effect_value}%`}{' '}{meta.hint}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Quantity + optional Use button */}
-                      <div className="shrink-0 flex flex-col items-end gap-1">
+                      {/* Left: icon + info */}
+                      <div className="flex items-center gap-3 p-3 flex-1 min-w-0">
                         <div
-                          className="inline-flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-lg font-extrabold text-sm"
-                          style={{ background: `${meta.color}22`, color: meta.color }}
+                          className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
+                          style={{ background: `${meta.color}18` }}
                         >
-                          ×{row.quantity}
+                          {meta.icon}
                         </div>
-                        {USABLE_FROM_BACKPACK.includes(item.type as ItemType) && (
-                          <button
-                            onClick={() => handleUse(row)}
-                            disabled={usingId === row.id}
-                            className="text-xs font-bold px-2.5 py-1 rounded-lg transition-all disabled:opacity-50"
-                            style={{ background: `${meta.color}25`, color: meta.color }}
-                          >
-                            {usingId === row.id ? '...' : 'Usa'}
-                          </button>
-                        )}
-                        {item.shop_price > 0 && (
-                          <p className="text-xs text-white/25">💰{item.shop_price}</p>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                            <p className="font-bold text-white text-sm">{item.name}</p>
+                            <span
+                              className="text-xs px-1.5 py-0.5 rounded-md font-semibold shrink-0"
+                              style={{ background: `${meta.color}20`, color: meta.color }}
+                            >
+                              {meta.label}
+                            </span>
+                          </div>
+                          {item.description && (
+                            <p className="text-xs text-white/45 leading-relaxed">{item.description}</p>
+                          )}
+                          {item.effect_value > 0 && (
+                            <p className="text-xs mt-0.5" style={{ color: meta.color }}>
+                              {(item.type === 'rete' || item.type === 'esca') ? `×${item.effect_value}` : `+${item.effect_value}%`}{' '}{meta.hint}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
+
+                      {/* Right side */}
+                      {usable ? (
+                        /* ── Full-height use button ── */
+                        <motion.button
+                          whileTap={{ scale: 0.94 }}
+                          onClick={() => handleUse(row)}
+                          disabled={isUsing}
+                          className="shrink-0 flex flex-col items-center justify-center gap-0.5 px-5 min-w-[72px] relative overflow-hidden disabled:opacity-60"
+                          style={{ background: `${meta.color}28`, borderLeft: `1px solid ${meta.color}35` }}
+                        >
+                          {/* Pulse glow behind button */}
+                          <motion.div
+                            className="absolute inset-0 pointer-events-none"
+                            animate={{ opacity: [0, 0.18, 0] }}
+                            transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+                            style={{ background: meta.color }}
+                          />
+                          {isUsing ? (
+                            <div
+                              className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+                              style={{ borderColor: meta.color, borderTopColor: 'transparent' }}
+                            />
+                          ) : (
+                            <>
+                              <span className="text-base leading-none relative z-10">✨</span>
+                              <span className="font-extrabold text-sm relative z-10" style={{ color: meta.color }}>Usa</span>
+                              <span className="text-[10px] font-semibold relative z-10" style={{ color: `${meta.color}99` }}>×{row.quantity}</span>
+                            </>
+                          )}
+                        </motion.button>
+                      ) : (
+                        /* ── Quantity + price (non-usable) ── */
+                        <div className="shrink-0 flex flex-col items-end justify-center gap-1 px-3">
+                          <div
+                            className="inline-flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-lg font-extrabold text-sm"
+                            style={{ background: `${meta.color}22`, color: meta.color }}
+                          >
+                            ×{row.quantity}
+                          </div>
+                          {item.shop_price > 0 && (
+                            <p className="text-xs text-white/25">💰{item.shop_price}</p>
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
                   )
                 })}
               </div>
