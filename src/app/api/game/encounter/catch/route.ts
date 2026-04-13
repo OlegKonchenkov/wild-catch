@@ -62,10 +62,11 @@ export async function POST(request: Request) {
   const { createAdminClient: adminFactory } = await import('@/lib/supabase/admin')
   const adminCatch = adminFactory()
   const [psResult, cfgResult] = await Promise.all([
-    supabase.from('player_sessions').select('level').eq('user_id', user.id).eq('session_id', encounter.session_id).single(),
+    supabase.from('player_sessions').select('level, gold').eq('user_id', user.id).eq('session_id', encounter.session_id).single(),
     adminCatch.from('global_catch_config').select('*').eq('id', 1).maybeSingle(),
   ])
-  const playerLevel = (psResult.data as any)?.level ?? 1
+  const playerLevel  = (psResult.data as any)?.level ?? 1
+  const currentGold  = (psResult.data as any)?.gold  ?? 0
   const cfg = cfgResult.data
 
   // Base catch rate: DB config overrides hardcoded defaults if present
@@ -180,18 +181,25 @@ export async function POST(request: Request) {
     }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
   }
 
-  // Award EXP and score — new catch=15 EXP, duplicate=5 EXP
+  // Award EXP, gold and score — new catch=15, duplicate=5
   const rarityMultiplier = { comune: 1, non_comune: 2, raro: 3, epico: 4, leggendario: 5, mitologico: 6 }
   const rarityMult = rarityMultiplier[creature.rarity as keyof typeof rarityMultiplier] ?? 1
   const expGain   = existing ? 5  : 15
+  const goldGain  = expGain   // gold mirrors EXP
   const scoreGain = existing ? 5  : 15 * rarityMult
 
-  const { data: rpcData } = await supabase.rpc('increment_player_stats', {
-    p_user_id: user.id,
-    p_session_id: encounter.session_id,
-    p_exp: expGain,
-    p_score: scoreGain,
-  })
+  const [{ data: rpcData }] = await Promise.all([
+    supabase.rpc('increment_player_stats', {
+      p_user_id: user.id,
+      p_session_id: encounter.session_id,
+      p_exp: expGain,
+      p_score: scoreGain,
+    }),
+    supabase.from('player_sessions')
+      .update({ gold: currentGold + goldGain })
+      .eq('user_id', user.id)
+      .eq('session_id', encounter.session_id),
+  ])
 
   const rpcRow    = Array.isArray(rpcData) ? rpcData[0] : null
   const levelUp   = rpcRow?.leveled_up
@@ -226,9 +234,10 @@ export async function POST(request: Request) {
       rarity: creature.rarity,
       element: creature.element,
       evolved: evolvedTriggered,
+      gold: goldGain,
     },
   }).then(undefined, () => {})
 
-  return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, scoreGain, levelUp, completedMissions })
+  return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, goldGain, scoreGain, levelUp, completedMissions })
 }
 
