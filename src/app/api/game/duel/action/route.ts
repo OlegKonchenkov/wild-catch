@@ -267,20 +267,19 @@ async function awardDuelResults(
   supabase: any,
   sessionId: string,
   winnerId: string,
-  loserId: string,
+  _loserId: string,
 ): Promise<{ winnerLevelUp: { newLevel: number; goldReward: number } | null }> {
-  // Winner gets EXP + score + gold. Loser gets nothing (REQ-XP-03).
-  const [winResult, , winnerGoldPs] = await Promise.all([
-    supabase.rpc('increment_player_stats', { p_user_id: winnerId, p_session_id: sessionId, p_exp: DUEL_WIN_EXP, p_score: 20 }),
-    supabase.rpc('increment_player_stats', { p_user_id: loserId,  p_session_id: sessionId, p_exp: 0,             p_score: 0  }),
-    supabase.from('player_sessions').select('gold').eq('user_id', winnerId).eq('session_id', sessionId).single(),
-  ])
-  await supabase.from('player_sessions')
-    .update({ gold: ((winnerGoldPs.data as { gold: number } | null)?.gold ?? 0) + DUEL_WIN_GOLD })
-    .eq('user_id', winnerId)
-    .eq('session_id', sessionId)
+  // Winner gets EXP + score + gold atomically via the RPC (p_gold added in migration 015).
+  // Loser gets nothing (REQ-XP-03) — no separate call needed.
+  const { data } = await supabase.rpc('increment_player_stats', {
+    p_user_id:    winnerId,
+    p_session_id: sessionId,
+    p_exp:        DUEL_WIN_EXP,
+    p_score:      20,
+    p_gold:       DUEL_WIN_GOLD,
+  })
 
-  const winRow = Array.isArray(winResult.data) ? winResult.data[0] : null
+  const winRow = Array.isArray(data) ? data[0] : null
   return {
     winnerLevelUp: winRow?.leveled_up
       ? { newLevel: winRow.new_level, goldReward: winRow.gold_reward ?? 0 }
