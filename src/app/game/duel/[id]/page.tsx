@@ -273,6 +273,7 @@ export default function DuelPage() {
   const surrenderedRef     = useRef(false)
   const duelStatusRef      = useRef<string | null>(null)
   const userIdRef          = useRef<string | null>(null)
+  const duelActivatedRef   = useRef(false)  // prevents lineup re-fetch on every turn change
   const supabase = useMemo(() => createClient(), [])
 
   function flashFortuneNotice(fortune: CombatFortuneInfo | null | undefined) {
@@ -410,6 +411,8 @@ export default function DuelPage() {
           const opp  = lineups.filter((l: LineupEntry) => l.user_id !== user.id)
           setMyLineup(mine)
           setOppLineup(opp)
+          // Both lineups loaded — prevent re-fetch on subsequent turn changes
+          if (mine.length > 0 && opp.length > 0) duelActivatedRef.current = true
         }
 
         const filtered = ((inv ?? []) as any[])
@@ -524,21 +527,26 @@ export default function DuelPage() {
           if (updated.status === 'active' && updated.current_turn) {
             setMyRole(role => { setIsMyTurn(updated.current_turn === role); return role })
             loadPlayerLevels(updated.session_id, [updated.challenger_id, updated.opponent_id]).catch(() => {})
-            // Re-fetch all lineups to get opponent's creatures (they were inserted, not updated)
-            supabase.from('duel_lineups')
-              .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url))')
-              .eq('duel_id', id)
-              .order('slot', { ascending: true })
-              .then(({ data: freshLineups }) => {
-                if (!freshLineups) return
-                supabase.auth.getUser().then(({ data: { user } }) => {
-                  if (!user) return
-                  const mine = freshLineups.filter((l: LineupEntry) => l.user_id === user.id)
-                  const opp  = freshLineups.filter((l: LineupEntry) => l.user_id !== user.id)
-                  setMyLineup(mine)
-                  setOppLineup(opp)
+            // Only re-fetch lineups on first activation (opponent inserts lineup on join).
+            // Subsequent current_turn changes must NOT re-fetch — that would bypass faint animations.
+            if (!duelActivatedRef.current) {
+              duelActivatedRef.current = true
+              supabase.from('duel_lineups')
+                .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url))')
+                .eq('duel_id', id)
+                .order('slot', { ascending: true })
+                .then(({ data: freshLineups }) => {
+                  if (!freshLineups) return
+                  supabase.auth.getUser().then(({ data: { user } }) => {
+                    if (!user) return
+                    const mine = freshLineups.filter((l: LineupEntry) => l.user_id === user.id)
+                    const opp  = freshLineups.filter((l: LineupEntry) => l.user_id !== user.id)
+                    setMyLineup(mine)
+                    setOppLineup(opp)
+                    if (mine.length > 0 && opp.length > 0) duelActivatedRef.current = true
+                  })
                 })
-              })
+            }
           }
         })
       .subscribe()

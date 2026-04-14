@@ -127,6 +127,7 @@ export default function DuelLobbyPage() {
   const [playerLevel, setPlayerLevel] = useState(1)
   const { history, loading: historyLoading } = useHistory(supabase)
   const [myUserId, setMyUserId] = useState<string | null>(null)
+  const [activeDuel, setActiveDuel] = useState<{ id: string; roomCode: string | null } | null>(null)
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
   const [duelLineupCache, setDuelLineupCache] = useState<Record<string, { userId: string; slot: number; name: string; rarity: string; element: string }[]>>({})
 
@@ -135,6 +136,14 @@ export default function DuelLobbyPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user || !sessionId) { setLoadingCreatures(false); return }
       setMyUserId(user.id)
+      // Check for an active duel the user can rejoin
+      supabase.from('duels').select('id, room_code')
+        .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
+        .eq('session_id', sessionId)
+        .in('status', ['waiting', 'active'])
+        .order('started_at', { ascending: false })
+        .limit(1).maybeSingle()
+        .then(({ data: d }) => { if (d) setActiveDuel({ id: d.id, roomCode: d.room_code }) })
       Promise.all([
         supabase
           .from('player_creatures')
@@ -433,6 +442,26 @@ export default function DuelLobbyPage() {
           )}
         </div>
       )}
+
+      {/* Rejoin banner */}
+      <AnimatePresence>
+        {activeDuel && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            className="mx-4 mb-2 rounded-2xl overflow-hidden"
+            style={{ background: 'rgba(232,93,47,0.12)', border: '1px solid rgba(232,93,47,0.35)' }}
+          >
+            <button onClick={() => router.push(`/game/duel/${activeDuel.id}`)} className="w-full flex items-center gap-3 px-4 py-3">
+              <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }} className="text-xl shrink-0">⚔️</motion.div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-sm font-extrabold text-[#E85D2F]">Duello in corso</p>
+                <p className="text-xs text-white/50 truncate">{activeDuel.roomCode ? `Stanza ${activeDuel.roomCode}` : 'Tocca per rientrare'}</p>
+              </div>
+              <span className="text-xs font-bold text-[#E85D2F] shrink-0">Rientra →</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Arena tab content */}
       {activeTab === 'arena' && (<>
