@@ -98,8 +98,11 @@ export async function POST(request: Request) {
       }))
     )
 
-    // Determine who goes first: lower slot-1 ATK attacks first
-    const { data: challengerPc } = await supabase
+    // Determine who goes first: lower slot-1 ATK attacks first.
+    // Must use admin client because the opponent can't read the challenger's player_creatures via RLS.
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const admin = createAdminClient()
+    const { data: challengerPc } = await admin
       .from('player_creatures')
       .select('creatures(atk)')
       .eq('id', duel.challenger_creature_id)
