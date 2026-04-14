@@ -64,6 +64,7 @@ interface CardProps {
   catchMultiplier?: number
   isWild?: boolean
   animState?: 'idle' | 'attack' | 'damage' | 'catch' | 'flee'
+  fainting?: boolean
   side: 'left' | 'right'
 }
 
@@ -72,7 +73,7 @@ function formatCatchMultiplier(multiplier: number): string {
   return multiplier.toFixed(multiplier >= 2 ? 2 : 1).replace(/\.0$/, '')
 }
 
-function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, catchMultiplier, isWild, animState = 'idle', side }: CardProps) {
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, catchMultiplier, isWild, animState = 'idle', fainting, side }: CardProps) {
   const rarityColor = RARITY_COLORS[rarity as Rarity] ?? '#64748b'
   const elemEmoji   = ELEMENT_EMOJI[element as keyof typeof ELEMENT_EMOJI] ?? '✦'
   const hpPct       = Math.max(0, Math.min(100, (currentHp / maxHp) * 100))
@@ -89,7 +90,7 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
 
   return (
     <div
-      className="flex overflow-hidden"
+      className="flex overflow-hidden relative"
       style={{
         borderRadius,
         background: 'rgba(4,8,18,0.92)',
@@ -98,8 +99,21 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
         borderLeft:  side === 'left'  ? 'none' : `1px solid ${rarityColor}45`,
         backdropFilter: 'blur(16px)',
         boxShadow: `0 16px 48px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0 1px ${rarityColor}18`,
+        filter: fainting ? 'grayscale(1)' : undefined,
+        transition: 'filter 0.3s ease',
       }}
     >
+      {fainting && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1"
+          style={{ background: 'rgba(0,0,0,0.55)' }}
+        >
+          <span style={{ fontSize: 32, lineHeight: 1 }}>💀</span>
+          <span className="text-[10px] font-extrabold tracking-widest uppercase text-white/60">Svenuta</span>
+        </motion.div>
+      )}
       {/* ── Image section ── */}
       <div
         className="relative shrink-0 flex items-center justify-center"
@@ -249,6 +263,7 @@ export default function EncounterPage() {
   const [squadCreatures, setSquadCreatures] = useState<SquadCreature[]>([])
   const [activeSlot, setActiveSlot]         = useState(0)
   const [slotHps, setSlotHps]               = useState<number[]>([])
+  const [playerFainting, setPlayerFainting] = useState(false)
 
   const [reteItems, setReteItems]         = useState<InvItem[]>([])
   const [battagliaItems, setBattagliaItems] = useState<InvItem[]>([])
@@ -457,6 +472,10 @@ export default function EncounterPage() {
       setPlayerAnim('idle')
 
       if (newHp <= 0) {
+        // Show faint animation before switching creature
+        setPlayerFainting(true)
+        await new Promise(r => setTimeout(r, 1000))
+        setPlayerFainting(false)
         // Try next squad creature
         if (squadCreatures.length > 0) {
           const nextSlot = activeSlot + 1
@@ -554,6 +573,9 @@ export default function EncounterPage() {
         await new Promise(r => setTimeout(r, 420))
         setPlayerAnim('idle')
         if (newHp <= 0) {
+          setPlayerFainting(true)
+          await new Promise(r => setTimeout(r, 1000))
+          setPlayerFainting(false)
           if (squadCreatures.length > 0) {
             const nextSlot = activeSlot + 1
             if (nextSlot < squadCreatures.length) {
@@ -686,23 +708,28 @@ export default function EncounterPage() {
 
         {/* PLAYER CARD — bottom, flush to left edge */}
         <div className="absolute z-10" style={{ bottom: 12, left: 0, right: '12%' }}>
-          <motion.div
-            initial={{ x: -80, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 0.12, duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
-          >
-            <CreatureCard
-              imageUrl={playerCreature?.imageUrl ?? ''}
-              name={playerCreature?.name ?? '...'}
-              element={playerElem}
-              rarity={playerCreature?.rarity ?? 'comune'}
-              currentHp={playerHp ?? playerCreature?.maxHp ?? 0}
-              maxHp={playerCreature?.maxHp ?? 100}
-              atk={playerCreature?.atk}
-              animState={playerAnim}
-              side="left"
-            />
-          </motion.div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeSlot}
+              initial={{ opacity: 0, x: -24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 24 }}
+              transition={{ duration: 0.28, ease: 'easeOut' }}
+            >
+              <CreatureCard
+                imageUrl={playerCreature?.imageUrl ?? ''}
+                name={playerCreature?.name ?? '...'}
+                element={playerElem}
+                rarity={playerCreature?.rarity ?? 'comune'}
+                currentHp={playerHp ?? playerCreature?.maxHp ?? 0}
+                maxHp={playerCreature?.maxHp ?? 100}
+                atk={playerCreature?.atk}
+                animState={playerAnim}
+                fainting={playerFainting}
+                side="left"
+              />
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* VS / message — center */}

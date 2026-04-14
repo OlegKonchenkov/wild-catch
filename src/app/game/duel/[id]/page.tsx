@@ -1033,7 +1033,8 @@ export default function DuelPage() {
             {[...myLineup].sort((a, b) => a.slot - b.slot).map(entry => {
               const cr = entry.player_creatures?.creatures
               if (!cr) return null
-              const hpPct = Math.max(0, Math.min(100, (entry.current_hp / cr.hp) * 100))
+              const scaledMax = getScaledLineupStats(entry, playerLevels)?.hp ?? cr.hp
+              const hpPct = Math.max(0, Math.min(100, (entry.current_hp / scaledMax) * 100))
               const hpColor = hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444'
               const isActive = entry.is_active
               const isFainted = !!entry.fainted_at
