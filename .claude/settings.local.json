@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "mcp__supabase__list_migrations",
+      "mcp__supabase__apply_migration"
+    ]
+  }
+}

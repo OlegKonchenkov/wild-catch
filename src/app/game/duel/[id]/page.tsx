@@ -234,6 +234,8 @@ export default function DuelPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [showItemsModal, setShowItemsModal] = useState(false)
   const [switchNotice, setSwitchNotice]     = useState<string | null>(null)
+  const [myFainting, setMyFainting]         = useState(false)
+  const [oppFainting, setOppFainting]       = useState(false)
   const [fortuneNotice, setFortuneNotice]   = useState<{ id: number; text: string; tone: CombatFortuneInfo['tone'] } | null>(null)
   const [playerLevels, setPlayerLevels]     = useState<Record<string, number>>({})
   const [completedMissions, setCompletedMissions] = useState<CompletedMissionInfo[]>([])
@@ -249,6 +251,10 @@ export default function DuelPage() {
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
   const duelStatusRef      = useRef<string | null>(null)
+  // Animation-ordering: suppress postgres_changes lineup updates while animations play
+  const suppressLineupUpdatesRef = useRef(false)
+  const pendingLineupUpdatesRef  = useRef<Array<any>>([])
+  const suppressFallbackRef      = useRef<ReturnType<typeof setTimeout> | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   function flashFortuneNotice(fortune: CombatFortuneInfo | null | undefined) {
@@ -279,6 +285,16 @@ export default function DuelPage() {
       ...Object.fromEntries((data as Array<{ user_id: string; level: number | null }>).map(row => [row.user_id, row.level ?? 1])),
     }))
   }, [supabase])
+
+  const flushPendingLineupUpdates = useCallback(() => {
+    if (suppressFallbackRef.current) { clearTimeout(suppressFallbackRef.current); suppressFallbackRef.current = null }
+    suppressLineupUpdatesRef.current = false
+    const updates = pendingLineupUpdatesRef.current.splice(0)
+    for (const updated of updates) {
+      setMyLineup(prev => prev.some(l => l.id === updated.id) ? prev.map(l => l.id === updated.id ? { ...l, ...(updated as LineupEntry) } : l) : prev)
+      setOppLineup(prev => prev.some(l => l.id === updated.id) ? prev.map(l => l.id === updated.id ? { ...l, ...(updated as LineupEntry) } : l) : prev)
+    }
+  }, [])
 
   const clearAttackFeedbackTimers = useCallback(() => {
     if (attackFallbackTimerRef.current) {
@@ -401,19 +417,46 @@ export default function DuelPage() {
     const channel = supabase
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
-        const { actorId, damage, fortune, nextTurn, itemUsed, switchedTo } = payload
+        const { actorId, damage, fortune, nextTurn, itemUsed, switchedTo, newOppHp } = payload
+        const DAMAGE_MS = 900
+        const FAINT_MS  = 700
+
+        // Suppress postgres_changes lineup updates while animations play; fallback flush after 3.5s
+        suppressLineupUpdatesRef.current = true
+        if (suppressFallbackRef.current) clearTimeout(suppressFallbackRef.current)
+        suppressFallbackRef.current = setTimeout(flushPendingLineupUpdates, 3500)
 
         setUserId(currentId => {
           const iAttacked = actorId === currentId
+          const hasFaint  = newOppHp === 0
+
           if (iAttacked) {
             setOppAnimState('damage')
             setLastDamage({ amount: damage, target: 'opp', id: Date.now() })
-            setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 900)
+            setTimeout(() => {
+              setOppAnimState('idle')
+              setLastDamage(null)
+              if (hasFaint) {
+                setOppFainting(true)
+                setTimeout(() => { setOppFainting(false); flushPendingLineupUpdates() }, FAINT_MS)
+              } else {
+                flushPendingLineupUpdates()
+              }
+            }, DAMAGE_MS)
             releaseAttackFeedback(450)
           } else {
             setAnimState('damage')
             setLastDamage({ amount: damage, target: 'me', id: Date.now() })
-            setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 900)
+            setTimeout(() => {
+              setAnimState('idle')
+              setLastDamage(null)
+              if (hasFaint) {
+                setMyFainting(true)
+                setTimeout(() => { setMyFainting(false); flushPendingLineupUpdates() }, FAINT_MS)
+              } else {
+                flushPendingLineupUpdates()
+              }
+            }, DAMAGE_MS)
           }
           if (nextTurn && currentId) {
             setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
@@ -422,8 +465,12 @@ export default function DuelPage() {
         })
 
         if (switchedTo) {
-          setSwitchNotice(`${switchedTo.name} entra in battaglia!`)
-          setTimeout(() => setSwitchNotice(null), 2500)
+          // Delay switch notice until after faint animation if faint occurred
+          const switchDelay = newOppHp === 0 ? DAMAGE_MS + FAINT_MS + 80 : 0
+          setTimeout(() => {
+            setSwitchNotice(`${switchedTo.name} entra in battaglia!`)
+            setTimeout(() => setSwitchNotice(null), 2500)
+          }, switchDelay)
         }
 
         flashFortuneNotice(fortune as CombatFortuneInfo | undefined)
@@ -435,16 +482,21 @@ export default function DuelPage() {
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'duel_lineups', filter: `duel_id=eq.${id}` },
         ({ new: updated }) => {
-          const updateLineup = (prev: LineupEntry[]) =>
-            prev.map(l => l.id === updated.id ? { ...l, ...updated } : l)
-          setMyLineup(prev => {
-            if (prev.some(l => l.id === updated.id)) return updateLineup(prev)
-            return prev
-          })
-          setOppLineup(prev => {
-            if (prev.some(l => l.id === updated.id)) return updateLineup(prev)
-            return prev
-          })
+          if (suppressLineupUpdatesRef.current) {
+            // Queue update — will be applied after animation completes
+            pendingLineupUpdatesRef.current.push(updated)
+          } else {
+            const updateLineup = (prev: LineupEntry[]) =>
+              prev.map(l => l.id === updated.id ? { ...l, ...updated } : l)
+            setMyLineup(prev => {
+              if (prev.some(l => l.id === updated.id)) return updateLineup(prev)
+              return prev
+            })
+            setOppLineup(prev => {
+              if (prev.some(l => l.id === updated.id)) return updateLineup(prev)
+              return prev
+            })
+          }
           if (attackingRef.current) releaseAttackFeedback(450)
         })
       .on('postgres_changes',
@@ -487,6 +539,7 @@ export default function DuelPage() {
     return () => {
       cancelled = true
       clearAttackFeedbackTimers()
+      if (suppressFallbackRef.current) { clearTimeout(suppressFallbackRef.current); suppressFallbackRef.current = null }
       supabase.removeChannel(channel)
       if (duelStatusRef.current === 'waiting') {
         fetch('/api/game/duel/connect', {
@@ -497,7 +550,7 @@ export default function DuelPage() {
         }).catch(() => {})
       }
     }
-  }, [clearAttackFeedbackTimers, id, loadPlayerLevels, releaseAttackFeedback, supabase])
+  }, [clearAttackFeedbackTimers, flushPendingLineupUpdates, id, loadPlayerLevels, releaseAttackFeedback, supabase])
 
   useEffect(() => {
     if (myLineup.length === 0 || result || waiting || surrenderedRef.current) return
@@ -817,25 +870,35 @@ export default function DuelPage() {
       <div className="relative flex-1 z-10 overflow-hidden">
 
         {/* Opponent card — top-right, flush to right edge */}
-        <div className="absolute z-10" style={{ top: 12, right: 0, left: '8%' }}>
+        <AnimatePresence mode="wait">
           {oppActiveCr ? (
-            <CreatureCard
-              imageUrl={oppActiveCr.image_url}
-              name={oppActiveCr.name}
-              element={oppActiveCr.element}
-              rarity={oppActiveCr.rarity}
-              currentHp={oppHp}
-              maxHp={oppHpMax}
-              atk={oppAtk}
-              def={oppDef}
-              animState={oppAnimState}
-              side="right"
-              lineup={oppLineupDots}
-            />
+            <motion.div
+              key={oppActive?.player_creature_id ?? 'opp-empty'}
+              className="absolute z-10"
+              style={{ top: 12, right: 0, left: '8%' }}
+              initial={{ opacity: 0, y: -18 }}
+              animate={oppFainting ? { opacity: 0, y: 28, transition: { duration: 0.6, ease: 'easeIn' } } : { opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10, transition: { duration: 0.25 } }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+            >
+              <CreatureCard
+                imageUrl={oppActiveCr.image_url}
+                name={oppActiveCr.name}
+                element={oppActiveCr.element}
+                rarity={oppActiveCr.rarity}
+                currentHp={oppHp}
+                maxHp={oppHpMax}
+                atk={oppAtk}
+                def={oppDef}
+                animState={oppAnimState}
+                side="right"
+                lineup={oppLineupDots}
+              />
+            </motion.div>
           ) : (
-            <div className="h-[100px] rounded-l-2xl animate-pulse mx-0" style={{ background: 'rgba(255,255,255,0.04)' }} />
+            <div className="absolute z-10 h-[100px] rounded-l-2xl animate-pulse" style={{ top: 12, right: 0, left: '8%', background: 'rgba(255,255,255,0.04)' }} />
           )}
-        </div>
+        </AnimatePresence>
 
         {/* Standalone damage floats — outside cards to avoid overflow-hidden clipping */}
         <AnimatePresence>
@@ -874,26 +937,36 @@ export default function DuelPage() {
         </AnimatePresence>
 
         {/* Player card — bottom-left, flush to left edge */}
-        <div className="absolute z-10" style={{ bottom: 12, left: 0, right: '8%' }}>
+        <AnimatePresence mode="wait">
           {myActiveCr ? (
-            <CreatureCard
-              imageUrl={myActiveCr.image_url}
-              name={myActiveCr.name}
-              element={myActiveCr.element}
-              rarity={myActiveCr.rarity}
-              currentHp={myHp}
-              maxHp={myHpMax}
-              atk={myAtk}
-              def={myDef}
-              animState={animState}
-              side="left"
-              lineup={myLineupDots}
-              lineupLabel="Tu"
-            />
+            <motion.div
+              key={myActive?.player_creature_id ?? 'my-empty'}
+              className="absolute z-10"
+              style={{ bottom: 12, left: 0, right: '8%' }}
+              initial={{ opacity: 0, y: 18 }}
+              animate={myFainting ? { opacity: 0, y: 28, transition: { duration: 0.6, ease: 'easeIn' } } : { opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10, transition: { duration: 0.25 } }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+            >
+              <CreatureCard
+                imageUrl={myActiveCr.image_url}
+                name={myActiveCr.name}
+                element={myActiveCr.element}
+                rarity={myActiveCr.rarity}
+                currentHp={myHp}
+                maxHp={myHpMax}
+                atk={myAtk}
+                def={myDef}
+                animState={animState}
+                side="left"
+                lineup={myLineupDots}
+                lineupLabel="Tu"
+              />
+            </motion.div>
           ) : (
-            <div className="h-[100px] rounded-r-2xl animate-pulse" style={{ background: 'rgba(255,255,255,0.04)' }} />
+            <div className="absolute z-10 h-[100px] rounded-r-2xl animate-pulse" style={{ bottom: 12, left: 0, right: '8%', background: 'rgba(255,255,255,0.04)' }} />
           )}
-        </div>
+        </AnimatePresence>
       </div>
 
       {/* ── Turn indicator + log ── */}
