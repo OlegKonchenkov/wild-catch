@@ -251,9 +251,10 @@ export default function DuelPage() {
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
   const duelStatusRef      = useRef<string | null>(null)
-  // Animation-ordering: suppress postgres_changes lineup updates while animations play
-  const suppressLineupUpdatesRef = useRef(false)
+  // Animation-ordering: queue lineup updates, broadcast takes control of flush timing
   const pendingLineupUpdatesRef  = useRef<Array<any>>([])
+  const lineupAutoFlushTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const animationActiveRef       = useRef(false)
   const suppressFallbackRef      = useRef<ReturnType<typeof setTimeout> | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
@@ -287,8 +288,9 @@ export default function DuelPage() {
   }, [supabase])
 
   const flushPendingLineupUpdates = useCallback(() => {
+    if (lineupAutoFlushTimerRef.current) { clearTimeout(lineupAutoFlushTimerRef.current); lineupAutoFlushTimerRef.current = null }
     if (suppressFallbackRef.current) { clearTimeout(suppressFallbackRef.current); suppressFallbackRef.current = null }
-    suppressLineupUpdatesRef.current = false
+    animationActiveRef.current = false
     const updates = pendingLineupUpdatesRef.current.splice(0)
     for (const updated of updates) {
       setMyLineup(prev => prev.some(l => l.id === updated.id) ? prev.map(l => l.id === updated.id ? { ...l, ...(updated as LineupEntry) } : l) : prev)
@@ -421,8 +423,9 @@ export default function DuelPage() {
         const DAMAGE_MS = 900
         const FAINT_MS  = 700
 
-        // Suppress postgres_changes lineup updates while animations play; fallback flush after 3.5s
-        suppressLineupUpdatesRef.current = true
+        // Cancel the postgres_changes auto-flush — we control timing now
+        if (lineupAutoFlushTimerRef.current) { clearTimeout(lineupAutoFlushTimerRef.current); lineupAutoFlushTimerRef.current = null }
+        animationActiveRef.current = true
         if (suppressFallbackRef.current) clearTimeout(suppressFallbackRef.current)
         suppressFallbackRef.current = setTimeout(flushPendingLineupUpdates, 3500)
 
@@ -482,21 +485,14 @@ export default function DuelPage() {
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'duel_lineups', filter: `duel_id=eq.${id}` },
         ({ new: updated }) => {
-          if (suppressLineupUpdatesRef.current) {
-            // Queue update — will be applied after animation completes
-            pendingLineupUpdatesRef.current.push(updated)
-          } else {
-            const updateLineup = (prev: LineupEntry[]) =>
-              prev.map(l => l.id === updated.id ? { ...l, ...updated } : l)
-            setMyLineup(prev => {
-              if (prev.some(l => l.id === updated.id)) return updateLineup(prev)
-              return prev
-            })
-            setOppLineup(prev => {
-              if (prev.some(l => l.id === updated.id)) return updateLineup(prev)
-              return prev
-            })
-          }
+          // Always queue — broadcast will cancel the auto-flush and control exact timing
+          pendingLineupUpdatesRef.current.push(updated)
+          // Auto-flush after 120ms if no broadcast arrives to take control
+          if (lineupAutoFlushTimerRef.current) clearTimeout(lineupAutoFlushTimerRef.current)
+          lineupAutoFlushTimerRef.current = setTimeout(() => {
+            lineupAutoFlushTimerRef.current = null
+            if (!animationActiveRef.current) flushPendingLineupUpdates()
+          }, 120)
           if (attackingRef.current) releaseAttackFeedback(450)
         })
       .on('postgres_changes',
@@ -539,6 +535,7 @@ export default function DuelPage() {
     return () => {
       cancelled = true
       clearAttackFeedbackTimers()
+      if (lineupAutoFlushTimerRef.current) { clearTimeout(lineupAutoFlushTimerRef.current); lineupAutoFlushTimerRef.current = null }
       if (suppressFallbackRef.current) { clearTimeout(suppressFallbackRef.current); suppressFallbackRef.current = null }
       supabase.removeChannel(channel)
       if (duelStatusRef.current === 'waiting') {
