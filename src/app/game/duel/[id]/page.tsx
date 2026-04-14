@@ -72,9 +72,10 @@ interface CardProps {
   side: 'left' | 'right'
   lineup?: Array<{ color: string; isActive: boolean; fainted: boolean }>
   lineupLabel?: string
+  fainting?: boolean
 }
 
-function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, def, animState = 'idle', side, lineup, lineupLabel }: CardProps) {
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, def, animState = 'idle', side, lineup, lineupLabel, fainting = false }: CardProps) {
   const spriteSize = typeof window !== 'undefined'
     ? Math.round(Math.min(window.innerWidth * 0.35, window.innerHeight * 0.2, 158))
     : 122
@@ -97,8 +98,27 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
         borderLeft:  side === 'left'  ? 'none' : `1px solid ${rarityColor}45`,
         backdropFilter: 'blur(16px)',
         boxShadow: `0 16px 48px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0 1px ${rarityColor}18`,
+        filter: fainting ? 'grayscale(0.85)' : 'none',
+        opacity: fainting ? 0.72 : 1,
+        transition: 'filter 0.4s ease, opacity 0.4s ease',
       }}
     >
+      {/* ── Faint overlay ── */}
+      <AnimatePresence>
+        {fainting && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.4 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.32, ease: 'easeOut' }}
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1"
+            style={{ background: 'rgba(0,0,0,0.58)', borderRadius }}
+          >
+            <span style={{ fontSize: 36, lineHeight: 1 }}>💀</span>
+            <span className="text-[10px] font-extrabold tracking-widest uppercase text-white/60">Svenuto</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* ── Image section ── */}
       <div
         className="relative shrink-0 flex items-center justify-center"
@@ -246,9 +266,13 @@ export default function DuelPage() {
   const attackFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const attackReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const [myFainting, setMyFainting]           = useState(false)
+  const [oppFainting, setOppFainting]         = useState(false)
+
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
   const duelStatusRef      = useRef<string | null>(null)
+  const userIdRef          = useRef<string | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   function flashFortuneNotice(fortune: CombatFortuneInfo | null | undefined) {
@@ -348,6 +372,7 @@ export default function DuelPage() {
         if (!user) return
 
         setUserId(user.id)
+        userIdRef.current = user.id
 
         const role: 'challenger' | 'opponent' = duelData.challenger_id === user.id ? 'challenger' : 'opponent'
         setMyRole(role)
@@ -402,60 +427,66 @@ export default function DuelPage() {
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
         const { actorId, damage, fortune, nextTurn, itemUsed, switchedTo, newOppHp } = payload
+        const iAttacked = actorId === userIdRef.current
+        const isFaint   = newOppHp === 0 && switchedTo
 
-        setUserId(currentId => {
-          const iAttacked = actorId === currentId
-
-          // Update HP immediately from broadcast — more reliable than waiting for postgres_changes
-          if (newOppHp !== undefined && newOppHp !== null) {
-            const updateHp = (prev: LineupEntry[]) => prev.map(l =>
-              l.is_active
-                ? { ...l, current_hp: newOppHp, ...(newOppHp === 0 ? { is_active: false, fainted_at: new Date().toISOString() } : {}) }
-                : l
-            )
-            if (iAttacked) {
-              setOppLineup(updateHp)
-            } else {
-              setMyLineup(updateHp)
-            }
+        // ── HP update (immediate) ──────────────────────────────────────────────
+        if (newOppHp !== undefined && newOppHp !== null) {
+          // Drop HP to 0; keep is_active=true so the card stays visible for faint anim
+          const updateHp = (prev: LineupEntry[]) => prev.map(l =>
+            l.is_active ? { ...l, current_hp: newOppHp } : l
+          )
+          if (iAttacked) {
+            setOppLineup(updateHp)
+            if (newOppHp === 0) setOppFainting(true)
+          } else {
+            setMyLineup(updateHp)
+            if (newOppHp === 0) setMyFainting(true)
           }
+        }
 
-          // Activate the next creature after a faint/switch
-          if (switchedTo) {
+        // ── Creature switch (delayed when faint, immediate otherwise) ─────────
+        if (switchedTo) {
+          const switchDelay = isFaint ? 1400 : 0
+          setTimeout(() => {
             const activateNext = (prev: LineupEntry[]) => prev.map(l => ({
               ...l,
               is_active: l.player_creature_id === switchedTo.playerCreatureId,
+              ...(l.is_active && l.player_creature_id !== switchedTo.playerCreatureId
+                ? { fainted_at: new Date().toISOString() }
+                : {}),
             }))
             if (iAttacked) {
+              setOppFainting(false)
               setOppLineup(activateNext)
             } else {
+              setMyFainting(false)
               setMyLineup(activateNext)
             }
-          }
+          }, switchDelay)
+          // Show "X entra in battaglia!" after the faint animation
+          setTimeout(() => {
+            setSwitchNotice(`${switchedTo.name} entra in battaglia!`)
+            setTimeout(() => setSwitchNotice(null), 2500)
+          }, isFaint ? 1300 : 0)
+        }
 
-          if (iAttacked) {
-            setOppAnimState('damage')
-            setLastDamage({ amount: damage, target: 'opp', id: Date.now() })
-            setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 900)
-            releaseAttackFeedback(450)
-          } else {
-            setAnimState('damage')
-            setLastDamage({ amount: damage, target: 'me', id: Date.now() })
-            setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 900)
-          }
-          if (nextTurn && currentId) {
-            setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
-          }
-          return currentId
-        })
-
-        if (switchedTo) {
-          setSwitchNotice(`${switchedTo.name} entra in battaglia!`)
-          setTimeout(() => setSwitchNotice(null), 2500)
+        // ── Animations & turn ─────────────────────────────────────────────────
+        if (iAttacked) {
+          setOppAnimState('damage')
+          setLastDamage({ amount: damage, target: 'opp', id: Date.now() })
+          setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 900)
+          releaseAttackFeedback(450)
+        } else {
+          setAnimState('damage')
+          setLastDamage({ amount: damage, target: 'me', id: Date.now() })
+          setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 900)
+        }
+        if (nextTurn) {
+          setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
         }
 
         flashFortuneNotice(fortune as CombatFortuneInfo | undefined)
-
         const atkLabel = itemUsed ? '⚔️+🗡️' : '⚔️'
         const fortuneText = formatFortuneText(fortune as CombatFortuneInfo | undefined)
         setLog(prev => [`${atkLabel} ${damage} danno${fortuneText ? ` · ${fortuneText}` : ''}!`, ...prev.slice(0, 3)])
@@ -849,23 +880,33 @@ export default function DuelPage() {
 
         {/* Opponent card — top-right, flush to right edge */}
         <div className="absolute z-10" style={{ top: 12, right: 0, left: '8%' }}>
-          {oppActiveCr ? (
-            <CreatureCard
-              imageUrl={oppActiveCr.image_url}
-              name={oppActiveCr.name}
-              element={oppActiveCr.element}
-              rarity={oppActiveCr.rarity}
-              currentHp={oppHp}
-              maxHp={oppHpMax}
-              atk={oppAtk}
-              def={oppDef}
-              animState={oppAnimState}
-              side="right"
-              lineup={oppLineupDots}
-            />
-          ) : (
-            <div className="h-[100px] rounded-l-2xl animate-pulse mx-0" style={{ background: 'rgba(255,255,255,0.04)' }} />
-          )}
+          <AnimatePresence mode="wait">
+            {oppActiveCr ? (
+              <motion.div
+                key={oppActive?.player_creature_id}
+                initial={{ opacity: 0, scale: 0.92, y: -6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+              >
+                <CreatureCard
+                  imageUrl={oppActiveCr.image_url}
+                  name={oppActiveCr.name}
+                  element={oppActiveCr.element}
+                  rarity={oppActiveCr.rarity}
+                  currentHp={oppHp}
+                  maxHp={oppHpMax}
+                  atk={oppAtk}
+                  def={oppDef}
+                  animState={oppAnimState}
+                  side="right"
+                  lineup={oppLineupDots}
+                  fainting={oppFainting}
+                />
+              </motion.div>
+            ) : (
+              <div className="h-[100px] rounded-l-2xl animate-pulse mx-0" style={{ background: 'rgba(255,255,255,0.04)' }} />
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Standalone damage floats — outside cards to avoid overflow-hidden clipping */}
@@ -906,24 +947,34 @@ export default function DuelPage() {
 
         {/* Player card — bottom-left, flush to left edge */}
         <div className="absolute z-10" style={{ bottom: 12, left: 0, right: '8%' }}>
-          {myActiveCr ? (
-            <CreatureCard
-              imageUrl={myActiveCr.image_url}
-              name={myActiveCr.name}
-              element={myActiveCr.element}
-              rarity={myActiveCr.rarity}
-              currentHp={myHp}
-              maxHp={myHpMax}
-              atk={myAtk}
-              def={myDef}
-              animState={animState}
-              side="left"
-              lineup={myLineupDots}
-              lineupLabel="Tu"
-            />
-          ) : (
-            <div className="h-[100px] rounded-r-2xl animate-pulse" style={{ background: 'rgba(255,255,255,0.04)' }} />
-          )}
+          <AnimatePresence mode="wait">
+            {myActiveCr ? (
+              <motion.div
+                key={myActive?.player_creature_id}
+                initial={{ opacity: 0, scale: 0.92, y: 6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+              >
+                <CreatureCard
+                  imageUrl={myActiveCr.image_url}
+                  name={myActiveCr.name}
+                  element={myActiveCr.element}
+                  rarity={myActiveCr.rarity}
+                  currentHp={myHp}
+                  maxHp={myHpMax}
+                  atk={myAtk}
+                  def={myDef}
+                  animState={animState}
+                  side="left"
+                  lineup={myLineupDots}
+                  lineupLabel="Tu"
+                  fainting={myFainting}
+                />
+              </motion.div>
+            ) : (
+              <div className="h-[100px] rounded-r-2xl animate-pulse" style={{ background: 'rgba(255,255,255,0.04)' }} />
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
