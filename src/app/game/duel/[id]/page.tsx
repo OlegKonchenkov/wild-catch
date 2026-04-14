@@ -401,10 +401,38 @@ export default function DuelPage() {
     const channel = supabase
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
-        const { actorId, damage, fortune, nextTurn, itemUsed, switchedTo } = payload
+        const { actorId, damage, fortune, nextTurn, itemUsed, switchedTo, newOppHp } = payload
 
         setUserId(currentId => {
           const iAttacked = actorId === currentId
+
+          // Update HP immediately from broadcast — more reliable than waiting for postgres_changes
+          if (newOppHp !== undefined && newOppHp !== null) {
+            const updateHp = (prev: LineupEntry[]) => prev.map(l =>
+              l.is_active
+                ? { ...l, current_hp: newOppHp, ...(newOppHp === 0 ? { is_active: false, fainted_at: new Date().toISOString() } : {}) }
+                : l
+            )
+            if (iAttacked) {
+              setOppLineup(updateHp)
+            } else {
+              setMyLineup(updateHp)
+            }
+          }
+
+          // Activate the next creature after a faint/switch
+          if (switchedTo) {
+            const activateNext = (prev: LineupEntry[]) => prev.map(l => ({
+              ...l,
+              is_active: l.player_creature_id === switchedTo.playerCreatureId,
+            }))
+            if (iAttacked) {
+              setOppLineup(activateNext)
+            } else {
+              setMyLineup(activateNext)
+            }
+          }
+
           if (iAttacked) {
             setOppAnimState('damage')
             setLastDamage({ amount: damage, target: 'opp', id: Date.now() })
@@ -568,6 +596,9 @@ export default function DuelPage() {
     if (res.ok) {
       if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
       if (data.duelOver) {
+        // Immediately mark as won for the attacker — don't wait for postgres_changes
+        setResult('won')
+        setIsMyTurn(false)
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
         if (data.completedMissions?.length) setCompletedMissions(data.completedMissions)
       }
