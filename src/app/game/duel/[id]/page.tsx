@@ -497,8 +497,11 @@ export default function DuelPage() {
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'duel_lineups', filter: `duel_id=eq.${id}` },
         ({ new: updated }) => {
+          // Only sync HP from the DB event — is_active and fainted_at are controlled exclusively
+          // by the broadcast handler (activateNext). postgres_changes fires BEFORE broadcast,
+          // so applying is_active here would switch the active creature before the faint animation plays.
           const updateLineup = (prev: LineupEntry[]) =>
-            prev.map(l => l.id === updated.id ? { ...l, ...updated } : l)
+            prev.map(l => l.id === updated.id ? { ...l, current_hp: updated.current_hp } : l)
           setMyLineup(prev => {
             if (prev.some(l => l.id === updated.id)) return updateLineup(prev)
             return prev
