@@ -93,13 +93,14 @@ interface CardProps {
   maxHp: number
   atk?: number
   animState?: 'idle' | 'attack' | 'damage'
+  fainting?: boolean
   side: 'left' | 'right'
   lineup?: Array<{ color: string; isActive: boolean; fainted: boolean }>
   lineupLabel?: string
   isBoss?: boolean
 }
 
-function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, animState = 'idle', side, lineup, lineupLabel, isBoss }: CardProps) {
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, animState = 'idle', side, lineup, lineupLabel, isBoss, fainting }: CardProps) {
   const spriteSize = typeof window !== 'undefined'
     ? Math.round(Math.min(window.innerWidth * 0.35, window.innerHeight * 0.2, 158))
     : 122
@@ -122,6 +123,8 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
         borderLeft:  side === 'left'  ? 'none' : `1px solid ${rarityColor}45`,
         backdropFilter: 'blur(16px)',
         boxShadow: `0 16px 48px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0 1px ${rarityColor}18`,
+        filter: fainting ? 'grayscale(1)' : undefined,
+        transition: 'filter 0.3s ease',
       }}
     >
       {/* ── Image section ── */}
@@ -214,6 +217,17 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
           </div>
         </div>
       </div>
+
+      {fainting && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="absolute inset-0 z-20 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.55)' }}
+        >
+          <span className="text-4xl">💀</span>
+        </motion.div>
+      )}
     </div>
   )
 }
@@ -472,6 +486,8 @@ function BattleScreen({
   onSelectItem,
   switchNotice,
   fortuneNotice,
+  bossFainting,
+  playerFainting,
 }: {
   bossLineup: BossSlot[]
   playerLineup: PlayerSlot[]
@@ -488,6 +504,8 @@ function BattleScreen({
   onSelectItem: (id: string | null) => void
   switchNotice: string | null
   fortuneNotice: { id: number; text: string; tone: CombatFortuneInfo['tone'] } | null
+  bossFainting: boolean
+  playerFainting: boolean
 }) {
   const [showItemsModal, setShowItemsModal] = useState(false)
   const [turnTimer, setTurnTimer] = useState(30)
@@ -651,20 +669,31 @@ function BattleScreen({
           }
           transition={{ duration: 0.15 }}
         >
-          <CreatureCard
-            imageUrl={activeBoss.image_url || activeBoss.sprite_url}
-            name={activeBoss.name}
-            element={activeBoss.element}
-            rarity="leggendaria"
-            currentHp={activeBoss.current_hp}
-            maxHp={activeBoss.max_hp}
-            atk={activeBoss.atk}
-            animState={bossAnimState}
-            side="right"
-            lineup={bossLineupDots}
-            lineupLabel="Boss"
-            isBoss
-          />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`boss-${bossActiveSlot}`}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25 }}
+            >
+              <CreatureCard
+                imageUrl={activeBoss.image_url || activeBoss.sprite_url}
+                name={activeBoss.name}
+                element={activeBoss.element}
+                rarity="leggendaria"
+                currentHp={activeBoss.current_hp}
+                maxHp={activeBoss.max_hp}
+                atk={activeBoss.atk}
+                animState={bossAnimState}
+                side="right"
+                lineup={bossLineupDots}
+                lineupLabel="Boss"
+                isBoss
+                fainting={bossFainting}
+              />
+            </motion.div>
+          </AnimatePresence>
         </motion.div>
 
         {/* Player card — bottom-left, flush to left edge */}
@@ -698,6 +727,7 @@ function BattleScreen({
                 side="left"
                 lineup={playerLineupDots}
                 lineupLabel="Tu"
+                fainting={playerFainting}
               />
             </motion.div>
           </AnimatePresence>
@@ -1014,6 +1044,8 @@ export default function BossFightPage() {
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [switchNotice, setSwitchNotice]   = useState<string | null>(null)
+  const [bossFainting, setBossFainting]   = useState(false)
+  const [playerFainting, setPlayerFainting] = useState(false)
   const [fortuneNotice, setFortuneNotice] = useState<{ id: number; text: string; tone: CombatFortuneInfo['tone'] } | null>(null)
   const [finalResult, setFinalResult]     = useState<{ won: boolean; reward: any; levelUp: any } | null>(null)
   const [bossMissions, setBossMissions]   = useState<CompletedMissionInfo[]>([])
@@ -1201,16 +1233,17 @@ export default function BossFightPage() {
     const actingPlayer = playerLineup.find((c: PlayerSlot) => c.is_active && !c.fainted)
       ?? nextPlayerLineup.find((c: PlayerSlot) => c.is_active)
 
-    setBossLineup(nextBossLineup)
-    const newBossSlot = nextBossLineup.findIndex((c: BossSlot) => !c.fainted)
-    setBossActiveSlot(newBossSlot === -1 ? 0 : newBossSlot)
-
     const isOver = data.status === 'won' || data.status === 'lost'
+    const bossCreatureFainted = nextBossLineup[bossActiveSlot]?.fainted === true
+
     const playerFortuneText = formatFortuneText(data.playerFortune as CombatFortuneInfo | undefined)
     addLog(`${actingPlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni${playerFortuneText ? ` · ${playerFortuneText}` : ''}!`)
     flashFortuneNotice(data.playerFortune as CombatFortuneInfo | undefined)
 
-    // Phase 1: player attacks boss
+    // Phase 1: show damage on boss (update HP bar only, don't switch yet)
+    setBossLineup(prev => prev.map((slot, i) =>
+      i === bossActiveSlot ? { ...slot, current_hp: nextBossLineup[i]?.current_hp ?? slot.current_hp } : slot
+    ))
     setLastDamage({ amount: data.playerDamage, target: 'boss', id: Date.now() })
     setBossAnimState('damage')
 
@@ -1218,18 +1251,36 @@ export default function BossFightPage() {
       setBossAnimState('idle')
       setLastDamage(null)
 
-      if (!isOver && data.bossDamage > 0) {
-        // Phase 2: boss counter-attacks (2 seconds total from player attack)
+      if (bossCreatureFainted) {
+        // Boss creature fainted — show faint animation, then switch
+        setBossFainting(true)
+        setTimeout(() => {
+          setBossFainting(false)
+          setBossLineup(nextBossLineup)
+          const newBossSlot = nextBossLineup.findIndex((c: BossSlot) => !c.fainted)
+          setBossActiveSlot(newBossSlot === -1 ? 0 : newBossSlot)
+          setPlayerLineup(nextPlayerLineup)
+          if (data.bossSwitchedTo) {
+            setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
+            setTimeout(() => setSwitchNotice(null), 2000)
+          }
+          if (isOver) {
+            window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+            if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+            if (data.completedMissions?.length) setBossMissions(data.completedMissions)
+            setTimeout(() => setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp }), 400)
+          }
+          attackingRef.current = false
+          setAttacking(false)
+        }, 1000)
+      } else if (!isOver && data.bossDamage > 0) {
+        // Phase 2: boss counter-attacks
         setBossAttacking(true)
         setTimeout(() => {
           setBossAttacking(false)
+          // Update player HP bar before damage animation
           setPlayerLineup(prev => prev.map(slot =>
-            slot.is_active
-              ? {
-                  ...slot,
-                  current_hp: data.newPlayerHp,
-                }
-              : slot,
+            slot.is_active ? { ...slot, current_hp: data.newPlayerHp } : slot,
           ))
           setLastDamage({ amount: data.bossDamage, target: 'me', id: Date.now() })
           setAnimState('damage')
@@ -1241,21 +1292,59 @@ export default function BossFightPage() {
             setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
             setTimeout(() => setSwitchNotice(null), 2000)
           }
-          if (data.playerSwitchedTo) {
-            setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`)
-            setTimeout(() => setSwitchNotice(null), 2000)
-          }
 
-          setTimeout(() => {
-            setPlayerLineup(nextPlayerLineup)
-            setAnimState('idle')
-            setLastDamage(null)
-            attackingRef.current = false
-            setAttacking(false)  // re-enable only after both animations done
-          }, 900)
-        }, 1100)  // boss "thinks" for ~1s then strikes
+          // Detect if player creature fainted from boss counter-attack
+          const currentActivePlayer = playerLineup.find(c => c.is_active && !c.fainted)
+          const playerCreatureFainted = currentActivePlayer != null &&
+            nextPlayerLineup.find(c => c.player_creature_id === currentActivePlayer.player_creature_id)?.fainted === true
+
+          if (playerCreatureFainted) {
+            setTimeout(() => {
+              setAnimState('idle')
+              setLastDamage(null)
+              setPlayerFainting(true)
+              setTimeout(() => {
+                setPlayerFainting(false)
+                setPlayerLineup(nextPlayerLineup)
+                if (data.playerSwitchedTo) {
+                  setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`)
+                  setTimeout(() => setSwitchNotice(null), 2000)
+                }
+                if (isOver) {
+                  window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+                  if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+                  if (data.completedMissions?.length) setBossMissions(data.completedMissions)
+                  setTimeout(() => setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp }), 400)
+                }
+                attackingRef.current = false
+                setAttacking(false)
+              }, 1000)
+            }, 900)
+          } else {
+            setTimeout(() => {
+              setPlayerLineup(nextPlayerLineup)
+              setAnimState('idle')
+              setLastDamage(null)
+              if (data.playerSwitchedTo) {
+                setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`)
+                setTimeout(() => setSwitchNotice(null), 2000)
+              }
+              if (isOver) {
+                window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+                if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+                if (data.completedMissions?.length) setBossMissions(data.completedMissions)
+                setTimeout(() => setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp }), 400)
+              }
+              attackingRef.current = false
+              setAttacking(false)
+            }, 900)
+          }
+        }, 1100)
       } else {
-        // Boss fainted or game over — no counter-attack
+        // No counter-attack, boss alive (edge case: 0 damage)
+        setBossLineup(nextBossLineup)
+        const newBossSlot = nextBossLineup.findIndex((c: BossSlot) => !c.fainted)
+        setBossActiveSlot(newBossSlot === -1 ? 0 : newBossSlot)
         setPlayerLineup(nextPlayerLineup)
         if (data.bossSwitchedTo) {
           setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
@@ -1265,9 +1354,7 @@ export default function BossFightPage() {
           window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
           if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
           if (data.completedMissions?.length) setBossMissions(data.completedMissions)
-          setTimeout(() => {
-            setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp })
-          }, 400)
+          setTimeout(() => setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp }), 400)
         }
         attackingRef.current = false
         setAttacking(false)
@@ -1382,6 +1469,8 @@ export default function BossFightPage() {
             onSelectItem={setSelectedItemId}
             switchNotice={switchNotice}
             fortuneNotice={fortuneNotice}
+            bossFainting={bossFainting}
+            playerFainting={playerFainting}
           />
         </div>
       )}
