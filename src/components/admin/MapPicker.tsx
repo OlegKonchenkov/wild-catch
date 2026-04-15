@@ -28,6 +28,7 @@ interface Props {
   }) => Promise<void> | void
   onDeletePin?: (id: string) => Promise<void> | void
   onEditPin?: (id: string) => void
+  onMovePin?: (id: string, lat: number, lng: number) => Promise<void> | void
   allItems?: { id: string; name: string; type: string }[]
   allCreatures?: { id: string; name: string; rarity: string }[]
 }
@@ -40,7 +41,7 @@ function isValidBounds(b: Bounds | null | undefined): b is Bounds {
     typeof b.west  === 'number' && isFinite(b.west)
 }
 
-export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPin, onDeletePin, onEditPin, allItems = [], allCreatures = [] }: Props) {
+export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPin, onDeletePin, onEditPin, onMovePin, allItems = [], allCreatures = [] }: Props) {
   const containerRef      = useRef<HTMLDivElement>(null)
   const mapRef            = useRef<any>(null)
   const rectRef           = useRef<any>(null)
@@ -277,7 +278,14 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
           <div style="margin-top:4px">${editBtn}${deleteBtn}</div>
         </div>`
       )
-      const m = L.marker([pin.lat, pin.lng], { icon: mkPinIcon() }).addTo(map).bindPopup(popup)
+      const m = L.marker([pin.lat, pin.lng], { icon: mkPinIcon(), draggable: !!onMovePin && !!pin.id }).addTo(map).bindPopup(popup)
+      if (onMovePin && pin.id) {
+        m.on('dragstart', () => m.closePopup())
+        m.on('dragend', () => {
+          const { lat, lng } = m.getLatLng()
+          window.dispatchEvent(new CustomEvent('wc:move-pin', { detail: { id: pin.id, lat, lng } }))
+        })
+      }
       pinMarkersRef.current.set(key, m)
     })
   }, [mapReady, pins]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -302,6 +310,16 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
     window.addEventListener('wc:edit-pin', handler)
     return () => window.removeEventListener('wc:edit-pin', handler)
   }, [onEditPin])
+
+  useEffect(() => {
+    if (!onMovePin) return
+    const handler = (e: Event) => {
+      const { id, lat, lng } = (e as CustomEvent<{ id: string; lat: number; lng: number }>).detail
+      if (id) onMovePin(id, lat, lng)
+    }
+    window.addEventListener('wc:move-pin', handler)
+    return () => window.removeEventListener('wc:move-pin', handler)
+  }, [onMovePin])
 
   async function geocode() {
     if (!searchQuery.trim() || !mapRef.current) return

@@ -230,6 +230,16 @@ export default function SessionsPage() {
     setEditingPins(prev => prev.filter(p => p.id !== id))
   }
 
+  async function handleMovePin(id: string, lat: number, lng: number) {
+    const res = await fetch(`/api/admin/session-pins/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng }),
+    })
+    const data = await res.json()
+    if (data.pin) setEditingPins(prev => prev.map(p => p.id === id ? data.pin as MapPin : p))
+  }
+
   function handleEditPin(id: string) {
     const pin = editingPins.find(p => p.id === id)
     if (!pin) return
@@ -553,6 +563,7 @@ export default function SessionsPage() {
                     onAddPin={handleAddPin}
                     onDeletePin={handleDeletePin}
                     onEditPin={handleEditPin}
+                    onMovePin={handleMovePin}
                     allItems={allItems}
                     allCreatures={allCreatures}
                   />

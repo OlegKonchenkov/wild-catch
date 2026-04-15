@@ -11,7 +11,7 @@ async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) 
 }
 
 // PATCH /api/admin/session-pins/[id]
-// body: { name, description }
+// body: any subset of { lat, lng, name, description, image_url, reward_type, reward_payload, reward_radius_m }
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
   const auth = await requireAdmin(supabase)
@@ -19,15 +19,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params
   const body = await request.json().catch(() => ({}))
-  const { name, description, image_url } = body
+  const { name, description, image_url, lat, lng } = body
 
   const admin = createAdminClient()
   const { reward_type, reward_payload, reward_radius_m } = body
   const { data, error } = await admin
     .from('session_map_pins')
     .update({
-      name: name ?? '',
-      description: description ?? '',
+      ...(lat !== undefined ? { lat } : {}),
+      ...(lng !== undefined ? { lng } : {}),
+      ...(name !== undefined ? { name: name ?? '' } : {}),
+      ...(description !== undefined ? { description: description ?? '' } : {}),
       ...(image_url !== undefined ? { image_url: image_url ?? null } : {}),
       ...(reward_type !== undefined ? { reward_type: reward_type ?? null } : {}),
       ...(reward_payload !== undefined ? { reward_payload: reward_payload ?? null } : {}),
