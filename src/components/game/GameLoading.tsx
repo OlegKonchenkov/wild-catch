@@ -52,7 +52,7 @@ export function GameMapSkeleton() {
           </div>
         </div>
 
-        <div className="absolute inset-x-4 bottom-24 rounded-[28px] border border-[#3A9DBC]/40 bg-[#0D1E2E]/96 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.35)]">
+        <div className="absolute inset-x-4 bottom-4 rounded-[28px] border border-[#3A9DBC]/40 bg-[#0D1E2E]/96 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.35)]">
           <div className="flex items-center gap-3">
             <div className="h-14 w-14 rounded-2xl bg-white/8 animate-pulse" />
             <div className="min-w-0 flex-1 space-y-2">
@@ -64,12 +64,6 @@ export function GameMapSkeleton() {
             <div className="h-14 flex-1 rounded-2xl bg-[#E85D2F]/80 animate-pulse" />
             <div className="h-14 w-24 rounded-2xl bg-white/10 animate-pulse" />
           </div>
-        </div>
-
-        <div className="absolute bottom-28 right-4 rounded-[26px] border border-[#3A9DBC]/35 bg-[#0D1E2E]/92 p-3 w-[88px]">
-          <div className="mx-auto h-8 w-8 rounded-lg bg-[#3A9DBC]/18 animate-pulse" />
-          <div className="mt-2 h-2.5 w-12 mx-auto rounded bg-white/10 animate-pulse" />
-          <div className="mt-1 h-2.5 w-9 mx-auto rounded bg-white/6 animate-pulse" />
         </div>
     </div>
   )
