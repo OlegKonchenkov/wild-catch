@@ -4,6 +4,11 @@ import { createClient } from '@/lib/supabase/client'
 import { ImageInput } from '@/components/admin/ImageInput'
 import { AdminInlineSpinner, AdminListSkeleton } from '@/components/admin/AdminLoading'
 import type { QRCodeType } from '@/lib/types'
+
+const RARITY_LABEL: Record<string, string> = {
+  comune: 'Terrestre', non_comune: 'Arcaico', raro: 'Eroico',
+  epico: 'Mostruoso', leggendario: 'Leggendario', mitologico: 'Mitologico',
+}
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
 
@@ -248,7 +253,7 @@ function getQrDescription(qr: any, items: any[], creatures: any[]): string {
     }
     case 'creatura': {
       const c = creatures.find(cr => cr.id === payload.creature_id)
-      return c ? `${c.name} (${c.rarity})` : 'Creatura non selezionata'
+      return c ? `${c.name} (${RARITY_LABEL[c.rarity] ?? c.rarity})` : 'Creatura non selezionata'
     }
     default:
       return TYPE_INFO[qr.type as QRCodeType]?.description ?? 'QR speciale'
@@ -554,7 +559,7 @@ export default function QRCodesPage() {
     document.body.removeChild(ta); return ok
   }
 
-  const creatureOptions = creatures.map(c => ({ value: c.id, label: c.name, sub: `${c.rarity} · ${c.element}` }))
+  const creatureOptions = creatures.map(c => ({ value: c.id, label: c.name, sub: `${RARITY_LABEL[c.rarity] ?? c.rarity} · ${c.element}` }))
   const itemOptions     = items.map(i => ({ value: i.id, label: i.name, sub: i.type }))
   const info = TYPE_INFO[type]
   const isBossType = type === 'boss'
@@ -858,7 +863,7 @@ export default function QRCodesPage() {
                 {type === 'creatura' && (
                   <Field label="Creatura" hint="La creatura verrà aggiunta alla collezione del giocatore (o incrementa i duplicati se già posseduta)">
                     <SearchSelect
-                      options={creatures.map(c => ({ value: c.id, label: c.name, sub: `${c.rarity} · ${c.element}` }))}
+                      options={creatures.map(c => ({ value: c.id, label: c.name, sub: `${RARITY_LABEL[c.rarity] ?? c.rarity} · ${c.element}` }))}
                       value={String(fields.creature_id ?? '')}
                       onChange={v => setField('creature_id', v)}
                       placeholder="Cerca creatura…"

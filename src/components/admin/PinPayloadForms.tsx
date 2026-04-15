@@ -14,6 +14,12 @@ const INPUT = 'w-full bg-white/10 text-white border border-white/20 rounded-lg p
 const SELECT = 'w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#3A9DBC]/60'
 const LABEL = 'block text-xs text-white/50 mb-1'
 
+const RARITY_LABEL: Record<string, string> = {
+  comune: 'Terrestre', non_comune: 'Arcaico', raro: 'Eroico',
+  epico: 'Mostruoso', leggendario: 'Leggendario', mitologico: 'Mitologico',
+}
+const EGG_RARITIES = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
+
 // ── Oggetto ───────────────────────────────────────────────────────────────────
 
 export function PinPayloadOggetto({ allItems, value, onChange }: {
@@ -54,8 +60,8 @@ export function PinPayloadUovo({ value, onChange }: { value: string; onChange: (
       <div>
         <label className={LABEL}>Rarità uovo</label>
         <select value={rarity} onChange={e => onChange(encodePayload({ egg_rarity: e.target.value, steps_required: steps }))} className={SELECT}>
-          {['comune','non_comune','raro','epico','leggendario','mitologico'].map(r => (
-            <option key={r} value={r}>{r}</option>
+          {EGG_RARITIES.map(r => (
+            <option key={r} value={r}>{RARITY_LABEL[r]}</option>
           ))}
         </select>
       </div>
@@ -83,7 +89,7 @@ export function PinPayloadCreatura({ allCreatures, value, onChange }: {
       <label className={LABEL}>Creatura</label>
       <select value={cid} onChange={e => onChange(encodePayload({ creature_id: e.target.value }))} className={SELECT}>
         <option value="">— Seleziona creatura —</option>
-        {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
+        {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({RARITY_LABEL[c.rarity] ?? c.rarity})</option>)}
       </select>
     </div>
   )
@@ -215,7 +221,7 @@ export function PinPayloadBoss({ allCreatures, value, onChange }: {
               className={SELECT}
             >
               <option value="">— Nessuna —</option>
-              {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
+              {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({RARITY_LABEL[c.rarity] ?? c.rarity})</option>)}
             </select>
             {cid && (
               <div>
