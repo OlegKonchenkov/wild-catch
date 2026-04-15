@@ -20,19 +20,7 @@ interface GameGridSkeletonProps {
 
 export function GameMapSkeleton() {
   return (
-    <div className="min-h-screen overflow-hidden" style={{ background: '#060C18' }}>
-      <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/8">
-        <div className="space-y-2">
-          <div className="h-5 w-14 rounded bg-[#F7C841]/20 animate-pulse" />
-          <div className="h-2.5 w-28 rounded-full bg-white/8 overflow-hidden">
-            <div className="h-full w-2/3 rounded-full bg-[#F7C841]/40 animate-pulse" />
-          </div>
-        </div>
-        <div className="h-8 w-20 rounded-xl bg-white/8 animate-pulse" />
-        <div className="h-8 w-8 rounded-full bg-white/8 animate-pulse" />
-      </div>
-
-      <div className="relative h-[calc(100svh-66px)]">
+    <div className="relative h-full overflow-hidden" style={{ background: '#060C18' }}>
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(58,157,188,0.12),transparent_35%),radial-gradient(circle_at_75%_20%,rgba(52,211,153,0.08),transparent_28%),linear-gradient(180deg,#101922_0%,#060C18_100%)]" />
           <div className="absolute inset-x-0 top-[14%] h-px bg-white/6" />
@@ -83,7 +71,6 @@ export function GameMapSkeleton() {
           <div className="mt-2 h-2.5 w-12 mx-auto rounded bg-white/10 animate-pulse" />
           <div className="mt-1 h-2.5 w-9 mx-auto rounded bg-white/6 animate-pulse" />
         </div>
-      </div>
     </div>
   )
 }
