@@ -486,18 +486,35 @@ const REWARD_TYPE_LABEL: Record<string, string> = {
   evento:  '🎉 Evento!',
 }
 
-function PinRewardModal({ reward, onDone }: { reward: Record<string, unknown>; onDone: () => void }) {
+// Typed shape of a pin claim response
+interface PinRewardData {
+  type: string
+  pinName: string
+  itemName?: string
+  quantity?: number
+  eggRarity?: string
+  stepsRequired?: number
+  creature?: { name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number }
+  chapterOrder?: number
+  text?: string
+  imageUrl?: string
+  bossFightId?: string
+  bossName?: string
+  eventType?: string
+  effect?: string
+}
+
+function PinRewardModal({ reward, onDone }: { reward: PinRewardData; onDone: () => void }) {
   const [visible, setVisible] = useState(false)
-  const type = reward.type as string
-  const pinName = reward.pinName as string
+  const { type, pinName } = reward
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 60)
     return () => clearTimeout(t)
   }, [])
 
-  const rarityColor = RARITY_COLOR[(reward.creature as any)?.rarity] ?? '#F7C841'
-  const glow = ELEMENT_GLOW[(reward.creature as any)?.element] ?? rarityColor
+  const rarityColor = RARITY_COLOR[reward.creature?.rarity ?? ''] ?? '#F7C841'
+  const glow = ELEMENT_GLOW[reward.creature?.element ?? ''] ?? rarityColor
 
   function handleDone() {
     if (type === 'boss' && reward.bossFightId) {
@@ -548,29 +565,28 @@ function PinRewardModal({ reward, onDone }: { reward: Record<string, unknown>; o
           {type === 'oggetto' && (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
               <p className="text-4xl mb-2">🎁</p>
-              <p className="text-white font-bold text-lg">{reward.itemName as string}</p>
-              <p className="text-white/50 text-sm">×{reward.quantity as number}</p>
+              <p className="text-white font-bold text-lg">{reward.itemName}</p>
+              <p className="text-white/50 text-sm">×{reward.quantity}</p>
             </div>
           )}
 
           {type === 'uovo' && (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
               <p className="text-4xl mb-2">🥚</p>
-              <p className="text-white font-bold capitalize">{reward.eggRarity as string}</p>
-              {(reward.stepsRequired as number) > 0 && (
-                <p className="text-white/50 text-sm mt-1">Si schiuderà dopo {reward.stepsRequired as number} passi</p>
+              <p className="text-white font-bold capitalize">{reward.eggRarity}</p>
+              {(reward.stepsRequired ?? 0) > 0 && (
+                <p className="text-white/50 text-sm mt-1">Si schiuderà dopo {reward.stepsRequired} passi</p>
               )}
             </div>
           )}
 
-          {type === 'creatura' && (() => {
-            const c = reward.creature as any
-            if (!c) return null
+          {type === 'creatura' && reward.creature && (() => {
+            const c = reward.creature!
             const elemEmoji = ({ fiamma:'🔥', adriatico:'🌊', bosco:'🌿', terra:'⚡', armonia:'✨' } as Record<string,string>)[c.element] ?? '✦'
             return (
               <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${rarityColor}40`, background: `linear-gradient(135deg, ${glow}12 0%, transparent 100%)` }}>
                 <div className="flex flex-col items-center py-5 px-4">
-                  <CreatureSprite imageUrl={c.image_url ?? ''} name={c.name} animState="idle" size={140} element={c.element} rarity={c.rarity} showAura />
+                  <CreatureSprite imageUrl={c.image_url ?? ''} name={c.name} animState="idle" size={140} element={c.element as any} rarity={c.rarity as any} showAura />
                   <p className="text-white font-bold text-xl mt-3">{c.name}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-sm">{elemEmoji}</span>
@@ -584,15 +600,15 @@ function PinRewardModal({ reward, onDone }: { reward: Record<string, unknown>; o
 
           {type === 'indizio' && (
             <div className="bg-[#1A0D2E] border border-[#7B4DB8]/30 rounded-2xl p-4 space-y-3">
-              {reward.chapterOrder && (
-                <p className="text-xs font-bold text-[#C084FC] uppercase tracking-wide">Capitolo {reward.chapterOrder as number}</p>
+              {reward.chapterOrder != null && (
+                <p className="text-xs font-bold text-[#C084FC] uppercase tracking-wide">Capitolo {reward.chapterOrder}</p>
               )}
               {reward.text && (
-                <p className="text-sm text-white/75 leading-relaxed whitespace-pre-wrap">{reward.text as string}</p>
+                <p className="text-sm text-white/75 leading-relaxed whitespace-pre-wrap">{reward.text}</p>
               )}
               {reward.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={reward.imageUrl as string} alt="Indizio"
+                <img src={reward.imageUrl} alt="Indizio"
                   className="w-full rounded-xl object-cover max-h-40 cursor-zoom-in"
                   onClick={() => window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: reward.imageUrl }))}
                 />
@@ -603,7 +619,7 @@ function PinRewardModal({ reward, onDone }: { reward: Record<string, unknown>; o
           {type === 'boss' && (
             <div className="bg-red-950/40 border border-red-500/30 rounded-2xl p-4 text-center">
               <p className="text-4xl mb-2">⚔️</p>
-              <p className="text-white font-bold text-lg">{reward.bossName as string}</p>
+              <p className="text-white font-bold text-lg">{reward.bossName}</p>
               <p className="text-red-300/70 text-sm mt-1">Il boss ti sfida in battaglia!</p>
             </div>
           )}
@@ -611,7 +627,7 @@ function PinRewardModal({ reward, onDone }: { reward: Record<string, unknown>; o
           {type === 'evento' && (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
               <p className="text-4xl mb-2">🎉</p>
-              <p className="text-white/70 text-sm">{reward.effect as string}</p>
+              <p className="text-white/70 text-sm">{reward.effect}</p>
             </div>
           )}
 
@@ -640,8 +656,8 @@ function MapPageInner() {
   const [mapPins, setMapPins] = useState<MapPin[]>([])
   const [claimedPinIds, setClaimedPinIds] = useState<Set<string>>(new Set())
   const claimedPinIdsRef = useRef<Set<string>>(new Set())
-  const [pinReward, setPinReward] = useState<Record<string, unknown> | null>(null)
-  const pinRewardRef = useRef<Record<string, unknown> | null>(null)
+  const [pinReward, setPinReward] = useState<PinRewardData | null>(null)
+  const pinRewardRef = useRef<PinRewardData | null>(null)
   const mapPinsRef = useRef<MapPin[]>([])
   const claimingPinRef = useRef(false)
   const [stepsWalked, setStepsWalked] = useState(0)
@@ -909,10 +925,10 @@ function MapPageInner() {
           body: JSON.stringify({ pinId: nearPin.id, sessionId: sid, lat: pos.lat, lng: pos.lng }),
         })
           .then(r => r.json())
-          .then(d => {
+          .then((d: any) => {
             if (d.success) {
               setClaimedPinIds(prev => new Set([...prev, nearPin.id]))
-              setPinReward(d)
+              setPinReward(d as PinRewardData)
               if (d.completedMissions?.length > 0) {
                 setMissionQueue(prev => [...prev, ...d.completedMissions])
               }
