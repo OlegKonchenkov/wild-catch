@@ -135,6 +135,8 @@ export default function SessionsPage() {
   const [pinEditId, setPinEditId]         = useState<string | null>(null)
   const [pinEditName, setPinEditName]     = useState('')
   const [pinEditDesc, setPinEditDesc]     = useState('')
+  const [pinEditImageUrl, setPinEditImageUrl] = useState<string>('')
+  const [pinEditImageUploading, setPinEditImageUploading] = useState(false)
   const [pinEditRadius, setPinEditRadius] = useState(50)
   const [pinEditRewardType, setPinEditRewardType] = useState<string>('none')
   const [pinEditPayload, setPinEditPayload]   = useState('')  // JSON string
@@ -182,11 +184,15 @@ export default function SessionsPage() {
       villainName: s.narrative_config?.villain_name ?? '',
       starterKit: Array.isArray(s.starter_kit) ? s.starter_kit : [],
     })
-    // Load items if not already loaded
+    // Load items + creatures if not already loaded (needed for pin reward picker)
     if (allItems.length === 0) {
       supabase.from('items').select('id, name, type').order('type').then(({ data }) => {
         if (data) setAllItems(data as Item[])
       })
+    }
+    if (allCreatures.length === 0) {
+      supabase.from('creatures').select('id, name, rarity').order('name')
+        .then(({ data }) => { if (data) setAllCreatures(data as { id: string; name: string; rarity: string }[]) })
     }
     // Load map pins
     setEditingPins([])
@@ -198,12 +204,22 @@ export default function SessionsPage() {
 
   function closeEdit() { setEditingId(null); setEditForm(null); setEditError(null); setEditingPins([]) }
 
-  async function handleAddPin(pin: { lat: number; lng: number; name: string; description: string; image_url?: string | null }) {
+  async function handleAddPin(pin: {
+    lat: number; lng: number; name: string; description: string
+    image_url?: string | null
+    reward_type?: string | null
+    reward_payload?: string | null
+    reward_radius_m?: number | null
+  }) {
     if (!editingId) return
+    const body: Record<string, unknown> = { sessionId: editingId, ...pin }
+    if (pin.reward_payload) {
+      try { body.reward_payload = JSON.parse(pin.reward_payload) } catch { /* keep as string */ }
+    }
     const res = await fetch('/api/admin/session-pins', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: editingId, ...pin }),
+      body: JSON.stringify(body),
     })
     const data = await res.json()
     if (data.pin) setEditingPins(prev => [...prev, data.pin as MapPin])
@@ -220,9 +236,10 @@ export default function SessionsPage() {
     setPinEditId(id)
     setPinEditName(pin.name)
     setPinEditDesc(pin.description)
+    setPinEditImageUrl((pin as any).image_url ?? '')
     setPinEditRadius(pin.reward_radius_m ?? 50)
     setPinEditRewardType(pin.reward_type ?? 'none')
-    setPinEditPayload('')
+    setPinEditPayload((pin as any).reward_payload ? JSON.stringify((pin as any).reward_payload) : '')
     setPinEditError(null)
     // Lazy-load items + creatures for payload pickers
     if (allItems.length === 0) {
@@ -249,6 +266,7 @@ export default function SessionsPage() {
       body: JSON.stringify({
         name: pinEditName,
         description: pinEditDesc,
+        image_url: pinEditImageUrl || null,
         reward_type: pinEditRewardType === 'none' ? null : pinEditRewardType,
         reward_payload: payload,
         reward_radius_m: pinEditRadius,
@@ -535,6 +553,8 @@ export default function SessionsPage() {
                     onAddPin={handleAddPin}
                     onDeletePin={handleDeletePin}
                     onEditPin={handleEditPin}
+                    allItems={allItems}
+                    allCreatures={allCreatures}
                   />
                 </div>
 
@@ -646,6 +666,36 @@ export default function SessionsPage() {
               <label className="block text-xs text-white/50 mb-1 font-semibold">Descrizione</label>
               <textarea value={pinEditDesc} onChange={e => setPinEditDesc(e.target.value)} rows={2}
                 className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#3A9DBC]/60" />
+            </div>
+
+            {/* Image */}
+            <div className="space-y-1.5">
+              <label className="block text-xs text-white/50 mb-1 font-semibold">
+                Immagine pin <span className="text-white/30">(opzionale)</span>
+              </label>
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={async e => {
+                  const f = e.target.files?.[0]
+                  if (!f) return
+                  setPinEditImageUploading(true)
+                  const fd = new FormData(); fd.append('file', f)
+                  const res = await fetch('/api/admin/upload', { method: 'POST', body: fd })
+                  if (res.ok) { const j = await res.json(); setPinEditImageUrl(j.url ?? '') }
+                  setPinEditImageUploading(false)
+                }}
+                className="w-full text-xs text-white/60 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white/70 hover:file:bg-white/15 cursor-pointer" />
+              {pinEditImageUploading && <p className="text-xs text-white/40">Caricamento…</p>}
+              <input value={pinEditImageUrl} placeholder="oppure incolla URL immagine…"
+                onChange={e => setPinEditImageUrl(e.target.value)}
+                className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+              {pinEditImageUrl && (
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={pinEditImageUrl} alt="Anteprima" className="w-full rounded-lg object-cover max-h-28" />
+                  <button type="button" onClick={() => setPinEditImageUrl('')}
+                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white text-xs flex items-center justify-center hover:bg-red-500/80">×</button>
+                </div>
+              )}
             </div>
 
             {/* Reward type */}

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { PinPayloadFields } from '@/components/admin/PinPayloadForms'
 
 export interface Bounds { north: number; south: number; east: number; west: number }
 
@@ -18,9 +19,17 @@ interface Props {
   onBoundsChange: (b: Bounds | null) => void
   initialBounds?: Bounds | null
   pins?: MapPin[]
-  onAddPin?: (pin: { lat: number; lng: number; name: string; description: string; image_url?: string | null }) => Promise<void> | void
+  onAddPin?: (pin: {
+    lat: number; lng: number; name: string; description: string
+    image_url?: string | null
+    reward_type?: string | null
+    reward_payload?: string | null
+    reward_radius_m?: number | null
+  }) => Promise<void> | void
   onDeletePin?: (id: string) => Promise<void> | void
   onEditPin?: (id: string) => void
+  allItems?: { id: string; name: string; type: string }[]
+  allCreatures?: { id: string; name: string; rarity: string }[]
 }
 
 function isValidBounds(b: Bounds | null | undefined): b is Bounds {
@@ -31,7 +40,7 @@ function isValidBounds(b: Bounds | null | undefined): b is Bounds {
     typeof b.west  === 'number' && isFinite(b.west)
 }
 
-export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPin, onDeletePin, onEditPin }: Props) {
+export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPin, onDeletePin, onEditPin, allItems = [], allCreatures = [] }: Props) {
   const containerRef      = useRef<HTMLDivElement>(null)
   const mapRef            = useRef<any>(null)
   const rectRef           = useRef<any>(null)
@@ -56,6 +65,9 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
   const [pinDesc, setPinDesc]         = useState('')
   const [pinImageFile, setPinImageFile] = useState<File | null>(null)
   const [pinImagePreview, setPinImagePreview] = useState<string | null>(null)
+  const [pinRewardType, setPinRewardType]     = useState('none')
+  const [pinRewardPayload, setPinRewardPayload] = useState('')
+  const [pinRewardRadius, setPinRewardRadius]   = useState(50)
   const [savingPin, setSavingPin]     = useState(false)
 
   useEffect(() => { onChangeRef.current = onBoundsChange }, [onBoundsChange])
@@ -330,11 +342,21 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
         imageUrl = json.url ?? null
       }
     }
-    await onAddPin({ lat: pendingPin.lat, lng: pendingPin.lng, name: pinName.trim(), description: pinDesc.trim(), image_url: imageUrl })
+    await onAddPin({
+      lat: pendingPin.lat, lng: pendingPin.lng,
+      name: pinName.trim(), description: pinDesc.trim(),
+      image_url: imageUrl,
+      reward_type: pinRewardType === 'none' ? null : pinRewardType,
+      reward_payload: (pinRewardType !== 'none' && pinRewardPayload) ? pinRewardPayload : null,
+      reward_radius_m: pinRewardType !== 'none' ? pinRewardRadius : null,
+    })
     setSavingPin(false)
     setPendingPin(null)
     setPinImageFile(null)
     setPinImagePreview(null)
+    setPinRewardType('none')
+    setPinRewardPayload('')
+    setPinRewardRadius(50)
   }
 
   const showPinTools = !!onAddPin
@@ -469,9 +491,47 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
               <img src={pinImagePreview} alt="Anteprima" className="w-full rounded-lg object-cover max-h-28" />
             )}
           </div>
+          {/* Reward type */}
+          <div>
+            <label className="text-xs text-white/50 font-medium">Tipo ricompensa (opzionale)</label>
+            <select value={pinRewardType}
+              onChange={e => { setPinRewardType(e.target.value); setPinRewardPayload('') }}
+              className="mt-1 w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#F7C841]/60">
+              <option value="none">— Nessuna —</option>
+              <option value="oggetto">🎁 Oggetto</option>
+              <option value="uovo">🥚 Uovo</option>
+              <option value="creatura">🐾 Creatura</option>
+              <option value="indizio">🧩 Indizio</option>
+              <option value="boss">⚔️ Boss</option>
+              <option value="evento">🎉 Evento</option>
+            </select>
+          </div>
+          {pinRewardType !== 'none' && (
+            <>
+              <PinPayloadFields
+                type={pinRewardType}
+                value={pinRewardPayload}
+                onChange={setPinRewardPayload}
+                allItems={allItems}
+                allCreatures={allCreatures}
+              />
+              <div>
+                <label className="text-xs text-white/50 font-medium">
+                  Raggio attivazione: <span className="text-[#F7C841]">{pinRewardRadius} m</span>
+                </label>
+                <input type="range" min={20} max={300} step={10} value={pinRewardRadius}
+                  onChange={e => setPinRewardRadius(+e.target.value)}
+                  className="w-full accent-[#F7C841] mt-1" />
+                <div className="flex justify-between text-xs text-white/25"><span>20 m</span><span>300 m</span></div>
+              </div>
+            </>
+          )}
           <div className="flex gap-2">
             <button
-              onClick={() => { setPendingPin(null); setPinImageFile(null); setPinImagePreview(null) }}
+              onClick={() => {
+                setPendingPin(null); setPinImageFile(null); setPinImagePreview(null)
+                setPinRewardType('none'); setPinRewardPayload(''); setPinRewardRadius(50)
+              }}
               className="flex-1 py-1.5 rounded-lg text-sm bg-white/8 text-white/60 border border-white/15 hover:bg-white/12 transition-colors"
             >
               Annulla

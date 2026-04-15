@@ -167,40 +167,80 @@ export function PinPayloadBoss({ allCreatures, value, onChange }: {
   value: string
   onChange: (v: string) => void
 }) {
-  const p          = parsePayload(value)
-  const cid        = (p.creature_id as string) ?? ''
-  const level      = (p.level_override as number) ?? 5
-  const goldReward = ((p.reward as any)?.gold as number) ?? 100
-  const expReward  = ((p.reward as any)?.exp  as number) ?? 50
-  const upd = (updates: object) => onChange(encodePayload({
-    creature_id: cid, level_override: level,
-    reward: { gold: goldReward, exp: expReward },
-    ...updates,
-  }))
+  const p = parsePayload(value)
+
+  // Support both legacy {creature_id, level_override} and new {creatures:[...]}
+  const rawCreatures: any[] = Array.isArray(p.creatures)
+    ? p.creatures
+    : (p.creature_id ? [{ creature_id: p.creature_id, level_override: p.level_override }] : [])
+
+  const c1 = (rawCreatures[0]?.creature_id as string) ?? ''
+  const l1 = (rawCreatures[0]?.level_override as number) ?? 10
+  const c2 = (rawCreatures[1]?.creature_id as string) ?? ''
+  const l2 = (rawCreatures[1]?.level_override as number) ?? 10
+  const c3 = (rawCreatures[2]?.creature_id as string) ?? ''
+  const l3 = (rawCreatures[2]?.level_override as number) ?? 10
+  const goldReward = ((p.reward as any)?.gold as number) ?? 200
+  const expReward  = ((p.reward as any)?.exp  as number) ?? 100
+
+  function save(nc1: string, nl1: number, nc2: string, nl2: number, nc3: string, nl3: number, gold: number, exp: number) {
+    const creatures = [
+      { creature_id: nc1, level_override: nl1 },
+      { creature_id: nc2, level_override: nl2 },
+      { creature_id: nc3, level_override: nl3 },
+    ].filter(c => c.creature_id)
+    onChange(encodePayload({ creatures, reward: { gold, exp } }))
+  }
+
+  const slots = [
+    { cid: c1, lv: l1, label: 'Creatura 1 (obbligatoria)' },
+    { cid: c2, lv: l2, label: 'Creatura 2 (opzionale)' },
+    { cid: c3, lv: l3, label: 'Creatura 3 (opzionale)' },
+  ]
+
   return (
-    <div className="space-y-2">
-      <div>
-        <label className={LABEL}>Creatura boss</label>
-        <select value={cid} onChange={e => upd({ creature_id: e.target.value })} className={SELECT}>
-          <option value="">— Seleziona creatura —</option>
-          {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
-        </select>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <div>
-          <label className={LABEL}>Livello boss</label>
-          <input type="number" min={1} max={20} value={level}
-            onChange={e => upd({ level_override: +e.target.value })} className={INPUT} />
-        </div>
+    <div className="space-y-3">
+      {slots.map(({ cid, lv, label }, i) => {
+        const vals = [c1, c2, c3]
+        const lvls = [l1, l2, l3]
+        return (
+          <div key={i} className="space-y-1.5 border border-white/10 rounded-xl p-3">
+            <label className={LABEL + ' font-semibold'}>{label}</label>
+            <select
+              value={cid}
+              onChange={e => {
+                const nv = [...vals]; nv[i] = e.target.value
+                save(nv[0], lvls[0], nv[1], lvls[1], nv[2], lvls[2], goldReward, expReward)
+              }}
+              className={SELECT}
+            >
+              <option value="">— Nessuna —</option>
+              {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
+            </select>
+            {cid && (
+              <div>
+                <label className={LABEL}>Livello</label>
+                <input type="number" min={1} max={20} value={lv}
+                  onChange={e => {
+                    const nv = [...lvls]; nv[i] = +e.target.value
+                    save(vals[0], nv[0], vals[1], nv[1], vals[2], nv[2], goldReward, expReward)
+                  }}
+                  className={INPUT} />
+              </div>
+            )}
+          </div>
+        )
+      })}
+      <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={LABEL}>Gold reward</label>
           <input type="number" min={0} value={goldReward}
-            onChange={e => upd({ reward: { gold: +e.target.value, exp: expReward } })} className={INPUT} />
+            onChange={e => save(c1, l1, c2, l2, c3, l3, +e.target.value, expReward)} className={INPUT} />
         </div>
         <div>
           <label className={LABEL}>EXP reward</label>
           <input type="number" min={0} value={expReward}
-            onChange={e => upd({ reward: { gold: goldReward, exp: +e.target.value } })} className={INPUT} />
+            onChange={e => save(c1, l1, c2, l2, c3, l3, goldReward, +e.target.value)} className={INPUT} />
         </div>
       </div>
     </div>
