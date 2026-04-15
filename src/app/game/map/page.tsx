@@ -476,6 +476,159 @@ function StarterSelect({
   )
 }
 
+// ── PinRewardModal ────────────────────────────────────────────────────────────
+const REWARD_TYPE_LABEL: Record<string, string> = {
+  oggetto: '🎁 Oggetto trovato!',
+  uovo:    '🥚 Uovo trovato!',
+  creatura:'🐾 Creatura trovata!',
+  indizio: '🧩 Frammento enigma!',
+  boss:    '⚔️ Boss apparso!',
+  evento:  '🎉 Evento!',
+}
+
+function PinRewardModal({ reward, onDone }: { reward: Record<string, unknown>; onDone: () => void }) {
+  const [visible, setVisible] = useState(false)
+  const type = reward.type as string
+  const pinName = reward.pinName as string
+
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 60)
+    return () => clearTimeout(t)
+  }, [])
+
+  const rarityColor = RARITY_COLOR[(reward.creature as any)?.rarity] ?? '#F7C841'
+  const glow = ELEMENT_GLOW[(reward.creature as any)?.element] ?? rarityColor
+
+  function handleDone() {
+    if (type === 'boss' && reward.bossFightId) {
+      window.location.href = `/game/boss/${reward.bossFightId}`
+    }
+    onDone()
+  }
+
+  return (
+    <div className="fixed inset-0 z-[1200] flex flex-col items-end justify-end">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleDone} />
+
+      {/* Bottom sheet */}
+      <div
+        className="relative w-full rounded-t-3xl overflow-y-auto"
+        style={{
+          background: 'linear-gradient(180deg, #080E1A 0%, #0F1F2E 100%)',
+          border: '1px solid rgba(247,200,65,0.25)',
+          borderBottom: 'none',
+          maxHeight: '78vh',
+          transform: visible ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
+        }}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 mb-1">
+          <div className="w-10 h-1 rounded-full bg-white/20" />
+        </div>
+
+        <div className="px-5 pb-8 space-y-4">
+          {/* Location context — the key UX requirement */}
+          <div className="flex items-start gap-3 bg-[#F7C841]/10 border border-[#F7C841]/25 rounded-2xl p-3">
+            <span className="text-2xl leading-none mt-0.5">📍</span>
+            <div>
+              <p className="text-xs font-bold text-[#F7C841] uppercase tracking-wide">Luogo raggiunto</p>
+              <p className="text-base font-extrabold text-white mt-0.5">{pinName}</p>
+              <p className="text-xs text-white/40 mt-0.5">Sei arrivato in questo punto di interesse!</p>
+            </div>
+          </div>
+
+          {/* Reward header */}
+          <div className="text-center">
+            <p className="text-lg font-extrabold text-white">{REWARD_TYPE_LABEL[type] ?? 'Ricompensa!'}</p>
+          </div>
+
+          {/* Reward content by type */}
+          {type === 'oggetto' && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+              <p className="text-4xl mb-2">🎁</p>
+              <p className="text-white font-bold text-lg">{reward.itemName as string}</p>
+              <p className="text-white/50 text-sm">×{reward.quantity as number}</p>
+            </div>
+          )}
+
+          {type === 'uovo' && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+              <p className="text-4xl mb-2">🥚</p>
+              <p className="text-white font-bold capitalize">{reward.eggRarity as string}</p>
+              {(reward.stepsRequired as number) > 0 && (
+                <p className="text-white/50 text-sm mt-1">Si schiuderà dopo {reward.stepsRequired as number} passi</p>
+              )}
+            </div>
+          )}
+
+          {type === 'creatura' && (() => {
+            const c = reward.creature as any
+            if (!c) return null
+            const elemEmoji = ({ fiamma:'🔥', adriatico:'🌊', bosco:'🌿', terra:'⚡', armonia:'✨' } as Record<string,string>)[c.element] ?? '✦'
+            return (
+              <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${rarityColor}40`, background: `linear-gradient(135deg, ${glow}12 0%, transparent 100%)` }}>
+                <div className="flex flex-col items-center py-5 px-4">
+                  <CreatureSprite imageUrl={c.image_url ?? ''} name={c.name} animState="idle" size={140} element={c.element} rarity={c.rarity} showAura />
+                  <p className="text-white font-bold text-xl mt-3">{c.name}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-sm">{elemEmoji}</span>
+                    <span className="text-xs capitalize text-white/40">{c.element}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: `${rarityColor}22`, color: rarityColor }}>{c.rarity}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {type === 'indizio' && (
+            <div className="bg-[#1A0D2E] border border-[#7B4DB8]/30 rounded-2xl p-4 space-y-3">
+              {reward.chapterOrder && (
+                <p className="text-xs font-bold text-[#C084FC] uppercase tracking-wide">Capitolo {reward.chapterOrder as number}</p>
+              )}
+              {reward.text && (
+                <p className="text-sm text-white/75 leading-relaxed whitespace-pre-wrap">{reward.text as string}</p>
+              )}
+              {reward.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={reward.imageUrl as string} alt="Indizio"
+                  className="w-full rounded-xl object-cover max-h-40 cursor-zoom-in"
+                  onClick={() => window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: reward.imageUrl }))}
+                />
+              )}
+            </div>
+          )}
+
+          {type === 'boss' && (
+            <div className="bg-red-950/40 border border-red-500/30 rounded-2xl p-4 text-center">
+              <p className="text-4xl mb-2">⚔️</p>
+              <p className="text-white font-bold text-lg">{reward.bossName as string}</p>
+              <p className="text-red-300/70 text-sm mt-1">Il boss ti sfida in battaglia!</p>
+            </div>
+          )}
+
+          {type === 'evento' && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+              <p className="text-4xl mb-2">🎉</p>
+              <p className="text-white/70 text-sm">{reward.effect as string}</p>
+            </div>
+          )}
+
+          {/* CTA */}
+          <button
+            onClick={handleDone}
+            className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
+            style={{ background: 'linear-gradient(135deg, #F7C841 0%, #E5A800 100%)', color: '#080E1A' }}
+          >
+            {type === 'boss' ? '⚔️ Affronta il boss!' : 'Continua'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function MapPageInner() {
   const [session, setSession] = useState<Session | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -485,6 +638,12 @@ function MapPageInner() {
   const [escaActiveUntil, setEscaActiveUntil] = useState<Date | null>(null)
   const [creatureImageUrl, setCreatureImageUrl] = useState<string | null>(null)
   const [mapPins, setMapPins] = useState<MapPin[]>([])
+  const [claimedPinIds, setClaimedPinIds] = useState<Set<string>>(new Set())
+  const claimedPinIdsRef = useRef<Set<string>>(new Set())
+  const [pinReward, setPinReward] = useState<Record<string, unknown> | null>(null)
+  const pinRewardRef = useRef<Record<string, unknown> | null>(null)
+  const mapPinsRef = useRef<MapPin[]>([])
+  const claimingPinRef = useRef(false)
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
   const [hatchQueue, setHatchQueue] = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number; description?: string | null; isStarter?: boolean }[]>([])
@@ -497,6 +656,10 @@ function MapPageInner() {
   const starterFlowLockedRef = useRef(true)
   const sessionEndedRef = useRef(false)
   const inBoundsRef = useRef(true)
+  // Refs kept in sync with state so GPS callbacks (closures) always read fresh values
+  useEffect(() => { claimedPinIdsRef.current = claimedPinIds }, [claimedPinIds])
+  useEffect(() => { pinRewardRef.current = pinReward }, [pinReward])
+  useEffect(() => { mapPinsRef.current = mapPins }, [mapPins])
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
   const [pendingEncounter, setPendingEncounter] = useState<{
     encounterId: string
@@ -563,10 +726,15 @@ function MapPageInner() {
             }
           })
       })
-      // Load map pins
+      // Load map pins (includes claimed status per user)
       fetch(`/api/game/map-pins?sessionId=${sid}`)
         .then(r => r.json())
-        .then((d: { pins?: MapPin[] }) => { if (d.pins) setMapPins(d.pins) })
+        .then((d: { pins?: (MapPin & { claimed?: boolean })[] }) => {
+          if (d.pins) {
+            setMapPins(d.pins)
+            setClaimedPinIds(new Set(d.pins.filter(p => p.claimed).map(p => p.id)))
+          }
+        })
         .catch(() => {})
     }
 
@@ -719,6 +887,42 @@ function MapPageInner() {
     }
 
     if (starterFlowLockedRef.current) return
+
+    // ── Pin proximity check ────────────────────────────────────────────────
+    // Refs are used here so the callback always reads the latest values
+    if (!claimingPinRef.current && !pinRewardRef.current) {
+      const nearPin = mapPinsRef.current.find(pin => {
+        if (!pin.reward_type) return false
+        if (claimedPinIdsRef.current.has(pin.id)) return false
+        const dLat = (pos.lat - pin.lat) * Math.PI / 180
+        const dLon = (pos.lng - pin.lng) * Math.PI / 180
+        const a = Math.sin(dLat / 2) ** 2 +
+          Math.cos(pin.lat * Math.PI / 180) * Math.cos(pos.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+        const dist = 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return dist <= (pin.reward_radius_m ?? 50)
+      })
+      if (nearPin) {
+        claimingPinRef.current = true
+        fetch('/api/game/map-pins/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pinId: nearPin.id, sessionId: sid, lat: pos.lat, lng: pos.lng }),
+        })
+          .then(r => r.json())
+          .then(d => {
+            if (d.success) {
+              setClaimedPinIds(prev => new Set([...prev, nearPin.id]))
+              setPinReward(d)
+              if (d.completedMissions?.length > 0) {
+                setMissionQueue(prev => [...prev, ...d.completedMissions])
+              }
+            }
+            if (d.alreadyClaimed) setClaimedPinIds(prev => new Set([...prev, nearPin.id]))
+          })
+          .catch(() => {})
+          .finally(() => { claimingPinRef.current = false })
+      }
+    }
 
     // Accumulate distance for walk-based encounter trigger
     if (typeof data.distanceMoved === 'number' && data.distanceMoved > 0 && data.distanceMoved < 500) {
@@ -1002,6 +1206,14 @@ function MapPageInner() {
         <MissionRewardModal
           missions={missionQueue}
           onDone={() => setMissionQueue([])}
+        />
+      )}
+
+      {/* Pin proximity reward modal */}
+      {pinReward && (
+        <PinRewardModal
+          reward={pinReward}
+          onDone={() => setPinReward(null)}
         />
       )}
 

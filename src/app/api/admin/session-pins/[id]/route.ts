@@ -22,12 +22,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { name, description, image_url } = body
 
   const admin = createAdminClient()
+  const { reward_type, reward_payload, reward_radius_m } = body
   const { data, error } = await admin
     .from('session_map_pins')
     .update({
       name: name ?? '',
       description: description ?? '',
       ...(image_url !== undefined ? { image_url: image_url ?? null } : {}),
+      ...(reward_type !== undefined ? { reward_type: reward_type ?? null } : {}),
+      ...(reward_payload !== undefined ? { reward_payload: reward_payload ?? null } : {}),
+      ...(reward_radius_m !== undefined ? { reward_radius_m: reward_radius_m ?? 50 } : {}),
     })
     .eq('id', id)
     .select()

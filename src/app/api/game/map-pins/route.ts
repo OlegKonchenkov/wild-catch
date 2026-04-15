@@ -14,10 +14,28 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from('session_map_pins')
-    .select('id, lat, lng, name, description, image_url')
+    .select('id, lat, lng, name, description, image_url, reward_type, reward_radius_m')
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ pins: data ?? [] })
+
+  // Mark which pins this user has already claimed
+  const pinIds = (data ?? []).map((p: any) => p.id)
+  let claimedSet = new Set<string>()
+  if (pinIds.length > 0) {
+    const { data: claims } = await supabase
+      .from('pin_claims')
+      .select('pin_id')
+      .eq('user_id', user.id)
+      .in('pin_id', pinIds)
+    claimedSet = new Set((claims ?? []).map((c: any) => c.pin_id))
+  }
+
+  const pins = (data ?? []).map((p: any) => ({
+    ...p,
+    claimed: claimedSet.has(p.id),
+  }))
+
+  return NextResponse.json({ pins })
 }

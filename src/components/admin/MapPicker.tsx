@@ -10,6 +10,8 @@ export interface MapPin {
   name: string
   description: string
   image_url?: string | null
+  reward_type?: string | null
+  reward_radius_m?: number | null
 }
 
 interface Props {
@@ -18,6 +20,7 @@ interface Props {
   pins?: MapPin[]
   onAddPin?: (pin: { lat: number; lng: number; name: string; description: string; image_url?: string | null }) => Promise<void> | void
   onDeletePin?: (id: string) => Promise<void> | void
+  onEditPin?: (id: string) => void
 }
 
 function isValidBounds(b: Bounds | null | undefined): b is Bounds {
@@ -28,7 +31,7 @@ function isValidBounds(b: Bounds | null | undefined): b is Bounds {
     typeof b.west  === 'number' && isFinite(b.west)
 }
 
-export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPin, onDeletePin }: Props) {
+export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPin, onDeletePin, onEditPin }: Props) {
   const containerRef      = useRef<HTMLDivElement>(null)
   const mapRef            = useRef<any>(null)
   const rectRef           = useRef<any>(null)
@@ -225,11 +228,27 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
 
     ;(pins ?? []).forEach(pin => {
       const key = pin.id ?? `${pin.lat},${pin.lng}`
+      const REWARD_LABELS: Record<string, string> = {
+        oggetto: '🎁 Oggetto', uovo: '🥚 Uovo', creatura: '🐾 Creatura',
+        indizio: '🧩 Indizio', boss: '⚔️ Boss', evento: '🎉 Evento',
+      }
+      const rewardBadge = pin.reward_type
+        ? `<span style="display:inline-block;margin-top:4px;font-size:10px;padding:2px 7px;border-radius:999px;background:#F7C84122;color:#F7C841;border:1px solid #F7C84155;font-weight:700">
+            ${REWARD_LABELS[pin.reward_type] ?? pin.reward_type}
+            ${pin.reward_radius_m ? `· ${pin.reward_radius_m}m` : ''}
+          </span>`
+        : ''
+      const editBtn = pin.id && onEditPin
+        ? `<button
+            onclick="(function(){window.dispatchEvent(new CustomEvent('wc:edit-pin',{detail:'${pin.id}'}));})()"
+            style="margin-top:6px;font-size:11px;color:#3A9DBC;background:none;border:none;cursor:pointer;padding:0;font-weight:600;margin-right:10px"
+          >✏️ Modifica</button>`
+        : ''
       const deleteBtn = pin.id && onDeletePin
-        ? `<br><button
-            onclick="(function(){var ev=new CustomEvent('wc:delete-pin',{detail:'${pin.id}'});window.dispatchEvent(ev);})()"
+        ? `<button
+            onclick="(function(){window.dispatchEvent(new CustomEvent('wc:delete-pin',{detail:'${pin.id}'}));})()"
             style="margin-top:6px;font-size:11px;color:#E85D2F;background:none;border:none;cursor:pointer;padding:0;font-weight:600"
-          >🗑 Elimina pin</button>`
+          >🗑 Elimina</button>`
         : ''
       const imgHtml = pin.image_url
         ? `<img src="${pin.image_url}"
@@ -237,12 +256,13 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
             style="width:100%;border-radius:8px;margin-top:6px;cursor:zoom-in;max-height:120px;object-fit:cover"
             title="Clicca per ingrandire" />`
         : ''
-      const popup = L.popup({ maxWidth: 220 }).setContent(
+      const popup = L.popup({ maxWidth: 230 }).setContent(
         `<div style="font-family:sans-serif;padding:2px 0">
           <div style="font-weight:700;font-size:13px;margin-bottom:3px">${pin.name || 'Pin'}</div>
           ${pin.description ? `<div style="font-size:12px;color:#aaa;line-height:1.4">${pin.description}</div>` : ''}
+          ${rewardBadge}
           ${imgHtml}
-          ${deleteBtn}
+          <div style="margin-top:4px">${editBtn}${deleteBtn}</div>
         </div>`
       )
       const m = L.marker([pin.lat, pin.lng], { icon: mkPinIcon() }).addTo(map).bindPopup(popup)
@@ -250,7 +270,7 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
     })
   }, [mapReady, pins]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Listen for delete-pin events fired from Leaflet popup buttons
+  // Listen for delete-pin / edit-pin events fired from Leaflet popup buttons
   useEffect(() => {
     if (!onDeletePin) return
     const handler = (e: Event) => {
@@ -260,6 +280,16 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
     window.addEventListener('wc:delete-pin', handler)
     return () => window.removeEventListener('wc:delete-pin', handler)
   }, [onDeletePin])
+
+  useEffect(() => {
+    if (!onEditPin) return
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail
+      if (id) onEditPin(id)
+    }
+    window.addEventListener('wc:edit-pin', handler)
+    return () => window.removeEventListener('wc:edit-pin', handler)
+  }, [onEditPin])
 
   async function geocode() {
     if (!searchQuery.trim() || !mapRef.current) return

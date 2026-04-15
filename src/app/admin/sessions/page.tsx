@@ -107,6 +107,175 @@ interface EditForm {
   starterKit: Array<{ item_id: string; quantity: number }>
 }
 
+// ── Payload sub-forms for pin reward editor ───────────────────────────────────
+
+function parsePayload(raw: string): Record<string, unknown> {
+  try { return raw ? JSON.parse(raw) : {} } catch { return {} }
+}
+function encodePayload(obj: Record<string, unknown>): string {
+  return JSON.stringify(obj)
+}
+
+function PinPayloadOggetto({ allItems, value, onChange }: { allItems: { id: string; name: string; type: string }[]; value: string; onChange: (v: string) => void }) {
+  const p = parsePayload(value)
+  const itemId = (p.item_id as string) ?? ''
+  const qty = (p.quantity as number) ?? 1
+  return (
+    <div className="space-y-2">
+      <div>
+        <label className="block text-xs text-white/50 mb-1">Oggetto</label>
+        <select value={itemId} onChange={e => onChange(encodePayload({ item_id: e.target.value, quantity: qty }))}
+          className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#3A9DBC]/60">
+          <option value="">— Seleziona oggetto —</option>
+          {allItems.map(it => <option key={it.id} value={it.id}>{it.name} ({it.type})</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs text-white/50 mb-1">Quantità</label>
+        <input type="number" min={1} max={99} value={qty}
+          onChange={e => onChange(encodePayload({ item_id: itemId, quantity: Math.max(1, +e.target.value) }))}
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+      </div>
+    </div>
+  )
+}
+
+function PinPayloadUovo({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const p = parsePayload(value)
+  const rarity = (p.egg_rarity as string) ?? 'comune'
+  const steps = (p.steps_required as number) ?? 0
+  return (
+    <div className="space-y-2">
+      <div>
+        <label className="block text-xs text-white/50 mb-1">Rarità uovo</label>
+        <select value={rarity} onChange={e => onChange(encodePayload({ egg_rarity: e.target.value, steps_required: steps }))}
+          className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#3A9DBC]/60">
+          {['comune','non_comune','raro','epico','leggendario','mitologico'].map(r => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs text-white/50 mb-1">Passi per schiudersi (0 = immediato)</label>
+        <input type="number" min={0} max={9999} value={steps}
+          onChange={e => onChange(encodePayload({ egg_rarity: rarity, steps_required: Math.max(0, +e.target.value) }))}
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+      </div>
+    </div>
+  )
+}
+
+function PinPayloadCreatura({ allCreatures, value, onChange }: { allCreatures: { id: string; name: string; rarity: string }[]; value: string; onChange: (v: string) => void }) {
+  const p = parsePayload(value)
+  const cid = (p.creature_id as string) ?? ''
+  return (
+    <div>
+      <label className="block text-xs text-white/50 mb-1">Creatura</label>
+      <select value={cid} onChange={e => onChange(encodePayload({ creature_id: e.target.value }))}
+        className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#3A9DBC]/60">
+        <option value="">— Seleziona creatura —</option>
+        {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
+      </select>
+    </div>
+  )
+}
+
+function PinPayloadIndizio({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const p = parsePayload(value)
+  const text = (p.text as string) ?? ''
+  const chapterOrder = (p.chapter_order as number) ?? 1
+  const imageUrl = (p.image_url as string) ?? ''
+  return (
+    <div className="space-y-2">
+      <div>
+        <label className="block text-xs text-white/50 mb-1">Ordine capitolo</label>
+        <input type="number" min={1} value={chapterOrder}
+          onChange={e => onChange(encodePayload({ text, chapter_order: +e.target.value, image_url: imageUrl }))}
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+      </div>
+      <div>
+        <label className="block text-xs text-white/50 mb-1">Testo indizio</label>
+        <textarea value={text} rows={3}
+          onChange={e => onChange(encodePayload({ text: e.target.value, chapter_order: chapterOrder, image_url: imageUrl }))}
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#3A9DBC]/60" />
+      </div>
+      <div>
+        <label className="block text-xs text-white/50 mb-1">URL immagine <span className="text-white/30">(opzionale)</span></label>
+        <input value={imageUrl}
+          onChange={e => onChange(encodePayload({ text, chapter_order: chapterOrder, image_url: e.target.value }))}
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+      </div>
+    </div>
+  )
+}
+
+function PinPayloadBoss({ allCreatures, value, onChange }: { allCreatures: { id: string; name: string; rarity: string }[]; value: string; onChange: (v: string) => void }) {
+  const p = parsePayload(value)
+  const cid = (p.creature_id as string) ?? ''
+  const level = (p.level_override as number) ?? 5
+  const goldReward = ((p.reward as any)?.gold as number) ?? 100
+  const expReward  = ((p.reward as any)?.exp  as number) ?? 50
+  const update = (updates: object) => onChange(encodePayload({
+    creature_id: cid, level_override: level,
+    reward: { gold: goldReward, exp: expReward },
+    ...updates,
+  }))
+  return (
+    <div className="space-y-2">
+      <div>
+        <label className="block text-xs text-white/50 mb-1">Creatura boss</label>
+        <select value={cid} onChange={e => update({ creature_id: e.target.value })}
+          className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#3A9DBC]/60">
+          <option value="">— Seleziona creatura —</option>
+          {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
+        </select>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <label className="block text-xs text-white/50 mb-1">Livello boss</label>
+          <input type="number" min={1} max={20} value={level}
+            onChange={e => update({ level_override: +e.target.value })}
+            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+        </div>
+        <div>
+          <label className="block text-xs text-white/50 mb-1">Gold reward</label>
+          <input type="number" min={0} value={goldReward}
+            onChange={e => update({ reward: { gold: +e.target.value, exp: expReward } })}
+            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+        </div>
+        <div>
+          <label className="block text-xs text-white/50 mb-1">EXP reward</label>
+          <input type="number" min={0} value={expReward}
+            onChange={e => update({ reward: { gold: goldReward, exp: +e.target.value } })}
+            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PinPayloadEvento({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const p = parsePayload(value)
+  const eventType = (p.event_type as string) ?? ''
+  const effect = (p.effect as string) ?? ''
+  return (
+    <div className="space-y-2">
+      <div>
+        <label className="block text-xs text-white/50 mb-1">Tipo evento</label>
+        <input value={eventType} placeholder="es. spawn_boost, gold_rain…"
+          onChange={e => onChange(encodePayload({ event_type: e.target.value, effect }))}
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+      </div>
+      <div>
+        <label className="block text-xs text-white/50 mb-1">Descrizione effetto</label>
+        <textarea value={effect} rows={2} placeholder="Testo mostrato al giocatore…"
+          onChange={e => onChange(encodePayload({ event_type: eventType, effect: e.target.value }))}
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#3A9DBC]/60" />
+      </div>
+    </div>
+  )
+}
+
 export default function SessionsPage() {
   const [sessions, setSessions]   = useState<Session[]>([])
   const [loadingSessions, setLoadingSessions] = useState(true)
@@ -123,6 +292,16 @@ export default function SessionsPage() {
   const [allItems, setAllItems]   = useState<Item[]>([])
   // Map pins for the session currently being edited
   const [editingPins, setEditingPins] = useState<MapPin[]>([])
+  // Pin being configured (reward editor panel)
+  const [pinEditId, setPinEditId]         = useState<string | null>(null)
+  const [pinEditName, setPinEditName]     = useState('')
+  const [pinEditDesc, setPinEditDesc]     = useState('')
+  const [pinEditRadius, setPinEditRadius] = useState(50)
+  const [pinEditRewardType, setPinEditRewardType] = useState<string>('none')
+  const [pinEditPayload, setPinEditPayload]   = useState('')  // JSON string
+  const [pinEditSaving, setPinEditSaving]     = useState(false)
+  const [pinEditError, setPinEditError]       = useState<string | null>(null)
+  const [allCreatures, setAllCreatures] = useState<{ id: string; name: string; rarity: string }[]>([])
 
   // Create wizard
   const [step, setStep]           = useState<WizardStep>(1)
@@ -194,6 +373,56 @@ export default function SessionsPage() {
   async function handleDeletePin(id: string) {
     await fetch(`/api/admin/session-pins/${id}`, { method: 'DELETE' })
     setEditingPins(prev => prev.filter(p => p.id !== id))
+  }
+
+  function handleEditPin(id: string) {
+    const pin = editingPins.find(p => p.id === id)
+    if (!pin) return
+    setPinEditId(id)
+    setPinEditName(pin.name)
+    setPinEditDesc(pin.description)
+    setPinEditRadius(pin.reward_radius_m ?? 50)
+    setPinEditRewardType(pin.reward_type ?? 'none')
+    setPinEditPayload('')
+    setPinEditError(null)
+    // Lazy-load items + creatures for payload pickers
+    if (allItems.length === 0) {
+      supabase.from('items').select('id, name, type').order('type')
+        .then(({ data }) => { if (data) setAllItems(data as Item[]) })
+    }
+    if (allCreatures.length === 0) {
+      supabase.from('creatures').select('id, name, rarity').order('name')
+        .then(({ data }) => { if (data) setAllCreatures(data as { id: string; name: string; rarity: string }[]) })
+    }
+  }
+
+  async function savePinEdit() {
+    if (!pinEditId) return
+    setPinEditSaving(true); setPinEditError(null)
+    let payload: Record<string, unknown> | null = null
+    if (pinEditRewardType !== 'none') {
+      try { payload = JSON.parse(pinEditPayload || '{}') }
+      catch { setPinEditError('Payload JSON non valido'); setPinEditSaving(false); return }
+    }
+    const res = await fetch(`/api/admin/session-pins/${pinEditId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: pinEditName,
+        description: pinEditDesc,
+        reward_type: pinEditRewardType === 'none' ? null : pinEditRewardType,
+        reward_payload: payload,
+        reward_radius_m: pinEditRadius,
+      }),
+    })
+    const data = await res.json()
+    if (data.pin) {
+      setEditingPins(prev => prev.map(p => p.id === pinEditId ? data.pin as MapPin : p))
+      setPinEditId(null)
+    } else {
+      setPinEditError(data.error ?? 'Errore salvataggio')
+    }
+    setPinEditSaving(false)
   }
 
   async function saveEdit() {
@@ -466,6 +695,7 @@ export default function SessionsPage() {
                     pins={editingPins}
                     onAddPin={handleAddPin}
                     onDeletePin={handleDeletePin}
+                    onEditPin={handleEditPin}
                   />
                 </div>
 
@@ -553,6 +783,103 @@ export default function SessionsPage() {
           </div>
         )
       })}
+
+      {/* ── Pin reward editor modal ── */}
+      {pinEditId && (
+        <div className="fixed inset-0 z-[800] flex items-end justify-center p-4 sm:items-center"
+          style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)' }}
+          onClick={e => { if (e.target === e.currentTarget) setPinEditId(null) }}>
+          <div className="w-full max-w-md bg-[#0F1F2E] border border-white/15 rounded-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base">✏️ Modifica pin</h3>
+              <button onClick={() => setPinEditId(null)} className="text-white/40 hover:text-white text-xl leading-none">×</button>
+            </div>
+
+            {/* Name */}
+            <div>
+              <label className="block text-xs text-white/50 mb-1 font-semibold">Nome</label>
+              <input value={pinEditName} onChange={e => setPinEditName(e.target.value)}
+                className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-xs text-white/50 mb-1 font-semibold">Descrizione</label>
+              <textarea value={pinEditDesc} onChange={e => setPinEditDesc(e.target.value)} rows={2}
+                className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#3A9DBC]/60" />
+            </div>
+
+            {/* Reward type */}
+            <div>
+              <label className="block text-xs text-white/50 mb-1 font-semibold">Tipo ricompensa</label>
+              <select value={pinEditRewardType}
+                onChange={e => { setPinEditRewardType(e.target.value); setPinEditPayload('') }}
+                className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#3A9DBC]/60">
+                <option value="none">— Nessuna ricompensa —</option>
+                <option value="oggetto">🎁 Oggetto</option>
+                <option value="uovo">🥚 Uovo</option>
+                <option value="creatura">🐾 Creatura</option>
+                <option value="indizio">🧩 Indizio</option>
+                <option value="boss">⚔️ Boss</option>
+                <option value="evento">🎉 Evento</option>
+              </select>
+            </div>
+
+            {/* Payload per tipo */}
+            {pinEditRewardType === 'oggetto' && (
+              <PinPayloadOggetto allItems={allItems} value={pinEditPayload} onChange={setPinEditPayload} />
+            )}
+            {pinEditRewardType === 'uovo' && (
+              <PinPayloadUovo value={pinEditPayload} onChange={setPinEditPayload} />
+            )}
+            {pinEditRewardType === 'creatura' && (
+              <PinPayloadCreatura allCreatures={allCreatures} value={pinEditPayload} onChange={setPinEditPayload} />
+            )}
+            {pinEditRewardType === 'indizio' && (
+              <PinPayloadIndizio value={pinEditPayload} onChange={setPinEditPayload} />
+            )}
+            {pinEditRewardType === 'boss' && (
+              <PinPayloadBoss allCreatures={allCreatures} value={pinEditPayload} onChange={setPinEditPayload} />
+            )}
+            {pinEditRewardType === 'evento' && (
+              <PinPayloadEvento value={pinEditPayload} onChange={setPinEditPayload} />
+            )}
+
+            {/* Radius */}
+            {pinEditRewardType !== 'none' && (
+              <div>
+                <label className="block text-xs text-white/50 mb-1 font-semibold">
+                  Raggio di attivazione: <span className="text-[#F7C841]">{pinEditRadius} m</span>
+                </label>
+                <input type="range" min={20} max={300} step={10} value={pinEditRadius}
+                  onChange={e => setPinEditRadius(+e.target.value)}
+                  className="w-full accent-[#F7C841]" />
+                <div className="flex justify-between text-xs text-white/25 mt-1">
+                  <span>20 m</span><span>300 m</span>
+                </div>
+                <p className="text-xs text-white/35 mt-1">
+                  Il server aggiunge +20 m di tolleranza GPS automaticamente.
+                </p>
+              </div>
+            )}
+
+            {pinEditError && (
+              <p className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">⚠ {pinEditError}</p>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setPinEditId(null)}
+                className="flex-1 bg-white/8 text-white/60 border border-white/15 font-bold py-2.5 rounded-xl text-sm hover:bg-white/12 transition-colors">
+                Annulla
+              </button>
+              <button onClick={savePinEdit} disabled={pinEditSaving || !pinEditName.trim()}
+                className="flex-1 bg-[#F7C841] text-black font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 hover:brightness-105 transition-all">
+                {pinEditSaving ? 'Salvataggio…' : '💾 Salva pin'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Create wizard ── */}
       {showCreate && (

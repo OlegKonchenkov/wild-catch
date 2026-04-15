@@ -9,6 +9,9 @@ export interface MapPin {
   name: string
   description: string
   image_url?: string | null
+  reward_type?: string | null
+  reward_radius_m?: number | null
+  claimed?: boolean
 }
 
 interface Props {
@@ -286,6 +289,37 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
     })
 
     ;(pins ?? []).forEach(pin => {
+      // Differentiate: claimed=grey, has reward=gold+pulse, plain=yellow
+      const hasReward = !!pin.reward_type
+      const isClaimed = !!pin.claimed
+      const pinColor  = isClaimed ? '#6B7280' : hasReward ? '#F7C841' : '#F7C841'
+      const pinBorder = isClaimed ? '#9CA3AF' : '#fff'
+      const pulse     = hasReward && !isClaimed
+        ? `<div style="position:absolute;width:36px;height:36px;left:-18px;top:-32px;border-radius:50%;border:2px solid #F7C84188;animation:pinPulse 1.8s ease-out infinite;"></div>`
+        : ''
+      const icon = Leaflet.divIcon({
+        html: `<div style="width:0;height:0;position:relative;">
+          ${pulse}
+          <div style="
+            position:absolute;width:28px;height:28px;
+            left:-14px;top:-28px;
+            background:${pinColor};border:3px solid ${pinBorder};
+            border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+            box-shadow:0 2px 8px rgba(0,0,0,0.45);
+            opacity:${isClaimed ? 0.55 : 1};
+          "></div>
+          ${hasReward && !isClaimed ? `<div style="position:absolute;width:10px;height:10px;left:-5px;top:-37px;background:#E85D2F;border:2px solid #fff;border-radius:50%;"></div>` : ''}
+        </div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+        className: '',
+      })
+
+      const rewardBadge = hasReward
+        ? `<div style="margin-top:5px;display:inline-block;font-size:10px;padding:2px 8px;border-radius:999px;background:${isClaimed ? '#6B728022' : '#F7C84122'};color:${isClaimed ? '#9CA3AF' : '#F7C841'};border:1px solid ${isClaimed ? '#6B728055' : '#F7C84155'};font-weight:700">
+            ${isClaimed ? '✓ Riscattato' : '🎁 Ricompensa disponibile!'}
+          </div>`
+        : ''
       const imgHtml = pin.image_url
         ? `<img src="${pin.image_url}"
             onclick="window.dispatchEvent(new CustomEvent('wc:zoom-image',{detail:'${pin.image_url}'}))"
@@ -296,12 +330,21 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
         <div style="font-family:sans-serif;padding:2px 0">
           <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#0F1F2E">${pin.name || 'Punto di interesse'}</div>
           ${pin.description ? `<div style="font-size:12px;color:#4B5563;line-height:1.4">${pin.description}</div>` : ''}
+          ${rewardBadge}
           ${imgHtml}
         </div>
       `)
-      const m = Leaflet.marker([pin.lat, pin.lng], { icon: pinIcon }).addTo(map).bindPopup(popup)
+      const m = Leaflet.marker([pin.lat, pin.lng], { icon }).addTo(map).bindPopup(popup)
       pinMarkersRef.current.set(pin.id, m)
     })
+
+    // Inject pulse keyframe into the page once
+    if (!document.getElementById('wc-pin-pulse')) {
+      const style = document.createElement('style')
+      style.id = 'wc-pin-pulse'
+      style.textContent = `@keyframes pinPulse { 0%{transform:scale(1);opacity:0.7} 70%{transform:scale(2.2);opacity:0} 100%{transform:scale(2.2);opacity:0} }`
+      document.head.appendChild(style)
+    }
   }, [mapReady, pins])
 
   function handleRecenter() {
