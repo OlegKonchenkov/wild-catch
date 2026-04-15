@@ -18,12 +18,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const { id } = await params
-  const { name, description } = await request.json().catch(() => ({}))
+  const body = await request.json().catch(() => ({}))
+  const { name, description, image_url } = body
 
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('session_map_pins')
-    .update({ name: name ?? '', description: description ?? '' })
+    .update({
+      name: name ?? '',
+      description: description ?? '',
+      ...(image_url !== undefined ? { image_url: image_url ?? null } : {}),
+    })
     .eq('id', id)
     .select()
     .single()

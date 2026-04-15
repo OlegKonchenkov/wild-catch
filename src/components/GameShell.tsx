@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
+import ImageLightbox from '@/components/ui/ImageLightbox'
 
 const NAV_ITEMS = [
   { href: '/game/map',      icon: '🗺️', label: 'Mappa'     },
@@ -431,6 +432,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div ref={rootRef} className="flex flex-col bg-[#0F1F2E] text-white overflow-hidden" style={{ height: '100dvh' }}>
+      <ImageLightbox />
       {/* Session status banner */}
       {!sessionEnded && sessionStatus === 'ready' && (
         <div className="flex-none bg-[#F7C841]/15 border-b border-[#F7C841]/35 px-4 py-1.5 text-center">

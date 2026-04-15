@@ -180,7 +180,7 @@ export default function SessionsPage() {
 
   function closeEdit() { setEditingId(null); setEditForm(null); setEditError(null); setEditingPins([]) }
 
-  async function handleAddPin(pin: { lat: number; lng: number; name: string; description: string }) {
+  async function handleAddPin(pin: { lat: number; lng: number; name: string; description: string; image_url?: string | null }) {
     if (!editingId) return
     const res = await fetch('/api/admin/session-pins', {
       method: 'POST',

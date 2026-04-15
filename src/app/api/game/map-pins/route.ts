@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from('session_map_pins')
-    .select('id, lat, lng, name, description')
+    .select('id, lat, lng, name, description, image_url')
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true })
 

@@ -795,15 +795,21 @@ export default function BestiaryPage() {
                   {/* Creature image */}
                   <div className="flex justify-center pt-7 pb-5">
                     {caught ? (
-                      <CreatureSprite
-                        imageUrl={creature.image_url ?? ''}
-                        name={creature.name}
-                        animState="idle"
-                        size={180}
-                        element={creature.element}
-                        rarity={creature.rarity}
-                        showAura
-                      />
+                      <div
+                        className={creature.image_url ? 'cursor-zoom-in' : undefined}
+                        onClick={() => creature.image_url && window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: creature.image_url }))}
+                        title={creature.image_url ? 'Tocca per ingrandire' : undefined}
+                      >
+                        <CreatureSprite
+                          imageUrl={creature.image_url ?? ''}
+                          name={creature.name}
+                          animState="idle"
+                          size={180}
+                          element={creature.element}
+                          rarity={creature.rarity}
+                          showAura
+                        />
+                      </div>
                     ) : (
                       <div className="relative w-40 h-40 flex items-center justify-center">
                         {creature.image_url ? (
@@ -1085,7 +1091,9 @@ export default function BestiaryPage() {
                               {creature.enigma_image_url && (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={creature.enigma_image_url} alt="Enigma"
-                                  className="w-full rounded-xl object-cover max-h-48" />
+                                  className="w-full rounded-xl object-cover max-h-48 cursor-zoom-in"
+                                  onClick={() => window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: creature.enigma_image_url }))}
+                                  title="Tocca per ingrandire" />
                               )}
                               {creature.enigma_video_url && (() => {
                                 const embed = getVideoEmbed(creature.enigma_video_url)

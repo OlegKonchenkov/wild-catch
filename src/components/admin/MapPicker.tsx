@@ -9,13 +9,14 @@ export interface MapPin {
   lng: number
   name: string
   description: string
+  image_url?: string | null
 }
 
 interface Props {
   onBoundsChange: (b: Bounds | null) => void
   initialBounds?: Bounds | null
   pins?: MapPin[]
-  onAddPin?: (pin: { lat: number; lng: number; name: string; description: string }) => Promise<void> | void
+  onAddPin?: (pin: { lat: number; lng: number; name: string; description: string; image_url?: string | null }) => Promise<void> | void
   onDeletePin?: (id: string) => Promise<void> | void
 }
 
@@ -50,6 +51,8 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
   const [pendingPin, setPendingPin]   = useState<{ lat: number; lng: number } | null>(null)
   const [pinName, setPinName]         = useState('')
   const [pinDesc, setPinDesc]         = useState('')
+  const [pinImageFile, setPinImageFile] = useState<File | null>(null)
+  const [pinImagePreview, setPinImagePreview] = useState<string | null>(null)
   const [savingPin, setSavingPin]     = useState(false)
 
   useEffect(() => { onChangeRef.current = onBoundsChange }, [onBoundsChange])
@@ -228,10 +231,17 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
             style="margin-top:6px;font-size:11px;color:#E85D2F;background:none;border:none;cursor:pointer;padding:0;font-weight:600"
           >🗑 Elimina pin</button>`
         : ''
+      const imgHtml = pin.image_url
+        ? `<img src="${pin.image_url}"
+            onclick="window.dispatchEvent(new CustomEvent('wc:zoom-image',{detail:'${pin.image_url}'}))"
+            style="width:100%;border-radius:8px;margin-top:6px;cursor:zoom-in;max-height:120px;object-fit:cover"
+            title="Clicca per ingrandire" />`
+        : ''
       const popup = L.popup({ maxWidth: 220 }).setContent(
         `<div style="font-family:sans-serif;padding:2px 0">
           <div style="font-weight:700;font-size:13px;margin-bottom:3px">${pin.name || 'Pin'}</div>
           ${pin.description ? `<div style="font-size:12px;color:#aaa;line-height:1.4">${pin.description}</div>` : ''}
+          ${imgHtml}
           ${deleteBtn}
         </div>`
       )
@@ -280,9 +290,21 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
   async function confirmPin() {
     if (!pendingPin || !onAddPin) return
     setSavingPin(true)
-    await onAddPin({ lat: pendingPin.lat, lng: pendingPin.lng, name: pinName.trim(), description: pinDesc.trim() })
+    let imageUrl: string | null = null
+    if (pinImageFile) {
+      const fd = new FormData()
+      fd.append('file', pinImageFile)
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd })
+      if (res.ok) {
+        const json = await res.json()
+        imageUrl = json.url ?? null
+      }
+    }
+    await onAddPin({ lat: pendingPin.lat, lng: pendingPin.lng, name: pinName.trim(), description: pinDesc.trim(), image_url: imageUrl })
     setSavingPin(false)
     setPendingPin(null)
+    setPinImageFile(null)
+    setPinImagePreview(null)
   }
 
   const showPinTools = !!onAddPin
@@ -393,9 +415,33 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
             rows={2}
             className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-1.5 text-sm resize-none placeholder:text-white/30 focus:outline-none focus:border-[#F7C841]/60"
           />
+          {/* Image upload */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-white/50 font-medium">Immagine (opzionale)</label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={e => {
+                const f = e.target.files?.[0] ?? null
+                setPinImageFile(f)
+                if (f) {
+                  const reader = new FileReader()
+                  reader.onload = ev => setPinImagePreview(ev.target?.result as string)
+                  reader.readAsDataURL(f)
+                } else {
+                  setPinImagePreview(null)
+                }
+              }}
+              className="w-full text-xs text-white/60 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white/70 hover:file:bg-white/15 cursor-pointer"
+            />
+            {pinImagePreview && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={pinImagePreview} alt="Anteprima" className="w-full rounded-lg object-cover max-h-28" />
+            )}
+          </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setPendingPin(null)}
+              onClick={() => { setPendingPin(null); setPinImageFile(null); setPinImagePreview(null) }}
               className="flex-1 py-1.5 rounded-lg text-sm bg-white/8 text-white/60 border border-white/15 hover:bg-white/12 transition-colors"
             >
               Annulla

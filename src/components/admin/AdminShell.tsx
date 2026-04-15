@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import ImageLightbox from '@/components/ui/ImageLightbox'
 
 const NAV = [
   { href: '/admin',             label: '📊 Dashboard'  },
@@ -44,6 +45,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="flex h-screen bg-[#0F1F2E] text-white">
+      <ImageLightbox />
       {/* Sidebar (desktop) */}
       <nav className="hidden md:flex flex-col w-48 border-r border-white/10 p-4 gap-1 shrink-0">
         <div className="font-bold text-[#3A9DBC] mb-4 text-lg">⚙️ Admin</div>

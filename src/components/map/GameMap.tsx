@@ -8,6 +8,7 @@ export interface MapPin {
   lng: number
   name: string
   description: string
+  image_url?: string | null
 }
 
 interface Props {
@@ -285,10 +286,17 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
     })
 
     ;(pins ?? []).forEach(pin => {
-      const popup = Leaflet.popup({ maxWidth: 220 }).setContent(`
+      const imgHtml = pin.image_url
+        ? `<img src="${pin.image_url}"
+            onclick="window.dispatchEvent(new CustomEvent('wc:zoom-image',{detail:'${pin.image_url}'}))"
+            style="width:100%;border-radius:8px;margin-top:6px;cursor:zoom-in;max-height:130px;object-fit:cover"
+            title="Tocca per ingrandire" />`
+        : ''
+      const popup = Leaflet.popup({ maxWidth: 230 }).setContent(`
         <div style="font-family:sans-serif;padding:2px 0">
           <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#0F1F2E">${pin.name || 'Punto di interesse'}</div>
           ${pin.description ? `<div style="font-size:12px;color:#4B5563;line-height:1.4">${pin.description}</div>` : ''}
+          ${imgHtml}
         </div>
       `)
       const m = Leaflet.marker([pin.lat, pin.lng], { icon: pinIcon }).addTo(map).bindPopup(popup)
