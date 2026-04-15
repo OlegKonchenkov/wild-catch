@@ -89,10 +89,13 @@ export default function PrivacyPolicyModal({
 
   if (!open) return null
 
-  const controllerLabel = controllerName?.trim() || "Organizzatore dell'evento"
-  const contactLabel =
-    contactEmail?.trim() ||
-    "Richiedi il contatto privacy all'organizzatore che ti ha fornito il codice invito."
+  // Dati fissi del titolare — Adventura Escape Room Pesaro
+  const businessName   = 'Adventura Escape Room Pesaro di Marco Tomasucci'
+  const controllerLabel = controllerName?.trim() || 'Marco Tomasucci'
+  const address        = 'Via XXIV Maggio 17, 61121 Pesaro (PU) — Italia'
+  const vatNumber      = '02812540413'
+  const contactLabel   = contactEmail?.trim() || 'adventuraescaperoom@gmail.com'
+  const phone          = '+39 339 7136398'
 
   return (
     <div
@@ -178,7 +181,7 @@ export default function PrivacyPolicyModal({
                 }}
               >
                 Versione sintetica mostrata al momento di accesso all&apos;evento. Ultimo
-                aggiornamento: 11 aprile 2026.
+                aggiornamento: 15 aprile 2026.
               </p>
             </div>
 
@@ -205,13 +208,32 @@ export default function PrivacyPolicyModal({
         </div>
 
         <div style={{ paddingBottom: 18 }}>
-          <PolicySection title="Titolare e contatti">
+          <PolicySection title="Titolare del trattamento">
             <p style={{ margin: 0 }}>
+              <strong style={{ color: '#fff' }}>{businessName}</strong>
+            </p>
+            <p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.55)' }}>
+              {address}
+            </p>
+            <p style={{ margin: '6px 0 0' }}>
+              <strong style={{ color: '#fff' }}>P.IVA:</strong>{' '}
+              <span style={{ color: 'rgba(255,255,255,0.72)' }}>{vatNumber}</span>
+            </p>
+            <p style={{ margin: '6px 0 0' }}>
               <strong style={{ color: '#fff' }}>Titolare / referente privacy:</strong>{' '}
               {controllerLabel}
             </p>
-            <p style={{ margin: '10px 0 0' }}>
-              <strong style={{ color: '#fff' }}>Contatto:</strong> {contactLabel}
+            <p style={{ margin: '6px 0 0' }}>
+              <strong style={{ color: '#fff' }}>Email:</strong>{' '}
+              <a href={`mailto:${contactLabel}`} style={{ color: '#3ABCA8', textDecoration: 'none' }}>
+                {contactLabel}
+              </a>
+            </p>
+            <p style={{ margin: '6px 0 0' }}>
+              <strong style={{ color: '#fff' }}>Tel:</strong>{' '}
+              <a href={`tel:${phone}`} style={{ color: '#3ABCA8', textDecoration: 'none' }}>
+                {phone}
+              </a>
             </p>
           </PolicySection>
 
@@ -276,12 +298,15 @@ export default function PrivacyPolicyModal({
             />
           </PolicySection>
 
-          <PolicySection title="Nota importante">
+          <PolicySection title="Autorità di controllo">
             <p style={{ margin: 0 }}>
-              Questa informativa e una versione sintetica in-app. Per una compliance GDPR
-              piena il titolare dovrebbe pubblicare anche una versione completa con dati
-              identificativi, contatti, basi giuridiche e tempi di conservazione definiti in
-              modo puntuale.
+              Hai il diritto di proporre reclamo al{' '}
+              <strong style={{ color: '#fff' }}>Garante per la Protezione dei Dati Personali</strong>{' '}
+              (
+              <a href="https://www.garanteprivacy.it" target="_blank" rel="noopener noreferrer" style={{ color: '#3ABCA8', textDecoration: 'none' }}>
+                www.garanteprivacy.it
+              </a>
+              ) se ritieni che il trattamento dei tuoi dati violi il Regolamento UE 2016/679 (GDPR).
             </p>
           </PolicySection>
         </div>
