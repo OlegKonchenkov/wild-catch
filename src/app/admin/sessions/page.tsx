@@ -4,6 +4,14 @@ import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { AdminListSkeleton } from '@/components/admin/AdminLoading'
 import type { Bounds, MapPin } from '@/components/admin/MapPicker'
+import {
+  PinPayloadOggetto,
+  PinPayloadUovo,
+  PinPayloadCreatura,
+  PinPayloadIndizio,
+  PinPayloadBoss,
+  PinPayloadEvento,
+} from '@/components/admin/PinPayloadForms'
 
 function SessionTimeInfo({ session }: { session: { status: string; start_at: string | null; end_at: string | null; duration_minutes: number } }) {
   const [countdown, setCountdown] = useState('')
@@ -105,175 +113,6 @@ interface EditForm {
   introText: string
   villainName: string
   starterKit: Array<{ item_id: string; quantity: number }>
-}
-
-// ── Payload sub-forms for pin reward editor ───────────────────────────────────
-
-function parsePayload(raw: string): Record<string, unknown> {
-  try { return raw ? JSON.parse(raw) : {} } catch { return {} }
-}
-function encodePayload(obj: Record<string, unknown>): string {
-  return JSON.stringify(obj)
-}
-
-function PinPayloadOggetto({ allItems, value, onChange }: { allItems: { id: string; name: string; type: string }[]; value: string; onChange: (v: string) => void }) {
-  const p = parsePayload(value)
-  const itemId = (p.item_id as string) ?? ''
-  const qty = (p.quantity as number) ?? 1
-  return (
-    <div className="space-y-2">
-      <div>
-        <label className="block text-xs text-white/50 mb-1">Oggetto</label>
-        <select value={itemId} onChange={e => onChange(encodePayload({ item_id: e.target.value, quantity: qty }))}
-          className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#3A9DBC]/60">
-          <option value="">— Seleziona oggetto —</option>
-          {allItems.map(it => <option key={it.id} value={it.id}>{it.name} ({it.type})</option>)}
-        </select>
-      </div>
-      <div>
-        <label className="block text-xs text-white/50 mb-1">Quantità</label>
-        <input type="number" min={1} max={99} value={qty}
-          onChange={e => onChange(encodePayload({ item_id: itemId, quantity: Math.max(1, +e.target.value) }))}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
-      </div>
-    </div>
-  )
-}
-
-function PinPayloadUovo({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const p = parsePayload(value)
-  const rarity = (p.egg_rarity as string) ?? 'comune'
-  const steps = (p.steps_required as number) ?? 0
-  return (
-    <div className="space-y-2">
-      <div>
-        <label className="block text-xs text-white/50 mb-1">Rarità uovo</label>
-        <select value={rarity} onChange={e => onChange(encodePayload({ egg_rarity: e.target.value, steps_required: steps }))}
-          className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#3A9DBC]/60">
-          {['comune','non_comune','raro','epico','leggendario','mitologico'].map(r => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="block text-xs text-white/50 mb-1">Passi per schiudersi (0 = immediato)</label>
-        <input type="number" min={0} max={9999} value={steps}
-          onChange={e => onChange(encodePayload({ egg_rarity: rarity, steps_required: Math.max(0, +e.target.value) }))}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
-      </div>
-    </div>
-  )
-}
-
-function PinPayloadCreatura({ allCreatures, value, onChange }: { allCreatures: { id: string; name: string; rarity: string }[]; value: string; onChange: (v: string) => void }) {
-  const p = parsePayload(value)
-  const cid = (p.creature_id as string) ?? ''
-  return (
-    <div>
-      <label className="block text-xs text-white/50 mb-1">Creatura</label>
-      <select value={cid} onChange={e => onChange(encodePayload({ creature_id: e.target.value }))}
-        className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#3A9DBC]/60">
-        <option value="">— Seleziona creatura —</option>
-        {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
-      </select>
-    </div>
-  )
-}
-
-function PinPayloadIndizio({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const p = parsePayload(value)
-  const text = (p.text as string) ?? ''
-  const chapterOrder = (p.chapter_order as number) ?? 1
-  const imageUrl = (p.image_url as string) ?? ''
-  return (
-    <div className="space-y-2">
-      <div>
-        <label className="block text-xs text-white/50 mb-1">Ordine capitolo</label>
-        <input type="number" min={1} value={chapterOrder}
-          onChange={e => onChange(encodePayload({ text, chapter_order: +e.target.value, image_url: imageUrl }))}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
-      </div>
-      <div>
-        <label className="block text-xs text-white/50 mb-1">Testo indizio</label>
-        <textarea value={text} rows={3}
-          onChange={e => onChange(encodePayload({ text: e.target.value, chapter_order: chapterOrder, image_url: imageUrl }))}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#3A9DBC]/60" />
-      </div>
-      <div>
-        <label className="block text-xs text-white/50 mb-1">URL immagine <span className="text-white/30">(opzionale)</span></label>
-        <input value={imageUrl}
-          onChange={e => onChange(encodePayload({ text, chapter_order: chapterOrder, image_url: e.target.value }))}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
-      </div>
-    </div>
-  )
-}
-
-function PinPayloadBoss({ allCreatures, value, onChange }: { allCreatures: { id: string; name: string; rarity: string }[]; value: string; onChange: (v: string) => void }) {
-  const p = parsePayload(value)
-  const cid = (p.creature_id as string) ?? ''
-  const level = (p.level_override as number) ?? 5
-  const goldReward = ((p.reward as any)?.gold as number) ?? 100
-  const expReward  = ((p.reward as any)?.exp  as number) ?? 50
-  const update = (updates: object) => onChange(encodePayload({
-    creature_id: cid, level_override: level,
-    reward: { gold: goldReward, exp: expReward },
-    ...updates,
-  }))
-  return (
-    <div className="space-y-2">
-      <div>
-        <label className="block text-xs text-white/50 mb-1">Creatura boss</label>
-        <select value={cid} onChange={e => update({ creature_id: e.target.value })}
-          className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#3A9DBC]/60">
-          <option value="">— Seleziona creatura —</option>
-          {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
-        </select>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <div>
-          <label className="block text-xs text-white/50 mb-1">Livello boss</label>
-          <input type="number" min={1} max={20} value={level}
-            onChange={e => update({ level_override: +e.target.value })}
-            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
-        </div>
-        <div>
-          <label className="block text-xs text-white/50 mb-1">Gold reward</label>
-          <input type="number" min={0} value={goldReward}
-            onChange={e => update({ reward: { gold: +e.target.value, exp: expReward } })}
-            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
-        </div>
-        <div>
-          <label className="block text-xs text-white/50 mb-1">EXP reward</label>
-          <input type="number" min={0} value={expReward}
-            onChange={e => update({ reward: { gold: goldReward, exp: +e.target.value } })}
-            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PinPayloadEvento({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const p = parsePayload(value)
-  const eventType = (p.event_type as string) ?? ''
-  const effect = (p.effect as string) ?? ''
-  return (
-    <div className="space-y-2">
-      <div>
-        <label className="block text-xs text-white/50 mb-1">Tipo evento</label>
-        <input value={eventType} placeholder="es. spawn_boost, gold_rain…"
-          onChange={e => onChange(encodePayload({ event_type: e.target.value, effect }))}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
-      </div>
-      <div>
-        <label className="block text-xs text-white/50 mb-1">Descrizione effetto</label>
-        <textarea value={effect} rows={2} placeholder="Testo mostrato al giocatore…"
-          onChange={e => onChange(encodePayload({ event_type: eventType, effect: e.target.value }))}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#3A9DBC]/60" />
-      </div>
-    </div>
-  )
 }
 
 export default function SessionsPage() {
