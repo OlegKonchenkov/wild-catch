@@ -782,7 +782,7 @@ export default function EncounterPage() {
           <motion.div
             initial={{ x: 380, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 140, damping: 20, delay: 1.2 }}
+            transition={{ type: 'spring', stiffness: 140, damping: 20, delay: 2.2 }}
           >
             <CreatureCard
               imageUrl={state.creature.image_url ?? ''}
@@ -808,7 +808,7 @@ export default function EncounterPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 24 }}
               transition={activeSlot === 0
-                ? { type: 'spring', stiffness: 140, damping: 22, delay: 1.55 }
+                ? { type: 'spring', stiffness: 140, damping: 22, delay: 2.7 }
                 : { duration: 0.28, ease: 'easeOut' }}
             >
               <CreatureCard
@@ -1500,7 +1500,7 @@ export default function EncounterPage() {
             className="absolute inset-0 z-[100] overflow-hidden pointer-events-none"
             initial={{ opacity: 1 }}
             animate={{ opacity: [1, 1, 1, 1, 0] }}
-            transition={{ duration: 2.1, times: [0, 0.38, 0.62, 0.76, 1.0] }}
+            transition={{ duration: 3.8, times: [0, 0.42, 0.68, 0.80, 1.0] }}
             onAnimationComplete={() => setShowIntro(false)}
             style={{ background: '#010306' }}
           >
@@ -1516,7 +1516,7 @@ export default function EncounterPage() {
               }}
               initial={{ scale: 1, opacity: 0 }}
               animate={{ scale: [1, 12, 28], opacity: [0, 0.55, 0] }}
-              transition={{ duration: 0.8, times: [0, 0.55, 1], ease: 'easeOut', delay: 0.05 }}
+              transition={{ duration: 1.1, times: [0, 0.55, 1], ease: 'easeOut', delay: 0.05 }}
             />
             {/* White burst ring — primary explosion */}
             <motion.div
@@ -1524,7 +1524,7 @@ export default function EncounterPage() {
               style={{ top: '50%', left: '50%', width: 22, height: 22, marginTop: -11, marginLeft: -11, background: 'white' }}
               initial={{ scale: 1, opacity: 1 }}
               animate={{ scale: 110, opacity: 0 }}
-              transition={{ duration: 0.7, ease: [0.1, 0.85, 0.28, 1], delay: 0.18 }}
+              transition={{ duration: 0.9, ease: [0.1, 0.85, 0.28, 1], delay: 0.2 }}
             />
             {/* Element ring — softer, blooms behind */}
             <motion.div
@@ -1532,7 +1532,7 @@ export default function EncounterPage() {
               style={{ top: '50%', left: '50%', width: 16, height: 16, marginTop: -8, marginLeft: -8, background: wildTheme.glow, filter: 'blur(6px)' }}
               initial={{ scale: 1, opacity: 0.9 }}
               animate={{ scale: 85, opacity: 0 }}
-              transition={{ duration: 0.78, delay: 0.26, ease: [0.1, 0.85, 0.28, 1] }}
+              transition={{ duration: 1.0, delay: 0.3, ease: [0.1, 0.85, 0.28, 1] }}
             />
             {/* Expanding border ring — adds crispness */}
             <motion.div
@@ -1546,14 +1546,28 @@ export default function EncounterPage() {
               }}
               initial={{ scale: 1, opacity: 1 }}
               animate={{ scale: [1, 45, 90], opacity: [1, 0.45, 0] }}
-              transition={{ duration: 0.75, delay: 0.3, times: [0, 0.55, 1], ease: 'easeOut' }}
+              transition={{ duration: 1.0, delay: 0.38, times: [0, 0.55, 1], ease: 'easeOut' }}
+            />
+            {/* Second ripple ring — follow-up wave */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{
+                top: '50%', left: '50%',
+                width: 12, height: 12,
+                marginTop: -6, marginLeft: -6,
+                border: `1.5px solid ${wildTheme.glow}88`,
+                filter: 'blur(2px)',
+              }}
+              initial={{ scale: 1, opacity: 0.8 }}
+              animate={{ scale: [1, 30, 70], opacity: [0.8, 0.35, 0] }}
+              transition={{ duration: 1.2, delay: 0.55, times: [0, 0.50, 1], ease: 'easeOut' }}
             />
             {/* White flash — peak brightness */}
             <motion.div
               className="absolute inset-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: [0, 1, 0.5, 0] }}
-              transition={{ duration: 0.55, delay: 0.32, times: [0, 0.28, 0.6, 1] }}
+              transition={{ duration: 0.7, delay: 0.42, times: [0, 0.28, 0.6, 1] }}
               style={{ background: `radial-gradient(ellipse 85% 65% at center, white 0%, ${wildTheme.glow}65 42%, transparent 72%)` }}
             />
             {/* Element flash — second wave, colored */}
@@ -1561,11 +1575,19 @@ export default function EncounterPage() {
               className="absolute inset-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: [0, 0.45, 0] }}
-              transition={{ duration: 0.4, delay: 0.6, times: [0, 0.4, 1] }}
+              transition={{ duration: 0.65, delay: 0.80, times: [0, 0.4, 1] }}
               style={{ background: `radial-gradient(ellipse 70% 55% at center, ${wildTheme.glow}90 0%, ${wildTheme.glow}30 55%, transparent 80%)` }}
             />
-            {/* Starburst scanlines — 8 directions */}
-            {[0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5].map((angle, i) => (
+            {/* Ambient glow — breathes during hold phase */}
+            <motion.div
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.22, 0.10, 0.22, 0] }}
+              transition={{ duration: 2.2, delay: 1.1, times: [0, 0.2, 0.5, 0.75, 1] }}
+              style={{ background: `radial-gradient(ellipse 60% 50% at center, ${wildTheme.glow}55 0%, transparent 65%)` }}
+            />
+            {/* Starburst scanlines — 12 directions */}
+            {[0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165].map((angle, i) => (
               <motion.div
                 key={angle}
                 className="absolute"
@@ -1580,9 +1602,32 @@ export default function EncounterPage() {
                 initial={{ scaleY: 0, opacity: 0 }}
                 animate={{ scaleY: [0, 1, 1], opacity: [0, 0.95, 0] }}
                 transition={{
-                  duration: 0.6,
-                  delay: 0.22 + i * 0.02,
+                  duration: 1.1,
+                  delay: 0.28 + i * 0.018,
                   times: [0, 0.22, 1],
+                  ease: 'easeOut',
+                }}
+              />
+            ))}
+            {/* Second scanline wave — element-colored, wider */}
+            {[7.5, 22.5, 37.5, 52.5, 67.5, 82.5, 97.5, 112.5, 127.5, 142.5, 157.5, 172.5].map((angle, i) => (
+              <motion.div
+                key={`b-${angle}`}
+                className="absolute"
+                style={{
+                  top: '50%', left: '50%',
+                  width: 4, height: '200%',
+                  marginLeft: -2,
+                  transformOrigin: 'top center',
+                  rotate: `${angle}deg`,
+                  background: `linear-gradient(to bottom, transparent 0%, ${wildTheme.glow}50 35%, ${wildTheme.glow}50 65%, transparent 100%)`,
+                }}
+                initial={{ scaleY: 0, opacity: 0 }}
+                animate={{ scaleY: [0, 1, 1], opacity: [0, 0.6, 0] }}
+                transition={{
+                  duration: 1.4,
+                  delay: 0.50 + i * 0.018,
+                  times: [0, 0.20, 1],
                   ease: 'easeOut',
                 }}
               />

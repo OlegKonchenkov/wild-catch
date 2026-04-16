@@ -690,7 +690,7 @@ function BattleScreen({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={showBossIntro
-                ? { type: 'spring', stiffness: 140, damping: 20, delay: 1.2 }
+                ? { type: 'spring', stiffness: 140, damping: 20, delay: 2.2 }
                 : { duration: 0.25 }}
             >
               <CreatureCard
@@ -730,7 +730,7 @@ function BattleScreen({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={showBossIntro
-                ? { type: 'spring', stiffness: 140, damping: 22, delay: 1.55 }
+                ? { type: 'spring', stiffness: 140, damping: 22, delay: 2.7 }
                 : { duration: 0.25 }}
             >
               <CreatureCard
@@ -975,7 +975,7 @@ function BattleScreen({
             className="absolute inset-0 z-[100] overflow-hidden pointer-events-none"
             initial={{ opacity: 1 }}
             animate={{ opacity: [1, 1, 1, 1, 0] }}
-            transition={{ duration: 2.1, times: [0, 0.38, 0.62, 0.76, 1.0] }}
+            transition={{ duration: 4.0, times: [0, 0.42, 0.68, 0.82, 1.0] }}
             onAnimationComplete={() => setShowBossIntro(false)}
             style={{ background: '#070400' }}
           >
@@ -985,7 +985,7 @@ function BattleScreen({
               style={{ top: '50%', left: '50%', width: 10, height: 10, marginTop: -5, marginLeft: -5, background: '#F7C841', filter: 'blur(18px)' }}
               initial={{ scale: 1, opacity: 0 }}
               animate={{ scale: [1, 16, 35], opacity: [0, 0.7, 0] }}
-              transition={{ duration: 0.9, times: [0, 0.5, 1], ease: 'easeOut', delay: 0.05 }}
+              transition={{ duration: 1.1, times: [0, 0.5, 1], ease: 'easeOut', delay: 0.05 }}
             />
             {/* White burst ring */}
             <motion.div
@@ -993,7 +993,7 @@ function BattleScreen({
               style={{ top: '50%', left: '50%', width: 22, height: 22, marginTop: -11, marginLeft: -11, background: 'white' }}
               initial={{ scale: 1, opacity: 1 }}
               animate={{ scale: 110, opacity: 0 }}
-              transition={{ duration: 0.72, ease: [0.1, 0.85, 0.28, 1], delay: 0.18 }}
+              transition={{ duration: 0.9, ease: [0.1, 0.85, 0.28, 1], delay: 0.2 }}
             />
             {/* Gold ring */}
             <motion.div
@@ -1001,7 +1001,7 @@ function BattleScreen({
               style={{ top: '50%', left: '50%', width: 16, height: 16, marginTop: -8, marginLeft: -8, background: '#F7C841', filter: 'blur(6px)' }}
               initial={{ scale: 1, opacity: 0.9 }}
               animate={{ scale: 85, opacity: 0 }}
-              transition={{ duration: 0.78, delay: 0.26, ease: [0.1, 0.85, 0.28, 1] }}
+              transition={{ duration: 1.0, delay: 0.3, ease: [0.1, 0.85, 0.28, 1] }}
             />
             {/* Double border ring (gold) */}
             <motion.div
@@ -1009,14 +1009,22 @@ function BattleScreen({
               style={{ top: '50%', left: '50%', width: 8, height: 8, marginTop: -4, marginLeft: -4, border: '2px solid rgba(247,200,65,0.9)', filter: 'blur(1px)' }}
               initial={{ scale: 1, opacity: 1 }}
               animate={{ scale: [1, 45, 90], opacity: [1, 0.5, 0] }}
-              transition={{ duration: 0.75, delay: 0.3, times: [0, 0.55, 1], ease: 'easeOut' }}
+              transition={{ duration: 1.0, delay: 0.38, times: [0, 0.55, 1], ease: 'easeOut' }}
+            />
+            {/* Second gold ripple ring */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{ top: '50%', left: '50%', width: 14, height: 14, marginTop: -7, marginLeft: -7, border: '1.5px solid rgba(247,200,65,0.6)', filter: 'blur(2px)' }}
+              initial={{ scale: 1, opacity: 0.8 }}
+              animate={{ scale: [1, 28, 65], opacity: [0.8, 0.40, 0] }}
+              transition={{ duration: 1.3, delay: 0.58, times: [0, 0.50, 1], ease: 'easeOut' }}
             />
             {/* White flash */}
             <motion.div
               className="absolute inset-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: [0, 1, 0.5, 0] }}
-              transition={{ duration: 0.55, delay: 0.32, times: [0, 0.28, 0.6, 1] }}
+              transition={{ duration: 0.7, delay: 0.42, times: [0, 0.28, 0.6, 1] }}
               style={{ background: 'radial-gradient(ellipse 85% 65% at center, white 0%, rgba(247,200,65,0.7) 42%, transparent 72%)' }}
             />
             {/* Gold tint */}
@@ -1024,29 +1032,37 @@ function BattleScreen({
               className="absolute inset-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: [0, 0.55, 0] }}
-              transition={{ duration: 0.4, delay: 0.6, times: [0, 0.4, 1] }}
+              transition={{ duration: 0.65, delay: 0.80, times: [0, 0.4, 1] }}
               style={{ background: 'radial-gradient(ellipse 70% 55% at center, rgba(247,200,65,0.85) 0%, rgba(247,200,65,0.25) 55%, transparent 80%)' }}
+            />
+            {/* Ambient gold glow — breathes during hold phase */}
+            <motion.div
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.28, 0.12, 0.28, 0] }}
+              transition={{ duration: 2.4, delay: 1.2, times: [0, 0.2, 0.5, 0.75, 1] }}
+              style={{ background: 'radial-gradient(ellipse 65% 55% at center, rgba(247,200,65,0.5) 0%, transparent 65%)' }}
             />
             {/* Boss title reveal */}
             <motion.div
               className="absolute inset-0 flex flex-col items-center justify-center gap-1"
               initial={{ opacity: 0, scale: 0.4 }}
-              animate={{ opacity: [0, 1, 1, 0], scale: [0.4, 1.1, 1.0, 0.85] }}
-              transition={{ duration: 1.0, delay: 0.65, times: [0, 0.18, 0.58, 1] }}
+              animate={{ opacity: [0, 1, 1, 0], scale: [0.4, 1.12, 1.02, 0.85] }}
+              transition={{ duration: 2.8, delay: 0.90, times: [0, 0.10, 0.72, 1.0] }}
             >
               <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.3em', color: 'rgba(247,200,65,0.85)', textTransform: 'uppercase' }}>
                 Capo Palestra
               </span>
               <span style={{
-                fontSize: 58, fontWeight: 900, letterSpacing: '-0.03em',
+                fontSize: 68, fontWeight: 900, letterSpacing: '-0.03em',
                 color: 'white', textShadow: '0 0 40px rgba(247,200,65,0.9), 0 0 80px rgba(247,200,65,0.5), 0 4px 16px rgba(0,0,0,0.9)',
                 lineHeight: 1.1,
               }}>
                 💀
               </span>
             </motion.div>
-            {/* Starburst scanlines — 8 directions */}
-            {[0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5].map((angle, i) => (
+            {/* Starburst scanlines — 12 directions */}
+            {[0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165].map((angle, i) => (
               <motion.div
                 key={angle}
                 className="absolute"
@@ -1057,7 +1073,22 @@ function BattleScreen({
                 }}
                 initial={{ scaleY: 0, opacity: 0 }}
                 animate={{ scaleY: [0, 1, 1], opacity: [0, 0.9, 0] }}
-                transition={{ duration: 0.6, delay: 0.22 + i * 0.02, times: [0, 0.22, 1], ease: 'easeOut' }}
+                transition={{ duration: 1.1, delay: 0.28 + i * 0.018, times: [0, 0.22, 1], ease: 'easeOut' }}
+              />
+            ))}
+            {/* Second scanline wave — gold-tinted, wider */}
+            {[7.5, 22.5, 37.5, 52.5, 67.5, 82.5, 97.5, 112.5, 127.5, 142.5, 157.5, 172.5].map((angle, i) => (
+              <motion.div
+                key={`b-${angle}`}
+                className="absolute"
+                style={{
+                  top: '50%', left: '50%', width: 4, height: '200%', marginLeft: -2,
+                  transformOrigin: 'top center', rotate: `${angle}deg`,
+                  background: 'linear-gradient(to bottom, transparent 0%, rgba(247,200,65,0.4) 35%, rgba(247,200,65,0.4) 65%, transparent 100%)',
+                }}
+                initial={{ scaleY: 0, opacity: 0 }}
+                animate={{ scaleY: [0, 1, 1], opacity: [0, 0.65, 0] }}
+                transition={{ duration: 1.5, delay: 0.52 + i * 0.018, times: [0, 0.20, 1], ease: 'easeOut' }}
               />
             ))}
           </motion.div>

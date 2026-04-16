@@ -939,7 +939,7 @@ export default function DuelPage() {
                 initial={{ opacity: 0, x: showDuelIntro ? 340 : 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={showDuelIntro
-                  ? { type: 'spring', stiffness: 140, damping: 20, delay: 1.2 }
+                  ? { type: 'spring', stiffness: 140, damping: 20, delay: 2.2 }
                   : { duration: 0.28, ease: 'easeOut' }}
               >
                 <CreatureCard
@@ -1027,7 +1027,7 @@ export default function DuelPage() {
                 initial={{ opacity: 0, x: showDuelIntro ? -340 : -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={showDuelIntro
-                  ? { type: 'spring', stiffness: 140, damping: 22, delay: 1.55 }
+                  ? { type: 'spring', stiffness: 140, damping: 22, delay: 2.7 }
                   : { duration: 0.28, ease: 'easeOut' }}
               >
                 <CreatureCard
@@ -1234,7 +1234,7 @@ export default function DuelPage() {
             className="absolute inset-0 z-[100] overflow-hidden pointer-events-none"
             initial={{ opacity: 1 }}
             animate={{ opacity: [1, 1, 1, 1, 0] }}
-            transition={{ duration: 2.1, times: [0, 0.38, 0.62, 0.76, 1.0] }}
+            transition={{ duration: 3.8, times: [0, 0.42, 0.68, 0.80, 1.0] }}
             onAnimationComplete={() => setShowDuelIntro(false)}
             style={{ background: '#08010A' }}
           >
@@ -1244,7 +1244,7 @@ export default function DuelPage() {
               style={{ top: '50%', left: '50%', width: 10, height: 10, marginTop: -5, marginLeft: -5, background: '#E85D2F', filter: 'blur(16px)' }}
               initial={{ scale: 1, opacity: 0 }}
               animate={{ scale: [1, 14, 30], opacity: [0, 0.6, 0] }}
-              transition={{ duration: 0.85, times: [0, 0.5, 1], ease: 'easeOut', delay: 0.05 }}
+              transition={{ duration: 1.1, times: [0, 0.5, 1], ease: 'easeOut', delay: 0.05 }}
             />
             {/* White burst ring */}
             <motion.div
@@ -1252,7 +1252,7 @@ export default function DuelPage() {
               style={{ top: '50%', left: '50%', width: 22, height: 22, marginTop: -11, marginLeft: -11, background: 'white' }}
               initial={{ scale: 1, opacity: 1 }}
               animate={{ scale: 110, opacity: 0 }}
-              transition={{ duration: 0.72, ease: [0.1, 0.85, 0.28, 1], delay: 0.18 }}
+              transition={{ duration: 0.9, ease: [0.1, 0.85, 0.28, 1], delay: 0.2 }}
             />
             {/* Red combat ring */}
             <motion.div
@@ -1260,7 +1260,7 @@ export default function DuelPage() {
               style={{ top: '50%', left: '50%', width: 16, height: 16, marginTop: -8, marginLeft: -8, background: '#E85D2F', filter: 'blur(6px)' }}
               initial={{ scale: 1, opacity: 0.9 }}
               animate={{ scale: 85, opacity: 0 }}
-              transition={{ duration: 0.78, delay: 0.26, ease: [0.1, 0.85, 0.28, 1] }}
+              transition={{ duration: 1.0, delay: 0.3, ease: [0.1, 0.85, 0.28, 1] }}
             />
             {/* Opponent element ring */}
             <motion.div
@@ -1268,14 +1268,22 @@ export default function DuelPage() {
               style={{ top: '50%', left: '50%', width: 8, height: 8, marginTop: -4, marginLeft: -4, border: `2px solid ${oppTheme.glow}CC`, filter: 'blur(1px)' }}
               initial={{ scale: 1, opacity: 1 }}
               animate={{ scale: [1, 45, 90], opacity: [1, 0.45, 0] }}
-              transition={{ duration: 0.75, delay: 0.3, times: [0, 0.55, 1], ease: 'easeOut' }}
+              transition={{ duration: 1.0, delay: 0.38, times: [0, 0.55, 1], ease: 'easeOut' }}
+            />
+            {/* Second ripple ring — follow-up wave */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{ top: '50%', left: '50%', width: 12, height: 12, marginTop: -6, marginLeft: -6, border: '1.5px solid rgba(232,93,47,0.5)', filter: 'blur(2px)' }}
+              initial={{ scale: 1, opacity: 0.8 }}
+              animate={{ scale: [1, 30, 70], opacity: [0.8, 0.35, 0] }}
+              transition={{ duration: 1.2, delay: 0.55, times: [0, 0.50, 1], ease: 'easeOut' }}
             />
             {/* White flash */}
             <motion.div
               className="absolute inset-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: [0, 1, 0.5, 0] }}
-              transition={{ duration: 0.55, delay: 0.32, times: [0, 0.28, 0.6, 1] }}
+              transition={{ duration: 0.7, delay: 0.42, times: [0, 0.28, 0.6, 1] }}
               style={{ background: 'radial-gradient(ellipse 85% 65% at center, white 0%, rgba(232,93,47,0.65) 42%, transparent 72%)' }}
             />
             {/* Red combat tint */}
@@ -1283,25 +1291,33 @@ export default function DuelPage() {
               className="absolute inset-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: [0, 0.5, 0] }}
-              transition={{ duration: 0.4, delay: 0.6, times: [0, 0.4, 1] }}
+              transition={{ duration: 0.65, delay: 0.80, times: [0, 0.4, 1] }}
               style={{ background: 'radial-gradient(ellipse 70% 55% at center, rgba(232,93,47,0.9) 0%, rgba(232,93,47,0.3) 55%, transparent 80%)' }}
+            />
+            {/* Ambient combat glow — breathes during hold phase */}
+            <motion.div
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.20, 0.08, 0.20, 0] }}
+              transition={{ duration: 2.2, delay: 1.1, times: [0, 0.2, 0.5, 0.75, 1] }}
+              style={{ background: 'radial-gradient(ellipse 60% 50% at center, rgba(232,93,47,0.55) 0%, transparent 65%)' }}
             />
             {/* VS text reveal */}
             <motion.div
               className="absolute inset-0 flex items-center justify-center"
               initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: [0, 1, 1, 0], scale: [0.5, 1.15, 1.0, 0.8] }}
-              transition={{ duration: 0.9, delay: 0.65, times: [0, 0.2, 0.6, 1] }}
+              animate={{ opacity: [0, 1, 1, 0], scale: [0.5, 1.2, 1.05, 0.85] }}
+              transition={{ duration: 2.4, delay: 0.90, times: [0, 0.12, 0.72, 1.0] }}
             >
               <span style={{
-                fontSize: 72, fontWeight: 900, letterSpacing: '-0.04em',
+                fontSize: 80, fontWeight: 900, letterSpacing: '-0.04em',
                 color: 'white', textShadow: '0 0 40px rgba(232,93,47,0.9), 0 0 80px rgba(232,93,47,0.5), 0 4px 16px rgba(0,0,0,0.9)',
               }}>
                 VS
               </span>
             </motion.div>
-            {/* Starburst scanlines — 8 directions */}
-            {[0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5].map((angle, i) => (
+            {/* Starburst scanlines — 12 directions */}
+            {[0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165].map((angle, i) => (
               <motion.div
                 key={angle}
                 className="absolute"
@@ -1312,7 +1328,22 @@ export default function DuelPage() {
                 }}
                 initial={{ scaleY: 0, opacity: 0 }}
                 animate={{ scaleY: [0, 1, 1], opacity: [0, 0.95, 0] }}
-                transition={{ duration: 0.6, delay: 0.22 + i * 0.02, times: [0, 0.22, 1], ease: 'easeOut' }}
+                transition={{ duration: 1.1, delay: 0.28 + i * 0.018, times: [0, 0.22, 1], ease: 'easeOut' }}
+              />
+            ))}
+            {/* Second scanline wave — red-tinted, wider */}
+            {[7.5, 22.5, 37.5, 52.5, 67.5, 82.5, 97.5, 112.5, 127.5, 142.5, 157.5, 172.5].map((angle, i) => (
+              <motion.div
+                key={`b-${angle}`}
+                className="absolute"
+                style={{
+                  top: '50%', left: '50%', width: 4, height: '200%', marginLeft: -2,
+                  transformOrigin: 'top center', rotate: `${angle}deg`,
+                  background: 'linear-gradient(to bottom, transparent 0%, rgba(232,93,47,0.4) 35%, rgba(232,93,47,0.4) 65%, transparent 100%)',
+                }}
+                initial={{ scaleY: 0, opacity: 0 }}
+                animate={{ scaleY: [0, 1, 1], opacity: [0, 0.6, 0] }}
+                transition={{ duration: 1.4, delay: 0.50 + i * 0.018, times: [0, 0.20, 1], ease: 'easeOut' }}
               />
             ))}
           </motion.div>
