@@ -30,8 +30,8 @@ interface LineupEntry {
       atk: number
       def: number
       image_url: string
-      attack_sound_url: string | null
-      attack_sound_duration_ms: number | null
+      attack_sound_url?: string | null
+      attack_sound_duration_ms?: number | null
     }
   }
 }

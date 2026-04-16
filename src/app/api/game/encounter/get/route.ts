@@ -32,9 +32,10 @@ export async function GET(request: Request) {
 
   const squadIds: string[] = (playerSession as any)?.squad_ids ?? []
   if (squadIds.length > 0) {
+    // Critical combat data — no sound fields so query never fails pre-migration
     const { data: pcs } = await supabase
       .from('player_creatures')
-      .select('id, creatures(id, name, hp, atk, element, rarity, image_url, attack_sound_url, attack_sound_duration_ms)')
+      .select('id, creatures(id, name, hp, atk, element, rarity, image_url)')
       .in('id', squadIds)
       .eq('user_id', user.id)
       .eq('session_id', encounter.session_id)
@@ -52,9 +53,27 @@ export async function GET(request: Request) {
           element: pc.creatures.element,
           rarity: pc.creatures.rarity,
           image_url: pc.creatures.image_url ?? null,
-          attack_sound_url: pc.creatures.attack_sound_url ?? null,
-          attack_sound_duration_ms: pc.creatures.attack_sound_duration_ms ?? null,
+          attack_sound_url: null,
+          attack_sound_duration_ms: null,
         }))
+
+      // Try to enrich with sound data (requires 018_attack_sound migration)
+      const creatureIds = squadCreatures.map(c => c.id)
+      const { data: soundRows } = await supabase
+        .from('creatures')
+        .select('id, attack_sound_url, attack_sound_duration_ms')
+        .in('id', creatureIds)
+      if (soundRows) {
+        const soundMap: Record<string, { url: string | null; ms: number | null }> = {}
+        for (const r of soundRows as any[]) {
+          soundMap[r.id] = { url: r.attack_sound_url ?? null, ms: r.attack_sound_duration_ms ?? null }
+        }
+        squadCreatures = squadCreatures.map(c => ({
+          ...c,
+          attack_sound_url: soundMap[c.id]?.url ?? null,
+          attack_sound_duration_ms: soundMap[c.id]?.ms ?? null,
+        }))
+      }
     }
   }
 

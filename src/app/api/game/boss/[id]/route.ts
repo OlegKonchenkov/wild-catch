@@ -62,11 +62,11 @@ export async function POST(request: Request, { params }: Params) {
       .maybeSingle()
     const playerLevel = playerSession?.level ?? 1
 
-    // Validate ownership & fetch creature data
+    // Validate ownership & fetch creature data (no sound fields — those are non-critical)
     const pcIds = lineup.map((e: any) => e.playerCreatureId)
     const { data: pcs } = await supabase
       .from('player_creatures')
-      .select('id, creatures(name, element, rarity, hp, atk, def, image_url, attack_sound_url, attack_sound_duration_ms)')
+      .select('id, creatures(id, name, element, rarity, hp, atk, def, image_url)')
       .in('id', pcIds)
       .eq('user_id', user.id)
 
@@ -78,9 +78,23 @@ export async function POST(request: Request, { params }: Params) {
       pcs.map((pc: any) => [pc.id, pc])
     )
 
+    // Try to fetch sound data separately (requires 018_attack_sound migration; skipped if missing)
+    const creatureIds = pcs.map((pc: any) => pc.creatures?.id).filter(Boolean)
+    const soundMap: Record<string, { url: string | null; ms: number | null }> = {}
+    const { data: soundRows } = await supabase
+      .from('creatures')
+      .select('id, attack_sound_url, attack_sound_duration_ms')
+      .in('id', creatureIds)
+    if (soundRows) {
+      for (const r of soundRows as any[]) {
+        soundMap[r.id] = { url: r.attack_sound_url ?? null, ms: r.attack_sound_duration_ms ?? null }
+      }
+    }
+
     const playerLineup = lineup.map((e: any, i: number) => {
       const pc = pcMap[e.playerCreatureId]
       const cr = pc?.creatures
+      const crId = cr?.id as string | undefined
       const scaledStats = scaleCombatStats(
         { hp: cr?.hp ?? 100, atk: cr?.atk ?? 10, def: cr?.def ?? 0 },
         playerLevel,
@@ -99,8 +113,8 @@ export async function POST(request: Request, { params }: Params) {
         fainted: false,
         is_active: i === 0,
         image_url: cr?.image_url ?? '',
-        attack_sound_url: cr?.attack_sound_url ?? null,
-        attack_sound_duration_ms: cr?.attack_sound_duration_ms ?? null,
+        attack_sound_url: crId ? (soundMap[crId]?.url ?? null) : null,
+        attack_sound_duration_ms: crId ? (soundMap[crId]?.ms ?? null) : null,
       }
     })
 
