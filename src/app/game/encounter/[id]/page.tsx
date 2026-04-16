@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import { playEncounterSound } from '@/lib/game/battle-sounds'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import { createClient } from '@/lib/supabase/client'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
@@ -451,11 +452,12 @@ export default function EncounterPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [state?.encounterId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Trigger encounter intro animation once when state first becomes available
+  // Trigger encounter intro animation + sound once when state first becomes available
   useEffect(() => {
     if (state && !introActive) {
       setIntroActive(true)
       setShowIntro(true)
+      playEncounterSound()
     }
   }, [state?.encounterId]) // eslint-disable-line react-hooks/exhaustive-deps
 

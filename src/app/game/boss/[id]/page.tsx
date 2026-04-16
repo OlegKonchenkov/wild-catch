@@ -13,6 +13,7 @@ import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
+import { playBossSound } from '@/lib/game/battle-sounds'
 import { scaleCombatStats } from '@/lib/game/combat'
 
 interface BossSlot {
@@ -517,11 +518,15 @@ function BattleScreen({
   onAttackAnimComplete: () => void
 }) {
   const [showItemsModal, setShowItemsModal] = useState(false)
+  const [showBossIntro, setShowBossIntro] = useState(true)
   const [turnTimer, setTurnTimer] = useState(30)
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoFightRef = useRef(false)
   const onAttackRef  = useRef(onAttack)
   useEffect(() => { onAttackRef.current = onAttack })
+
+  // Play boss intro sound once on mount
+  useEffect(() => { playBossSound() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -681,10 +686,12 @@ function BattleScreen({
           <AnimatePresence mode="wait">
             <motion.div
               key={`boss-${bossActiveSlot}`}
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: showBossIntro ? 340 : 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.25 }}
+              transition={showBossIntro
+                ? { type: 'spring', stiffness: 140, damping: 20, delay: 1.2 }
+                : { duration: 0.25 }}
             >
               <CreatureCard
                 imageUrl={activeBoss.image_url || activeBoss.sprite_url}
@@ -719,10 +726,12 @@ function BattleScreen({
           <AnimatePresence mode="wait">
             <motion.div
               key={activePlayer.player_creature_id}
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: showBossIntro ? -340 : -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.25 }}
+              transition={showBossIntro
+                ? { type: 'spring', stiffness: 140, damping: 22, delay: 1.55 }
+                : { duration: 0.25 }}
             >
               <CreatureCard
                 imageUrl={activePlayer.image_url}
@@ -958,6 +967,102 @@ function BattleScreen({
           )}
         </motion.button>
       </div>
+
+      {/* ── BOSS INTRO OVERLAY (golden dramatic wipe) ── */}
+      <AnimatePresence>
+        {showBossIntro && (
+          <motion.div
+            className="absolute inset-0 z-[100] overflow-hidden pointer-events-none"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: [1, 1, 1, 1, 0] }}
+            transition={{ duration: 2.1, times: [0, 0.38, 0.62, 0.76, 1.0] }}
+            onAnimationComplete={() => setShowBossIntro(false)}
+            style={{ background: '#070400' }}
+          >
+            {/* Pre-glow: gold pulse */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{ top: '50%', left: '50%', width: 10, height: 10, marginTop: -5, marginLeft: -5, background: '#F7C841', filter: 'blur(18px)' }}
+              initial={{ scale: 1, opacity: 0 }}
+              animate={{ scale: [1, 16, 35], opacity: [0, 0.7, 0] }}
+              transition={{ duration: 0.9, times: [0, 0.5, 1], ease: 'easeOut', delay: 0.05 }}
+            />
+            {/* White burst ring */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{ top: '50%', left: '50%', width: 22, height: 22, marginTop: -11, marginLeft: -11, background: 'white' }}
+              initial={{ scale: 1, opacity: 1 }}
+              animate={{ scale: 110, opacity: 0 }}
+              transition={{ duration: 0.72, ease: [0.1, 0.85, 0.28, 1], delay: 0.18 }}
+            />
+            {/* Gold ring */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{ top: '50%', left: '50%', width: 16, height: 16, marginTop: -8, marginLeft: -8, background: '#F7C841', filter: 'blur(6px)' }}
+              initial={{ scale: 1, opacity: 0.9 }}
+              animate={{ scale: 85, opacity: 0 }}
+              transition={{ duration: 0.78, delay: 0.26, ease: [0.1, 0.85, 0.28, 1] }}
+            />
+            {/* Double border ring (gold) */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{ top: '50%', left: '50%', width: 8, height: 8, marginTop: -4, marginLeft: -4, border: '2px solid rgba(247,200,65,0.9)', filter: 'blur(1px)' }}
+              initial={{ scale: 1, opacity: 1 }}
+              animate={{ scale: [1, 45, 90], opacity: [1, 0.5, 0] }}
+              transition={{ duration: 0.75, delay: 0.3, times: [0, 0.55, 1], ease: 'easeOut' }}
+            />
+            {/* White flash */}
+            <motion.div
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 1, 0.5, 0] }}
+              transition={{ duration: 0.55, delay: 0.32, times: [0, 0.28, 0.6, 1] }}
+              style={{ background: 'radial-gradient(ellipse 85% 65% at center, white 0%, rgba(247,200,65,0.7) 42%, transparent 72%)' }}
+            />
+            {/* Gold tint */}
+            <motion.div
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.55, 0] }}
+              transition={{ duration: 0.4, delay: 0.6, times: [0, 0.4, 1] }}
+              style={{ background: 'radial-gradient(ellipse 70% 55% at center, rgba(247,200,65,0.85) 0%, rgba(247,200,65,0.25) 55%, transparent 80%)' }}
+            />
+            {/* Boss title reveal */}
+            <motion.div
+              className="absolute inset-0 flex flex-col items-center justify-center gap-1"
+              initial={{ opacity: 0, scale: 0.4 }}
+              animate={{ opacity: [0, 1, 1, 0], scale: [0.4, 1.1, 1.0, 0.85] }}
+              transition={{ duration: 1.0, delay: 0.65, times: [0, 0.18, 0.58, 1] }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.3em', color: 'rgba(247,200,65,0.85)', textTransform: 'uppercase' }}>
+                Capo Palestra
+              </span>
+              <span style={{
+                fontSize: 58, fontWeight: 900, letterSpacing: '-0.03em',
+                color: 'white', textShadow: '0 0 40px rgba(247,200,65,0.9), 0 0 80px rgba(247,200,65,0.5), 0 4px 16px rgba(0,0,0,0.9)',
+                lineHeight: 1.1,
+              }}>
+                💀
+              </span>
+            </motion.div>
+            {/* Starburst scanlines — 8 directions */}
+            {[0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5].map((angle, i) => (
+              <motion.div
+                key={angle}
+                className="absolute"
+                style={{
+                  top: '50%', left: '50%', width: 2.5, height: '200%', marginLeft: -1.25,
+                  transformOrigin: 'top center', rotate: `${angle}deg`,
+                  background: 'linear-gradient(to bottom, transparent 0%, rgba(247,200,65,0.7) 32%, rgba(247,200,65,0.7) 68%, transparent 100%)',
+                }}
+                initial={{ scaleY: 0, opacity: 0 }}
+                animate={{ scaleY: [0, 1, 1], opacity: [0, 0.9, 0] }}
+                transition={{ duration: 0.6, delay: 0.22 + i * 0.02, times: [0, 0.22, 1], ease: 'easeOut' }}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
