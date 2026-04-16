@@ -270,6 +270,7 @@ export default function EncounterPage() {
   const [wildAnim, setWildAnim]     = useState<'idle' | 'damage' | 'catch' | 'flee'>('idle')
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null>(null)
+  const [lastDamage, setLastDamage] = useState<{ amount: number; target: 'wild' | 'player'; id: number; isCrit?: boolean } | null>(null)
   const [catchPhase, setCatchPhase] = useState<'idle' | 'throwing' | 'hit'>('idle')
   const [message, setMessage]   = useState('')
   const [isCritMessage, setIsCritMessage] = useState(false)
@@ -466,6 +467,7 @@ export default function EncounterPage() {
     if (remainingAttackMs > 0) await new Promise(r => setTimeout(r, remainingAttackMs))
 
     setWildAnim('damage')
+    setLastDamage({ amount: data.playerDamage, target: 'wild', id: Date.now(), isCrit: !!data.playerCrit })
     await new Promise(r => setTimeout(r, 380))
     setWildAnim('idle')
 
@@ -493,6 +495,7 @@ export default function EncounterPage() {
         side: 'right',
       })
       await new Promise(r => setTimeout(r, 320))
+      setLastDamage({ amount: data.wildDamage, target: 'player', id: Date.now() })
 
       const curHp = playerHp ?? playerCreature?.maxHp ?? 100
       const newHp = Math.max(0, curHp - data.wildDamage)
@@ -608,6 +611,7 @@ export default function EncounterPage() {
           side: 'right',
         })
         await new Promise(r => setTimeout(r, 320))
+        setLastDamage({ amount: data.wildDamage, target: 'player', id: Date.now() })
 
         const newHp = Math.max(0, (playerHp ?? playerCreature?.maxHp ?? 100) - data.wildDamage)
         if (squadCreatures.length > 0) {
@@ -793,6 +797,45 @@ export default function EncounterPage() {
             onComplete={() => setAttackAnim(null)}
           />
         )}
+
+        {/* ── Floating damage numbers ── */}
+        <AnimatePresence>
+          {lastDamage?.target === 'wild' && (
+            <motion.div
+              key={`wild-dmg-${lastDamage.id}`}
+              initial={{ opacity: 1, y: 0, scale: lastDamage.isCrit ? 1.4 : 1 }}
+              animate={{ opacity: 0, y: -80, scale: 2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9 }}
+              className="absolute pointer-events-none z-50"
+              style={{ top: '22%', left: '60%', transform: 'translateX(-50%)' }}
+              onAnimationComplete={() => setLastDamage(null)}
+            >
+              <span style={lastDamage.isCrit
+                ? { color: '#FB923C', fontSize: 44, fontWeight: 900, textShadow: '0 0 28px rgba(249,115,22,0.95), 0 2px 8px rgba(0,0,0,0.9)' }
+                : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 2px 8px rgba(0,0,0,0.9)' }
+              }>
+                -{lastDamage.amount}
+              </span>
+            </motion.div>
+          )}
+          {lastDamage?.target === 'player' && (
+            <motion.div
+              key={`player-dmg-${lastDamage.id}`}
+              initial={{ opacity: 1, y: 0, scale: 1 }}
+              animate={{ opacity: 0, y: -80, scale: 2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9 }}
+              className="absolute pointer-events-none z-50"
+              style={{ top: '62%', left: '38%', transform: 'translateX(-50%)' }}
+              onAnimationComplete={() => setLastDamage(null)}
+            >
+              <span style={{ color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 2px 8px rgba(0,0,0,0.9)' }}>
+                -{lastDamage.amount}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* VS / message — center */}
         <div className="absolute inset-x-0 z-10" style={{ top: '46%', transform: 'translateY(-50%)' }}>
