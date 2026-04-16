@@ -484,6 +484,16 @@ export default function EncounterPage() {
 
     if (data.playerTookDamage && data.wildDamage > 0) {
       await new Promise(r => setTimeout(r, 280))
+
+      // Wild creature counter-attack animation (side: 'right')
+      setAttackAnim({
+        key: Date.now() + 1,
+        element: state.creature?.element ?? 'armonia',
+        rarity: state.creature?.rarity ?? 'comune',
+        side: 'right',
+      })
+      await new Promise(r => setTimeout(r, 320))
+
       const curHp = playerHp ?? playerCreature?.maxHp ?? 100
       const newHp = Math.max(0, curHp - data.wildDamage)
 
@@ -590,6 +600,15 @@ export default function EncounterPage() {
       setCatchPhase('idle')
 
       if (data.wildDamage > 0) {
+        // Wild creature counter-attack animation after failed catch
+        setAttackAnim({
+          key: Date.now() + 1,
+          element: state.creature?.element ?? 'armonia',
+          rarity: state.creature?.rarity ?? 'comune',
+          side: 'right',
+        })
+        await new Promise(r => setTimeout(r, 320))
+
         const newHp = Math.max(0, (playerHp ?? playerCreature?.maxHp ?? 100) - data.wildDamage)
         if (squadCreatures.length > 0) {
           setSlotHps(prev => {
