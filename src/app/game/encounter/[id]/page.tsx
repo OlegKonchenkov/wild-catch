@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import AttackAnimation from '@/components/battle/AttackAnimation'
 import { GameBattleSkeleton } from '@/components/game/GameLoading'
 import { createClient } from '@/lib/supabase/client'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
@@ -266,6 +267,7 @@ export default function EncounterPage() {
   const [loadError, setLoadError] = useState(false)
   const [wildAnim, setWildAnim]     = useState<'idle' | 'damage' | 'catch' | 'flee'>('idle')
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
+  const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right' } | null>(null)
   const [catchPhase, setCatchPhase] = useState<'idle' | 'throwing' | 'hit'>('idle')
   const [message, setMessage]   = useState('')
   const [isCritMessage, setIsCritMessage] = useState(false)
@@ -433,6 +435,7 @@ export default function EncounterPage() {
 
     const actionStartedAt = Date.now()
     setPlayerAnim('attack')
+    setAttackAnim({ key: Date.now(), element: playerCreature?.element ?? 'armonia', rarity: playerCreature?.rarity ?? 'comune', side: 'left' })
     const attackReset = setTimeout(() => setPlayerAnim('idle'), 260)
 
     const activeItemId = selectedPozioneId ?? selectedBattagliaId ?? null
@@ -755,6 +758,17 @@ export default function EncounterPage() {
             </motion.div>
           </AnimatePresence>
         </div>
+
+        {/* ── Attack animation overlay ── */}
+        {attackAnim && (
+          <AttackAnimation
+            key={attackAnim.key}
+            element={attackAnim.element}
+            rarity={attackAnim.rarity}
+            side={attackAnim.side}
+            onComplete={() => setAttackAnim(null)}
+          />
+        )}
 
         {/* VS / message — center */}
         <div className="absolute inset-x-0 z-10" style={{ top: '46%', transform: 'translateY(-50%)' }}>

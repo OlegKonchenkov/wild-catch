@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import AttackAnimation from '@/components/battle/AttackAnimation'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import { GameBattleSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
@@ -269,6 +270,7 @@ export default function DuelPage() {
 
   const [myFainting, setMyFainting]           = useState(false)
   const [oppFainting, setOppFainting]         = useState(false)
+  const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right' } | null>(null)
 
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
@@ -495,6 +497,15 @@ export default function DuelPage() {
           setLastDamage({ amount: damage, target: 'me', id: Date.now(), isCrit: !!isCrit })
           setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 900)
           if (isCrit) flashCritNotice()
+          // Show opponent attack animation
+          setOppLineup(prev => {
+            const oppActiveLine = prev.find(l => l.is_active)
+            const cr = oppActiveLine?.player_creatures?.creatures
+            if (cr) {
+              setAttackAnim({ key: Date.now(), element: cr.element, rarity: cr.rarity, side: 'right' })
+            }
+            return prev
+          })
         }
         if (nextTurn) {
           setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
@@ -629,6 +640,10 @@ export default function DuelPage() {
     startAttackFeedback()
     setAnimState('attack')
     setTimeout(() => setAnimState('idle'), 400)
+    const myActiveCrNow = myLineup.find(l => l.is_active)?.player_creatures?.creatures
+    if (myActiveCrNow) {
+      setAttackAnim({ key: Date.now(), element: myActiveCrNow.element, rarity: myActiveCrNow.rarity, side: 'left' })
+    }
 
     const body: Record<string, string> = { duelId: id, action: 'attack' }
     if (selectedItemId) body.itemId = selectedItemId
@@ -973,6 +988,17 @@ export default function DuelPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* ── Attack animation overlay ── */}
+        {attackAnim && (
+          <AttackAnimation
+            key={attackAnim.key}
+            element={attackAnim.element}
+            rarity={attackAnim.rarity}
+            side={attackAnim.side}
+            onComplete={() => setAttackAnim(null)}
+          />
+        )}
 
         {/* Player card — bottom-left, flush to left edge */}
         <div className="absolute z-10" style={{ bottom: 12, left: 0, right: '8%' }}>

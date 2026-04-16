@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import AttackAnimation from '@/components/battle/AttackAnimation'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import { GameBattleSkeleton, GameListSkeleton } from '@/components/game/GameLoading'
 import { GameToast } from '@/components/game/GameToast'
@@ -489,6 +490,8 @@ function BattleScreen({
   critNotice,
   bossFainting,
   playerFainting,
+  attackAnim,
+  onAttackAnimComplete,
 }: {
   bossLineup: BossSlot[]
   playerLineup: PlayerSlot[]
@@ -508,6 +511,8 @@ function BattleScreen({
   critNotice: { id: number } | null
   bossFainting: boolean
   playerFainting: boolean
+  attackAnim: { key: number; element: string; rarity: string; side: 'left' | 'right' } | null
+  onAttackAnimComplete: () => void
 }) {
   const [showItemsModal, setShowItemsModal] = useState(false)
   const [turnTimer, setTurnTimer] = useState(30)
@@ -734,6 +739,17 @@ function BattleScreen({
             </motion.div>
           </AnimatePresence>
         </motion.div>
+
+        {/* ── Attack animation overlay ── */}
+        {attackAnim && (
+          <AttackAnimation
+            key={attackAnim.key}
+            element={attackAnim.element}
+            rarity={attackAnim.rarity}
+            side={attackAnim.side}
+            onComplete={onAttackAnimComplete}
+          />
+        )}
 
         {/* ── Standalone damage floats (outside cards, not clipped) ── */}
         <AnimatePresence>
@@ -1066,6 +1082,7 @@ export default function BossFightPage() {
   const [finalResult, setFinalResult]     = useState<{ won: boolean; reward: any; levelUp: any } | null>(null)
   const [bossMissions, setBossMissions]   = useState<CompletedMissionInfo[]>([])
   const [showBossMissions, setShowBossMissions] = useState(false)
+  const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right' } | null>(null)
 
   const addLog = (msg: string) => setLog(prev => [...prev.slice(-9), msg])
 
@@ -1233,6 +1250,10 @@ export default function BossFightPage() {
     setAttacking(true)
     setAnimState('attack')
     setTimeout(() => setAnimState('idle'), 300)
+    const actingPlayerNow = playerLineup.find((c: PlayerSlot) => c.is_active && !c.fainted)
+    if (actingPlayerNow) {
+      setAttackAnim({ key: Date.now(), element: actingPlayerNow.element, rarity: actingPlayerNow.rarity, side: 'left' })
+    }
 
     const res = await fetch(`/api/game/boss/${id}`, {
       method: 'POST',
@@ -1302,6 +1323,10 @@ export default function BossFightPage() {
       } else if (!isOver && data.bossDamage > 0) {
         // Phase 2: boss counter-attacks
         setBossAttacking(true)
+        const counterBoss = nextBossLineup[bossActiveSlot]
+        if (counterBoss) {
+          setAttackAnim({ key: Date.now() + 1, element: counterBoss.element, rarity: 'leggendario', side: 'right' })
+        }
         setTimeout(() => {
           setBossAttacking(false)
           // Update player HP bar before damage animation
@@ -1500,6 +1525,8 @@ export default function BossFightPage() {
             critNotice={critNotice}
             bossFainting={bossFainting}
             playerFainting={playerFainting}
+            attackAnim={attackAnim}
+            onAttackAnimComplete={() => setAttackAnim(null)}
           />
         </div>
       )}
