@@ -273,6 +273,18 @@ async function checkAndHatchEggs(
   const hatched: Array<{ name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null }> = []
 
   for (const egg of readyEggs) {
+    // Atomically claim this egg: only one concurrent request can win.
+    // The WHERE hatched_at IS NULL ensures Postgres locks the row — if another
+    // request already set hatched_at, this UPDATE matches 0 rows and we skip.
+    const { data: claimed } = await supabase
+      .from('player_eggs')
+      .update({ hatched_at: new Date().toISOString() })
+      .eq('id', egg.id)
+      .is('hatched_at', null)
+      .select('id')
+
+    if (!claimed?.length) continue  // Another concurrent request already hatched this egg
+
     const targetRarity = pickEggRarity(egg.egg_rarity)
 
     const { data: candidates } = await supabase
@@ -314,9 +326,10 @@ async function checkAndHatchEggs(
       }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
     }
 
+    // Store which creature hatched
     await supabase
       .from('player_eggs')
-      .update({ hatched_at: new Date().toISOString(), hatched_creature_id: picked.id })
+      .update({ hatched_creature_id: picked.id })
       .eq('id', egg.id)
 
     hatched.push({ name: picked.name, rarity: picked.rarity, element: picked.element, image_url: picked.image_url ?? null, hp: picked.hp, atk: picked.atk, def: picked.def, description: picked.description ?? null })
