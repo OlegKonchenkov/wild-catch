@@ -139,25 +139,31 @@ async function updateWalkMissions(
 
     if (!existing) {
       const justCompleted = newProgress >= mission.target_count
-      await supabase.from('player_missions').insert({
+      const { error: insertErr } = await supabase.from('player_missions').insert({
         user_id: userId,
         mission_id: mission.id,
         progress: newProgress,
         ...(justCompleted ? { completed_at: new Date().toISOString() } : {}),
       })
+      // If insert failed (23505 = race condition: another concurrent request beat us), skip
+      if (insertErr) continue
       if (justCompleted) {
         await grantMissionReward(mission, userId, sessionId)
         justCompletedMissions.push({ title: mission.title, rewardGold: mission.reward_gold, rewardExp: mission.reward_exp })
       }
     } else if (newProgress > existing.progress) {
       const justCompleted = newProgress >= mission.target_count
-      await supabase.from('player_missions').update({
-        progress: newProgress,
-        ...(justCompleted ? { completed_at: new Date().toISOString() } : {}),
-      }).eq('id', existing.id)
       if (justCompleted) {
+        // Atomically claim the completion — only succeeds if another request hasn't done it yet
+        const { data: claimed } = await supabase.from('player_missions').update({
+          progress: newProgress,
+          completed_at: new Date().toISOString(),
+        }).eq('id', existing.id).is('completed_at', null).select('id')
+        if (!claimed?.length) continue // Another concurrent request already completed this mission
         await grantMissionReward(mission, userId, sessionId)
         justCompletedMissions.push({ title: mission.title, rewardGold: mission.reward_gold, rewardExp: mission.reward_exp })
+      } else {
+        await supabase.from('player_missions').update({ progress: newProgress }).eq('id', existing.id)
       }
     }
   }
@@ -172,32 +178,14 @@ async function grantMissionReward(
 ) {
   const admin = createAdminClient()
   await Promise.all([
-    // Gold
-    mission.reward_gold > 0
-      ? admin
-          .from('player_sessions')
-          .select('gold')
-          .eq('user_id', userId)
-          .eq('session_id', sessionId)
-          .single()
-          .then(({ data }) => {
-            if (data) {
-              return admin
-                .from('player_sessions')
-                .update({ gold: (data.gold ?? 0) + mission.reward_gold })
-                .eq('user_id', userId)
-                .eq('session_id', sessionId)
-            }
-          })
-      : Promise.resolve(),
-
-    // EXP
-    mission.reward_exp > 0
+    // Gold + EXP in a single atomic RPC call (increment_player_stats supports p_gold)
+    (mission.reward_gold > 0 || mission.reward_exp > 0)
       ? admin.rpc('increment_player_stats', {
           p_user_id: userId,
           p_session_id: sessionId,
           p_exp: mission.reward_exp,
           p_score: 0,
+          p_gold: mission.reward_gold,
         })
       : Promise.resolve(),
 
