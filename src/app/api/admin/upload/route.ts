@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml']
-const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
+const ALLOWED_TYPES = [
+  'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml',
+  'audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/wav', 'audio/webm',
+]
+const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -19,7 +22,7 @@ export async function POST(request: Request) {
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'Campo "file" mancante' }, { status: 400 })
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: 'Tipo file non supportato (usa PNG, JPG, WEBP, GIF, SVG)' }, { status: 400 })
+    return NextResponse.json({ error: 'Tipo file non supportato (immagini: PNG/JPG/WEBP/GIF/SVG; audio: MP3/OGG/WAV/WEBM)' }, { status: 400 })
   }
 
   const bytes = await file.arrayBuffer()

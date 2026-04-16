@@ -44,6 +44,8 @@ interface PlayerSlot {
   fainted: boolean
   is_active: boolean
   image_url: string
+  attack_sound_url?: string | null
+  attack_sound_duration_ms?: number | null
 }
 
 interface SquadCreature {
@@ -511,7 +513,7 @@ function BattleScreen({
   critNotice: { id: number } | null
   bossFainting: boolean
   playerFainting: boolean
-  attackAnim: { key: number; element: string; rarity: string; side: 'left' | 'right' } | null
+  attackAnim: { key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null
   onAttackAnimComplete: () => void
 }) {
   const [showItemsModal, setShowItemsModal] = useState(false)
@@ -747,6 +749,8 @@ function BattleScreen({
             element={attackAnim.element}
             rarity={attackAnim.rarity}
             side={attackAnim.side}
+            soundUrl={attackAnim.soundUrl}
+            soundDurationMs={attackAnim.soundDurationMs}
             onComplete={onAttackAnimComplete}
           />
         )}
@@ -1082,7 +1086,7 @@ export default function BossFightPage() {
   const [finalResult, setFinalResult]     = useState<{ won: boolean; reward: any; levelUp: any } | null>(null)
   const [bossMissions, setBossMissions]   = useState<CompletedMissionInfo[]>([])
   const [showBossMissions, setShowBossMissions] = useState(false)
-  const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right' } | null>(null)
+  const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null>(null)
 
   const addLog = (msg: string) => setLog(prev => [...prev.slice(-9), msg])
 
@@ -1252,7 +1256,7 @@ export default function BossFightPage() {
     setTimeout(() => setAnimState('idle'), 300)
     const actingPlayerNow = playerLineup.find((c: PlayerSlot) => c.is_active && !c.fainted)
     if (actingPlayerNow) {
-      setAttackAnim({ key: Date.now(), element: actingPlayerNow.element, rarity: actingPlayerNow.rarity, side: 'left' })
+      setAttackAnim({ key: Date.now(), element: actingPlayerNow.element, rarity: actingPlayerNow.rarity, side: 'left', soundUrl: actingPlayerNow.attack_sound_url, soundDurationMs: actingPlayerNow.attack_sound_duration_ms })
     }
 
     const res = await fetch(`/api/game/boss/${id}`, {

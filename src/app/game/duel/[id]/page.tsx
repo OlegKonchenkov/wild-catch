@@ -30,6 +30,8 @@ interface LineupEntry {
       atk: number
       def: number
       image_url: string
+      attack_sound_url: string | null
+      attack_sound_duration_ms: number | null
     }
   }
 }
@@ -270,7 +272,7 @@ export default function DuelPage() {
 
   const [myFainting, setMyFainting]           = useState(false)
   const [oppFainting, setOppFainting]         = useState(false)
-  const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right' } | null>(null)
+  const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null>(null)
 
   const realtimeUpdatedRef = useRef(false)
   const surrenderedRef     = useRef(false)
@@ -393,7 +395,7 @@ export default function DuelPage() {
 
         const lineupsPromise = supabase
           .from('duel_lineups')
-          .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url))')
+          .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, attack_sound_url, attack_sound_duration_ms))')
           .eq('duel_id', id)
           .order('slot', { ascending: true })
 
@@ -502,7 +504,7 @@ export default function DuelPage() {
             const oppActiveLine = prev.find(l => l.is_active)
             const cr = oppActiveLine?.player_creatures?.creatures
             if (cr) {
-              setAttackAnim({ key: Date.now(), element: cr.element, rarity: cr.rarity, side: 'right' })
+              setAttackAnim({ key: Date.now(), element: cr.element, rarity: cr.rarity, side: 'right', soundUrl: cr.attack_sound_url, soundDurationMs: cr.attack_sound_duration_ms })
             }
             return prev
           })
@@ -558,7 +560,7 @@ export default function DuelPage() {
             if (!duelActivatedRef.current) {
               duelActivatedRef.current = true
               supabase.from('duel_lineups')
-                .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url))')
+                .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, attack_sound_url, attack_sound_duration_ms))')
                 .eq('duel_id', id)
                 .order('slot', { ascending: true })
                 .then(({ data: freshLineups }) => {
@@ -642,7 +644,7 @@ export default function DuelPage() {
     setTimeout(() => setAnimState('idle'), 400)
     const myActiveCrNow = myLineup.find(l => l.is_active)?.player_creatures?.creatures
     if (myActiveCrNow) {
-      setAttackAnim({ key: Date.now(), element: myActiveCrNow.element, rarity: myActiveCrNow.rarity, side: 'left' })
+      setAttackAnim({ key: Date.now(), element: myActiveCrNow.element, rarity: myActiveCrNow.rarity, side: 'left', soundUrl: myActiveCrNow.attack_sound_url, soundDurationMs: myActiveCrNow.attack_sound_duration_ms })
     }
 
     const body: Record<string, string> = { duelId: id, action: 'attack' }
@@ -996,6 +998,8 @@ export default function DuelPage() {
             element={attackAnim.element}
             rarity={attackAnim.rarity}
             side={attackAnim.side}
+            soundUrl={attackAnim.soundUrl}
+            soundDurationMs={attackAnim.soundDurationMs}
             onComplete={() => setAttackAnim(null)}
           />
         )}

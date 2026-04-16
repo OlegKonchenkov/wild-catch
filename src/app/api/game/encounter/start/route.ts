@@ -112,11 +112,11 @@ export async function POST(request: Request) {
   if (!creature) return NextResponse.json({ error: 'Errore dati creatura' }, { status: 500 })
 
   // Load squad creatures (up to 3), falling back to single selected_creature_id
-  let squadCreatures: Array<{ pcId: string; id: string; name: string; hp: number; atk: number; element: string; rarity: string; image_url: string | null }> = []
+  let squadCreatures: Array<{ pcId: string; id: string; name: string; hp: number; atk: number; element: string; rarity: string; image_url: string | null; attack_sound_url: string | null; attack_sound_duration_ms: number | null }> = []
   if (squadIds.length > 0) {
     const { data: pcs } = await supabase
       .from('player_creatures')
-      .select('id, creatures(id, name, hp, atk, element, rarity, image_url)')
+      .select('id, creatures(id, name, hp, atk, element, rarity, image_url, attack_sound_url, attack_sound_duration_ms)')
       .in('id', squadIds)
       .eq('user_id', user.id)
       .eq('session_id', sessionId)
@@ -134,6 +134,8 @@ export async function POST(request: Request) {
           element: pc.creatures.element,
           rarity: pc.creatures.rarity,
           image_url: pc.creatures.image_url ?? null,
+          attack_sound_url: pc.creatures.attack_sound_url ?? null,
+          attack_sound_duration_ms: pc.creatures.attack_sound_duration_ms ?? null,
         }))
     }
   }

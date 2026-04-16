@@ -28,6 +28,8 @@ interface Creature {
   enigma_description: string | null
   enigma_image_url: string | null
   enigma_video_url: string | null
+  attack_sound_url: string | null
+  attack_sound_duration_ms: number | null
 }
 
 const RARITIES: Rarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
@@ -55,6 +57,7 @@ const EMPTY_FORM = {
   hp: 50, atk: 10, def: 5, evolution_of: '', session_id: '', catch_difficulty: 1,
   enigma_title: '', enigma_description: '', enigma_image_url: '', enigma_video_url: '',
   spawnable: true,
+  attack_sound_url: '', attack_sound_duration_ms: '',
 }
 
 type ImageMode = 'preview' | 'url' | 'upload' | 'ai'
@@ -86,6 +89,11 @@ export default function CreaturesPage() {
   const [enigmaImgError, setEnigmaImgError] = useState<string | null>(null)
   const enigmaFileRef = useRef<HTMLInputElement>(null)
 
+  const [soundOpen, setSoundOpen] = useState(false)
+  const [soundUploading, setSoundUploading] = useState(false)
+  const [soundError, setSoundError] = useState<string | null>(null)
+  const soundFileRef = useRef<HTMLInputElement>(null)
+
   const [showFilters, setShowFilters] = useState(false)
   const [filter, setFilter] = useState<ElementType | 'all'>('all')
   const [rarityFilter, setRarityFilter] = useState<Rarity | 'all'>('all')
@@ -113,7 +121,8 @@ export default function CreaturesPage() {
 
   function openNew() {
     setPanel('new'); setFormData({ ...EMPTY_FORM }); setFormError(null)
-    setImageMode('preview'); setManualUrl(''); setAiPrompt(''); setArtworkError(null); setEnigmaOpen(false)
+    setImageMode('preview'); setManualUrl(''); setAiPrompt(''); setArtworkError(null)
+    setEnigmaOpen(false); setSoundOpen(false); setSoundError(null)
   }
 
   function openEdit(c: Creature) {
@@ -123,13 +132,15 @@ export default function CreaturesPage() {
       session_id: c.session_id ?? '', catch_difficulty: c.catch_difficulty ?? 1,
       enigma_title: c.enigma_title ?? '', enigma_description: c.enigma_description ?? '',
       enigma_image_url: c.enigma_image_url ?? '', enigma_video_url: c.enigma_video_url ?? '',
-      spawnable: (c as any).spawnable !== false })
+      spawnable: (c as any).spawnable !== false,
+      attack_sound_url: c.attack_sound_url ?? '', attack_sound_duration_ms: c.attack_sound_duration_ms ?? '' } as any)
     setFormError(null); setImageMode('preview')
     setManualUrl(c.image_url ?? ''); setAiPrompt(c.description ?? ''); setArtworkError(null)
+    setSoundError(null)
   }
 
   function closePanel() {
-    setPanel('none'); setFormError(null); setArtworkError(null)
+    setPanel('none'); setFormError(null); setArtworkError(null); setSoundError(null)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -147,6 +158,9 @@ export default function CreaturesPage() {
       enigma_image_url: (formData as any).enigma_image_url || null,
       enigma_video_url: (formData as any).enigma_video_url || null,
       spawnable: (formData as any).spawnable !== false,
+      attack_sound_url: (formData as any).attack_sound_url || null,
+      attack_sound_duration_ms: (formData as any).attack_sound_duration_ms
+        ? Number((formData as any).attack_sound_duration_ms) : null,
     }
     try {
       const res = await fetch(isEdit ? `/api/admin/creatures/${panel}` : '/api/admin/creatures', {
@@ -222,6 +236,30 @@ export default function CreaturesPage() {
       setFormData(f => ({ ...f, enigma_image_url: d.url } as any))
     } catch { setEnigmaImgError('Errore di rete') }
     finally { setEnigmaImgUploading(false) }
+  }
+
+  async function handleSoundUpload(file: File) {
+    setSoundUploading(true); setSoundError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd })
+      const d = await res.json()
+      if (!res.ok) { setSoundError(d.error ?? 'Errore upload'); return }
+      // Auto-detect duration from audio file
+      const url = d.url as string
+      let durationMs: number | null = null
+      try {
+        const audio = new Audio(url)
+        durationMs = await new Promise<number>(resolve => {
+          audio.addEventListener('loadedmetadata', () => resolve(Math.round(audio.duration * 1000)))
+          audio.addEventListener('error', () => resolve(0))
+          setTimeout(() => resolve(0), 5000)
+        })
+      } catch { /* silent */ }
+      setFormData(f => ({ ...f, attack_sound_url: url, attack_sound_duration_ms: durationMs ?? '' } as any))
+    } catch { setSoundError('Errore di rete') }
+    finally { setSoundUploading(false) }
   }
 
   const editingCreature = panel !== 'none' && panel !== 'new'
@@ -704,6 +742,66 @@ export default function CreaturesPage() {
                               onChange={e => setFormData(f => ({ ...f, enigma_video_url: e.target.value } as any))}
                               placeholder="https://youtube.com/... o link diretto"
                               className="w-full bg-white/5 text-white text-xs border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sound section */}
+                    <div className="border border-white/10 rounded-xl overflow-hidden">
+                      <button type="button"
+                        onClick={() => setSoundOpen(o => !o)}
+                        className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-white/5 transition-colors">
+                        <span className="text-xs font-semibold text-white/60 flex items-center gap-2">
+                          🔊 Suono attacco <span className="text-white/30 font-normal">(opzionale)</span>
+                          {(formData as any).attack_sound_url && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#2ECC6A] inline-block" />
+                          )}
+                        </span>
+                        <span className="text-white/30 text-xs">{soundOpen ? '▲' : '▼'}</span>
+                      </button>
+                      {soundOpen && (
+                        <div className="px-3 pb-3 space-y-3 border-t border-white/10 pt-3">
+                          {/* Upload button */}
+                          <div>
+                            <label className="text-xs text-white/40 block mb-1">File audio (MP3, OGG, WAV)</label>
+                            <div className="flex gap-2 items-center">
+                              <button type="button"
+                                onClick={() => soundFileRef.current?.click()}
+                                disabled={soundUploading}
+                                className="shrink-0 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors disabled:opacity-40">
+                                {soundUploading ? '⏳ Carico...' : '📁 Carica audio'}
+                              </button>
+                              {(formData as any).attack_sound_url && (
+                                <button type="button"
+                                  onClick={() => setFormData(f => ({ ...f, attack_sound_url: '', attack_sound_duration_ms: '' } as any))}
+                                  className="text-xs text-red-400/70 hover:text-red-400 transition-colors">
+                                  ✕ Rimuovi
+                                </button>
+                              )}
+                            </div>
+                            <input ref={soundFileRef} type="file" accept="audio/mpeg,audio/mp3,audio/ogg,audio/wav,audio/webm"
+                              className="hidden"
+                              onChange={e => { if (e.target.files?.[0]) handleSoundUpload(e.target.files[0]); e.target.value = '' }} />
+                            {soundError && <p className="text-xs text-red-400 mt-1">{soundError}</p>}
+                          </div>
+                          {/* Preview + URL display */}
+                          {(formData as any).attack_sound_url && !soundUploading && (
+                            <div className="space-y-2">
+                              <audio controls src={(formData as any).attack_sound_url}
+                                className="w-full h-8"
+                                style={{ filter: 'invert(1) brightness(0.7)' }} />
+                              <p className="text-[10px] text-white/25 truncate">{(formData as any).attack_sound_url}</p>
+                            </div>
+                          )}
+                          {/* Duration override */}
+                          <div>
+                            <label className="text-xs text-white/40 block mb-1">Durata riproduzione (ms) — lascia vuoto = automatico</label>
+                            <input type="number" min={0} step={100}
+                              value={(formData as any).attack_sound_duration_ms}
+                              onChange={e => setFormData(f => ({ ...f, attack_sound_duration_ms: e.target.value } as any))}
+                              placeholder="Es. 1200"
+                              className="w-full bg-white/5 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50" />
                           </div>
                         </div>
                       )}

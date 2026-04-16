@@ -19,6 +19,8 @@ interface SquadCreature {
   element: string
   rarity: string
   image_url: string | null
+  attack_sound_url?: string | null
+  attack_sound_duration_ms?: number | null
 }
 
 interface EncounterState {
@@ -267,7 +269,7 @@ export default function EncounterPage() {
   const [loadError, setLoadError] = useState(false)
   const [wildAnim, setWildAnim]     = useState<'idle' | 'damage' | 'catch' | 'flee'>('idle')
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
-  const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right' } | null>(null)
+  const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null>(null)
   const [catchPhase, setCatchPhase] = useState<'idle' | 'throwing' | 'hit'>('idle')
   const [message, setMessage]   = useState('')
   const [isCritMessage, setIsCritMessage] = useState(false)
@@ -280,6 +282,7 @@ export default function EncounterPage() {
   const [missionRewardIdx, setMissionRewardIdx]     = useState(-1)
   const [playerCreature, setPlayerCreature] = useState<{
     name: string; maxHp: number; atk: number; element: string; rarity: string; imageUrl: string
+    soundUrl?: string | null; soundDurationMs?: number | null
   } | null>(null)
   const [playerHp, setPlayerHp] = useState<number | null>(null)
 
@@ -317,7 +320,7 @@ export default function EncounterPage() {
         setSquadCreatures(squad)
         setSlotHps(squad.map((c: SquadCreature) => c.hp))
         const lead = squad[0]
-        setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity })
+        setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
         setPlayerHp(lead.hp)
       }
       return
@@ -344,7 +347,7 @@ export default function EncounterPage() {
           setSquadCreatures(squad)
           setSlotHps(squad.map(c => c.hp))
           const lead = squad[0]
-          setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity })
+          setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
           setPlayerHp(lead.hp)
         }
       })
@@ -379,7 +382,7 @@ export default function EncounterPage() {
       const hps = squad.map(c => c.hp)
       setSlotHps(hps)
       const lead = squad[0]
-      setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity })
+      setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
       setPlayerHp(lead.hp)
       return
     }
@@ -390,12 +393,12 @@ export default function EncounterPage() {
         if (!enc?.player_creature_id) return
         const { data: pc } = await supabase
           .from('player_creatures')
-          .select('creatures(name, hp, atk, element, image_url, rarity)')
+          .select('creatures(name, hp, atk, element, image_url, rarity, attack_sound_url, attack_sound_duration_ms)')
           .eq('id', enc.player_creature_id).single()
         if (pc) {
-          const cr = (pc as any).creatures as { name: string; hp: number; atk: number; element: string; image_url: string; rarity: string }
+          const cr = (pc as any).creatures as { name: string; hp: number; atk: number; element: string; image_url: string; rarity: string; attack_sound_url: string | null; attack_sound_duration_ms: number | null }
           if (cr) {
-            setPlayerCreature({ name: cr.name, maxHp: cr.hp, atk: cr.atk ?? 0, element: cr.element, imageUrl: cr.image_url ?? '', rarity: cr.rarity ?? 'comune' })
+            setPlayerCreature({ name: cr.name, maxHp: cr.hp, atk: cr.atk ?? 0, element: cr.element, imageUrl: cr.image_url ?? '', rarity: cr.rarity ?? 'comune', soundUrl: cr.attack_sound_url, soundDurationMs: cr.attack_sound_duration_ms })
             setPlayerHp(cr.hp)
           }
         }
@@ -435,7 +438,7 @@ export default function EncounterPage() {
 
     const actionStartedAt = Date.now()
     setPlayerAnim('attack')
-    setAttackAnim({ key: Date.now(), element: playerCreature?.element ?? 'armonia', rarity: playerCreature?.rarity ?? 'comune', side: 'left' })
+    setAttackAnim({ key: Date.now(), element: playerCreature?.element ?? 'armonia', rarity: playerCreature?.rarity ?? 'comune', side: 'left', soundUrl: playerCreature?.soundUrl, soundDurationMs: playerCreature?.soundDurationMs })
     const attackReset = setTimeout(() => setPlayerAnim('idle'), 260)
 
     const activeItemId = selectedPozioneId ?? selectedBattagliaId ?? null
@@ -766,6 +769,8 @@ export default function EncounterPage() {
             element={attackAnim.element}
             rarity={attackAnim.rarity}
             side={attackAnim.side}
+            soundUrl={attackAnim.soundUrl}
+            soundDurationMs={attackAnim.soundDurationMs}
             onComplete={() => setAttackAnim(null)}
           />
         )}
