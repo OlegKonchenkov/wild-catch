@@ -127,22 +127,43 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
         <AnimatePresence>
           {animState === 'catch' && isWild && (
             <motion.div key="net" className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-              <motion.div
-                className="absolute rounded-full"
-                style={{ border: '2.5px solid rgba(58,157,188,1)', boxShadow: '0 0 18px rgba(58,157,188,0.9), 0 0 40px rgba(58,157,188,0.5)' }}
-                initial={{ width: 148, height: 148, opacity: 0 }}
-                animate={{ width: [148, 148, 55, 5], height: [148, 148, 55, 5], opacity: [0, 1, 1, 0] }}
-                transition={{ duration: 1.4, times: [0, 0.12, 0.62, 1], ease: 'easeInOut' }}
-              />
-              <motion.div
-                className="absolute text-[#3A9DBC] font-extrabold"
-                style={{ fontSize: 20, textShadow: '0 0 10px rgba(58,157,188,0.9)' }}
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ opacity: [0, 1, 0], scale: [0, 2, 0] }}
-                transition={{ duration: 0.45, delay: 0.72 }}
+              {/* SVG net drapes over the creature */}
+              <motion.svg
+                viewBox="0 0 140 140"
+                width="140" height="140"
+                className="absolute"
+                style={{ filter: 'drop-shadow(0 0 10px rgba(58,188,168,0.85))' }}
+                initial={{ opacity: 0, scale: 0.55, y: -30, rotate: -15 }}
+                animate={{ opacity: [0, 1, 1, 0.8, 0], scale: [0.55, 1.05, 1, 0.95, 0.6], y: [-30, 0, 0, 0, 4], rotate: [-15, 5, 0, 0, 0] }}
+                transition={{ duration: 1.3, times: [0, 0.22, 0.52, 0.82, 1], ease: 'easeOut' }}
               >
-                ✦
-              </motion.div>
+                {/* Outer rim */}
+                <circle cx="70" cy="70" r="64" fill="rgba(58,188,168,0.06)" stroke="rgba(58,188,168,0.95)" strokeWidth="3"/>
+                {/* Concentric rings */}
+                <circle cx="70" cy="70" r="47" fill="none" stroke="rgba(58,188,168,0.60)" strokeWidth="1.5"/>
+                <circle cx="70" cy="70" r="31" fill="none" stroke="rgba(58,188,168,0.48)" strokeWidth="1.3"/>
+                <circle cx="70" cy="70" r="15" fill="none" stroke="rgba(58,188,168,0.38)" strokeWidth="1.1"/>
+                {/* 8 radial spokes clipped to rim */}
+                <line x1="6" y1="70" x2="134" y2="70" stroke="rgba(58,188,168,0.52)" strokeWidth="1.2"/>
+                <line x1="70" y1="6" x2="70" y2="134" stroke="rgba(58,188,168,0.52)" strokeWidth="1.2"/>
+                <line x1="24.7" y1="24.7" x2="115.3" y2="115.3" stroke="rgba(58,188,168,0.42)" strokeWidth="1.1"/>
+                <line x1="115.3" y1="24.7" x2="24.7" y2="115.3" stroke="rgba(58,188,168,0.42)" strokeWidth="1.1"/>
+                {/* Half-diagonal spokes for denser mesh */}
+                <line x1="6" y1="30" x2="110" y2="134" stroke="rgba(58,188,168,0.22)" strokeWidth="0.9"/>
+                <line x1="6" y1="110" x2="110" y2="6" stroke="rgba(58,188,168,0.22)" strokeWidth="0.9"/>
+                <line x1="30" y1="6" x2="134" y2="110" stroke="rgba(58,188,168,0.22)" strokeWidth="0.9"/>
+                <line x1="134" y1="30" x2="30" y2="134" stroke="rgba(58,188,168,0.22)" strokeWidth="0.9"/>
+                {/* Center dot */}
+                <circle cx="70" cy="70" r="3.5" fill="rgba(58,188,168,0.85)"/>
+              </motion.svg>
+              {/* Capture flash */}
+              <motion.div
+                className="absolute"
+                style={{ width: 60, height: 60, borderRadius: '50%', background: 'radial-gradient(circle, rgba(58,188,168,0.6) 0%, transparent 70%)' }}
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: [0, 0.9, 0], scale: [0, 1.8, 0] }}
+                transition={{ duration: 0.4, delay: 0.58 }}
+              />
             </motion.div>
           )}
         </AnimatePresence>
@@ -773,31 +794,43 @@ export default function EncounterPage() {
               initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <motion.div
+              {/* Net SVG thrown from player to creature sprite */}
+              <motion.svg
+                viewBox="0 0 80 80"
+                width="80" height="80"
                 className="absolute"
-                style={{ width: 52, height: 52, borderRadius: '50%', border: '2.5px dashed rgba(58,188,168,0.95)', boxShadow: '0 0 20px rgba(58,188,168,0.75), inset 0 0 10px rgba(58,188,168,0.25)' }}
-                initial={{ top: '72%', left: '18%', scale: 0.4, opacity: 0, rotate: 0 }}
+                style={{ filter: 'drop-shadow(0 0 10px rgba(58,188,168,0.85))' }}
+                initial={{ top: '74%', left: '14%', scale: 0.35, opacity: 0, rotate: -30 }}
                 animate={
                   catchPhase === 'throwing'
-                    ? { top: '16%', left: '62%', scale: 1, opacity: 1, rotate: 180 }
-                    : { x: [0, -11, 11, -7, 7, 0], scale: [1, 1.25, 0.85, 1.1, 0.9, 0], opacity: [1, 1, 1, 1, 0.5, 0] }
+                    ? { top: '10%', left: '18%', scale: 1, opacity: 1, rotate: 320 }
+                    : { x: [0, -10, 10, -6, 6, 0], scale: [1, 1.18, 0.88, 1.06, 0.92, 0], opacity: [1, 1, 1, 0.9, 0.4, 0] }
                 }
                 transition={
                   catchPhase === 'throwing'
-                    ? { duration: 0.62, ease: [0.4, 0, 0.2, 1] }
-                    : { duration: 0.5, ease: 'easeOut' }
+                    ? { duration: 0.58, ease: [0.25, 0.46, 0.45, 0.94] }
+                    : { duration: 0.52, ease: 'easeOut' }
                 }
               >
-                {/* Net grid lines */}
-                <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', overflow: 'hidden' }}>
-                  <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'rgba(58,188,168,0.55)', transform: 'translateY(-50%)' }} />
-                  <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'rgba(58,188,168,0.55)', transform: 'translateX(-50%)' }} />
-                  <div style={{ position: 'absolute', top: '25%', left: 0, right: 0, height: 1, background: 'rgba(58,188,168,0.28)' }} />
-                  <div style={{ position: 'absolute', top: '75%', left: 0, right: 0, height: 1, background: 'rgba(58,188,168,0.28)' }} />
-                  <div style={{ position: 'absolute', left: '25%', top: 0, bottom: 0, width: 1, background: 'rgba(58,188,168,0.28)' }} />
-                  <div style={{ position: 'absolute', left: '75%', top: 0, bottom: 0, width: 1, background: 'rgba(58,188,168,0.28)' }} />
-                </div>
-              </motion.div>
+                {/* Outer rim */}
+                <circle cx="40" cy="40" r="36" fill="rgba(58,188,168,0.07)" stroke="rgba(58,188,168,0.95)" strokeWidth="2.8"/>
+                {/* Concentric rings */}
+                <circle cx="40" cy="40" r="26" fill="none" stroke="rgba(58,188,168,0.62)" strokeWidth="1.4"/>
+                <circle cx="40" cy="40" r="16" fill="none" stroke="rgba(58,188,168,0.48)" strokeWidth="1.2"/>
+                <circle cx="40" cy="40" r="7"  fill="none" stroke="rgba(58,188,168,0.36)" strokeWidth="1"/>
+                {/* 8 radial spokes */}
+                <line x1="4"    y1="40"   x2="76"   y2="40"   stroke="rgba(58,188,168,0.55)" strokeWidth="1.1"/>
+                <line x1="40"   y1="4"    x2="40"   y2="76"   stroke="rgba(58,188,168,0.55)" strokeWidth="1.1"/>
+                <line x1="14.5" y1="14.5" x2="65.5" y2="65.5" stroke="rgba(58,188,168,0.44)" strokeWidth="1"/>
+                <line x1="65.5" y1="14.5" x2="14.5" y2="65.5" stroke="rgba(58,188,168,0.44)" strokeWidth="1"/>
+                {/* Denser mesh diagonals */}
+                <line x1="4"  y1="22" x2="58" y2="76" stroke="rgba(58,188,168,0.22)" strokeWidth="0.8"/>
+                <line x1="4"  y1="58" x2="58" y2="4"  stroke="rgba(58,188,168,0.22)" strokeWidth="0.8"/>
+                <line x1="22" y1="4"  x2="76" y2="58" stroke="rgba(58,188,168,0.22)" strokeWidth="0.8"/>
+                <line x1="76" y1="22" x2="22" y2="76" stroke="rgba(58,188,168,0.22)" strokeWidth="0.8"/>
+                {/* Center dot */}
+                <circle cx="40" cy="40" r="3" fill="rgba(58,188,168,0.85)"/>
+              </motion.svg>
             </motion.div>
           )}
         </AnimatePresence>
