@@ -4,7 +4,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import AttackAnimation from '@/components/battle/AttackAnimation'
-import { GameBattleSkeleton } from '@/components/game/GameLoading'
 import { createClient } from '@/lib/supabase/client'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
@@ -54,6 +53,30 @@ const CATCH_STARS: Record<string, number> = {
 const THROW_MESSAGES = ['Lancio la rete!', 'Prendila!', 'Vai, cattura!', 'Ora o mai più!', 'È il momento!']
 const FAIL_RESIST_MESSAGES = ['Ha rotto la rete!', 'Troppo forte, resiste...', 'Ha evitato la rete!', 'Si è liberata con un balzo!', 'Non era abbastanza...']
 const FAIL_COUNTER_MESSAGES = ['Si è liberata e contrattacca!', 'Si è arrabbiata e risponde!', 'Ha sfondato la rete — attacca!']
+
+// ── Battle dialogue ────────────────────────────────────────────────────────────
+const FIGHT_PLAYER_MSGS = [
+  (p: string, w: string) => `${p} scatta all'attacco su ${w}!`,
+  (p: string, w: string) => `Vai ${p}, colpisci forte!`,
+  (p: string, w: string) => `${p} si avventa su ${w}!`,
+  (p: string, w: string) => `${p} sferra un colpo deciso!`,
+  (p: string, w: string) => `Attacca, ${p}!`,
+  (p: string, w: string) => `${p} punta dritta a ${w}!`,
+]
+const FIGHT_CRIT_MSGS = [
+  '⚡ Colpo critico! Devastante!',
+  '⚡ CRITICO! Che botta potente!',
+  '⚡ Critico perfetto! Incredibile!',
+  '⚡ Colpo critico! Senti quella forza!',
+]
+const WILD_COUNTER_MSGS = [
+  (w: string) => `${w} risponde all'attacco!`,
+  (w: string) => `${w} contrattacca furioso!`,
+  (w: string) => `${w} non si arrende e colpisce!`,
+  (w: string) => `${w} lancia un contrattacco!`,
+  (w: string) => `${w} reagisce con tutta la forza!`,
+]
+function rnd<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
 
 // ── Creature card (unified image + info) ──────────────────────────────────────
 interface CardProps {
@@ -270,7 +293,6 @@ export default function EncounterPage() {
   const [wildAnim, setWildAnim]     = useState<'idle' | 'damage' | 'catch' | 'flee'>('idle')
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null>(null)
-  const [lastDamage, setLastDamage] = useState<{ amount: number; target: 'wild' | 'player'; id: number; isCrit?: boolean } | null>(null)
   const [catchPhase, setCatchPhase] = useState<'idle' | 'throwing' | 'hit'>('idle')
   const [message, setMessage]   = useState('')
   const [isCritMessage, setIsCritMessage] = useState(false)
@@ -301,6 +323,8 @@ export default function EncounterPage() {
   const [selectedBattagliaId, setSelectedBattagliaId] = useState<string | null>(null)
   const [selectedPozioneId, setSelectedPozioneId] = useState<string | null>(null)
   const [showItemsModal, setShowItemsModal] = useState(false)
+  const [showIntro, setShowIntro] = useState(false)
+  const [introActive, setIntroActive] = useState(false)
   const [turnTimer, setTurnTimer] = useState(45)
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoFightRef = useRef(false)
@@ -427,6 +451,14 @@ export default function EncounterPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [state?.encounterId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Trigger encounter intro animation once when state first becomes available
+  useEffect(() => {
+    if (state && !introActive) {
+      setIntroActive(true)
+      setShowIntro(true)
+    }
+  }, [state?.encounterId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function finishPendingAction() {
     setPendingAction(null)
     setLoading(false)
@@ -467,7 +499,6 @@ export default function EncounterPage() {
     if (remainingAttackMs > 0) await new Promise(r => setTimeout(r, remainingAttackMs))
 
     setWildAnim('damage')
-    setLastDamage({ amount: data.playerDamage, target: 'wild', id: Date.now(), isCrit: !!data.playerCrit })
     await new Promise(r => setTimeout(r, 380))
     setWildAnim('idle')
 
@@ -477,12 +508,15 @@ export default function EncounterPage() {
       setWildAnim('flee'); setMessage(''); setResult('ko'); finishPendingAction(); return
     }
 
-    const bonusPct = Math.round((data.catchMultiplier - 1) * 100)
-    const elemStr  = data.elementMultiplier !== 1 ? ` (×${data.elementMultiplier.toFixed(1)})` : ''
-    const bonusStr = bonusPct > 0 ? ` · +${bonusPct}% 🎯` : ''
-    setIsCritMessage(!!data.playerCrit)
-    const critStr  = data.playerCrit ? '⚡ CRITICO! · ' : ''
-    setMessage(`${critStr}Danno: ${data.playerDamage}${elemStr}${bonusStr}`)
+    const playerName = playerCreature?.name ?? 'la tua creatura'
+    const wildName   = state.creature.name ?? 'creatura selvatica'
+    if (data.playerCrit) {
+      setIsCritMessage(true)
+      setMessage(rnd(FIGHT_CRIT_MSGS))
+    } else {
+      setIsCritMessage(false)
+      setMessage(rnd(FIGHT_PLAYER_MSGS)(playerName, wildName))
+    }
 
     if (data.playerTookDamage && data.wildDamage > 0) {
       await new Promise(r => setTimeout(r, 280))
@@ -495,7 +529,8 @@ export default function EncounterPage() {
         side: 'right',
       })
       await new Promise(r => setTimeout(r, 320))
-      setLastDamage({ amount: data.wildDamage, target: 'player', id: Date.now() })
+      setMessage(rnd(WILD_COUNTER_MSGS)(state.creature.name ?? 'creatura selvatica'))
+      setIsCritMessage(false)
 
       const curHp = playerHp ?? playerCreature?.maxHp ?? 100
       const newHp = Math.max(0, curHp - data.wildDamage)
@@ -611,7 +646,6 @@ export default function EncounterPage() {
           side: 'right',
         })
         await new Promise(r => setTimeout(r, 320))
-        setLastDamage({ amount: data.wildDamage, target: 'player', id: Date.now() })
 
         const newHp = Math.max(0, (playerHp ?? playerCreature?.maxHp ?? 100) - data.wildDamage)
         if (squadCreatures.length > 0) {
@@ -696,7 +730,11 @@ export default function EncounterPage() {
       </div>
     )
     return (
-      <GameBattleSkeleton />
+      <div className="flex flex-col h-full overflow-hidden relative" style={{ background: '#030610' }}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-2 h-2 rounded-full bg-white/15 animate-pulse" />
+        </div>
+      </div>
     )
   }
 
@@ -740,9 +778,9 @@ export default function EncounterPage() {
         {/* WILD CARD — top, flush to right edge */}
         <div className="absolute z-10" style={{ top: 12, right: 0, left: '12%' }}>
           <motion.div
-            initial={{ x: 80, opacity: 0 }}
+            initial={{ x: 380, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+            transition={{ type: 'spring', stiffness: 140, damping: 20, delay: 1.2 }}
           >
             <CreatureCard
               imageUrl={state.creature.image_url ?? ''}
@@ -764,10 +802,12 @@ export default function EncounterPage() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSlot}
-              initial={{ opacity: 0, x: -24 }}
+              initial={{ opacity: 0, x: activeSlot === 0 ? -380 : -24 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 24 }}
-              transition={{ duration: 0.28, ease: 'easeOut' }}
+              transition={activeSlot === 0
+                ? { type: 'spring', stiffness: 140, damping: 22, delay: 1.55 }
+                : { duration: 0.28, ease: 'easeOut' }}
             >
               <CreatureCard
                 imageUrl={playerCreature?.imageUrl ?? ''}
@@ -797,45 +837,6 @@ export default function EncounterPage() {
             onComplete={() => setAttackAnim(null)}
           />
         )}
-
-        {/* ── Floating damage numbers ── */}
-        <AnimatePresence>
-          {lastDamage?.target === 'wild' && (
-            <motion.div
-              key={`wild-dmg-${lastDamage.id}`}
-              initial={{ opacity: 1, y: 0, scale: lastDamage.isCrit ? 1.4 : 1 }}
-              animate={{ opacity: 0, y: -80, scale: 2 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.9 }}
-              className="absolute pointer-events-none z-50"
-              style={{ top: '22%', left: '60%', transform: 'translateX(-50%)' }}
-              onAnimationComplete={() => setLastDamage(null)}
-            >
-              <span style={lastDamage.isCrit
-                ? { color: '#FB923C', fontSize: 44, fontWeight: 900, textShadow: '0 0 28px rgba(249,115,22,0.95), 0 2px 8px rgba(0,0,0,0.9)' }
-                : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 2px 8px rgba(0,0,0,0.9)' }
-              }>
-                -{lastDamage.amount}
-              </span>
-            </motion.div>
-          )}
-          {lastDamage?.target === 'player' && (
-            <motion.div
-              key={`player-dmg-${lastDamage.id}`}
-              initial={{ opacity: 1, y: 0, scale: 1 }}
-              animate={{ opacity: 0, y: -80, scale: 2 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.9 }}
-              className="absolute pointer-events-none z-50"
-              style={{ top: '62%', left: '38%', transform: 'translateX(-50%)' }}
-              onAnimationComplete={() => setLastDamage(null)}
-            >
-              <span style={{ color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 2px 8px rgba(0,0,0,0.9)' }}>
-                -{lastDamage.amount}
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* VS / message — center */}
         <div className="absolute inset-x-0 z-10" style={{ top: '46%', transform: 'translateY(-50%)' }}>
@@ -1488,6 +1489,104 @@ export default function EncounterPage() {
             </motion.div>
           )
         })()}
+      </AnimatePresence>
+
+      {/* ── ENCOUNTER INTRO OVERLAY (Pokemon-style wipe) ── */}
+      <AnimatePresence>
+        {showIntro && (
+          <motion.div
+            className="absolute inset-0 z-[100] overflow-hidden pointer-events-none"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: [1, 1, 1, 1, 0] }}
+            transition={{ duration: 2.1, times: [0, 0.38, 0.62, 0.76, 1.0] }}
+            onAnimationComplete={() => setShowIntro(false)}
+            style={{ background: '#010306' }}
+          >
+            {/* Pre-glow: soft element pulse before the burst */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{
+                top: '50%', left: '50%',
+                width: 10, height: 10,
+                marginTop: -5, marginLeft: -5,
+                background: wildTheme.glow,
+                filter: 'blur(16px)',
+              }}
+              initial={{ scale: 1, opacity: 0 }}
+              animate={{ scale: [1, 12, 28], opacity: [0, 0.55, 0] }}
+              transition={{ duration: 0.8, times: [0, 0.55, 1], ease: 'easeOut', delay: 0.05 }}
+            />
+            {/* White burst ring — primary explosion */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{ top: '50%', left: '50%', width: 22, height: 22, marginTop: -11, marginLeft: -11, background: 'white' }}
+              initial={{ scale: 1, opacity: 1 }}
+              animate={{ scale: 110, opacity: 0 }}
+              transition={{ duration: 0.7, ease: [0.1, 0.85, 0.28, 1], delay: 0.18 }}
+            />
+            {/* Element ring — softer, blooms behind */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{ top: '50%', left: '50%', width: 16, height: 16, marginTop: -8, marginLeft: -8, background: wildTheme.glow, filter: 'blur(6px)' }}
+              initial={{ scale: 1, opacity: 0.9 }}
+              animate={{ scale: 85, opacity: 0 }}
+              transition={{ duration: 0.78, delay: 0.26, ease: [0.1, 0.85, 0.28, 1] }}
+            />
+            {/* Expanding border ring — adds crispness */}
+            <motion.div
+              className="absolute rounded-full"
+              style={{
+                top: '50%', left: '50%',
+                width: 8, height: 8,
+                marginTop: -4, marginLeft: -4,
+                border: `2px solid ${wildTheme.glow}CC`,
+                filter: 'blur(1px)',
+              }}
+              initial={{ scale: 1, opacity: 1 }}
+              animate={{ scale: [1, 45, 90], opacity: [1, 0.45, 0] }}
+              transition={{ duration: 0.75, delay: 0.3, times: [0, 0.55, 1], ease: 'easeOut' }}
+            />
+            {/* White flash — peak brightness */}
+            <motion.div
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 1, 0.5, 0] }}
+              transition={{ duration: 0.55, delay: 0.32, times: [0, 0.28, 0.6, 1] }}
+              style={{ background: `radial-gradient(ellipse 85% 65% at center, white 0%, ${wildTheme.glow}65 42%, transparent 72%)` }}
+            />
+            {/* Element flash — second wave, colored */}
+            <motion.div
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.45, 0] }}
+              transition={{ duration: 0.4, delay: 0.6, times: [0, 0.4, 1] }}
+              style={{ background: `radial-gradient(ellipse 70% 55% at center, ${wildTheme.glow}90 0%, ${wildTheme.glow}30 55%, transparent 80%)` }}
+            />
+            {/* Starburst scanlines — 8 directions */}
+            {[0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5].map((angle, i) => (
+              <motion.div
+                key={angle}
+                className="absolute"
+                style={{
+                  top: '50%', left: '50%',
+                  width: 2.5, height: '200%',
+                  marginLeft: -1.25,
+                  transformOrigin: 'top center',
+                  rotate: `${angle}deg`,
+                  background: 'linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.85) 32%, rgba(255,255,255,0.85) 68%, transparent 100%)',
+                }}
+                initial={{ scaleY: 0, opacity: 0 }}
+                animate={{ scaleY: [0, 1, 1], opacity: [0, 0.95, 0] }}
+                transition={{
+                  duration: 0.6,
+                  delay: 0.22 + i * 0.02,
+                  times: [0, 0.22, 1],
+                  ease: 'easeOut',
+                }}
+              />
+            ))}
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   )
