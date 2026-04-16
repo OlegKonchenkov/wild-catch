@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { calculateCombatDamage, rollCombatFortune, scaleCombatStats } from '@/lib/game/combat'
+import { calculateCombatDamage, rollCombatFortune, rollCrit, scaleCombatStats } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
@@ -134,10 +134,11 @@ export async function POST(request: Request) {
     attackerStats: myCombatStats,
     defenderStats: oppCombatStats,
   })
+  const { isCrit, critMultiplier } = rollCrit()
   const damage = calculateCombatDamage({
     attackerAtk: myCombatStats.atk,
     defenderDef: oppCombatStats.def,
-    attackMultiplier: atkMultiplier,
+    attackMultiplier: atkMultiplier * critMultiplier,
     elementMultiplier: mult,
     varianceMultiplier: fortune.multiplier,
   })
@@ -237,6 +238,7 @@ export async function POST(request: Request) {
       action,
       damage,
       fortune,
+      isCrit,
       elementMultiplier: mult,
       itemUsed: atkMultiplier > 1,
       nextTurn: duelOver ? null : nextTurn,
@@ -251,6 +253,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     damage,
     fortune,
+    isCrit,
     elementMultiplier: mult,
     nextTurn: duelOver ? null : nextTurn,
     duelOver,

@@ -249,7 +249,8 @@ export default function DuelPage() {
   const [isMyTurn, setIsMyTurn]             = useState(false)
   const [attacking, setAttacking]           = useState(false)
   const attackingRef = useRef(false)
-  const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp'; id: number } | null>(null)
+  const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp'; id: number; isCrit?: boolean } | null>(null)
+  const [critNotice, setCritNotice]         = useState<{ id: number } | null>(null)
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [showItemsModal, setShowItemsModal] = useState(false)
@@ -285,6 +286,14 @@ export default function DuelPage() {
     setTimeout(() => {
       setFortuneNotice(current => current?.id === id ? null : current)
     }, 1800)
+  }
+
+  function flashCritNotice() {
+    const id = Date.now()
+    setCritNotice({ id })
+    setTimeout(() => {
+      setCritNotice(current => current?.id === id ? null : current)
+    }, 1600)
   }
 
   const loadPlayerLevels = useCallback(async (sessionId: string | undefined, duelUserIds: Array<string | null | undefined>) => {
@@ -429,7 +438,7 @@ export default function DuelPage() {
     const channel = supabase
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
-        const { actorId, damage, fortune, nextTurn, itemUsed, switchedTo, newOppHp } = payload
+        const { actorId, damage, fortune, isCrit, nextTurn, itemUsed, switchedTo, newOppHp } = payload
         const iAttacked = actorId === userIdRef.current
         const isFaint   = newOppHp === 0 && switchedTo
 
@@ -477,22 +486,25 @@ export default function DuelPage() {
         // ── Animations & turn ─────────────────────────────────────────────────
         if (iAttacked) {
           setOppAnimState('damage')
-          setLastDamage({ amount: damage, target: 'opp', id: Date.now() })
+          setLastDamage({ amount: damage, target: 'opp', id: Date.now(), isCrit: !!isCrit })
           setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 900)
+          if (isCrit) flashCritNotice()
           releaseAttackFeedback(450)
         } else {
           setAnimState('damage')
-          setLastDamage({ amount: damage, target: 'me', id: Date.now() })
+          setLastDamage({ amount: damage, target: 'me', id: Date.now(), isCrit: !!isCrit })
           setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 900)
+          if (isCrit) flashCritNotice()
         }
         if (nextTurn) {
           setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
         }
 
-        flashFortuneNotice(fortune as CombatFortuneInfo | undefined)
+        if (!isCrit) flashFortuneNotice(fortune as CombatFortuneInfo | undefined)
         const atkLabel = itemUsed ? '⚔️+🗡️' : '⚔️'
         const fortuneText = formatFortuneText(fortune as CombatFortuneInfo | undefined)
-        setLog(prev => [`${atkLabel} ${damage} danno${fortuneText ? ` · ${fortuneText}` : ''}!`, ...prev.slice(0, 3)])
+        const critLabel = isCrit ? ' · ⚡ CRITICO! ×1.75' : ''
+        setLog(prev => [`${atkLabel} ${damage} danno${critLabel}${fortuneText && !isCrit ? ` · ${fortuneText}` : ''}!`, ...prev.slice(0, 3)])
       })
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'duel_lineups', filter: `duel_id=eq.${id}` },
@@ -925,14 +937,17 @@ export default function DuelPage() {
           {lastDamage?.target === 'opp' && (
             <motion.div
               key={`opp-dmg-${lastDamage.id}`}
-              initial={{ opacity: 1, y: 0, scale: 1 }}
+              initial={{ opacity: 1, y: 0, scale: lastDamage.isCrit ? 1.4 : 1 }}
               animate={{ opacity: 0, y: -80, scale: 2 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.9 }}
               className="absolute pointer-events-none z-50"
               style={{ top: '28%', left: '50%', transform: 'translateX(-50%)' }}
             >
-              <span style={{ color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }}>
+              <span style={lastDamage.isCrit
+                ? { color: '#FB923C', fontSize: 44, fontWeight: 900, textShadow: '0 0 28px rgba(249,115,22,0.95), 0 0 56px rgba(249,115,22,0.5), 0 2px 8px rgba(0,0,0,0.9)' }
+                : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+              }>
                 -{lastDamage.amount}
               </span>
             </motion.div>
@@ -942,14 +957,17 @@ export default function DuelPage() {
           {lastDamage?.target === 'me' && (
             <motion.div
               key={`me-dmg-${lastDamage.id}`}
-              initial={{ opacity: 1, y: 0, scale: 1 }}
+              initial={{ opacity: 1, y: 0, scale: lastDamage.isCrit ? 1.4 : 1 }}
               animate={{ opacity: 0, y: -80, scale: 2 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.9 }}
               className="absolute pointer-events-none z-50"
               style={{ bottom: '32%', left: '50%', transform: 'translateX(-50%)' }}
             >
-              <span style={{ color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }}>
+              <span style={lastDamage.isCrit
+                ? { color: '#FB923C', fontSize: 44, fontWeight: 900, textShadow: '0 0 28px rgba(249,115,22,0.95), 0 0 56px rgba(249,115,22,0.5), 0 2px 8px rgba(0,0,0,0.9)' }
+                : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+              }>
                 -{lastDamage.amount}
               </span>
             </motion.div>
@@ -993,7 +1011,14 @@ export default function DuelPage() {
       <div className="relative z-10 shrink-0 flex items-center gap-3 px-4 py-1.5">
         <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06))' }} />
         <AnimatePresence mode="wait">
-          {switchNotice ? (
+          {critNotice ? (
+            <motion.div key={`crit-${critNotice.id}`} initial={{ opacity: 0, scale: 1.3 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold"
+              style={{ background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.55)', color: '#FB923C' }}>
+              ⚡ CRITICO! ×1.75
+            </motion.div>
+          ) : switchNotice ? (
             <motion.div key="switch" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
               className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold text-[#C084FC]"
               style={{ background: 'rgba(123,77,184,0.18)', border: '1px solid rgba(123,77,184,0.4)' }}>

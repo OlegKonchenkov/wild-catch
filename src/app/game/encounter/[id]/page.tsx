@@ -247,6 +247,7 @@ export default function EncounterPage() {
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [catchPhase, setCatchPhase] = useState<'idle' | 'throwing' | 'hit'>('idle')
   const [message, setMessage]   = useState('')
+  const [isCritMessage, setIsCritMessage] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [pendingAction, setPendingAction] = useState<'fight' | 'catch' | 'heal' | null>(null)
   const [result, setResult]     = useState<'caught' | 'fled' | 'evolved' | 'ko' | 'lost' | null>(null)
@@ -407,7 +408,7 @@ export default function EncounterPage() {
   // ── Handlers ─────────────────────────────────────────────────────────────────
   async function handleFight() {
     if (!state || loading) return
-    resetTimer(); setLoading(true); setPendingAction('fight'); setMessage(''); setShowItemsModal(false)
+    resetTimer(); setLoading(true); setPendingAction('fight'); setMessage(''); setIsCritMessage(false); setShowItemsModal(false)
 
     const actionStartedAt = Date.now()
     setPlayerAnim('attack')
@@ -448,9 +449,11 @@ export default function EncounterPage() {
     }
 
     const bonusPct = Math.round((data.catchMultiplier - 1) * 100)
-    const elemStr = data.elementMultiplier !== 1 ? ` (×${data.elementMultiplier.toFixed(1)})` : ''
+    const elemStr  = data.elementMultiplier !== 1 ? ` (×${data.elementMultiplier.toFixed(1)})` : ''
     const bonusStr = bonusPct > 0 ? ` · +${bonusPct}% 🎯` : ''
-    setMessage(`Danno: ${data.playerDamage}${elemStr}${bonusStr}`)
+    setIsCritMessage(!!data.playerCrit)
+    const critStr  = data.playerCrit ? '⚡ CRITICO! · ' : ''
+    setMessage(`${critStr}Danno: ${data.playerDamage}${elemStr}${bonusStr}`)
 
     if (data.playerTookDamage && data.wildDamage > 0) {
       await new Promise(r => setTimeout(r, 280))
@@ -739,12 +742,15 @@ export default function EncounterPage() {
               {message ? (
                 <motion.div
                   key={message}
-                  initial={{ opacity: 0, scale: 0.85 }}
+                  initial={{ opacity: 0, scale: isCritMessage ? 1.2 : 0.85 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.18 }}
                   className="text-xs font-bold px-3 py-1.5 rounded-full text-center"
-                  style={{ background: 'rgba(247,200,65,0.14)', border: '1px solid rgba(247,200,65,0.35)', color: '#F7C841', maxWidth: 200 }}
+                  style={isCritMessage
+                    ? { background: 'rgba(249,115,22,0.18)', border: '1px solid rgba(249,115,22,0.5)', color: '#FB923C', maxWidth: 220 }
+                    : { background: 'rgba(247,200,65,0.14)', border: '1px solid rgba(247,200,65,0.35)', color: '#F7C841', maxWidth: 200 }
+                  }
                 >
                   {message}
                 </motion.div>

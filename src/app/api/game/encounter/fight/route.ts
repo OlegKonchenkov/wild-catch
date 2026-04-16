@@ -100,7 +100,9 @@ export async function POST(request: Request) {
   )
   // REQ-INV-04: anti-weakness potion neutralises disadvantage (mult < 1 → 1)
   if (antiWeakness && elementMult < 1) elementMult = 1
-  playerDamage = Math.round(calculateFightDamage(playerCr.atk) * elementMult * atkMultiplier)
+  const playerCrit = Math.random() < 0.10
+  const critMult   = playerCrit ? 1.75 : 1
+  playerDamage = Math.round(calculateFightDamage(playerCr.atk) * elementMult * atkMultiplier * critMult)
   wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
 
   // Non-rare attacks after player
@@ -139,6 +141,7 @@ export async function POST(request: Request) {
     wildDamage,
     playerTookDamage,
     elementMultiplier: elementMult,
+    playerCrit,
     fightResult,
     catchMultiplier,
     levelUp: null,

@@ -18,6 +18,14 @@ export interface CombatFortuneResult {
   isUnderdog: boolean
 }
 
+export const CRIT_CHANCE     = 0.10   // 10% base critical hit chance
+export const CRIT_MULTIPLIER = 1.75   // ×1.75 damage on critical hit
+
+export function rollCrit(): { isCrit: boolean; critMultiplier: number } {
+  const isCrit = Math.random() < CRIT_CHANCE
+  return { isCrit, critMultiplier: isCrit ? CRIT_MULTIPLIER : 1 }
+}
+
 const MIN_COMBAT_LEVEL = 1
 const MAX_COMBAT_LEVEL = 50
 const HP_PER_LEVEL = 0.14

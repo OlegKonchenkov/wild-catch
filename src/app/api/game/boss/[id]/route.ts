@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { calculateCombatDamage, rollCombatFortune, scaleCombatStats } from '@/lib/game/combat'
+import { calculateCombatDamage, rollCombatFortune, rollCrit, scaleCombatStats } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
 
@@ -166,10 +166,11 @@ export async function POST(request: Request, { params }: Params) {
       attackerStats: { hp: playerActive.max_hp, atk: playerActive.atk, def: playerActive.def ?? 0 },
       defenderStats: { hp: bossActive.max_hp, atk: bossActive.atk, def: bossActive.def ?? 0 },
     })
+    const { isCrit: playerCrit, critMultiplier: playerCritMult } = rollCrit()
     const playerDamage = calculateCombatDamage({
       attackerAtk: playerActive.atk,
       defenderDef: bossActive.def ?? 0,
-      attackMultiplier: atkMultiplier,
+      attackMultiplier: atkMultiplier * playerCritMult,
       elementMultiplier: playerMult,
       varianceMultiplier: playerFortune.multiplier,
     })
@@ -195,6 +196,7 @@ export async function POST(request: Request, { params }: Params) {
     let bossDamage = 0
     let newPlayerHp = playerActive.current_hp
     let bossFortune = null
+    let bossCrit = false
 
     if (!allBossFainted && newBossHp > 0) {
       const counterBoss = bossActive
@@ -206,9 +208,12 @@ export async function POST(request: Request, { params }: Params) {
           attackerStats: { hp: counterBoss.max_hp, atk: counterBoss.atk, def: counterBoss.def ?? 0 },
           defenderStats: { hp: playerActive.max_hp, atk: playerActive.atk, def: playerActive.def ?? 0 },
         })
+        const { isCrit: bossCritRoll, critMultiplier: bossCritMult } = rollCrit()
+        bossCrit = bossCritRoll
         bossDamage = calculateCombatDamage({
           attackerAtk: counterBoss.atk,
           defenderDef: playerActive.def ?? 0,
+          attackMultiplier: bossCritMult,
           elementMultiplier: bossMult,
           varianceMultiplier: bossFortune.multiplier,
         })
@@ -346,6 +351,8 @@ export async function POST(request: Request, { params }: Params) {
       bossDamage,
       playerFortune,
       bossFortune,
+      playerCrit,
+      bossCrit,
       playerElementMult: playerMult,
       newBossHp,
       newPlayerHp,

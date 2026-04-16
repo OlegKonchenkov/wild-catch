@@ -486,6 +486,7 @@ function BattleScreen({
   onSelectItem,
   switchNotice,
   fortuneNotice,
+  critNotice,
   bossFainting,
   playerFainting,
 }: {
@@ -498,12 +499,13 @@ function BattleScreen({
   log: string[]
   animState: 'idle' | 'attack' | 'damage'
   bossAnimState: 'idle' | 'attack' | 'damage'
-  lastDamage: { amount: number; target: 'me' | 'boss'; id: number } | null
+  lastDamage: { amount: number; target: 'me' | 'boss'; id: number; isCrit?: boolean } | null
   battagliaItems: BattagliaItem[]
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
   switchNotice: string | null
   fortuneNotice: { id: number; text: string; tone: CombatFortuneInfo['tone'] } | null
+  critNotice: { id: number } | null
   bossFainting: boolean
   playerFainting: boolean
 }) {
@@ -738,14 +740,17 @@ function BattleScreen({
           {lastDamage?.target === 'boss' && (
             <motion.div
               key={`boss-dmg-${lastDamage.id}`}
-              initial={{ opacity: 1, y: 0, scale: 1 }}
+              initial={{ opacity: 1, y: 0, scale: lastDamage.isCrit ? 1.4 : 1 }}
               animate={{ opacity: 0, y: -80, scale: 2 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.9 }}
               className="absolute pointer-events-none z-50"
               style={{ top: '28%', left: '50%', transform: 'translateX(-50%)' }}
             >
-              <span style={{ color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }}>
+              <span style={lastDamage.isCrit
+                ? { color: '#FB923C', fontSize: 44, fontWeight: 900, textShadow: '0 0 28px rgba(249,115,22,0.95), 0 0 56px rgba(249,115,22,0.5), 0 2px 8px rgba(0,0,0,0.9)' }
+                : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+              }>
                 -{lastDamage.amount}
               </span>
             </motion.div>
@@ -755,14 +760,17 @@ function BattleScreen({
           {lastDamage?.target === 'me' && (
             <motion.div
               key={`me-dmg-${lastDamage.id}`}
-              initial={{ opacity: 1, y: 0, scale: 1 }}
+              initial={{ opacity: 1, y: 0, scale: lastDamage.isCrit ? 1.4 : 1 }}
               animate={{ opacity: 0, y: -80, scale: 2 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.9 }}
               className="absolute pointer-events-none z-50"
               style={{ bottom: '32%', left: '50%', transform: 'translateX(-50%)' }}
             >
-              <span style={{ color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }}>
+              <span style={lastDamage.isCrit
+                ? { color: '#FB923C', fontSize: 44, fontWeight: 900, textShadow: '0 0 28px rgba(249,115,22,0.95), 0 0 56px rgba(249,115,22,0.5), 0 2px 8px rgba(0,0,0,0.9)' }
+                : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+              }>
                 -{lastDamage.amount}
               </span>
             </motion.div>
@@ -774,7 +782,14 @@ function BattleScreen({
       <div className="relative z-10 shrink-0 flex items-center gap-3 px-4 py-1.5">
         <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06))' }} />
         <AnimatePresence mode="wait">
-          {bossAttacking ? (
+          {critNotice ? (
+            <motion.div key={`crit-${critNotice.id}`} initial={{ opacity: 0, scale: 1.3 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold"
+              style={{ background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.55)', color: '#FB923C' }}>
+              ⚡ CRITICO! ×1.75
+            </motion.div>
+          ) : bossAttacking ? (
             <motion.div key="boss-turn"
               initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
               className="flex items-center gap-1.5 px-3 py-1 rounded-full"
@@ -1040,7 +1055,8 @@ export default function BossFightPage() {
   const [log, setLog]                     = useState<string[]>([])
   const [animState, setAnimState]         = useState<'idle' | 'attack' | 'damage'>('idle')
   const [bossAnimState, setBossAnimState] = useState<'idle' | 'attack' | 'damage'>('idle')
-  const [lastDamage, setLastDamage]       = useState<{ amount: number; target: 'me' | 'boss'; id: number } | null>(null)
+  const [lastDamage, setLastDamage]       = useState<{ amount: number; target: 'me' | 'boss'; id: number; isCrit?: boolean } | null>(null)
+  const [critNotice, setCritNotice]       = useState<{ id: number } | null>(null)
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [switchNotice, setSwitchNotice]   = useState<string | null>(null)
@@ -1062,6 +1078,14 @@ export default function BossFightPage() {
     setTimeout(() => {
       setFortuneNotice(current => current?.id === id ? null : current)
     }, 1800)
+  }
+
+  function flashCritNotice() {
+    const id = Date.now()
+    setCritNotice({ id })
+    setTimeout(() => {
+      setCritNotice(current => current?.id === id ? null : current)
+    }, 1600)
   }
 
   useEffect(() => {
@@ -1237,14 +1261,16 @@ export default function BossFightPage() {
     const bossCreatureFainted = nextBossLineup[bossActiveSlot]?.fainted === true
 
     const playerFortuneText = formatFortuneText(data.playerFortune as CombatFortuneInfo | undefined)
-    addLog(`${actingPlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni${playerFortuneText ? ` · ${playerFortuneText}` : ''}!`)
-    flashFortuneNotice(data.playerFortune as CombatFortuneInfo | undefined)
+    const playerCritLabel = data.playerCrit ? ' · ⚡ CRITICO! ×1.75' : ''
+    addLog(`${actingPlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni${playerCritLabel}${playerFortuneText && !data.playerCrit ? ` · ${playerFortuneText}` : ''}!`)
+    if (data.playerCrit) flashCritNotice()
+    else flashFortuneNotice(data.playerFortune as CombatFortuneInfo | undefined)
 
     // Phase 1: show damage on boss (update HP bar only, don't switch yet)
     setBossLineup(prev => prev.map((slot, i) =>
       i === bossActiveSlot ? { ...slot, current_hp: nextBossLineup[i]?.current_hp ?? slot.current_hp } : slot
     ))
-    setLastDamage({ amount: data.playerDamage, target: 'boss', id: Date.now() })
+    setLastDamage({ amount: data.playerDamage, target: 'boss', id: Date.now(), isCrit: !!data.playerCrit })
     setBossAnimState('damage')
 
     setTimeout(() => {
@@ -1282,11 +1308,13 @@ export default function BossFightPage() {
           setPlayerLineup(prev => prev.map(slot =>
             slot.is_active ? { ...slot, current_hp: data.newPlayerHp } : slot,
           ))
-          setLastDamage({ amount: data.bossDamage, target: 'me', id: Date.now() })
+          setLastDamage({ amount: data.bossDamage, target: 'me', id: Date.now(), isCrit: !!data.bossCrit })
           setAnimState('damage')
           const bossFortuneText = formatFortuneText(data.bossFortune as CombatFortuneInfo | undefined)
-          addLog(`Il Capo Palestra risponde con ${data.bossDamage} danni${bossFortuneText ? ` · ${bossFortuneText}` : ''}!`)
-          flashFortuneNotice(data.bossFortune as CombatFortuneInfo | undefined)
+          const bossCritLabel = data.bossCrit ? ' · ⚡ CRITICO! ×1.75' : ''
+          addLog(`Il Capo Palestra risponde con ${data.bossDamage} danni${bossCritLabel}${bossFortuneText && !data.bossCrit ? ` · ${bossFortuneText}` : ''}!`)
+          if (data.bossCrit) flashCritNotice()
+          else flashFortuneNotice(data.bossFortune as CombatFortuneInfo | undefined)
 
           if (data.bossSwitchedTo) {
             setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
@@ -1469,6 +1497,7 @@ export default function BossFightPage() {
             onSelectItem={setSelectedItemId}
             switchNotice={switchNotice}
             fortuneNotice={fortuneNotice}
+            critNotice={critNotice}
             bossFainting={bossFainting}
             playerFainting={playerFainting}
           />
