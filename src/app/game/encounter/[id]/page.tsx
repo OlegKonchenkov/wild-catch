@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
+import { startEncounterLoop } from '@/lib/game/sounds/battle-loop'
 import { playCatchAttempt, playCatchFail, playCatchSuccess } from '@/lib/game/sounds/catch'
 import { playKnockout, playFlee, playLevelUp, playDefeat } from '@/lib/game/sounds/events'
 import AttackAnimation from '@/components/battle/AttackAnimation'
@@ -329,6 +330,7 @@ export default function EncounterPage() {
   const [showItemsModal, setShowItemsModal] = useState(false)
   const [showIntro, setShowIntro] = useState(false)
   const [introActive, setIntroActive] = useState(false)
+  const stopEncounterLoopRef = useRef<(() => void) | null>(null)
   const [turnTimer, setTurnTimer] = useState(45)
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoFightRef = useRef(false)
@@ -455,13 +457,15 @@ export default function EncounterPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [state?.encounterId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Trigger encounter intro animation + sound once when state first becomes available
+  // Trigger encounter intro animation + sound + background loop once when state is available
   useEffect(() => {
     if (state && !introActive) {
       setIntroActive(true)
       setShowIntro(true)
       playEncounterSound()
+      stopEncounterLoopRef.current = startEncounterLoop()
     }
+    return () => { stopEncounterLoopRef.current?.(); stopEncounterLoopRef.current = null }
   }, [state?.encounterId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function finishPendingAction() {
