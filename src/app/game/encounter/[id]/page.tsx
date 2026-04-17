@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
+import { playCatchAttempt, playCatchFail, playCatchSuccess } from '@/lib/game/sounds/catch'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import { createClient } from '@/lib/supabase/client'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
@@ -295,6 +296,7 @@ export default function EncounterPage() {
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null>(null)
   const [catchPhase, setCatchPhase] = useState<'idle' | 'throwing' | 'hit'>('idle')
+  const [showCatchSuccess, setShowCatchSuccess] = useState(false)
   const [message, setMessage]   = useState('')
   const [isCritMessage, setIsCritMessage] = useState(false)
   const [loading, setLoading]   = useState(false)
@@ -591,6 +593,7 @@ export default function EncounterPage() {
     const throwMsg = THROW_MESSAGES[Math.floor(Math.random() * THROW_MESSAGES.length)]
     setMessage(throwMsg)
     setCatchPhase('throwing')
+    playCatchAttempt()
 
     // Fetch parallelo all'animazione; aspetta almeno 700 ms perché la rete arrivi
     const fetchPromise = fetch('/api/game/encounter/catch', {
@@ -614,7 +617,10 @@ export default function EncounterPage() {
       setCatchPhase('idle')
       setMessage('')
       setWildAnim('catch')
+      playCatchSuccess()
+      setShowCatchSuccess(true)
       await new Promise(r => setTimeout(r, 1800))
+      setShowCatchSuccess(false)
       const creatureId = data.newCreatureId ?? state.creature.id
       supabase.from('creatures')
         .select('name, hp, atk, def, element, rarity, image_url, description')
@@ -634,6 +640,7 @@ export default function EncounterPage() {
       const failMsg = data.wildDamage > 0
         ? FAIL_COUNTER_MESSAGES[Math.floor(Math.random() * FAIL_COUNTER_MESSAGES.length)]
         : FAIL_RESIST_MESSAGES[Math.floor(Math.random() * FAIL_RESIST_MESSAGES.length)]
+      playCatchFail()
       setCatchPhase('hit')
       setMessage(failMsg)
       await new Promise(r => setTimeout(r, 550))
@@ -915,6 +922,52 @@ export default function EncounterPage() {
                 {/* Center dot */}
                 <circle cx="40" cy="40" r="3" fill="rgba(58,188,168,0.85)"/>
               </motion.svg>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── CATCH SUCCESS BANNER ── */}
+        <AnimatePresence>
+          {showCatchSuccess && (
+            <motion.div
+              className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0, y: 20 }}
+                animate={{ scale: [0.5, 1.12, 1.0], opacity: [0, 1, 1], y: [20, -6, 0] }}
+                exit={{ scale: 0.85, opacity: 0, y: -20 }}
+                transition={{ duration: 0.45, times: [0, 0.55, 1] }}
+                className="flex flex-col items-center gap-1 px-7 py-4 rounded-3xl"
+                style={{
+                  background: 'rgba(4, 18, 10, 0.82)',
+                  border: '1.5px solid rgba(52,211,153,0.55)',
+                  boxShadow: '0 0 40px rgba(52,211,153,0.35), 0 8px 32px rgba(0,0,0,0.7)',
+                  backdropFilter: 'blur(12px)',
+                }}
+              >
+                {/* Sparkle ring */}
+                <motion.div
+                  className="text-3xl leading-none"
+                  animate={{ rotate: [0, 15, -10, 8, 0], scale: [1, 1.2, 0.95, 1.1, 1] }}
+                  transition={{ duration: 0.6, delay: 0.1 }}
+                >
+                  ✨
+                </motion.div>
+                <span style={{
+                  fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em',
+                  color: '#34D399',
+                  textShadow: '0 0 20px rgba(52,211,153,0.8), 0 0 40px rgba(52,211,153,0.4)',
+                }}>
+                  Catturata!
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(52,211,153,0.65)', letterSpacing: '0.05em' }}>
+                  {state?.creature?.name ?? 'Creatura'} aggiunta alla squadra
+                </span>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

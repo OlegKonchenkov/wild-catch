@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { getAttackAnimation } from './animations/registry'
 import type { AttackAnimationProps } from './animations/types'
+import { playDefaultAttack } from '@/lib/game/sounds/attack-defaults'
 
 /**
  * Plug-and-play attack animation component.
@@ -25,7 +26,10 @@ export default function AttackAnimation({
 
   // Sound playback
   useEffect(() => {
-    if (!soundUrl) return
+    if (!soundUrl) {
+      playDefaultAttack(element, rarity)
+      return
+    }
     const audio = new Audio(soundUrl)
     audio.volume = 0.7
     audioRef.current = audio

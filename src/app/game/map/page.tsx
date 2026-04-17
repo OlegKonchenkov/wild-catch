@@ -12,6 +12,7 @@ import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import type { Session } from '@/lib/types'
 import { RARITY_LABELS } from '@/lib/types'
 import type { MapPin } from '@/components/map/GameMap'
+import { startMapAmbience } from '@/lib/game/sounds/map-loop'
 
 // Dynamic import — Leaflet is not SSR-safe
 const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false })
@@ -676,6 +677,12 @@ function MapPageInner() {
   useEffect(() => { claimedPinIdsRef.current = claimedPinIds }, [claimedPinIds])
   useEffect(() => { pinRewardRef.current = pinReward }, [pinReward])
   useEffect(() => { mapPinsRef.current = mapPins }, [mapPins])
+
+  // Background ambience loop — starts on mount, stops on unmount
+  useEffect(() => {
+    const stop = startMapAmbience()
+    return () => stop()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
   const [pendingEncounter, setPendingEncounter] = useState<{
     encounterId: string
