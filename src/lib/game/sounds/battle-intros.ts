@@ -7,17 +7,12 @@
  * playBossSound       — Boss / Capo Palestra fight starts
  */
 
-function ctx(): AudioContext | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return new ((window as any).AudioContext || (window as any).webkitAudioContext)()
-  } catch { return null }
-}
+import { getSharedAC } from './shared-ac'
 
 // ── Wild creature encounter ────────────────────────────────────────────────────
 // Ascending arpeggio (C4→E4→G4→C5) over a soft whoosh: "something appeared!"
 export function playEncounterSound(vol = 0.55) {
-  const ac = ctx()
+  const ac = getSharedAC()
   if (!ac) return
 
   const now = ac.currentTime
@@ -77,13 +72,12 @@ export function playEncounterSound(vol = 0.55) {
   wGain.connect(ac.destination)
   noise.start(now)
 
-  setTimeout(() => ac.close(), 1200)
 }
 
 // ── PvP Duel battle ────────────────────────────────────────────────────────────
 // Deep impact thud + power chord + high ping ring: "BATTLE BEGINS!"
 export function playBattleSound(vol = 0.55) {
-  const ac = ctx()
+  const ac = getSharedAC()
   if (!ac) return
 
   const now = ac.currentTime
@@ -135,13 +129,12 @@ export function playBattleSound(vol = 0.55) {
   nSrc.connect(nGain); nGain.connect(ac.destination)
   nSrc.start(now)
 
-  setTimeout(() => ac.close(), 900)
 }
 
 // ── Boss / Capo Palestra ───────────────────────────────────────────────────────
 // Double-hit power chord in C minor + dramatic sweep: "BOSS BATTLE!"
 export function playBossSound(vol = 0.55) {
-  const ac = ctx()
+  const ac = getSharedAC()
   if (!ac) return
 
   const now = ac.currentTime
@@ -200,5 +193,4 @@ export function playBossSound(vol = 0.55) {
     src.start(t)
   })
 
-  setTimeout(() => ac.close(), 1300)
 }

@@ -11,6 +11,7 @@ import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { playBattleSound } from '@/lib/game/battle-sounds'
+import { startDuelLoop } from '@/lib/game/sounds/battle-loop'
 import { playKnockout, playVictory, playDefeat, playLevelUp } from '@/lib/game/sounds/events'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
@@ -266,6 +267,7 @@ export default function DuelPage() {
   const [showMissionModal, setShowMissionModal] = useState(false)
   const [showDuelIntro, setShowDuelIntro] = useState(false)
   const duelIntroFiredRef = useRef(false)
+  const stopDuelLoopRef   = useRef<(() => void) | null>(null)
 
   const [turnTimer, setTurnTimer] = useState(30)
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -641,14 +643,16 @@ export default function DuelPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [isMyTurn, result, waiting]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fire intro animation + sound once when the duel becomes active (waiting → false)
+  // Fire intro animation + sound + background loop once when duel becomes active (waiting → false)
   useEffect(() => {
     if (!waiting && !duelIntroFiredRef.current) {
       duelIntroFiredRef.current = true
       setShowDuelIntro(true)
       playBattleSound()
+      stopDuelLoopRef.current = startDuelLoop()
     }
-  }, [waiting])
+    return () => { stopDuelLoopRef.current?.(); stopDuelLoopRef.current = null }
+  }, [waiting]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleAttack() {
     if (attackingRef.current || !isMyTurn) return

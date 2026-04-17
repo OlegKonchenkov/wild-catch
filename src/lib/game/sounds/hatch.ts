@@ -10,14 +10,7 @@
  *   mitologico  – ultimate: bass boom + 9-note sweep + cosmic sparkle cascade
  */
 
-function makeAC(): AudioContext | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return new ((window as any).AudioContext || (window as any).webkitAudioContext)()
-  } catch {
-    return null
-  }
-}
+import { getSharedAC } from './shared-ac'
 
 // Crack transient shared by all rarities — highpass-filtered noise burst
 function playCrack(ac: AudioContext, now: number, vol: number): void {
@@ -49,7 +42,7 @@ function bell(ac: AudioContext, freq: number, t: number, vol: number, dur = 0.55
 }
 
 export function playEggHatch(rarity: string, vol = 0.50): void {
-  const ac = makeAC(); if (!ac) return
+  const ac = getSharedAC(); if (!ac) return
   const now = ac.currentTime
 
   // Crack volume scales with rarity
@@ -148,9 +141,4 @@ export function playEggHatch(rarity: string, vol = 0.50): void {
     })
   }
 
-  const durations: Record<string, number> = {
-    comune: 400, non_comune: 700, raro: 1200,
-    epico: 2200, leggendario: 2600, mitologico: 3500,
-  }
-  setTimeout(() => ac.close().catch(() => {}), durations[rarity] ?? 1000)
 }

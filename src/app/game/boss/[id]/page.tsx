@@ -14,6 +14,7 @@ import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 import { playBossSound } from '@/lib/game/battle-sounds'
+import { startBossLoop } from '@/lib/game/sounds/battle-loop'
 import { playKnockout, playVictory, playDefeat, playLevelUp } from '@/lib/game/sounds/events'
 import { scaleCombatStats } from '@/lib/game/combat'
 
@@ -526,8 +527,12 @@ function BattleScreen({
   const onAttackRef  = useRef(onAttack)
   useEffect(() => { onAttackRef.current = onAttack })
 
-  // Play boss intro sound once on mount
-  useEffect(() => { playBossSound() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Play boss intro sound + start background loop on mount; stop loop on unmount
+  useEffect(() => {
+    playBossSound()
+    const stopLoop = startBossLoop()
+    return () => { stopLoop() }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)

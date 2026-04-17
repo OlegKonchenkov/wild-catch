@@ -7,20 +7,16 @@
  *   playMissionComplete– mission finished (short G-major fanfare)
  *   playVictory        – battle won (triumphant 5-note fanfare + chord)
  *   playDefeat         – battle lost (descending minor + rumble)
+ *
+ * All sounds share a single AudioContext (shared-ac) to prevent race conditions
+ * when multiple sounds fire in rapid succession (e.g. knockout + defeat).
  */
 
-function makeAC(): AudioContext | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return new ((window as any).AudioContext || (window as any).webkitAudioContext)()
-  } catch {
-    return null
-  }
-}
+import { getSharedAC } from './shared-ac'
 
 // ── Knockout ──────────────────────────────────────────────────────────────────
 export function playKnockout(vol = 0.55): void {
-  const ac = makeAC(); if (!ac) return
+  const ac = getSharedAC(); if (!ac) return
   const now = ac.currentTime
 
   // Bass punch — sine that drops from 75 Hz to 32 Hz
@@ -61,12 +57,11 @@ export function playKnockout(vol = 0.55): void {
   w.connect(wG); wG.connect(ac.destination)
   w.start(now); w.stop(now + 0.65)
 
-  setTimeout(() => ac.close().catch(() => {}), 800)
 }
 
 // ── Flee ──────────────────────────────────────────────────────────────────────
 export function playFlee(vol = 0.40): void {
-  const ac = makeAC(); if (!ac) return
+  const ac = getSharedAC(); if (!ac) return
   const now = ac.currentTime
 
   // Rising whoosh — bandpass noise sweeping 300 → 3500 Hz
@@ -100,12 +95,11 @@ export function playFlee(vol = 0.40): void {
     o.start(now + d); o.stop(now + d + 0.08)
   })
 
-  setTimeout(() => ac.close().catch(() => {}), 450)
 }
 
 // ── Level Up ──────────────────────────────────────────────────────────────────
 export function playLevelUp(vol = 0.55): void {
-  const ac = makeAC(); if (!ac) return
+  const ac = getSharedAC(); if (!ac) return
   const now = ac.currentTime
 
   // C-major ascending arpeggio: C4 → E4 → G4 → C5 → E5
@@ -152,12 +146,11 @@ export function playLevelUp(vol = 0.55): void {
     o.start(t); o.stop(t + 0.40)
   })
 
-  setTimeout(() => ac.close().catch(() => {}), 2100)
 }
 
 // ── Mission Complete ───────────────────────────────────────────────────────────
 export function playMissionComplete(vol = 0.50): void {
-  const ac = makeAC(); if (!ac) return
+  const ac = getSharedAC(); if (!ac) return
   const now = ac.currentTime
 
   // G-major ascending motif: G4 → B4 → D5 → G5
@@ -190,12 +183,11 @@ export function playMissionComplete(vol = 0.50): void {
     o.start(t); o.stop(t + 0.58)
   })
 
-  setTimeout(() => ac.close().catch(() => {}), 1400)
 }
 
 // ── Victory ───────────────────────────────────────────────────────────────────
 export function playVictory(vol = 0.60): void {
-  const ac = makeAC(); if (!ac) return
+  const ac = getSharedAC(); if (!ac) return
   const now = ac.currentTime
 
   // Triumphant 5-note rising fanfare: C4 → E4 → G4 → C5 → E5
@@ -244,12 +236,11 @@ export function playVictory(vol = 0.60): void {
     o.start(t); o.stop(t + 0.88)
   })
 
-  setTimeout(() => ac.close().catch(() => {}), 2900)
 }
 
 // ── Defeat ────────────────────────────────────────────────────────────────────
 export function playDefeat(vol = 0.45): void {
-  const ac = makeAC(); if (!ac) return
+  const ac = getSharedAC(); if (!ac) return
   const now = ac.currentTime
 
   // Descending A-natural minor: A4 → F4 → D4 → Bb3
@@ -278,5 +269,4 @@ export function playDefeat(vol = 0.45): void {
   r.connect(rG); rG.connect(ac.destination)
   r.start(now); r.stop(now + 1.52)
 
-  setTimeout(() => ac.close().catch(() => {}), 1900)
 }
