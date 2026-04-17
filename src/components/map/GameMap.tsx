@@ -20,6 +20,7 @@ interface Props {
   sessionId: string
   creatureImageUrl?: string | null
   pins?: MapPin[]
+  onPinTap?: (pin: MapPin) => void
 }
 
 // Haversine distance in metres between two GPS points
@@ -113,7 +114,7 @@ function markerSize(hasImage: boolean): number {
   return hasImage ? 40 : 20
 }
 
-export default function GameMap({ session, playerPosition, sessionId, creatureImageUrl, pins }: Props) {
+export default function GameMap({ session, playerPosition, sessionId, creatureImageUrl, pins, onPinTap }: Props) {
   const mapRef = useRef<unknown>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const markerRef = useRef<unknown>(null)
@@ -124,8 +125,11 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
   const playerPositionRef = useRef(playerPosition)
   const pinMarkersRef = useRef<Map<string, unknown>>(new Map())
   const LRef = useRef<any>(null)
+  const onPinTapRef = useRef(onPinTap)
   const [following, setFollowing] = useState(true)
   const [mapReady, setMapReady] = useState(false)
+
+  useEffect(() => { onPinTapRef.current = onPinTap }, [onPinTap])
 
   useEffect(() => { playerPositionRef.current = playerPosition }, [playerPosition])
 
@@ -335,6 +339,7 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
         </div>
       `)
       const m = Leaflet.marker([pin.lat, pin.lng], { icon }).addTo(map).bindPopup(popup)
+      m.on('click', () => { if (onPinTapRef.current) onPinTapRef.current(pin) })
       pinMarkersRef.current.set(pin.id, m)
     })
 

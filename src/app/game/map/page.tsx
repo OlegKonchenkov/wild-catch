@@ -646,6 +646,105 @@ function PinRewardModal({ reward, onDone }: { reward: PinRewardData; onDone: () 
   )
 }
 
+// ── BossApproachModal ─────────────────────────────────────────────────────────
+// Shown when a boss pin enters proximity range — lets the player choose
+// to fight now or postpone (manual tap on the pin will re-open it later).
+function BossApproachModal({
+  pin,
+  sessionId,
+  onFight,
+  onLater,
+}: {
+  pin: MapPin
+  sessionId: string
+  onFight: (reward: PinRewardData) => void
+  onLater: () => void
+}) {
+  const [visible, setVisible] = useState(false)
+  const [claiming, setClaiming] = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 60)
+    return () => clearTimeout(t)
+  }, [])
+
+  async function handleFight() {
+    if (claiming) return
+    setClaiming(true)
+    try {
+      const res = await fetch('/api/game/map-pins/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinId: pin.id, sessionId, lat: pin.lat, lng: pin.lng }),
+      })
+      const d: any = await res.json()
+      if (d.success || d.alreadyClaimed) {
+        onFight(d as PinRewardData)
+      }
+    } catch {
+      setClaiming(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[1200] flex flex-col items-end justify-end">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onLater} />
+      <div
+        className="relative w-full rounded-t-3xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(180deg, #0D0608 0%, #1A060A 100%)',
+          border: '1px solid rgba(232,93,47,0.3)',
+          borderBottom: 'none',
+          transform: visible ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
+        }}
+      >
+        <div className="flex justify-center pt-3 mb-1">
+          <div className="w-10 h-1 rounded-full bg-white/20" />
+        </div>
+        <div className="px-5 pb-8 space-y-4 pt-2">
+          {/* Location */}
+          <div className="flex items-start gap-3 bg-[#E85D2F]/10 border border-[#E85D2F]/25 rounded-2xl p-3">
+            <span className="text-2xl leading-none mt-0.5">📍</span>
+            <div>
+              <p className="text-xs font-bold text-[#E85D2F] uppercase tracking-wide">Luogo raggiunto</p>
+              <p className="text-base font-extrabold text-white mt-0.5">{pin.name}</p>
+            </div>
+          </div>
+          {/* Boss card */}
+          <div className="bg-red-950/40 border border-red-500/30 rounded-2xl p-5 text-center">
+            <p className="text-5xl mb-3">💀</p>
+            <p className="text-white font-extrabold text-lg">Capo Palestra</p>
+            <p className="text-red-300/70 text-sm mt-1">Un boss ti sfida in battaglia!</p>
+            <p className="text-white/35 text-xs mt-2">Sei pronto ad affrontarlo?</p>
+          </div>
+          {/* Actions */}
+          <div className="flex gap-3">
+            <button
+              onClick={onLater}
+              className="flex-1 py-3.5 rounded-xl font-bold text-sm text-white/60 transition-all active:scale-95"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+            >
+              Più tardi
+            </button>
+            <button
+              onClick={handleFight}
+              disabled={claiming}
+              className="flex-[2] py-3.5 rounded-xl font-extrabold text-sm text-white transition-all active:scale-95 disabled:opacity-60"
+              style={{
+                background: 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)',
+                boxShadow: '0 4px 20px rgba(232,93,47,0.4)',
+              }}
+            >
+              {claiming ? 'Avvio...' : '⚔️ Affronta ora!'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function MapPageInner() {
   const [session, setSession] = useState<Session | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -661,6 +760,10 @@ function MapPageInner() {
   const pinRewardRef = useRef<PinRewardData | null>(null)
   const mapPinsRef = useRef<MapPin[]>([])
   const claimingPinRef = useRef(false)
+  const [pendingBossPin, setPendingBossPin] = useState<MapPin | null>(null)
+  const pendingBossPinRef = useRef<MapPin | null>(null)
+  const [declinedBossPinIds, setDeclinedBossPinIds] = useState<Set<string>>(new Set())
+  const declinedBossPinIdsRef = useRef<Set<string>>(new Set())
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
   const [hatchQueue, setHatchQueue] = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number; description?: string | null; isStarter?: boolean }[]>([])
@@ -677,6 +780,8 @@ function MapPageInner() {
   useEffect(() => { claimedPinIdsRef.current = claimedPinIds }, [claimedPinIds])
   useEffect(() => { pinRewardRef.current = pinReward }, [pinReward])
   useEffect(() => { mapPinsRef.current = mapPins }, [mapPins])
+  useEffect(() => { pendingBossPinRef.current = pendingBossPin }, [pendingBossPin])
+  useEffect(() => { declinedBossPinIdsRef.current = declinedBossPinIds }, [declinedBossPinIds])
 
   // Background ambience loop — starts on mount, stops on unmount
   useEffect(() => {
@@ -815,6 +920,17 @@ function MapPageInner() {
     }
   }, [])
 
+  // ── Handle pin tap from map — show boss confirm if applicable ──────────────
+  const handlePinTap = useCallback((pin: MapPin) => {
+    const sid = sessionIdRef.current
+    if (!sid) return
+    // Only act on boss pins that aren't yet claimed
+    if (pin.reward_type !== 'boss') return
+    if (claimedPinIdsRef.current.has(pin.id)) return
+    // Show the confirm dialog (removes it from declined if it was there)
+    setPendingBossPin(pin)
+  }, [])
+
   const triggerEncounter = useCallback(async (trigger: 'gps' | 'timer' = 'gps'): Promise<boolean> => {
     // Mutex: skip if another trigger is in-flight or popup already showing
     if (triggeringEncounterRef.current) return false
@@ -913,10 +1029,12 @@ function MapPageInner() {
 
     // ── Pin proximity check ────────────────────────────────────────────────
     // Refs are used here so the callback always reads the latest values
-    if (!claimingPinRef.current && !pinRewardRef.current) {
+    if (!claimingPinRef.current && !pinRewardRef.current && !pendingBossPinRef.current) {
       const nearPin = mapPinsRef.current.find(pin => {
         if (!pin.reward_type) return false
         if (claimedPinIdsRef.current.has(pin.id)) return false
+        // Boss pins that were declined skip auto-trigger (user can still tap manually)
+        if (pin.reward_type === 'boss' && declinedBossPinIdsRef.current.has(pin.id)) return false
         const dLat = (pos.lat - pin.lat) * Math.PI / 180
         const dLon = (pos.lng - pin.lng) * Math.PI / 180
         const a = Math.sin(dLat / 2) ** 2 +
@@ -925,6 +1043,11 @@ function MapPageInner() {
         return dist <= (pin.reward_radius_m ?? 50)
       })
       if (nearPin) {
+        // Boss pins get a confirm dialog — player may not be ready to fight
+        if (nearPin.reward_type === 'boss') {
+          setPendingBossPin(nearPin)
+          return
+        }
         claimingPinRef.current = true
         fetch('/api/game/map-pins/claim', {
           method: 'POST',
@@ -1095,6 +1218,7 @@ function MapPageInner() {
         sessionId={sessionId!}
         creatureImageUrl={creatureImageUrl}
         pins={mapPins}
+        onPinTap={handlePinTap}
       />
 
       {/* Session restarted overlay */}
@@ -1229,6 +1353,25 @@ function MapPageInner() {
         <MissionRewardModal
           missions={missionQueue}
           onDone={() => setMissionQueue([])}
+        />
+      )}
+
+      {/* Boss pin approach confirm — shown before auto-claiming a boss pin */}
+      {pendingBossPin && (
+        <BossApproachModal
+          pin={pendingBossPin}
+          sessionId={sessionId!}
+          onFight={(reward) => {
+            setClaimedPinIds(prev => new Set([...prev, pendingBossPin.id]))
+            setPendingBossPin(null)
+            if (reward.bossFightId) {
+              window.location.href = `/game/boss/${reward.bossFightId}`
+            }
+          }}
+          onLater={() => {
+            setDeclinedBossPinIds(prev => new Set([...prev, pendingBossPin.id]))
+            setPendingBossPin(null)
+          }}
         />
       )}
 

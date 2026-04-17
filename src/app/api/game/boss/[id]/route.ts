@@ -50,8 +50,8 @@ export async function POST(request: Request, { params }: Params) {
     if (fight.status !== 'selecting') {
       return NextResponse.json({ error: 'Battaglia già iniziata' }, { status: 409 })
     }
-    if (!Array.isArray(lineup) || lineup.length !== 3) {
-      return NextResponse.json({ error: 'Seleziona esattamente 3 creature' }, { status: 400 })
+    if (!Array.isArray(lineup) || lineup.length < 1 || lineup.length > 3) {
+      return NextResponse.json({ error: 'Seleziona da 1 a 3 creature' }, { status: 400 })
     }
 
     const { data: playerSession } = await supabase
@@ -70,7 +70,7 @@ export async function POST(request: Request, { params }: Params) {
       .in('id', pcIds)
       .eq('user_id', user.id)
 
-    if (!pcs || pcs.length !== 3) {
+    if (!pcs || pcs.length !== lineup.length) {
       return NextResponse.json({ error: 'Creature non valide' }, { status: 400 })
     }
 

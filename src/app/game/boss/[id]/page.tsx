@@ -401,14 +401,14 @@ function SquadSelector({
       <div className="p-4 border-t border-white/10 shrink-0">
         <button
           onClick={onConfirm}
-          disabled={filledCount < 3 || starting}
+          disabled={filledCount < 1 || starting}
           className="w-full text-white font-extrabold py-3.5 rounded-xl text-sm transition-all disabled:opacity-40"
           style={{
-            background: filledCount < 3 || starting ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)',
-            boxShadow: filledCount >= 3 && !starting ? '0 4px 20px rgba(232,93,47,0.4)' : 'none',
+            background: filledCount < 1 || starting ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)',
+            boxShadow: filledCount >= 1 && !starting ? '0 4px 20px rgba(232,93,47,0.4)' : 'none',
           }}
         >
-          {starting ? 'Inizio battaglia...' : filledCount < 3 ? `Seleziona ancora ${3 - filledCount}` : '⚔️ Inizia la battaglia!'}
+          {starting ? 'Inizio battaglia...' : filledCount < 1 ? 'Seleziona almeno 1 creatura' : '⚔️ Inizia la battaglia!'}
         </button>
       </div>
     </div>
