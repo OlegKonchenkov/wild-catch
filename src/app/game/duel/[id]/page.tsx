@@ -939,7 +939,7 @@ export default function DuelPage() {
                 initial={{ opacity: 0, x: showDuelIntro ? 340 : 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={showDuelIntro
-                  ? { type: 'spring', stiffness: 140, damping: 20, delay: 2.2 }
+                  ? { type: 'spring', stiffness: 80, damping: 14, delay: 3.3 }
                   : { duration: 0.28, ease: 'easeOut' }}
               >
                 <CreatureCard
@@ -1027,7 +1027,7 @@ export default function DuelPage() {
                 initial={{ opacity: 0, x: showDuelIntro ? -340 : -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={showDuelIntro
-                  ? { type: 'spring', stiffness: 140, damping: 22, delay: 2.7 }
+                  ? { type: 'spring', stiffness: 80, damping: 14, delay: 4.0 }
                   : { duration: 0.28, ease: 'easeOut' }}
               >
                 <CreatureCard

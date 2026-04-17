@@ -789,7 +789,7 @@ export default function EncounterPage() {
           <motion.div
             initial={{ x: 380, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 140, damping: 20, delay: 2.2 }}
+            transition={{ type: 'spring', stiffness: 80, damping: 14, delay: 3.3 }}
           >
             <CreatureCard
               imageUrl={state.creature.image_url ?? ''}
@@ -815,7 +815,7 @@ export default function EncounterPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 24 }}
               transition={activeSlot === 0
-                ? { type: 'spring', stiffness: 140, damping: 22, delay: 2.7 }
+                ? { type: 'spring', stiffness: 80, damping: 14, delay: 4.0 }
                 : { duration: 0.28, ease: 'easeOut' }}
             >
               <CreatureCard

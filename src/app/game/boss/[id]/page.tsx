@@ -690,7 +690,7 @@ function BattleScreen({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={showBossIntro
-                ? { type: 'spring', stiffness: 140, damping: 20, delay: 2.2 }
+                ? { type: 'spring', stiffness: 80, damping: 14, delay: 3.3 }
                 : { duration: 0.25 }}
             >
               <CreatureCard
@@ -730,7 +730,7 @@ function BattleScreen({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={showBossIntro
-                ? { type: 'spring', stiffness: 140, damping: 22, delay: 2.7 }
+                ? { type: 'spring', stiffness: 80, damping: 14, delay: 4.0 }
                 : { duration: 0.25 }}
             >
               <CreatureCard
