@@ -799,7 +799,7 @@ export default function EncounterPage() {
           <motion.div
             initial={{ x: 380, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 80, damping: 14, delay: 2.8 }}
+            transition={{ type: 'spring', stiffness: 80, damping: 14, delay: 1.5 }}
           >
             <CreatureCard
               imageUrl={state.creature.image_url ?? ''}
@@ -823,9 +823,9 @@ export default function EncounterPage() {
               key={activeSlot}
               initial={{ opacity: 0, x: activeSlot === 0 ? -380 : -24 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 24 }}
+              exit={{ opacity: 0, x: 24, transition: { duration: 0.28, ease: 'easeIn' } }}
               transition={activeSlot === 0
-                ? { type: 'spring', stiffness: 80, damping: 14, delay: 3.5 }
+                ? { type: 'spring', stiffness: 80, damping: 14, delay: 1.9 }
                 : { duration: 0.28, ease: 'easeOut' }}
             >
               <CreatureCard
@@ -1562,8 +1562,8 @@ export default function EncounterPage() {
           <motion.div
             className="absolute inset-0 z-[100] overflow-hidden pointer-events-none"
             initial={{ opacity: 1 }}
-            animate={{ opacity: [1, 1, 1, 1, 0] }}
-            transition={{ duration: 3.8, times: [0, 0.42, 0.68, 0.80, 1.0] }}
+            animate={{ opacity: [1, 1, 0] }}
+            transition={{ duration: 2.6, times: [0, 0.65, 1.0] }}
             onAnimationComplete={() => setShowIntro(false)}
             style={{ background: '#010306' }}
           >
@@ -1641,12 +1641,12 @@ export default function EncounterPage() {
               transition={{ duration: 0.65, delay: 0.80, times: [0, 0.4, 1] }}
               style={{ background: `radial-gradient(ellipse 70% 55% at center, ${wildTheme.glow}90 0%, ${wildTheme.glow}30 55%, transparent 80%)` }}
             />
-            {/* Ambient glow — breathes during hold phase */}
+            {/* Ambient glow — brief breathe before fade */}
             <motion.div
               className="absolute inset-0"
               initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0.22, 0.10, 0.22, 0] }}
-              transition={{ duration: 2.2, delay: 1.1, times: [0, 0.2, 0.5, 0.75, 1] }}
+              animate={{ opacity: [0, 0.20, 0] }}
+              transition={{ duration: 0.9, delay: 1.0, times: [0, 0.45, 1] }}
               style={{ background: `radial-gradient(ellipse 60% 50% at center, ${wildTheme.glow}55 0%, transparent 65%)` }}
             />
             {/* Starburst scanlines — 12 directions */}
