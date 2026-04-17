@@ -14,6 +14,7 @@ import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 import { playBossSound } from '@/lib/game/battle-sounds'
+import { playKnockout, playVictory, playDefeat, playLevelUp } from '@/lib/game/sounds/events'
 import { scaleCombatStats } from '@/lib/game/combat'
 
 interface BossSlot {
@@ -1440,6 +1441,7 @@ export default function BossFightPage() {
 
       if (bossCreatureFainted) {
         // Boss creature fainted — show faint animation, then switch
+        playKnockout()
         setBossFainting(true)
         setTimeout(() => {
           setBossFainting(false)
@@ -1453,8 +1455,9 @@ export default function BossFightPage() {
           }
           if (isOver) {
             window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
-            if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+            if (data.levelUp) { playLevelUp(); window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp })) }
             if (data.completedMissions?.length) setBossMissions(data.completedMissions)
+            if (data.won) playVictory(); else playDefeat()
             setTimeout(() => setFinalResult({ won: data.won, reward: data.reward, levelUp: data.levelUp }), 400)
           }
           attackingRef.current = false
@@ -1495,6 +1498,7 @@ export default function BossFightPage() {
             setTimeout(() => {
               setAnimState('idle')
               setLastDamage(null)
+              playKnockout()
               setPlayerFainting(true)
               setTimeout(() => {
                 setPlayerFainting(false)

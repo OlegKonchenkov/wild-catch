@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
 import { playCatchAttempt, playCatchFail, playCatchSuccess } from '@/lib/game/sounds/catch'
+import { playKnockout, playFlee, playLevelUp, playDefeat } from '@/lib/game/sounds/events'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import { createClient } from '@/lib/supabase/client'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
@@ -509,6 +510,7 @@ export default function EncounterPage() {
     setState(prev => prev ? { ...prev, wildHp: data.wildHpRemaining, catchMultiplier: data.catchMultiplier, turns: prev.turns + 1 } : null)
 
     if (data.fightResult === 'fled') {
+      playKnockout()
       setWildAnim('flee'); setMessage(''); setResult('ko'); finishPendingAction(); return
     }
 
@@ -554,6 +556,7 @@ export default function EncounterPage() {
       setPlayerAnim('idle')
 
       if (newHp <= 0) {
+        playKnockout()
         // Show faint animation before switching creature
         setPlayerFainting(true)
         await new Promise(r => setTimeout(r, 1000))
@@ -574,13 +577,14 @@ export default function EncounterPage() {
             return
           }
         }
+        playDefeat()
         setResult('lost')
         finishPendingAction()
         return
       }
     }
 
-    if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+    if (data.levelUp) { playLevelUp(); window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp })) }
     window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
     finishPendingAction()
   }
@@ -629,11 +633,12 @@ export default function EncounterPage() {
       setCaughtExpGain(data.expGain ?? 0)
       if (data.completedMissions?.length) setCompletedMissions(data.completedMissions)
       setResult(data.evolved ? 'evolved' : 'caught')
-      if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+      if (data.levelUp) { playLevelUp(); window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp })) }
       window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       window.dispatchEvent(new CustomEvent('wc:refresh-bestiary'))
     } else if (data.fled) {
       setCatchPhase('idle')
+      playFlee()
       setWildAnim('flee'); setMessage('La creatura è fuggita...'); setResult('fled')
     } else {
       // ── Cattura fallita: shake della rete + messaggio casuale ─────────────
@@ -713,6 +718,7 @@ export default function EncounterPage() {
   }
 
   async function handleFlee() {
+    playFlee()
     if (state) {
       // Await flee so the encounter is 'fled' in DB before returning to map
       await fetch('/api/game/encounter/flee', {
@@ -789,7 +795,7 @@ export default function EncounterPage() {
           <motion.div
             initial={{ x: 380, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 80, damping: 14, delay: 3.3 }}
+            transition={{ type: 'spring', stiffness: 80, damping: 14, delay: 2.8 }}
           >
             <CreatureCard
               imageUrl={state.creature.image_url ?? ''}
@@ -815,7 +821,7 @@ export default function EncounterPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 24 }}
               transition={activeSlot === 0
-                ? { type: 'spring', stiffness: 80, damping: 14, delay: 4.0 }
+                ? { type: 'spring', stiffness: 80, damping: 14, delay: 3.5 }
                 : { duration: 0.28, ease: 'easeOut' }}
             >
               <CreatureCard

@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { playMissionComplete } from '@/lib/game/sounds/events'
 
 export interface CompletedMissionInfo {
   title: string
@@ -16,6 +17,9 @@ interface MissionRewardModalProps {
 
 export default function MissionRewardModal({ missions, onDone }: MissionRewardModalProps) {
   const [idx, setIdx] = useState(0)
+
+  // Play sound once when the modal first appears
+  useEffect(() => { playMissionComplete() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!missions.length) return null
 

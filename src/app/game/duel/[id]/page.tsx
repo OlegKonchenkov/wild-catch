@@ -11,6 +11,7 @@ import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { playBattleSound } from '@/lib/game/battle-sounds'
+import { playKnockout, playVictory, playDefeat, playLevelUp } from '@/lib/game/sounds/events'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 
@@ -457,10 +458,10 @@ export default function DuelPage() {
           )
           if (iAttacked) {
             setOppLineup(updateHp)
-            if (newOppHp === 0) setOppFainting(true)
+            if (newOppHp === 0) { setOppFainting(true); playKnockout() }
           } else {
             setMyLineup(updateHp)
-            if (newOppHp === 0) setMyFainting(true)
+            if (newOppHp === 0) { setMyFainting(true); playKnockout() }
           }
         }
 
@@ -547,7 +548,9 @@ export default function DuelPage() {
           if (updated.status === 'ended') {
             releaseAttackFeedback(250)
             supabase.auth.getUser().then(({ data: { user } }) => {
-              setResult(updated.winner_id === user?.id ? 'won' : 'lost')
+              const didWin = updated.winner_id === user?.id
+              setResult(didWin ? 'won' : 'lost')
+              if (didWin) playVictory(); else playDefeat()
               setIsMyTurn(false)
               window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
             })
@@ -677,9 +680,10 @@ export default function DuelPage() {
 
     const data = await res.json()
     if (res.ok) {
-      if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
+      if (data.levelUp) { playLevelUp(); window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp })) }
       if (data.duelOver) {
         // Immediately mark as won for the attacker — don't wait for postgres_changes
+        playVictory()
         setResult('won')
         setIsMyTurn(false)
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))

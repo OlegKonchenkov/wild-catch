@@ -13,6 +13,7 @@ import type { Session } from '@/lib/types'
 import { RARITY_LABELS } from '@/lib/types'
 import type { MapPin } from '@/components/map/GameMap'
 import { startMapAmbience } from '@/lib/game/sounds/map-loop'
+import { playEggHatch } from '@/lib/game/sounds/hatch'
 
 // Dynamic import — Leaflet is not SSR-safe
 const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false })
@@ -104,7 +105,7 @@ function EggHatchModal({
       const t = setTimeout(() => setCardVisible(true), 80)
       return () => clearTimeout(t)
     }
-    const t1 = setTimeout(() => setPhase('crack'), 900)
+    const t1 = setTimeout(() => { setPhase('crack'); playEggHatch(creature.rarity) }, 900)
     const t2 = setTimeout(() => { setPhase('reveal'); setTimeout(() => setCardVisible(true), 80) }, 1900)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [])
