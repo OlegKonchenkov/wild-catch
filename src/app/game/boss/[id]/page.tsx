@@ -1369,7 +1369,7 @@ export default function BossFightPage() {
 
   async function confirmLineup() {
     const filled = lineup.filter(Boolean) as SquadCreature[]
-    if (filled.length !== 3) return
+    if (filled.length < 1) return
     setStarting(true)
     const res = await fetch(`/api/game/boss/${id}`, {
       method: 'POST',
