@@ -26,7 +26,8 @@ export function startMapAmbience(vol = 0.12): () => void {
     return () => {}
   }
 
-  const actx = ac
+  if (!ac) return () => {}
+  const actx: AudioContext = ac
 
   // ── Soft ambient drone ────────────────────────────────────────────────────
   // Two slightly detuned oscillators create a gentle beating effect
