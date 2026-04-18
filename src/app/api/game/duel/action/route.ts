@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     const { createAdminClient: adminClientFactory } = await import('@/lib/supabase/admin')
     const adminSurrender = adminClientFactory()
     adminSurrender.from('player_game_events').insert([
-      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: user.id } },
+      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: user.id, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD } },
       { user_id: user.id,    session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: oppUserId } },
     ]).then(undefined, () => {})
     return NextResponse.json({ ended: true, winnerId: oppUserId })
@@ -279,7 +279,7 @@ export async function POST(request: Request) {
     const { createAdminClient } = await import('@/lib/supabase/admin')
     const adminClient = createAdminClient()
     const eventsToInsert = [
-      { user_id: user.id,    session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId } },
+      { user_id: user.id,    session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD } },
       { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: user.id } },
     ]
     adminClient.from('player_game_events').insert(eventsToInsert).then(undefined, () => {})

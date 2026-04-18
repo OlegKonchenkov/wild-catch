@@ -906,7 +906,10 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                         )}
                                         {p.element && <span className="text-xs px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>{p.element}</span>}
                                         {p.evolved && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399', border: '1px solid rgba(52,211,153,0.3)' }}>✨ Evoluta</span>}
-                                        {p.via_pin && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(58,157,188,0.15)', color: '#3A9DBC' }}>da pin</span>}
+                                        {p.via_pin  && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(58,157,188,0.15)',  color: '#3A9DBC' }}>📍 da pin</span>}
+                                      {p.via_egg  && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.15)',  color: '#FBBF24' }}>🥚 da uovo</span>}
+                                      {p.via_qr   && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(167,139,250,0.15)', color: '#A78BFA' }}>📱 da QR</span>}
+                                      {p.starter  && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)',  color: '#34D399' }}>⭐ starter</span>}
                                       </div>
                                       {(p.gold || p.exp) && (
                                         <div className="flex gap-2 flex-wrap">
@@ -993,6 +996,13 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                   {ev.type === 'qr_redeemed' && (
                                     <>
                                       {p.item_name && <p className="text-xs font-bold text-white">📱 {p.item_name}</p>}
+                                      {p.qr_label  && <p className="text-[11px] text-white/45">Etichetta: {p.qr_label}</p>}
+                                      {p.qr_type && (
+                                        <span className="inline-block text-xs px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(167,139,250,0.1)', color: '#A78BFA', border: '1px solid rgba(167,139,250,0.25)' }}>
+                                          {REWARD_TYPE_ICONS[p.qr_type as string] ?? '📱'} {p.qr_type}
+                                        </span>
+                                      )}
+                                      {p.egg_rarity && <p className="text-[11px] text-white/45">Rarità uovo: {p.egg_rarity}</p>}
                                       {(p.gold || p.exp) && (
                                         <div className="flex gap-2 flex-wrap">
                                           {p.gold ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{p.gold} 💰</span> : null}

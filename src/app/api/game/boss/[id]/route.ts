@@ -136,9 +136,10 @@ export async function POST(request: Request, { params }: Params) {
       .update({ status: 'lost', ended_at: new Date().toISOString() })
       .eq('id', id)
     const adminSurr = createAdminClient()
+    const bossNameSurr = (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss'
     adminSurr.from('player_game_events').insert({
       user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
-      payload: { fight_id: id },
+      payload: { fight_id: id, boss_name: bossNameSurr },
     }).then(undefined, () => {})
     return NextResponse.json({ surrendered: true })
   }
@@ -220,9 +221,10 @@ export async function POST(request: Request, { params }: Params) {
     ])
 
     if (allHealPlayerFainted) {
+      const bossNameHeal = (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss'
       createAdminClient().from('player_game_events').insert({
         user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
-        payload: { fight_id: id },
+        payload: { fight_id: id, boss_name: bossNameHeal },
       }).then(undefined, () => {})
     }
 

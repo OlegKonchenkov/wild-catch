@@ -121,6 +121,20 @@ export async function POST(
     .update({ hatched_at: new Date().toISOString(), hatched_creature_id: picked.id })
     .eq('id', id)
 
+  // Game event — egg hatch is treated as a catch
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  createAdminClient().from('player_game_events').insert({
+    user_id: user.id, session_id: sessionId, type: 'catch',
+    payload: {
+      creature_name: picked.name,
+      rarity: picked.rarity,
+      element: picked.element,
+      evolved: false,
+      via_egg: true,
+      egg_rarity: (egg as any).egg_rarity,
+    },
+  }).then(undefined, () => {})
+
   return NextResponse.json({
     hatched: true,
     creature: {

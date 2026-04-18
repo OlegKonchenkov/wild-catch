@@ -294,6 +294,25 @@ export async function POST(request: Request) {
     }
   }
 
+  // Game event for QR scan — creatura already emits 'catch'; boss is tracked by the fight itself
+  if (isFirstUniqueScan && ['oggetto', 'uovo', 'indizio'].includes(qr.type)) {
+    const evtAdmin = createAdminClient()
+    const evtPayload: Record<string, unknown> = {
+      qr_label:  qr.label ?? null,
+      qr_type:   qr.type,
+    }
+    if ((result as any).itemName)     evtPayload.item_name   = (result as any).itemName
+    if ((result as any).eggRarity)    evtPayload.egg_rarity  = (result as any).eggRarity
+    if ((result as any).stepsRequired != null) evtPayload.steps_required = (result as any).stepsRequired
+    // Normalise to a display name for the panel
+    evtPayload.item_name ??= qr.type === 'uovo'    ? `Uovo ${(result as any).eggRarity ?? ''}`
+                           : qr.type === 'indizio' ? 'Indizio sbloccato'
+                           : (result as any).itemName ?? 'QR riscattato'
+    evtAdmin.from('player_game_events').insert({
+      user_id: user.id, session_id: sessionId, type: 'qr_redeemed', payload: evtPayload,
+    }).then(undefined, () => {})
+  }
+
   // Track qr + collect missions (awaited so we can return completedMissions)
   const missionPromises: Promise<CompletedMission[]>[] = []
 
