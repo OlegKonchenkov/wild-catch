@@ -21,15 +21,32 @@ export async function GET(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Mark which pins this user has already claimed
-  const pinIds = (data ?? []).map((p: any) => p.id)
+  const pinIds    = (data ?? []).map((p: any) => p.id)
+  const bossPinIds = (data ?? []).filter((p: any) => p.reward_type === 'boss').map((p: any) => p.id)
+
   let claimedSet = new Set<string>()
   if (pinIds.length > 0) {
-    const { data: claims } = await supabase
-      .from('pin_claims')
-      .select('pin_id')
-      .eq('user_id', user.id)
-      .in('pin_id', pinIds)
-    claimedSet = new Set((claims ?? []).map((c: any) => c.pin_id))
+    // Regular pins — use pin_claims
+    const regularPinIds = pinIds.filter((id: string) => !bossPinIds.includes(id))
+    if (regularPinIds.length > 0) {
+      const { data: claims } = await supabase
+        .from('pin_claims')
+        .select('pin_id')
+        .eq('user_id', user.id)
+        .in('pin_id', regularPinIds)
+      for (const c of claims ?? []) claimedSet.add((c as any).pin_id)
+    }
+
+    // Boss pins — claimed only when the boss fight is won
+    if (bossPinIds.length > 0) {
+      const { data: wonFights } = await supabase
+        .from('boss_fights')
+        .select('pin_id')
+        .eq('user_id', user.id)
+        .eq('status', 'won')
+        .in('pin_id', bossPinIds)
+      for (const f of wonFights ?? []) claimedSet.add((f as any).pin_id)
+    }
   }
 
   const pins = (data ?? []).map((p: any) => ({

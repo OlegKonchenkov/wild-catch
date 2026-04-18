@@ -56,28 +56,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Troppo lontano dal pin', distanceM: Math.round(dist) }, { status: 422 })
   }
 
-  // Idempotency: one claim per (pin, user) — enforced by DB UNIQUE constraint, but check first
-  const { data: existing } = await supabase
-    .from('pin_claims')
-    .select('id')
-    .eq('pin_id', pinId)
-    .eq('user_id', user.id)
-    .maybeSingle()
+  // ── Boss pins bypass pin_claims — rechallengeable until won ──────────────
+  // Skip the idempotency insert; boss state is tracked in boss_fights.
+  if (pin.reward_type !== 'boss') {
+    const { data: existing } = await supabase
+      .from('pin_claims')
+      .select('id')
+      .eq('pin_id', pinId)
+      .eq('user_id', user.id)
+      .maybeSingle()
 
-  if (existing) {
-    return NextResponse.json({ error: 'Hai già riscattato questo pin', alreadyClaimed: true }, { status: 409 })
-  }
-
-  // Insert claim (will fail with 409-equivalent if race condition hits the UNIQUE constraint)
-  const { error: claimErr } = await supabase
-    .from('pin_claims')
-    .insert({ pin_id: pinId, user_id: user.id, session_id: sessionId })
-
-  if (claimErr) {
-    if (claimErr.code === '23505') {
+    if (existing) {
       return NextResponse.json({ error: 'Hai già riscattato questo pin', alreadyClaimed: true }, { status: 409 })
     }
-    return NextResponse.json({ error: claimErr.message }, { status: 500 })
+
+    const { error: claimErr } = await supabase
+      .from('pin_claims')
+      .insert({ pin_id: pinId, user_id: user.id, session_id: sessionId })
+
+    if (claimErr) {
+      if (claimErr.code === '23505') {
+        return NextResponse.json({ error: 'Hai già riscattato questo pin', alreadyClaimed: true }, { status: 409 })
+      }
+      return NextResponse.json({ error: claimErr.message }, { status: 500 })
+    }
   }
 
   // ── Dispense reward ────────────────────────────────────────────────────────
@@ -178,28 +180,37 @@ export async function POST(request: Request) {
         result = { ...result, error: 'Creature boss non trovate' }; break
       }
 
-      // Reuse existing fight if present, else create new one
+      // Reuse existing in-progress fight; allow rechallenge after loss; return won fight as-is
       const { data: existingFights } = await admin
         .from('boss_fights')
-        .select('id, status')
+        .select('id, status, reward_claimed')
         .eq('user_id', user.id)
         .eq('session_id', sessionId)
-        .eq('pin_id', pinId)  // link boss fight to pin (column added below via nullable FK)
-        .in('status', ['selecting', 'active', 'won'])
+        .eq('pin_id', pinId)
+        .in('status', ['selecting', 'active', 'won', 'lost'])
         .order('created_at', { ascending: false })
 
-      let bossFightId: string
-      const reusable = (existingFights ?? []).find(
+      const fights = existingFights ?? []
+      const inProgress = fights.find(
         (f: any) => f.status === 'selecting' || f.status === 'active',
-      ) ?? (existingFights ?? []).find((f: any) => f.status === 'won')
+      ) as any | undefined
+      const wonFight   = fights.find((f: any) => f.status === 'won')  as any | undefined
 
-      if (reusable) {
-        bossFightId = (reusable as any).id
+      let bossFightId: string
+
+      if (inProgress) {
+        // Continue the ongoing fight (player is still selecting or mid-battle)
+        bossFightId = inProgress.id
+      } else if (wonFight) {
+        // Boss already beaten — just return the existing fight id
+        bossFightId = wonFight.id
       } else {
+        // Either first attempt or a rechallenge after loss — create a new fight
         const { data: newFight, error: fightErr } = await admin
           .from('boss_fights')
           .insert({
             user_id: user.id, session_id: sessionId,
+            pin_id: pinId,
             boss_lineup: bossLineup, player_lineup: [],
             boss_active_slot: 0, player_active_slot: 0,
             status: 'selecting',

@@ -653,11 +653,13 @@ function PinRewardModal({ reward, onDone }: { reward: PinRewardData; onDone: () 
 function BossApproachModal({
   pin,
   sessionId,
+  playerPos,
   onFight,
   onLater,
 }: {
   pin: MapPin
   sessionId: string
+  playerPos: { lat: number; lng: number } | null
   onFight: (reward: PinRewardData) => void
   onLater: () => void
 }) {
@@ -676,7 +678,7 @@ function BossApproachModal({
       const res = await fetch('/api/game/map-pins/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pinId: pin.id, sessionId, lat: pin.lat, lng: pin.lng }),
+        body: JSON.stringify({ pinId: pin.id, sessionId, lat: playerPos?.lat ?? pin.lat, lng: playerPos?.lng ?? pin.lng }),
       })
       const d: any = await res.json()
       if (d.success || d.alreadyClaimed) {
@@ -802,6 +804,7 @@ function MapPageInner() {
   } | null>(null)
   const lastEncounterRef = useRef(0)
   const sessionIdRef = useRef<string | null>(null)
+  const lastPosRef = useRef<{ lat: number; lng: number } | null>(null)
   // Tracks metres walked since the last encounter attempt — resets after each attempt
   const cumDistRef = useRef(0)
   // Prevent concurrent triggerEncounter calls (mutex) and skip when popup is already open
@@ -928,6 +931,20 @@ function MapPageInner() {
     // Only act on boss pins that aren't yet claimed
     if (pin.reward_type !== 'boss') return
     if (claimedPinIdsRef.current.has(pin.id)) return
+
+    // Client-side GPS proximity check (server will verify again)
+    const pos = lastPosRef.current
+    if (pos) {
+      const R = 6371000
+      const dLat = (pin.lat - pos.lat) * Math.PI / 180
+      const dLon = (pin.lng - pos.lng) * Math.PI / 180
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(pos.lat * Math.PI / 180) * Math.cos(pin.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      const threshold = (pin.reward_radius_m ?? 50) + 20
+      if (dist > threshold) return
+    }
+
     // Show the confirm dialog (removes it from declined if it was there)
     setPendingBossPin(pin)
   }, [])
@@ -985,6 +1002,7 @@ function MapPageInner() {
 
     // Update accuracy display regardless of whether we send to server
     setGpsAccuracy(Math.round(pos.accuracy))
+    lastPosRef.current = { lat: pos.lat, lng: pos.lng }
 
     // Skip very inaccurate fixes for server calls (map marker still updates from useGPS).
     // 300m is generous — on poor GPS we still want step counting to work.
@@ -1362,6 +1380,7 @@ function MapPageInner() {
         <BossApproachModal
           pin={pendingBossPin}
           sessionId={sessionId!}
+          playerPos={lastPosRef.current}
           onFight={(reward) => {
             setClaimedPinIds(prev => new Set([...prev, pendingBossPin.id]))
             setPendingBossPin(null)
