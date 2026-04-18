@@ -522,6 +522,7 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
               <option value="indizio">🧩 Indizio</option>
               <option value="boss">⚔️ Boss</option>
               <option value="evento">🎉 Evento</option>
+              <option value="enigma">🔐 Enigma</option>
             </select>
           </div>
           {pinRewardType !== 'none' && (

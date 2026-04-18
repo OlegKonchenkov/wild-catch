@@ -791,6 +791,7 @@ function BossApproachModal({
 }) {
   const [visible, setVisible] = useState(false)
   const [claiming, setClaiming] = useState(false)
+  const [claimError, setClaimError] = useState<string | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 60)
@@ -800,6 +801,7 @@ function BossApproachModal({
   async function handleFight() {
     if (claiming) return
     setClaiming(true)
+    setClaimError(null)
     try {
       const res = await fetch('/api/game/map-pins/claim', {
         method: 'POST',
@@ -807,10 +809,16 @@ function BossApproachModal({
         body: JSON.stringify({ pinId: pin.id, sessionId, lat: playerPos?.lat ?? pin.lat, lng: playerPos?.lng ?? pin.lng }),
       })
       const d: any = await res.json()
-      if (d.success || d.alreadyClaimed) {
+      if ((d.success || d.alreadyClaimed) && d.bossFightId) {
         onFight(d as PinRewardData)
+      } else if (d.success && !d.bossFightId) {
+        setClaimError('Boss non configurato correttamente.')
+      } else {
+        setClaimError(d.error ?? 'Errore nell\'avviare la battaglia.')
       }
     } catch {
+      setClaimError('Errore di rete, riprova.')
+    } finally {
       setClaiming(false)
     }
   }
@@ -847,6 +855,12 @@ function BossApproachModal({
             <p className="text-red-300/70 text-sm mt-1">Un boss ti sfida in battaglia!</p>
             <p className="text-white/35 text-xs mt-2">Sei pronto ad affrontarlo?</p>
           </div>
+          {/* Error */}
+          {claimError && (
+            <p className="text-xs text-red-400 bg-red-400/10 border border-red-400/25 rounded-xl px-3 py-2 text-center">
+              ⚠ {claimError}
+            </p>
+          )}
           {/* Actions */}
           <div className="flex gap-3">
             <button
@@ -1181,6 +1195,9 @@ function MapPageInner() {
     }
 
     if (starterFlowLockedRef.current) return
+
+    // Only perform pin claims and encounter triggers for active sessions
+    if (data.sessionStatus && data.sessionStatus !== 'active') return
 
     // ── Pin proximity check ────────────────────────────────────────────────
     // Refs are used here so the callback always reads the latest values
