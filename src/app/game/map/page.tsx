@@ -893,8 +893,10 @@ function MapPageInner() {
   const pendingBossPinRef = useRef<MapPin | null>(null)
   const [pendingEnigmaPin, setPendingEnigmaPin] = useState<MapPin | null>(null)
   const pendingEnigmaPinRef = useRef<MapPin | null>(null)
-  const [declinedBossPinIds, setDeclinedBossPinIds] = useState<Set<string>>(new Set())
+  const [declinedBossPinIds, setDeclinedBossPinIds]     = useState<Set<string>>(new Set())
   const declinedBossPinIdsRef = useRef<Set<string>>(new Set())
+  const [declinedEnigmaPinIds, setDeclinedEnigmaPinIds] = useState<Set<string>>(new Set())
+  const declinedEnigmaPinIdsRef = useRef<Set<string>>(new Set())
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
   const [hatchQueue, setHatchQueue] = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number; description?: string | null; isStarter?: boolean }[]>([])
@@ -914,6 +916,7 @@ function MapPageInner() {
   useEffect(() => { pendingBossPinRef.current = pendingBossPin }, [pendingBossPin])
   useEffect(() => { pendingEnigmaPinRef.current = pendingEnigmaPin }, [pendingEnigmaPin])
   useEffect(() => { declinedBossPinIdsRef.current = declinedBossPinIds }, [declinedBossPinIds])
+  useEffect(() => { declinedEnigmaPinIdsRef.current = declinedEnigmaPinIds }, [declinedEnigmaPinIds])
 
   // Background ambience loop — starts on mount, stops on unmount
   useEffect(() => {
@@ -1075,7 +1078,11 @@ function MapPageInner() {
     }
 
     if (pin.reward_type === 'boss') setPendingBossPin(pin)
-    else if (pin.reward_type === 'enigma') setPendingEnigmaPin(pin)
+    else if (pin.reward_type === 'enigma') {
+      // Clear declined so the modal reopens on manual tap
+      setDeclinedEnigmaPinIds(prev => { const s = new Set(prev); s.delete(pin.id); return s })
+      setPendingEnigmaPin(pin)
+    }
   }, [])
 
   const triggerEncounter = useCallback(async (trigger: 'gps' | 'timer' = 'gps'): Promise<boolean> => {
@@ -1181,8 +1188,9 @@ function MapPageInner() {
       const nearPin = mapPinsRef.current.find(pin => {
         if (!pin.reward_type) return false
         if (claimedPinIdsRef.current.has(pin.id)) return false
-        // Boss pins that were declined skip auto-trigger (user can still tap manually)
-        if (pin.reward_type === 'boss' && declinedBossPinIdsRef.current.has(pin.id)) return false
+        // Boss/enigma pins that were declined skip auto-trigger (user can still tap manually)
+        if (pin.reward_type === 'boss'   && declinedBossPinIdsRef.current.has(pin.id))   return false
+        if (pin.reward_type === 'enigma' && declinedEnigmaPinIdsRef.current.has(pin.id)) return false
         const dLat = (pos.lat - pin.lat) * Math.PI / 180
         const dLon = (pos.lng - pin.lng) * Math.PI / 180
         const a = Math.sin(dLat / 2) ** 2 +
@@ -1539,7 +1547,11 @@ function MapPageInner() {
             setPendingEnigmaPin(null)
             setPinReward(reward as PinRewardData)
           }}
-          onClose={() => setPendingEnigmaPin(null)}
+          onClose={() => {
+            // Mark declined so GPS doesn't re-trigger immediately; player can tap manually to retry
+            setDeclinedEnigmaPinIds(prev => new Set([...prev, pendingEnigmaPin.id]))
+            setPendingEnigmaPin(null)
+          }}
         />
       )}
 
