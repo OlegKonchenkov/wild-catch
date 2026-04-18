@@ -74,11 +74,11 @@ function formatGameEvent(ev: any): { icon: string; title: string; body: string }
     case 'duel_won':
       return {
         icon: '🏆',
-        title: 'Duello vinto!',
+        title: p.opponent_name ? `Vinto vs ${p.opponent_name}` : 'Duello vinto!',
         body: rewardParts(p) || 'Vittoria in duello',
       }
     case 'duel_lost':
-      return { icon: '💀', title: 'Duello perso', body: '' }
+      return { icon: '💀', title: p.winner_name ? `Perso vs ${p.winner_name}` : 'Duello perso', body: '' }
     case 'boss_won':
       return {
         icon: '👑',
@@ -887,6 +887,32 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                           </div>
                         ) : null
                       )
+                      const DuelSquadColumn = ({ label, creatures, accentColor }: { label: string; creatures: any[]; accentColor: string }) => (
+                        <div className="flex flex-col gap-1.5">
+                          <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: accentColor + 'AA' }}>{label}</p>
+                          {creatures.map((cr: any, i: number) => {
+                            const crRarity = cr.rarity ? RARITY_DISPLAY[cr.rarity as string] : null
+                            const crElem   = cr.element ? (ELEMENT_EMOJI as Record<string, string>)[cr.element as string] : null
+                            return (
+                              <div key={i} className="flex items-center gap-1.5 rounded-lg p-1.5" style={{ background: 'rgba(0,0,0,0.22)', border: `1px solid ${crRarity?.color ?? accentColor}22` }}>
+                                <div className="w-9 h-9 rounded-md shrink-0 overflow-hidden flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                                  {cr.image_url
+                                    ? <img src={cr.image_url} alt={cr.name} className="w-full h-full object-contain" />
+                                    : <span className="text-lg">🎯</span>
+                                  }
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[11px] font-semibold text-white truncate leading-tight">{cr.name ?? '—'}</p>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    {crRarity && <span className="text-[9px] font-bold px-1 py-0.5 rounded-full" style={{ background: `${crRarity.color}20`, color: crRarity.color }}>{crRarity.label}</span>}
+                                    {crElem && cr.element && <span className="text-[9px] px-1 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>{crElem}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
 
                       return (
                         <div key={ev.id}>
@@ -998,21 +1024,47 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                     )}
 
                                     {/* ── DUEL WON ──────────────────────────── */}
-                                    {ev.type === 'duel_won' && (
-                                      <>
-                                        <p className="text-base font-extrabold" style={{ color: '#34D399' }}>🏆 Vittoria!</p>
-                                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Duello vinto per KO</p>
-                                        <RewardChips gold={p.gold} exp={p.exp} />
-                                      </>
-                                    )}
+                                    {ev.type === 'duel_won' && (() => {
+                                      const oppName = p.opponent_name as string | null
+                                      const mySquad  = (p.my_creatures  as any[]) ?? []
+                                      const oppSquad = (p.opp_creatures as any[]) ?? []
+                                      return (
+                                        <>
+                                          <div className="flex items-center gap-2">
+                                            <p className="text-base font-extrabold" style={{ color: '#34D399' }}>🏆 Vittoria!</p>
+                                            {oppName && <span className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>vs {oppName}</span>}
+                                          </div>
+                                          {(mySquad.length > 0 || oppSquad.length > 0) && (
+                                            <div className="grid grid-cols-2 gap-2 mt-1">
+                                              <DuelSquadColumn label="La tua squadra" creatures={mySquad} accentColor="#34D399" />
+                                              <DuelSquadColumn label="Avversario" creatures={oppSquad} accentColor="#F87171" />
+                                            </div>
+                                          )}
+                                          <RewardChips gold={p.gold} exp={p.exp} />
+                                        </>
+                                      )
+                                    })()}
 
                                     {/* ── DUEL LOST ─────────────────────────── */}
-                                    {ev.type === 'duel_lost' && (
-                                      <>
-                                        <p className="text-base font-extrabold" style={{ color: '#F87171' }}>💀 Sconfitta</p>
-                                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Duello perso per KO</p>
-                                      </>
-                                    )}
+                                    {ev.type === 'duel_lost' && (() => {
+                                      const winnerName = p.winner_name as string | null
+                                      const mySquad    = (p.my_creatures  as any[]) ?? []
+                                      const oppSquad   = (p.opp_creatures as any[]) ?? []
+                                      return (
+                                        <>
+                                          <div className="flex items-center gap-2">
+                                            <p className="text-base font-extrabold" style={{ color: '#F87171' }}>💀 Sconfitta</p>
+                                            {winnerName && <span className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>vs {winnerName}</span>}
+                                          </div>
+                                          {(mySquad.length > 0 || oppSquad.length > 0) && (
+                                            <div className="grid grid-cols-2 gap-2 mt-1">
+                                              <DuelSquadColumn label="La tua squadra" creatures={mySquad} accentColor="#F87171" />
+                                              <DuelSquadColumn label="Avversario" creatures={oppSquad} accentColor="#34D399" />
+                                            </div>
+                                          )}
+                                        </>
+                                      )
+                                    })()}
 
                                     {/* ── BOSS WON ──────────────────────────── */}
                                     {ev.type === 'boss_won' && (

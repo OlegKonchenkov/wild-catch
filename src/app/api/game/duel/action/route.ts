@@ -49,9 +49,21 @@ export async function POST(request: Request) {
     // Game events on surrender
     const { createAdminClient: adminClientFactory } = await import('@/lib/supabase/admin')
     const adminSurrender = adminClientFactory()
+    // Load lineups + profiles for enriched event payload
+    const { data: surrenderLineups } = await supabase
+      .from('duel_lineups')
+      .select('user_id, slot, player_creatures(creatures(name, element, hp, atk, def, image_url, sprite_url, rarity))')
+      .eq('duel_id', duelId)
+      .order('slot', { ascending: true })
+    const { data: surrenderProfiles } = await adminSurrender.from('profiles').select('user_id, nickname').in('user_id', [user.id, oppUserId!])
+    const surrenderProfileMap: Record<string, string | null> = Object.fromEntries(
+      (surrenderProfiles ?? []).map((r: any) => [r.user_id, r.nickname ?? null])
+    )
+    const surrenderMine = buildCreatureSummaries(surrenderLineups ?? [], user.id)
+    const surrenderOpp  = buildCreatureSummaries(surrenderLineups ?? [], oppUserId!)
     adminSurrender.from('player_game_events').insert([
-      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: user.id, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD } },
-      { user_id: user.id,    session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: oppUserId } },
+      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: user.id, opponent_name: surrenderProfileMap[user.id] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: surrenderOpp, opp_creatures: surrenderMine } },
+      { user_id: user.id,    session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: oppUserId, winner_name: surrenderProfileMap[oppUserId!] ?? null, my_creatures: surrenderMine, opp_creatures: surrenderOpp } },
     ]).then(undefined, () => {})
     return NextResponse.json({ ended: true, winnerId: oppUserId })
   }
@@ -130,7 +142,7 @@ export async function POST(request: Request) {
   // ── Load all lineups ───────────────────────────────────────────────────────
   const { data: allLineups } = await supabase
     .from('duel_lineups')
-    .select('*, player_creatures(*, creatures(name, element, hp, atk, def))')
+    .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_url, rarity))')
     .eq('duel_id', duelId)
     .order('slot', { ascending: true })
 
@@ -278,9 +290,17 @@ export async function POST(request: Request) {
     // Save game events for bell history
     const { createAdminClient } = await import('@/lib/supabase/admin')
     const adminClient = createAdminClient()
+    // Build creature summaries from allLineups for event payload
+    const myCreatures   = buildCreatureSummaries(allLineups ?? [], user.id)
+    const oppCreatures  = buildCreatureSummaries(allLineups ?? [], oppUserId!)
+    // Fetch opponent nickname
+    const { data: profileRows } = await adminClient.from('profiles').select('user_id, nickname').in('user_id', [user.id, oppUserId!])
+    const profileMap: Record<string, string | null> = Object.fromEntries(
+      (profileRows ?? []).map((r: any) => [r.user_id, r.nickname ?? null])
+    )
     const eventsToInsert = [
-      { user_id: user.id,    session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD } },
-      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: user.id } },
+      { user_id: user.id,    session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId, opponent_name: profileMap[oppUserId!] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: myCreatures, opp_creatures: oppCreatures } },
+      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: user.id, winner_name: profileMap[user.id] ?? null, my_creatures: oppCreatures, opp_creatures: myCreatures } },
     ]
     adminClient.from('player_game_events').insert(eventsToInsert).then(undefined, () => {})
     if (myLevelUp) {
@@ -331,6 +351,26 @@ export async function POST(request: Request) {
 
 const DUEL_WIN_EXP  = 30
 const DUEL_WIN_GOLD = 30  // mirrors EXP
+
+function buildCreatureSummaries(lineups: any[], userId: string) {
+  return lineups
+    .filter(l => l.user_id === userId)
+    .sort((a, b) => a.slot - b.slot)
+    .map(l => {
+      const cr = l.player_creatures?.creatures
+      if (!cr) return null
+      return {
+        name:      cr.name      ?? null,
+        image_url: cr.image_url ?? cr.sprite_url ?? null,
+        rarity:    cr.rarity    ?? null,
+        element:   cr.element   ?? null,
+        hp:        cr.hp        ?? null,
+        atk:       cr.atk       ?? null,
+        def:       cr.def       ?? null,
+      }
+    })
+    .filter(Boolean)
+}
 
 async function awardDuelResults(
   supabase: any,
