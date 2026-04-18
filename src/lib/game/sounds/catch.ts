@@ -7,19 +7,14 @@
  * playCatchSuccess  — creature caught: ascending fanfare + sparkle chimes
  */
 
-function ctx(): AudioContext | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return new ((window as any).AudioContext || (window as any).webkitAudioContext)()
-  } catch { return null }
-}
+import { getSharedAC, getSoundStartTime } from './shared-ac'
 
 // ── Catch attempt ─────────────────────────────────────────────────────────────
 // Rising bandpass whoosh + spin rattle oscillator + bass thud on landing
 export function playCatchAttempt(vol = 0.50) {
-  const ac = ctx()
+  const ac = getSharedAC()
   if (!ac) return
-  const now = ac.currentTime
+  const now = getSoundStartTime(0.60)
 
   // Rising whoosh — filtered noise sweep
   const bufLen = Math.floor(ac.sampleRate * 0.55)
@@ -71,15 +66,14 @@ export function playCatchAttempt(vol = 0.50) {
   thud.connect(tGain); tGain.connect(ac.destination)
   thud.start(t); thud.stop(t + 0.22)
 
-  setTimeout(() => ac.close(), 900)
 }
 
 // ── Catch failed ──────────────────────────────────────────────────────────────
 // Three shake clunks + descending sad wail + low rumble as net breaks open
 export function playCatchFail(vol = 0.50) {
-  const ac = ctx()
+  const ac = getSharedAC()
   if (!ac) return
-  const now = ac.currentTime
+  const now = getSoundStartTime(0.90)
 
   // Three quick shake clunks
   ;[0, 0.10, 0.20].forEach((delay, i) => {
@@ -118,15 +112,14 @@ export function playCatchFail(vol = 0.50) {
   rumble.connect(rGain); rGain.connect(ac.destination)
   rumble.start(now + 0.15); rumble.stop(now + 0.44)
 
-  setTimeout(() => ac.close(), 1100)
 }
 
 // ── Catch success ─────────────────────────────────────────────────────────────
 // G-major ascending arpeggio + sparkle chimes + held chord: creature caught!
 export function playCatchSuccess(vol = 0.55) {
-  const ac = ctx()
+  const ac = getSharedAC()
   if (!ac) return
-  const now = ac.currentTime
+  const now = getSoundStartTime(1.40)
 
   // Ascending G major arpeggio (G4 B4 D5 G5)
   const arp = [196.00, 246.94, 293.66, 392.00]
@@ -174,5 +167,4 @@ export function playCatchSuccess(vol = 0.55) {
     osc.start(t); osc.stop(t + 0.70)
   })
 
-  setTimeout(() => ac.close(), 1700)
 }

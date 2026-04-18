@@ -10,7 +10,17 @@
  *   mitologico  – ultimate: bass boom + 9-note sweep + cosmic sparkle cascade
  */
 
-import { getSharedAC } from './shared-ac'
+import { getSharedAC, getSoundStartTime } from './shared-ac'
+
+// Approximate total duration per rarity — used to reserve a queue slot
+const HATCH_DURATION: Record<string, number> = {
+  comune:      0.30,
+  non_comune:  0.85,
+  raro:        1.05,
+  epico:       1.90,
+  leggendario: 1.70,
+  mitologico:  2.25,
+}
 
 // Crack transient shared by all rarities — highpass-filtered noise burst
 function playCrack(ac: AudioContext, now: number, vol: number): void {
@@ -43,7 +53,7 @@ function bell(ac: AudioContext, freq: number, t: number, vol: number, dur = 0.55
 
 export function playEggHatch(rarity: string, vol = 0.50): void {
   const ac = getSharedAC(); if (!ac) return
-  const now = ac.currentTime
+  const now = getSoundStartTime(HATCH_DURATION[rarity] ?? 1.05)
 
   // Crack volume scales with rarity
   const crackVols: Record<string, number> = {

@@ -14,13 +14,7 @@
  */
 
 import type { Element, Rarity } from '@/lib/types'
-
-function ctx(): AudioContext | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return new ((window as any).AudioContext || (window as any).webkitAudioContext)()
-  } catch { return null }
-}
+import { getSharedAC, getSoundStartTime } from './shared-ac'
 
 // Volume and duration scale with rarity
 const RARITY_VOL: Record<string, number> = {
@@ -43,8 +37,7 @@ const RARITY_DUR: Record<string, number> = {
 
 // ── fiamma (fire) ─────────────────────────────────────────────────────────────
 // Sharp high-pass crackle + descending sizzle oscillator
-function playFiamma(ac: AudioContext, vol: number, dur: number) {
-  const now = ac.currentTime
+function playFiamma(ac: AudioContext, now: number, vol: number, dur: number) {
 
   const len = Math.floor(ac.sampleRate * (dur + 0.10))
   const buf = ac.createBuffer(1, len, ac.sampleRate)
@@ -73,8 +66,7 @@ function playFiamma(ac: AudioContext, vol: number, dur: number) {
 
 // ── adriatico (water) ─────────────────────────────────────────────────────────
 // Bandpass whoosh (500→200 Hz sweep) + bubble pop at mid-point
-function playAdriatico(ac: AudioContext, vol: number, dur: number) {
-  const now = ac.currentTime
+function playAdriatico(ac: AudioContext, now: number, vol: number, dur: number) {
 
   const len = Math.floor(ac.sampleRate * (dur + 0.15))
   const buf = ac.createBuffer(1, len, ac.sampleRate)
@@ -109,8 +101,7 @@ function playAdriatico(ac: AudioContext, vol: number, dur: number) {
 
 // ── bosco (forest/nature) ─────────────────────────────────────────────────────
 // Mid-band rustling noise + soft low thud
-function playBosco(ac: AudioContext, vol: number, dur: number) {
-  const now = ac.currentTime
+function playBosco(ac: AudioContext, now: number, vol: number, dur: number) {
 
   const len = Math.floor(ac.sampleRate * (dur + 0.12))
   const buf = ac.createBuffer(1, len, ac.sampleRate)
@@ -141,8 +132,7 @@ function playBosco(ac: AudioContext, vol: number, dur: number) {
 
 // ── terra (earth/rock) ────────────────────────────────────────────────────────
 // Deep sine bass drop + low-pass filtered rumble noise
-function playTerra(ac: AudioContext, vol: number, dur: number) {
-  const now = ac.currentTime
+function playTerra(ac: AudioContext, now: number, vol: number, dur: number) {
 
   const bass = ac.createOscillator()
   const bGain = ac.createGain()
@@ -171,8 +161,7 @@ function playTerra(ac: AudioContext, vol: number, dur: number) {
 
 // ── armonia (normal/harmony) ──────────────────────────────────────────────────
 // Clean sine punch + mid-band noise layer
-function playArmonia(ac: AudioContext, vol: number, dur: number) {
-  const now = ac.currentTime
+function playArmonia(ac: AudioContext, now: number, vol: number, dur: number) {
 
   const osc = ac.createOscillator()
   const oGain = ac.createGain()
@@ -202,21 +191,19 @@ function playArmonia(ac: AudioContext, vol: number, dur: number) {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 export function playDefaultAttack(element: Element | string, rarity: Rarity | string) {
-  const ac = ctx()
+  const ac = getSharedAC()
   if (!ac) return
 
   const vol = RARITY_VOL[rarity] ?? 0.50
   const dur = RARITY_DUR[rarity] ?? 0.25
+  const now = getSoundStartTime(dur + 0.15)
 
   switch (element as Element) {
-    case 'fiamma':    playFiamma(ac, vol, dur);    break
-    case 'adriatico': playAdriatico(ac, vol, dur); break
-    case 'bosco':     playBosco(ac, vol, dur);     break
-    case 'terra':     playTerra(ac, vol, dur);     break
+    case 'fiamma':    playFiamma(ac, now, vol, dur);    break
+    case 'adriatico': playAdriatico(ac, now, vol, dur); break
+    case 'bosco':     playBosco(ac, now, vol, dur);     break
+    case 'terra':     playTerra(ac, now, vol, dur);     break
     case 'armonia':
-    default:          playArmonia(ac, vol, dur);   break
+    default:          playArmonia(ac, now, vol, dur);   break
   }
-
-  const closingDelay = ((RARITY_DUR[rarity] ?? 0.25) + 0.35) * 1000
-  setTimeout(() => ac.close(), closingDelay)
 }
