@@ -270,6 +270,8 @@ export async function POST(request: Request) {
         payload: {
           creature_name: (creature as any).name, rarity: (creature as any).rarity,
           element: (creature as any).element, evolved: false, via_pin: true,
+          image_url: (creature as any).image_url ?? (creature as any).sprite_url ?? null,
+          hp: (creature as any).hp ?? null, atk: (creature as any).atk ?? null, def: (creature as any).def ?? null,
         },
       }).then(undefined, () => {})
 

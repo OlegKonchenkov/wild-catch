@@ -230,11 +230,16 @@ export async function POST(request: Request) {
     session_id: encounter.session_id,
     type: 'catch',
     payload: {
-      creature_name: creature.name,
-      rarity: creature.rarity,
-      element: creature.element,
-      evolved: evolvedTriggered,
-      gold: goldGain,
+      creature_name:    creature.name,
+      rarity:           creature.rarity,
+      element:          creature.element,
+      evolved:          evolvedTriggered,
+      gold:             goldGain,
+      image_url:        creature.image_url ?? creature.sprite_url ?? null,
+      hp:               creature.hp  ?? null,
+      atk:              creature.atk ?? null,
+      def:              creature.def ?? null,
+      catch_difficulty: creature.catch_difficulty ?? null,
     },
   }).then(undefined, () => {})
 

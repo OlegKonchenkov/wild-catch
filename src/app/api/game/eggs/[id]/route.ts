@@ -127,11 +127,15 @@ export async function POST(
     user_id: user.id, session_id: sessionId, type: 'catch',
     payload: {
       creature_name: picked.name,
-      rarity: picked.rarity,
-      element: picked.element,
-      evolved: false,
-      via_egg: true,
-      egg_rarity: (egg as any).egg_rarity,
+      rarity:        picked.rarity,
+      element:       picked.element,
+      evolved:       false,
+      via_egg:       true,
+      egg_rarity:    (egg as any).egg_rarity,
+      image_url:     picked.image_url ?? picked.sprite_url ?? null,
+      hp:  picked.hp  ?? null,
+      atk: picked.atk ?? null,
+      def: picked.def ?? null,
     },
   }).then(undefined, () => {})
 

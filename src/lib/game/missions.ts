@@ -93,19 +93,28 @@ export async function incrementMissionProgress({
 
     if (justCompleted) {
       const levelUp = await grantMissionReward(mission, userId, sessionId, admin)
-      // Game event for bell history
+      // Game events for bell history
       admin.from('player_game_events').insert({
         user_id: userId,
         session_id: sessionId,
         type: 'mission_completed',
         payload: {
-          mission_id:   mission.id,
+          mission_id:     mission.id,
           mission_target: mission.target,
-          title:        mission.title,
-          reward_gold:  mission.reward_gold,
-          reward_exp:   mission.reward_exp,
+          target_count:   mission.target_count,
+          title:          mission.title,
+          reward_gold:    mission.reward_gold,
+          reward_exp:     mission.reward_exp,
         },
       }).then(undefined, () => {})
+      if (levelUp) {
+        admin.from('player_game_events').insert({
+          user_id: userId,
+          session_id: sessionId,
+          type: 'level_up',
+          payload: { new_level: levelUp.newLevel, gold_reward: levelUp.goldReward },
+        }).then(undefined, () => {})
+      }
       completed.push({
         title: mission.title,
         rewardGold: mission.reward_gold,

@@ -67,10 +67,14 @@ export async function POST(request: Request) {
     type: 'catch',
     payload: {
       creature_name: creature.name,
-      rarity: creature.rarity,
-      element: creature.element,
-      evolved: false,
-      starter: true,
+      rarity:        creature.rarity,
+      element:       creature.element,
+      evolved:       false,
+      starter:       true,
+      image_url:     (creature as any).image_url ?? (creature as any).sprite_url ?? null,
+      hp:  (creature as any).hp  ?? null,
+      atk: (creature as any).atk ?? null,
+      def: (creature as any).def ?? null,
     },
   }).then(undefined, () => {})
 

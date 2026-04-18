@@ -951,19 +951,43 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                     {/* ── CATCH ─────────────────────────────── */}
                                     {ev.type === 'catch' && (
                                       <>
-                                        <p className="text-sm font-bold text-white">{p.creature_name ?? '—'}</p>
+                                        {/* Creature card */}
+                                        <div className="flex gap-3 rounded-xl p-2.5" style={{ background: 'rgba(0,0,0,0.25)', border: `1px solid ${rarityInfo?.color ?? '#ffffff'}22` }}>
+                                          {/* Image */}
+                                          <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                                            {p.image_url
+                                              ? <img src={p.image_url} alt={p.creature_name} className="w-full h-full object-contain" />
+                                              : <span className="text-3xl">🎯</span>
+                                            }
+                                          </div>
+                                          {/* Info */}
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-white leading-tight mb-1">{p.creature_name ?? '—'}</p>
+                                            <div className="flex flex-wrap gap-1 mb-2">
+                                              {rarityInfo && (
+                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${rarityInfo.color}22`, color: rarityInfo.color, border: `1px solid ${rarityInfo.color}50` }}>
+                                                  {rarityInfo.label}
+                                                </span>
+                                              )}
+                                              {elemEmoji && p.element && (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full capitalize" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)' }}>
+                                                  {elemEmoji} {p.element}
+                                                </span>
+                                              )}
+                                              {p.evolved && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399' }}>✨ Ev.</span>}
+                                            </div>
+                                            {/* Stats */}
+                                            {(p.hp || p.atk || p.def) && (
+                                              <div className="flex gap-2.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                                                {p.hp  != null && <span>❤️ {p.hp}</span>}
+                                                {p.atk != null && <span>⚔️ {p.atk}</span>}
+                                                {p.def != null && <span>🛡️ {p.def}</span>}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {/* Source + rewards */}
                                         <div className="flex flex-wrap gap-1.5">
-                                          {rarityInfo && (
-                                            <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${rarityInfo.color}22`, color: rarityInfo.color, border: `1px solid ${rarityInfo.color}50` }}>
-                                              {rarityInfo.label}
-                                            </span>
-                                          )}
-                                          {elemEmoji && p.element && (
-                                            <span className="text-xs px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.65)' }}>
-                                              {elemEmoji} {p.element}
-                                            </span>
-                                          )}
-                                          {p.evolved  && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399', border: '1px solid rgba(52,211,153,0.3)' }}>✨ Evoluta</span>}
                                           {p.via_pin  && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(58,157,188,0.15)',  color: '#3A9DBC' }}>📍 pin</span>}
                                           {p.via_egg  && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.15)',  color: '#FBBF24' }}>🥚 uovo</span>}
                                           {p.via_qr   && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(192,132,252,0.15)', color: '#C084FC' }}>📱 QR</span>}
@@ -1018,8 +1042,16 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                         <p className="text-base font-extrabold text-white">
                                           {p.title ?? p.mission_target ?? 'Missione completata!'}
                                         </p>
-                                        {p.title && p.mission_target && (
-                                          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>Obiettivo: {p.mission_target}</p>
+                                        {/* Objective detail */}
+                                        {(p.mission_target || p.target_count > 1) && (
+                                          <div className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)' }}>
+                                            <span className="text-sm">🎯</span>
+                                            <p className="text-xs text-white/70">
+                                              {p.target_count > 1
+                                                ? `${p.target_count}× ${p.mission_target ?? 'completamenti'}`
+                                                : (p.mission_target ?? 'completato')}
+                                            </p>
+                                          </div>
                                         )}
                                         <RewardChips gold={p.reward_gold} exp={p.reward_exp} />
                                       </>
