@@ -56,6 +56,72 @@ export async function POST(request: Request) {
     return NextResponse.json({ ended: true, winnerId: oppUserId })
   }
 
+  // ── Heal ───────────────────────────────────────────────────────────────────
+  if (action === 'heal') {
+    if (duel.current_turn !== myRole) {
+      return NextResponse.json({ error: 'Non è il tuo turno' }, { status: 409 })
+    }
+    if (!itemId) return NextResponse.json({ error: 'itemId richiesto' }, { status: 400 })
+
+    const { data: invItem } = await supabase
+      .from('player_inventory')
+      .select('id, quantity, items(effect_value, type)')
+      .eq('id', itemId)
+      .eq('user_id', user.id)
+      .eq('session_id', duel.session_id)
+      .single()
+
+    const inv = invItem as { id: string; quantity: number; items: { effect_value: number; type: string } } | null
+    if (!inv || inv.quantity <= 0 || inv.items?.type !== 'cura') {
+      return NextResponse.json({ error: 'Oggetto non valido' }, { status: 400 })
+    }
+
+    // Load my active creature
+    const { data: healLineups } = await supabase
+      .from('duel_lineups')
+      .select('id, current_hp, player_creatures(creatures(hp, atk, def))')
+      .eq('duel_id', duelId)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single()
+
+    if (!healLineups) return NextResponse.json({ error: 'Nessuna creatura attiva' }, { status: 400 })
+
+    const { data: healPsRow } = await supabase
+      .from('player_sessions')
+      .select('level')
+      .eq('user_id', user.id)
+      .eq('session_id', duel.session_id)
+      .maybeSingle()
+    const healLevel = healPsRow?.level ?? 1
+    const baseCreature = (healLineups as any).player_creatures?.creatures
+    const maxHp = scaleCombatStats(
+      { hp: baseCreature?.hp ?? 100, atk: baseCreature?.atk ?? 10, def: baseCreature?.def ?? 0 },
+      healLevel,
+    ).hp
+
+    const healAmount = Math.round(maxHp * ((inv.items.effect_value ?? 20) / 100))
+    const newHp = Math.min(maxHp, (healLineups as any).current_hp + healAmount)
+
+    await Promise.all([
+      supabase.from('duel_lineups').update({ current_hp: newHp }).eq('id', (healLineups as any).id),
+      supabase.from('player_inventory').update({ quantity: inv.quantity - 1 }).eq('id', itemId),
+      supabase.from('duels').update({ current_turn: isChallenger ? 'opponent' : 'challenger' }).eq('id', duelId),
+    ])
+
+    const nextTurn: 'challenger' | 'opponent' = isChallenger ? 'opponent' : 'challenger'
+    const channel = supabase.channel(`duel:${duelId}`)
+    await new Promise<void>(resolve => channel.subscribe(() => resolve()))
+    await channel.send({
+      type: 'broadcast',
+      event: 'duel_action',
+      payload: { actorId: user.id, action: 'heal', healAmount, newHp, nextTurn, duelOver: false },
+    })
+    await supabase.removeChannel(channel)
+
+    return NextResponse.json({ healed: true, healAmount, newHp, nextTurn })
+  }
+
   // ── Turn check ─────────────────────────────────────────────────────────────
   if (duel.current_turn !== myRole) {
     return NextResponse.json({ error: 'Non è il tuo turno' }, { status: 409 })

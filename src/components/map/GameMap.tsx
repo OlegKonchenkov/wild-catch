@@ -11,6 +11,7 @@ export interface MapPin {
   image_url?: string | null
   reward_type?: string | null
   reward_radius_m?: number | null
+  reward_payload?: Record<string, unknown> | null
   claimed?: boolean
 }
 

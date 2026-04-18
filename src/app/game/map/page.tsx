@@ -486,6 +486,7 @@ const REWARD_TYPE_LABEL: Record<string, string> = {
   indizio: '🧩 Frammento enigma!',
   boss:    '⚔️ Boss apparso!',
   evento:  '🎉 Evento!',
+  enigma:  '🔐 Enigma risolto!',
 }
 
 // Typed shape of a pin claim response
@@ -647,6 +648,131 @@ function PinRewardModal({ reward, onDone }: { reward: PinRewardData; onDone: () 
   )
 }
 
+// ── EnigmaModal ───────────────────────────────────────────────────────────────
+// Shown when the player taps or enters range of an enigma pin.
+function EnigmaModal({
+  pin,
+  sessionId,
+  playerPos,
+  onSuccess,
+  onClose,
+}: {
+  pin: MapPin
+  sessionId: string
+  playerPos: { lat: number; lng: number } | null
+  onSuccess: (reward: PinRewardData) => void
+  onClose: () => void
+}) {
+  const [visible, setVisible] = useState(false)
+  const [solution, setSolution] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 60)
+    return () => clearTimeout(t)
+  }, [])
+
+  const question: string = (pin as any).reward_payload?.question ?? ''
+  const imageUrl: string | null = (pin as any).reward_payload?.image_url ?? null
+
+  async function handleSubmit() {
+    if (!solution.trim() || submitting) return
+    setSubmitting(true)
+    setErrorMsg(null)
+    try {
+      const res = await fetch('/api/game/map-pins/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pinId: pin.id, sessionId,
+          lat: playerPos?.lat ?? pin.lat, lng: playerPos?.lng ?? pin.lng,
+          solution: solution.trim(),
+        }),
+      })
+      const d: any = await res.json()
+      if (d.success || d.alreadyClaimed) {
+        onSuccess(d as PinRewardData)
+      } else if (d.wrongSolution) {
+        setErrorMsg('Soluzione errata, riprova!')
+        setSubmitting(false)
+      } else {
+        setErrorMsg(d.error ?? 'Errore')
+        setSubmitting(false)
+      }
+    } catch {
+      setErrorMsg('Errore di rete')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[1200] flex flex-col items-end justify-end">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative w-full rounded-t-3xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(180deg, #08040F 0%, #0F0820 100%)',
+          border: '1px solid rgba(139,92,246,0.3)',
+          borderBottom: 'none',
+          transform: visible ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
+        }}
+      >
+        <div className="flex justify-center pt-3 mb-1">
+          <div className="w-10 h-1 rounded-full bg-white/20" />
+        </div>
+        <div className="px-5 pb-8 space-y-4 pt-2">
+          <div className="flex items-start gap-3 bg-violet-500/10 border border-violet-400/25 rounded-2xl p-3">
+            <span className="text-2xl leading-none mt-0.5">🔐</span>
+            <div>
+              <p className="text-xs font-bold text-violet-300 uppercase tracking-wide">Enigma</p>
+              <p className="text-base font-extrabold text-white mt-0.5">{pin.name}</p>
+            </div>
+          </div>
+          {imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt="Indizio" className="w-full rounded-2xl object-cover max-h-40" />
+          )}
+          {question && (
+            <p className="text-sm text-white/80 leading-relaxed">{question}</p>
+          )}
+          <div className="space-y-2">
+            <input
+              value={solution}
+              onChange={e => setSolution(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+              placeholder="Inserisci la soluzione…"
+              className="w-full bg-white/08 text-white border border-white/20 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-violet-400/60 placeholder:text-white/30"
+              style={{ background: 'rgba(255,255,255,0.06)' }}
+            />
+            {errorMsg && (
+              <p className="text-xs text-red-400">{errorMsg}</p>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 py-3.5 rounded-xl font-bold text-sm text-white/60 transition-all active:scale-95"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+            >
+              Più tardi
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !solution.trim()}
+              className="flex-[2] py-3.5 rounded-xl font-extrabold text-sm text-white transition-all active:scale-95 disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}
+            >
+              {submitting ? 'Verifica…' : '✓ Conferma'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── BossApproachModal ─────────────────────────────────────────────────────────
 // Shown when a boss pin enters proximity range — lets the player choose
 // to fight now or postpone (manual tap on the pin will re-open it later).
@@ -763,8 +889,10 @@ function MapPageInner() {
   const pinRewardRef = useRef<PinRewardData | null>(null)
   const mapPinsRef = useRef<MapPin[]>([])
   const claimingPinRef = useRef(false)
-  const [pendingBossPin, setPendingBossPin] = useState<MapPin | null>(null)
+  const [pendingBossPin, setPendingBossPin]     = useState<MapPin | null>(null)
   const pendingBossPinRef = useRef<MapPin | null>(null)
+  const [pendingEnigmaPin, setPendingEnigmaPin] = useState<MapPin | null>(null)
+  const pendingEnigmaPinRef = useRef<MapPin | null>(null)
   const [declinedBossPinIds, setDeclinedBossPinIds] = useState<Set<string>>(new Set())
   const declinedBossPinIdsRef = useRef<Set<string>>(new Set())
   const [stepsWalked, setStepsWalked] = useState(0)
@@ -784,6 +912,7 @@ function MapPageInner() {
   useEffect(() => { pinRewardRef.current = pinReward }, [pinReward])
   useEffect(() => { mapPinsRef.current = mapPins }, [mapPins])
   useEffect(() => { pendingBossPinRef.current = pendingBossPin }, [pendingBossPin])
+  useEffect(() => { pendingEnigmaPinRef.current = pendingEnigmaPin }, [pendingEnigmaPin])
   useEffect(() => { declinedBossPinIdsRef.current = declinedBossPinIds }, [declinedBossPinIds])
 
   // Background ambience loop — starts on mount, stops on unmount
@@ -924,12 +1053,12 @@ function MapPageInner() {
     }
   }, [])
 
-  // ── Handle pin tap from map — show boss confirm if applicable ──────────────
+  // ── Handle pin tap from map — show boss/enigma modals ─────────────────────
   const handlePinTap = useCallback((pin: MapPin) => {
     const sid = sessionIdRef.current
     if (!sid) return
-    // Only act on boss pins that aren't yet claimed
-    if (pin.reward_type !== 'boss') return
+    // Only act on boss/enigma pins that aren't yet claimed
+    if (pin.reward_type !== 'boss' && pin.reward_type !== 'enigma') return
     if (claimedPinIdsRef.current.has(pin.id)) return
 
     // Client-side GPS proximity check (server will verify again)
@@ -945,8 +1074,8 @@ function MapPageInner() {
       if (dist > threshold) return
     }
 
-    // Show the confirm dialog (removes it from declined if it was there)
-    setPendingBossPin(pin)
+    if (pin.reward_type === 'boss') setPendingBossPin(pin)
+    else if (pin.reward_type === 'enigma') setPendingEnigmaPin(pin)
   }, [])
 
   const triggerEncounter = useCallback(async (trigger: 'gps' | 'timer' = 'gps'): Promise<boolean> => {
@@ -1048,7 +1177,7 @@ function MapPageInner() {
 
     // ── Pin proximity check ────────────────────────────────────────────────
     // Refs are used here so the callback always reads the latest values
-    if (!claimingPinRef.current && !pinRewardRef.current && !pendingBossPinRef.current) {
+    if (!claimingPinRef.current && !pinRewardRef.current && !pendingBossPinRef.current && !pendingEnigmaPinRef.current) {
       const nearPin = mapPinsRef.current.find(pin => {
         if (!pin.reward_type) return false
         if (claimedPinIdsRef.current.has(pin.id)) return false
@@ -1062,9 +1191,13 @@ function MapPageInner() {
         return dist <= (pin.reward_radius_m ?? 50)
       })
       if (nearPin) {
-        // Boss pins get a confirm dialog — player may not be ready to fight
+        // Boss and enigma pins get confirm dialogs
         if (nearPin.reward_type === 'boss') {
           setPendingBossPin(nearPin)
+          return
+        }
+        if (nearPin.reward_type === 'enigma') {
+          setPendingEnigmaPin(nearPin)
           return
         }
         claimingPinRef.current = true
@@ -1392,6 +1525,21 @@ function MapPageInner() {
             setDeclinedBossPinIds(prev => new Set([...prev, pendingBossPin.id]))
             setPendingBossPin(null)
           }}
+        />
+      )}
+
+      {/* Enigma pin modal */}
+      {pendingEnigmaPin && (
+        <EnigmaModal
+          pin={pendingEnigmaPin}
+          sessionId={sessionId!}
+          playerPos={lastPosRef.current}
+          onSuccess={(reward) => {
+            setClaimedPinIds(prev => new Set([...prev, pendingEnigmaPin.id]))
+            setPendingEnigmaPin(null)
+            setPinReward(reward as PinRewardData)
+          }}
+          onClose={() => setPendingEnigmaPin(null)}
         />
       )}
 

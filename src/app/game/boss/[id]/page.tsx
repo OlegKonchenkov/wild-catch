@@ -488,8 +488,10 @@ function BattleScreen({
   bossAnimState,
   lastDamage,
   battagliaItems,
+  curaItems,
   selectedItemId,
   onSelectItem,
+  onHeal,
   switchNotice,
   fortuneNotice,
   critNotice,
@@ -509,8 +511,10 @@ function BattleScreen({
   bossAnimState: 'idle' | 'attack' | 'damage'
   lastDamage: { amount: number; target: 'me' | 'boss'; id: number; isCrit?: boolean } | null
   battagliaItems: BattagliaItem[]
+  curaItems: BattagliaItem[]
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
+  onHeal: (itemId: string) => void
   switchNotice: string | null
   fortuneNotice: { id: number; text: string; tone: CombatFortuneInfo['tone'] } | null
   critNotice: { id: number } | null
@@ -644,32 +648,58 @@ function BattleScreen({
                   </svg>
                 </button>
               </div>
-              <div className="px-4 pb-6 flex flex-col gap-2">
-                {battagliaItems.map(item => (
-                  <button key={item.inventoryId}
-                    onClick={() => {
-                      onSelectItem(selectedItemId === item.inventoryId ? null : item.inventoryId)
-                      setShowItemsModal(false)
-                    }}
-                    className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all"
-                    style={{
-                      background: selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.07)'}`,
-                    }}>
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                      style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      ⚔️
+              <div className="px-4 pb-6 flex flex-col gap-3">
+                {battagliaItems.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-white/35 mb-2">⚔️ Battaglia — potenzia ATK questo turno</p>
+                    <div className="flex flex-col gap-1.5">
+                      {battagliaItems.map(item => (
+                        <button key={item.inventoryId}
+                          onClick={() => {
+                            onSelectItem(selectedItemId === item.inventoryId ? null : item.inventoryId)
+                            setShowItemsModal(false)
+                          }}
+                          className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all"
+                          style={{
+                            background: selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                          }}>
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                            style={{ background: 'rgba(255,255,255,0.06)' }}>⚔️</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-white truncate">{item.name}</p>
+                            <p className="text-xs text-[#FBBF24]">+{item.effectValue}% ATK</p>
+                          </div>
+                          <span className="text-sm font-bold text-white/35 shrink-0">×{item.quantity}</span>
+                          {selectedItemId === item.inventoryId && (
+                            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: '#FBBF24' }} />
+                          )}
+                        </button>
+                      ))}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white truncate">{item.name}</p>
-                      <p className="text-xs text-[#FBBF24]">+{item.effectValue}% ATK</p>
+                  </div>
+                )}
+                {curaItems.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-white/35 mb-2">💚 Cura — ripristina HP (il boss attacca)</p>
+                    <div className="flex flex-col gap-1.5">
+                      {curaItems.map(item => (
+                        <button key={item.inventoryId}
+                          onClick={() => { onHeal(item.inventoryId); setShowItemsModal(false) }}
+                          className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all"
+                          style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)' }}>
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                            style={{ background: 'rgba(52,211,153,0.1)' }}>💚</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-white truncate">{item.name}</p>
+                            <p className="text-xs text-[#34D399]">+{item.effectValue}% HP</p>
+                          </div>
+                          <span className="text-sm font-bold text-white/35 shrink-0">×{item.quantity}</span>
+                        </button>
+                      ))}
                     </div>
-                    <span className="text-sm font-bold text-white/35 shrink-0">×{item.quantity}</span>
-                    {selectedItemId === item.inventoryId && (
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: '#FBBF24' }} />
-                    )}
-                  </button>
-                ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           </>
@@ -924,7 +954,7 @@ function BattleScreen({
       {/* ── ACTIONS ── */}
       <div className="shrink-0 px-4 pb-5 pt-1 z-10 flex gap-2">
         {/* Items button */}
-        {battagliaItems.length > 0 && (
+        {(battagliaItems.length > 0 || curaItems.length > 0) && (
           <motion.button
             onClick={() => setShowItemsModal(true)}
             whileTap={{ scale: 0.95 }}
@@ -1220,6 +1250,7 @@ export default function BossFightPage() {
   const [lastDamage, setLastDamage]       = useState<{ amount: number; target: 'me' | 'boss'; id: number; isCrit?: boolean } | null>(null)
   const [critNotice, setCritNotice]       = useState<{ id: number } | null>(null)
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
+  const [curaItems, setCuraItems]           = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [switchNotice, setSwitchNotice]   = useState<string | null>(null)
   const [bossFainting, setBossFainting]   = useState(false)
@@ -1335,6 +1366,15 @@ export default function BossFightPage() {
               quantity: inv.quantity,
             }))
           setBattagliaItems(bItems)
+          const cItems: BattagliaItem[] = ((invRes.data ?? []) as any[])
+            .filter(inv => inv.items?.type === 'cura' && inv.quantity > 0)
+            .map(inv => ({
+              inventoryId: inv.id,
+              name: inv.items.name,
+              effectValue: inv.items.effect_value,
+              quantity: inv.quantity,
+            }))
+          setCuraItems(cItems)
         }
       } finally {
         setLoadingCreatures(false)
@@ -1564,6 +1604,59 @@ export default function BossFightPage() {
     }, 900)
   }
 
+  async function handleHeal(itemId: string) {
+    if (attackingRef.current) return
+    attackingRef.current = true
+    setAttacking(true)
+
+    const res = await fetch(`/api/game/boss/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'heal', itemId }),
+    })
+    const data = await res.json()
+
+    if (!res.ok) { showActionError(res.status, data.error ?? 'Errore cura'); attackingRef.current = false; setAttacking(false); return }
+
+    setCuraItems(prev => prev.map(it => it.inventoryId === itemId ? { ...it, quantity: it.quantity - 1 } : it).filter(it => it.quantity > 0))
+
+    // Update player HP — heal then boss counter
+    if (data.healedHp != null) {
+      setPlayerLineup(prev => prev.map(slot => slot.is_active ? { ...slot, current_hp: data.healedHp } : slot))
+      addLog(`💚 Cura +${data.healAmount} HP`)
+    }
+
+    // Boss counter-attack animation
+    if (data.bossDamage > 0 && data.newPlayerHp != null) {
+      setBossAttacking(true)
+      setTimeout(() => {
+        setBossAttacking(false)
+        setPlayerLineup(data.playerLineup as PlayerSlot[])
+        setLastDamage({ amount: data.bossDamage, target: 'me', id: Date.now(), isCrit: !!data.bossCrit })
+        setAnimState('damage')
+        addLog(`Il Capo Palestra risponde con ${data.bossDamage} danni!`)
+        const isOver = data.status === 'won' || data.status === 'lost'
+        if (data.playerSwitchedTo) {
+          setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`)
+          setTimeout(() => setSwitchNotice(null), 2000)
+        }
+        setTimeout(() => {
+          setAnimState('idle')
+          setLastDamage(null)
+          if (isOver) {
+            if (data.won) playVictory(); else playDefeat()
+            setTimeout(() => setFinalResult({ won: data.won, reward: null, levelUp: null }), 400)
+          }
+          attackingRef.current = false
+          setAttacking(false)
+        }, 900)
+      }, 1100)
+    } else {
+      attackingRef.current = false
+      setAttacking(false)
+    }
+  }
+
   async function handleSurrender() {
     await fetch(`/api/game/boss/${id}`, {
       method: 'POST',
@@ -1667,8 +1760,10 @@ export default function BossFightPage() {
             bossAnimState={bossAnimState}
             lastDamage={lastDamage}
             battagliaItems={battagliaItems}
+            curaItems={curaItems}
             selectedItemId={selectedItemId}
             onSelectItem={setSelectedItemId}
+            onHeal={handleHeal}
             switchNotice={switchNotice}
             fortuneNotice={fortuneNotice}
             critNotice={critNotice}

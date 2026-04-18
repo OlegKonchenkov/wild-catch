@@ -258,6 +258,7 @@ export default function DuelPage() {
   const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp'; id: number; isCrit?: boolean } | null>(null)
   const [critNotice, setCritNotice]         = useState<{ id: number } | null>(null)
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
+  const [curaItems, setCuraItems]           = useState<BattagliaItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [showItemsModal, setShowItemsModal] = useState(false)
   const [switchNotice, setSwitchNotice]     = useState<string | null>(null)
@@ -438,6 +439,10 @@ export default function DuelPage() {
           .filter(r => r.items?.type === 'battaglia')
           .map(r => ({ inventoryId: r.id, name: r.items.name, effectValue: r.items.effect_value, quantity: r.quantity }))
         setBattagliaItems(filtered)
+        const filteredCura = ((inv ?? []) as any[])
+          .filter(r => r.items?.type === 'cura')
+          .map(r => ({ inventoryId: r.id, name: r.items.name, effectValue: r.items.effect_value, quantity: r.quantity }))
+        setCuraItems(filteredCura)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -448,8 +453,22 @@ export default function DuelPage() {
     const channel = supabase
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
-        const { actorId, damage, fortune, isCrit, nextTurn, itemUsed, switchedTo, newOppHp } = payload
+        const { actorId, action: broadcastAction, damage, fortune, isCrit, nextTurn, itemUsed, switchedTo, newOppHp, healAmount, newHp } = payload
         const iAttacked = actorId === userIdRef.current
+
+        // ── Heal broadcast — update the healer's HP ────────────────────────────
+        if (broadcastAction === 'heal') {
+          if (iAttacked) {
+            // I healed — HP already updated locally in handleHeal
+          } else {
+            // Opponent healed — update their HP
+            setOppLineup(prev => prev.map(l => l.is_active ? { ...l, current_hp: newHp } : l))
+          }
+          if (nextTurn) setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
+          setLog(prev => [`💚 Cura +${healAmount} HP`, ...prev.slice(0, 3)])
+          return
+        }
+
         const isFaint   = newOppHp === 0 && switchedTo
 
         // ── HP update (immediate) ──────────────────────────────────────────────
@@ -705,6 +724,32 @@ export default function DuelPage() {
     }
   }
 
+  async function handleHeal(itemId: string) {
+    if (attackingRef.current || !isMyTurn) return
+    if (timerRef.current) clearInterval(timerRef.current)
+    attackingRef.current = true
+    setAttacking(true)
+
+    const res = await fetch('/api/game/duel/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duelId: id, action: 'heal', itemId }),
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      // Update local HP optimistically (broadcast also updates it via channel)
+      if (data.newHp != null) {
+        setMyLineup(prev => prev.map(l => l.is_active ? { ...l, current_hp: data.newHp } : l))
+      }
+      setCuraItems(prev => prev.map(it => it.inventoryId === itemId ? { ...it, quantity: it.quantity - 1 } : it).filter(it => it.quantity > 0))
+      setIsMyTurn(false)
+      setShowItemsModal(false)
+    }
+    attackingRef.current = false
+    setAttacking(false)
+  }
+
   async function handleSurrender() {
     setIsMyTurn(false)
     await fetch('/api/game/duel/action', {
@@ -903,32 +948,60 @@ export default function DuelPage() {
                   </svg>
                 </button>
               </div>
-              <div className="px-4 pb-6 flex flex-col gap-2">
-                {battagliaItems.map(item => (
-                  <button key={item.inventoryId}
-                    onClick={() => {
-                      setSelectedItemId(selectedItemId === item.inventoryId ? null : item.inventoryId)
-                      setShowItemsModal(false)
-                    }}
-                    className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all"
-                    style={{
-                      background: selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.07)'}`,
-                    }}>
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                      style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      ⚔️
+              <div className="px-4 pb-6 flex flex-col gap-3">
+                {/* ── Battaglia items (boost ATK this turn) ── */}
+                {battagliaItems.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-white/35 mb-2">⚔️ Battaglia — potenzia ATK questo turno</p>
+                    <div className="flex flex-col gap-1.5">
+                      {battagliaItems.map(item => (
+                        <button key={item.inventoryId}
+                          onClick={() => {
+                            setSelectedItemId(selectedItemId === item.inventoryId ? null : item.inventoryId)
+                            setShowItemsModal(false)
+                          }}
+                          className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all"
+                          style={{
+                            background: selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${selectedItemId === item.inventoryId ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                          }}>
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                            style={{ background: 'rgba(255,255,255,0.06)' }}>⚔️</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-white truncate">{item.name}</p>
+                            <p className="text-xs text-[#FBBF24]">+{item.effectValue}% ATK</p>
+                          </div>
+                          <span className="text-sm font-bold text-white/35 shrink-0">×{item.quantity}</span>
+                          {selectedItemId === item.inventoryId && (
+                            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: '#FBBF24' }} />
+                          )}
+                        </button>
+                      ))}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white truncate">{item.name}</p>
-                      <p className="text-xs text-[#FBBF24]">+{item.effectValue}% ATK</p>
+                  </div>
+                )}
+                {/* ── Cura items (heal active creature, uses turn) ── */}
+                {curaItems.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-white/35 mb-2">💚 Cura — ripristina HP (usa il turno)</p>
+                    <div className="flex flex-col gap-1.5">
+                      {curaItems.map(item => (
+                        <button key={item.inventoryId}
+                          onClick={() => handleHeal(item.inventoryId)}
+                          className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all"
+                          style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)' }}>
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                            style={{ background: 'rgba(52,211,153,0.1)' }}>💚</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-white truncate">{item.name}</p>
+                            <p className="text-xs text-[#34D399]">+{item.effectValue}% HP</p>
+                          </div>
+                          <span className="text-sm font-bold text-white/35 shrink-0">×{item.quantity}</span>
+                        </button>
+                      ))}
                     </div>
-                    <span className="text-sm font-bold text-white/35 shrink-0">×{item.quantity}</span>
-                    {selectedItemId === item.inventoryId && (
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: '#FBBF24' }} />
-                    )}
-                  </button>
-                ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           </>
@@ -1171,7 +1244,7 @@ export default function DuelPage() {
         <div className="shrink-0 px-4 pb-5 pt-1 z-10 flex gap-2">
 
           {/* Items toggle button */}
-          {battagliaItems.length > 0 && (
+          {(battagliaItems.length > 0 || curaItems.length > 0) && (
             <motion.button
               onClick={() => { if (isMyTurn) setShowItemsModal(true) }}
               whileTap={{ scale: 0.95 }}

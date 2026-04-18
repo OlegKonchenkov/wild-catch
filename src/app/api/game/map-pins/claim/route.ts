@@ -16,14 +16,14 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 }
 
 // POST /api/game/map-pins/claim
-// body: { pinId, sessionId, lat, lng }
+// body: { pinId, sessionId, lat, lng, solution? }  ← solution required for enigma pins
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const body = await request.json().catch(() => ({}))
-  const { pinId, sessionId, lat, lng } = body
+  const { pinId, sessionId, lat, lng, solution } = body
 
   if (!pinId || !sessionId || lat == null || lng == null) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
@@ -54,6 +54,14 @@ export async function POST(request: Request) {
   const dist = haversine(lat, lng, pin.lat, pin.lng)
   if (dist > threshold) {
     return NextResponse.json({ error: 'Troppo lontano dal pin', distanceM: Math.round(dist) }, { status: 422 })
+  }
+
+  // ── Enigma pins: verify solution before proceeding ───────────────────────
+  if (pin.reward_type === 'enigma') {
+    const correctSolution = ((pin.reward_payload as any)?.solution ?? '') as string
+    if (!solution || solution.trim().toLowerCase() !== correctSolution.trim().toLowerCase()) {
+      return NextResponse.json({ error: 'Soluzione errata, riprova!', wrongSolution: true }, { status: 422 })
+    }
   }
 
   // ── Boss pins bypass pin_claims — rechallengeable until won ──────────────
@@ -271,6 +279,62 @@ export async function POST(request: Request) {
 
     case 'evento': {
       result = { ...result, eventType: payload.event_type, effect: payload.effect }
+      break
+    }
+
+    case 'enigma': {
+      // Solution already verified above; now grant the nested reward
+      const rewardType    = payload.reward_type as string | undefined
+      const rewardPayload = (payload.reward_payload ?? {}) as any
+
+      if (rewardType === 'exp' || rewardType === 'gold') {
+        const amount = (rewardPayload.amount ?? 0) as number
+        await admin.rpc('increment_player_stats', {
+          p_user_id: user.id,
+          p_session_id: sessionId,
+          p_exp:   rewardType === 'exp'  ? amount : 0,
+          p_score: rewardType === 'exp'  ? Math.floor(amount / 10) : 0,
+          p_gold:  rewardType === 'gold' ? amount : 0,
+        })
+        result = { ...result, rewardType, amount }
+      } else if (rewardType === 'oggetto' && rewardPayload.item_id) {
+        const { data: existingOggettoEnigma } = await supabase
+          .from('player_inventory')
+          .select('id, quantity')
+          .eq('user_id', user.id).eq('session_id', sessionId).eq('item_id', rewardPayload.item_id)
+          .maybeSingle()
+        if (existingOggettoEnigma) {
+          await supabase.from('player_inventory')
+            .update({ quantity: existingOggettoEnigma.quantity + (rewardPayload.quantity ?? 1) })
+            .eq('id', existingOggettoEnigma.id)
+        } else {
+          await supabase.from('player_inventory').insert({
+            user_id: user.id, session_id: sessionId,
+            item_id: rewardPayload.item_id, quantity: rewardPayload.quantity ?? 1,
+          })
+        }
+        const { data: enigmaItem } = await supabase.from('items').select('name').eq('id', rewardPayload.item_id).single()
+        result = { ...result, rewardType, itemName: (enigmaItem as any)?.name, quantity: rewardPayload.quantity ?? 1 }
+      } else if (rewardType === 'creatura' && rewardPayload.creature_id) {
+        const { data: enigmaCreature } = await supabase
+          .from('creatures').select('id, name, rarity, element, image_url, sprite_url, hp, atk, def, description')
+          .eq('id', rewardPayload.creature_id).single()
+        if (enigmaCreature) {
+          const { data: existingEnigmaPc } = await admin
+            .from('player_creatures').select('id, duplicates_count')
+            .eq('user_id', user.id).eq('session_id', sessionId).eq('creature_id', (enigmaCreature as any).id).maybeSingle()
+          if (existingEnigmaPc) {
+            await admin.from('player_creatures')
+              .update({ duplicates_count: existingEnigmaPc.duplicates_count + 1 })
+              .eq('id', existingEnigmaPc.id)
+          } else {
+            await admin.from('player_creatures').upsert({
+              user_id: user.id, creature_id: (enigmaCreature as any).id, session_id: sessionId, duplicates_count: 1,
+            }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
+          }
+          result = { ...result, rewardType, creature: enigmaCreature }
+        }
+      }
       break
     }
   }

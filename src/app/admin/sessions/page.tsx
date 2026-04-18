@@ -11,6 +11,7 @@ import {
   PinPayloadIndizio,
   PinPayloadBoss,
   PinPayloadEvento,
+  PinPayloadEnigma,
 } from '@/components/admin/PinPayloadForms'
 
 function SessionTimeInfo({ session }: { session: { status: string; start_at: string | null; end_at: string | null; duration_minutes: number } }) {
@@ -722,6 +723,7 @@ export default function SessionsPage() {
                 <option value="indizio">🧩 Indizio</option>
                 <option value="boss">⚔️ Boss</option>
                 <option value="evento">🎉 Evento</option>
+                <option value="enigma">🔐 Enigma</option>
               </select>
             </div>
 
@@ -743,6 +745,9 @@ export default function SessionsPage() {
             )}
             {pinEditRewardType === 'evento' && (
               <PinPayloadEvento value={pinEditPayload} onChange={setPinEditPayload} />
+            )}
+            {pinEditRewardType === 'enigma' && (
+              <PinPayloadEnigma allItems={allItems} allCreatures={allCreatures} value={pinEditPayload} onChange={setPinEditPayload} />
             )}
 
             {/* Radius */}

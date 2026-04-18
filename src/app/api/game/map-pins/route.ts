@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from('session_map_pins')
-    .select('id, lat, lng, name, description, image_url, reward_type, reward_radius_m')
+    .select('id, lat, lng, name, description, image_url, reward_type, reward_radius_m, reward_payload')
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true })
 
@@ -49,10 +49,23 @@ export async function GET(request: Request) {
     }
   }
 
-  const pins = (data ?? []).map((p: any) => ({
-    ...p,
-    claimed: claimedSet.has(p.id),
-  }))
+  const pins = (data ?? []).map((p: any) => {
+    // For enigma pins: expose question + image_url from payload, but NEVER expose the solution
+    let enigmaPublic: Record<string, unknown> | null = null
+    if (p.reward_type === 'enigma' && p.reward_payload) {
+      enigmaPublic = {
+        question:  p.reward_payload.question  ?? null,
+        image_url: p.reward_payload.image_url ?? null,
+      }
+    }
+    // Strip reward_payload from the response (contains secrets); replace with safe enigma data
+    const { reward_payload: _rp, ...rest } = p
+    return {
+      ...rest,
+      claimed: claimedSet.has(p.id),
+      ...(enigmaPublic ? { reward_payload: enigmaPublic } : {}),
+    }
+  })
 
   return NextResponse.json({ pins })
 }

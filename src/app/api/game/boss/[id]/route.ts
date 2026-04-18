@@ -143,6 +143,105 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ surrendered: true })
   }
 
+  // ── Heal ────────────────────────────────────────────────────────────────
+  if (action === 'heal') {
+    if (fight.status !== 'active') {
+      return NextResponse.json({ error: 'Battaglia non attiva' }, { status: 409 })
+    }
+    if (!itemId) return NextResponse.json({ error: 'itemId richiesto' }, { status: 400 })
+
+    const { data: healInvItem } = await supabase
+      .from('player_inventory')
+      .select('id, quantity, items(effect_value, type)')
+      .eq('id', itemId)
+      .eq('user_id', user.id)
+      .eq('session_id', fight.session_id)
+      .single()
+
+    const healInv = healInvItem as { id: string; quantity: number; items: { effect_value: number; type: string } } | null
+    if (!healInv || healInv.quantity <= 0 || healInv.items?.type !== 'cura') {
+      return NextResponse.json({ error: 'Oggetto non valido' }, { status: 400 })
+    }
+
+    const healPlayerLineup: any[] = fight.player_lineup
+    const healBossLineup: any[] = fight.boss_lineup
+    const healPlayerActive = healPlayerLineup.find((c: any) => c.is_active && !c.fainted)
+    const healBossActive = healBossLineup[fight.boss_active_slot]
+
+    if (!healPlayerActive) return NextResponse.json({ error: 'Nessuna creatura attiva' }, { status: 400 })
+    if (!healBossActive || healBossActive.fainted) return NextResponse.json({ error: 'Boss già sconfitto' }, { status: 400 })
+
+    const healAmount = Math.round(healPlayerActive.max_hp * ((healInv.items.effect_value ?? 20) / 100))
+    const healedHp = Math.min(healPlayerActive.max_hp, healPlayerActive.current_hp + healAmount)
+    healPlayerActive.current_hp = healedHp
+
+    // Boss counter-attacks even when player heals
+    const bossHealMult = getElementMultiplier(healBossActive.element as Element, healPlayerActive.element as Element)
+    const bossHealFortune = rollCombatFortune({
+      attackerLevel: healBossActive.level ?? 1,
+      defenderLevel: healPlayerActive.level ?? 1,
+      attackerStats: { hp: healBossActive.max_hp, atk: healBossActive.atk, def: healBossActive.def ?? 0 },
+      defenderStats: { hp: healPlayerActive.max_hp, atk: healPlayerActive.atk, def: healPlayerActive.def ?? 0 },
+    })
+    const { isCrit: healBossCrit, critMultiplier: healBossCritMult } = rollCrit()
+    const counterDamage = calculateCombatDamage({
+      attackerAtk: healBossActive.atk,
+      defenderDef: healPlayerActive.def ?? 0,
+      attackMultiplier: healBossCritMult,
+      elementMultiplier: bossHealMult,
+      varianceMultiplier: bossHealFortune.multiplier,
+    })
+    const afterCounterHp = Math.max(0, healedHp - counterDamage)
+    healPlayerActive.current_hp = afterCounterHp
+    if (afterCounterHp === 0) healPlayerActive.fainted = true
+
+    let healPlayerActiveSlot = fight.player_active_slot
+    let healPlayerSwitchedTo: string | null = null
+    if (afterCounterHp === 0) {
+      healPlayerActive.is_active = false
+      const nextIdx = healPlayerLineup.findIndex((c: any) => !c.fainted)
+      if (nextIdx !== -1) {
+        healPlayerLineup[nextIdx].is_active = true
+        healPlayerActiveSlot = nextIdx
+        healPlayerSwitchedTo = healPlayerLineup[nextIdx].name
+      }
+    }
+
+    const allHealPlayerFainted = healPlayerLineup.every((c: any) => c.fainted)
+    const healStatus = allHealPlayerFainted ? 'lost' : fight.status
+
+    await Promise.all([
+      supabase.from('player_inventory').update({ quantity: healInv.quantity - 1 }).eq('id', itemId),
+      supabase.from('boss_fights').update({
+        player_lineup: healPlayerLineup,
+        player_active_slot: healPlayerActiveSlot,
+        ...(healStatus !== fight.status ? { status: healStatus, ended_at: new Date().toISOString() } : {}),
+      }).eq('id', id),
+    ])
+
+    if (allHealPlayerFainted) {
+      createAdminClient().from('player_game_events').insert({
+        user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
+        payload: { fight_id: id },
+      }).then(undefined, () => {})
+    }
+
+    return NextResponse.json({
+      healed: true,
+      healAmount,
+      healedHp,
+      bossDamage: counterDamage,
+      newPlayerHp: afterCounterHp,
+      bossFortune: bossHealFortune,
+      bossCrit: healBossCrit,
+      bossElementMult: bossHealMult,
+      playerSwitchedTo: healPlayerSwitchedTo,
+      playerLineup: healPlayerLineup,
+      status: healStatus,
+      lost: healStatus === 'lost',
+    })
+  }
+
   // ── Attack ───────────────────────────────────────────────────────────────
   if (action === 'attack') {
     if (fight.status !== 'active') {
