@@ -497,6 +497,8 @@ interface PinRewardData {
   quantity?: number
   eggRarity?: string
   stepsRequired?: number
+  rewardType?: string   // nested reward type for enigma pins
+  amount?: number       // exp/gold amount for enigma reward
   creature?: { name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number }
   chapterOrder?: number
   text?: string
@@ -633,6 +635,56 @@ function PinRewardModal({ reward, onDone }: { reward: PinRewardData; onDone: () 
               <p className="text-white/70 text-sm">{reward.effect}</p>
             </div>
           )}
+
+          {type === 'enigma' && (() => {
+            const rType = reward.rewardType
+            const c     = reward.creature
+            const elemEmoji = ({ fiamma:'🔥', adriatico:'🌊', bosco:'🌿', terra:'⚡', armonia:'✨' } as Record<string,string>)[c?.element ?? ''] ?? '✦'
+            const enigmaRarityColor = RARITY_COLOR[c?.rarity ?? ''] ?? '#A78BFA'
+            const enigmaGlow        = ELEMENT_GLOW[c?.element ?? ''] ?? enigmaRarityColor
+            return (
+              <>
+                {/* "Enigma risolto!" badge */}
+                <div className="flex items-center justify-center gap-2 bg-violet-500/10 border border-violet-400/25 rounded-xl px-3 py-2">
+                  <span className="text-lg">🔐</span>
+                  <p className="text-sm font-bold text-violet-300">Enigma risolto! Ecco la tua ricompensa:</p>
+                </div>
+
+                {/* Creature reward */}
+                {rType === 'creatura' && c && (
+                  <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${enigmaRarityColor}40`, background: `linear-gradient(135deg, ${enigmaGlow}12 0%, transparent 100%)` }}>
+                    <div className="flex flex-col items-center py-5 px-4">
+                      <CreatureSprite imageUrl={c.image_url ?? ''} name={c.name} animState="idle" size={140} element={c.element as any} rarity={c.rarity as any} showAura />
+                      <p className="text-white font-bold text-xl mt-3">{c.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm">{elemEmoji}</span>
+                        <span className="text-xs capitalize text-white/40">{c.element}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: `${enigmaRarityColor}22`, color: enigmaRarityColor }}>{c.rarity}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Item reward */}
+                {rType === 'oggetto' && (
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+                    <p className="text-4xl mb-2">🎁</p>
+                    <p className="text-white font-bold text-lg">{reward.itemName}</p>
+                    <p className="text-white/50 text-sm">×{reward.quantity ?? 1}</p>
+                  </div>
+                )}
+
+                {/* EXP/Gold reward */}
+                {(rType === 'exp' || rType === 'gold') && reward.amount != null && (
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+                    <p className="text-4xl mb-2">{rType === 'exp' ? '⭐' : '💰'}</p>
+                    <p className="text-white font-bold text-2xl">+{reward.amount}</p>
+                    <p className="text-white/50 text-sm mt-1">{rType === 'exp' ? 'Punti esperienza' : 'Monete'}</p>
+                  </div>
+                )}
+              </>
+            )
+          })()}
 
           {/* CTA */}
           <button
