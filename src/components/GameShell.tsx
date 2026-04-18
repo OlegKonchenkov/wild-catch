@@ -38,36 +38,90 @@ interface NotifPopup {
   icon?: string
 }
 
+const REWARD_TYPE_ICONS: Record<string, string> = {
+  exp: '⭐', gold: '💰', oggetto: '📦', indizio: '🔍',
+  uovo: '🥚', creatura: '🎯', enigma: '🔐', evento: '⚡',
+}
+
+function rewardParts(p: any): string {
+  const parts: string[] = []
+  if (p.gold)         parts.push(`+${p.gold} 💰`)
+  if (p.exp)          parts.push(`+${p.exp} ⭐`)
+  if (p.gold_reward)  parts.push(`+${p.gold_reward} 💰`)
+  if (p.reward_gold)  parts.push(`+${p.reward_gold} 💰`)
+  if (p.reward_exp)   parts.push(`+${p.reward_exp} ⭐`)
+  return parts.join(' · ')
+}
+
 function formatGameEvent(ev: any): { icon: string; title: string; body: string } {
   const p = ev.payload ?? {}
   switch (ev.type) {
-    case 'catch':
+    case 'catch': {
+      const rarityInfo = p.rarity ? RARITY_DISPLAY[p.rarity as string] : null
+      const bodyParts = [
+        rarityInfo?.label,
+        p.element,
+        p.evolved ? '✨ Evoluta' : '',
+        p.gold ? `+${p.gold} 💰` : '',
+      ].filter(Boolean)
       return {
-        icon: '🎯',
+        icon: p.evolved ? '✨' : '🎯',
         title: `Catturato: ${p.creature_name ?? 'creatura'}`,
-        body: [p.rarity, p.evolved ? 'evoluto!' : ''].filter(Boolean).join(' · '),
+        body: bodyParts.join(' · '),
       }
+    }
     case 'duel_won':
-      return { icon: '🏆', title: 'Duello vinto!', body: '' }
+      return {
+        icon: '🏆',
+        title: 'Duello vinto!',
+        body: rewardParts(p) || 'Vittoria in duello',
+      }
     case 'duel_lost':
       return { icon: '💀', title: 'Duello perso', body: '' }
     case 'boss_won':
       return {
         icon: '👑',
-        title: 'Boss sconfitto!',
-        body: p.gold ? `+${p.gold} 💰 · +${p.exp ?? 0} ⭐` : '',
+        title: p.boss_name ? `${p.boss_name} sconfitto!` : 'Boss sconfitto!',
+        body: rewardParts(p),
       }
     case 'boss_lost':
-      return { icon: '💀', title: 'Sconfitto dal boss', body: '' }
-    case 'mission_completed':
-      return { icon: '✅', title: 'Missione completata!', body: p.mission_target ? p.mission_target : '' }
+      return {
+        icon: '💀',
+        title: 'Sconfitto dal boss',
+        body: p.boss_name ? `Boss: ${p.boss_name}` : '',
+      }
+    case 'mission_completed': {
+      const mRewards = rewardParts(p)
+      return {
+        icon: '✅',
+        title: p.title ? `Missione: ${p.title}` : 'Missione completata!',
+        body: mRewards || (p.mission_target ? p.mission_target : ''),
+      }
+    }
     case 'level_up':
-      return { icon: '⭐', title: `Livello ${p.new_level}!`, body: p.gold_reward > 0 ? `+${p.gold_reward} 💰` : '' }
+      return {
+        icon: '⭐',
+        title: `Livello ${p.new_level}!`,
+        body: p.gold_reward > 0 ? `+${p.gold_reward} 💰` : 'Nuovo livello raggiunto',
+      }
     case 'qr_redeemed': {
-      const parts: string[] = []
-      if (p.gold) parts.push(`+${p.gold} 💰`)
-      if (p.exp)  parts.push(`+${p.exp} ⭐`)
-      return { icon: '📱', title: `QR: "${p.item_name}"`, body: parts.join(' · ') }
+      return {
+        icon: '📱',
+        title: `QR: "${p.item_name}"`,
+        body: rewardParts(p),
+      }
+    }
+    case 'pin_claimed': {
+      const pinIcon = REWARD_TYPE_ICONS[p.reward_type as string] ?? '📍'
+      const pinReward = rewardParts(p) ||
+        (p.creature_name ? p.creature_name : '') ||
+        (p.item_name ? p.item_name : '') ||
+        (p.egg_rarity ? `Uovo ${p.egg_rarity}` : '')
+      return {
+        icon: pinIcon,
+        title: p.pin_name ? `Pin: ${p.pin_name}` : 'Pin riscattato!',
+        body: pinReward,
+      }
     }
     default:
       return { icon: '🎮', title: ev.type, body: '' }
@@ -840,58 +894,138 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                 className="overflow-hidden"
                               >
                                 <div className="mx-4 mb-3 mt-1 rounded-xl p-3 space-y-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                                  {/* catch */}
+
+                                  {/* ── catch ── */}
                                   {ev.type === 'catch' && (
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      {rarityInfo && (
-                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${rarityInfo.color}20`, color: rarityInfo.color, border: `1px solid ${rarityInfo.color}40` }}>
-                                          {rarityInfo.label}
+                                    <>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        {rarityInfo && (
+                                          <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${rarityInfo.color}20`, color: rarityInfo.color, border: `1px solid ${rarityInfo.color}40` }}>
+                                            {rarityInfo.label}
+                                          </span>
+                                        )}
+                                        {p.element && <span className="text-xs px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>{p.element}</span>}
+                                        {p.evolved && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399', border: '1px solid rgba(52,211,153,0.3)' }}>✨ Evoluta</span>}
+                                        {p.via_pin && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(58,157,188,0.15)', color: '#3A9DBC' }}>da pin</span>}
+                                      </div>
+                                      {(p.gold || p.exp) && (
+                                        <div className="flex gap-2 flex-wrap">
+                                          {p.gold ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{p.gold} 💰</span> : null}
+                                          {p.exp  ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841' }}>+{p.exp} ⭐</span>  : null}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {/* ── duel ── */}
+                                  {(ev.type === 'duel_won' || ev.type === 'duel_lost') && (
+                                    <>
+                                      <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full" style={{
+                                        background: ev.type === 'duel_won' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.12)',
+                                        color:      ev.type === 'duel_won' ? '#34D399' : '#F87171',
+                                        border:     `1px solid ${ev.type === 'duel_won' ? 'rgba(52,211,153,0.3)' : 'rgba(239,68,68,0.25)'}`,
+                                      }}>
+                                        {ev.type === 'duel_won' ? '🏆 Vittoria in duello' : '💀 Sconfitta in duello'}
+                                      </span>
+                                      {ev.type === 'duel_won' && (p.gold || p.exp) && (
+                                        <div className="flex gap-2 flex-wrap">
+                                          {p.gold ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{p.gold} 💰</span> : null}
+                                          {p.exp  ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841' }}>+{p.exp} ⭐</span>  : null}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {/* ── boss ── */}
+                                  {(ev.type === 'boss_won' || ev.type === 'boss_lost') && (
+                                    <>
+                                      {p.boss_name && (
+                                        <p className="text-xs font-semibold" style={{ color: ev.type === 'boss_won' ? '#F7C841' : 'rgba(255,255,255,0.6)' }}>
+                                          💀 {p.boss_name}
+                                        </p>
+                                      )}
+                                      <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full" style={{
+                                        background: ev.type === 'boss_won' ? 'rgba(247,200,65,0.15)' : 'rgba(239,68,68,0.12)',
+                                        color:      ev.type === 'boss_won' ? '#F7C841' : '#F87171',
+                                        border:     `1px solid ${ev.type === 'boss_won' ? 'rgba(247,200,65,0.3)' : 'rgba(239,68,68,0.25)'}`,
+                                      }}>
+                                        {ev.type === 'boss_won' ? '👑 Boss sconfitto' : '💀 Sconfitta dal boss'}
+                                      </span>
+                                      {ev.type === 'boss_won' && (p.gold || p.exp) && (
+                                        <div className="flex gap-2 flex-wrap">
+                                          {p.gold ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{p.gold} 💰</span> : null}
+                                          {p.exp  ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841' }}>+{p.exp} ⭐</span>  : null}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {/* ── mission ── */}
+                                  {ev.type === 'mission_completed' && (
+                                    <>
+                                      <p className="text-[9px] text-white/30 uppercase tracking-wider">Missione completata</p>
+                                      {(p.title || p.mission_target) && (
+                                        <p className="text-sm font-bold text-white">📋 {p.title ?? p.mission_target}</p>
+                                      )}
+                                      {p.mission_target && p.title && (
+                                        <p className="text-[11px] text-white/45">Obiettivo: {p.mission_target}</p>
+                                      )}
+                                      {(p.reward_gold > 0 || p.reward_exp > 0) && (
+                                        <div className="flex gap-2 flex-wrap">
+                                          {p.reward_gold > 0 ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{p.reward_gold} 💰</span> : null}
+                                          {p.reward_exp  > 0 ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841' }}>+{p.reward_exp} ⭐</span>  : null}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {/* ── level up ── */}
+                                  {ev.type === 'level_up' && (
+                                    <>
+                                      <p className="text-sm font-extrabold" style={{ color: '#F7C841' }}>⭐ Livello {p.new_level} raggiunto!</p>
+                                      {p.gold_reward > 0 && (
+                                        <span className="inline-block text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{p.gold_reward} 💰 bonus livello</span>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {/* ── qr ── */}
+                                  {ev.type === 'qr_redeemed' && (
+                                    <>
+                                      {p.item_name && <p className="text-xs font-bold text-white">📱 {p.item_name}</p>}
+                                      {(p.gold || p.exp) && (
+                                        <div className="flex gap-2 flex-wrap">
+                                          {p.gold ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{p.gold} 💰</span> : null}
+                                          {p.exp  ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841' }}>+{p.exp} ⭐</span>  : null}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {/* ── pin claimed ── */}
+                                  {ev.type === 'pin_claimed' && (
+                                    <>
+                                      <p className="text-[9px] text-white/30 uppercase tracking-wider">Pin riscattato</p>
+                                      {p.pin_name && <p className="text-sm font-bold text-white">📍 {p.pin_name}</p>}
+                                      {p.reward_type && (
+                                        <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(58,157,188,0.15)', color: '#3A9DBC', border: '1px solid rgba(58,157,188,0.3)' }}>
+                                          {REWARD_TYPE_ICONS[p.reward_type as string] ?? '🎁'} {p.reward_type}
                                         </span>
                                       )}
-                                      {p.element && <span className="text-xs text-white/50 capitalize">{p.element}</span>}
-                                      {p.evolved && <span className="text-xs font-semibold" style={{ color: '#34D399' }}>✨ Evoluta</span>}
-                                    </div>
+                                      {(p.creature_name || p.item_name || p.egg_rarity) && (
+                                        <p className="text-xs text-white/60">
+                                          {p.creature_name ?? p.item_name ?? (p.egg_rarity ? `Uovo ${p.egg_rarity}` : '')}
+                                        </p>
+                                      )}
+                                      {(p.gold || p.exp || p.amount) && (
+                                        <div className="flex gap-2 flex-wrap">
+                                          {(p.gold || (p.reward_type === 'gold' && p.amount)) ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{p.gold ?? p.amount} 💰</span> : null}
+                                          {(p.exp  || (p.reward_type === 'exp'  && p.amount)) ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841' }}>+{p.exp  ?? p.amount} ⭐</span>  : null}
+                                        </div>
+                                      )}
+                                    </>
                                   )}
-                                  {/* duel */}
-                                  {(ev.type === 'duel_won' || ev.type === 'duel_lost') && (
-                                    <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full" style={{
-                                      background: ev.type === 'duel_won' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.12)',
-                                      color:      ev.type === 'duel_won' ? '#34D399' : '#F87171',
-                                    }}>
-                                      {ev.type === 'duel_won' ? '🏆 Vittoria duello' : '💀 Sconfitta duello'}
-                                    </span>
-                                  )}
-                                  {/* boss */}
-                                  {(ev.type === 'boss_won' || ev.type === 'boss_lost') && (
-                                    <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full" style={{
-                                      background: ev.type === 'boss_won' ? 'rgba(247,200,65,0.15)' : 'rgba(239,68,68,0.12)',
-                                      color:      ev.type === 'boss_won' ? '#F7C841' : '#F87171',
-                                    }}>
-                                      {ev.type === 'boss_won' ? '👑 Boss sconfitto' : '💀 Sconfitta dal boss'}
-                                    </span>
-                                  )}
-                                  {/* mission */}
-                                  {ev.type === 'mission_completed' && (
-                                    <div>
-                                      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">Missione completata</p>
-                                      {p.mission_target && <p className="text-xs font-semibold text-white/80">📋 {p.mission_target}</p>}
-                                    </div>
-                                  )}
-                                  {/* level up */}
-                                  {ev.type === 'level_up' && p.new_level && (
-                                    <p className="text-sm font-extrabold" style={{ color: '#F7C841' }}>⭐ Livello {p.new_level} raggiunto</p>
-                                  )}
-                                  {/* qr */}
-                                  {ev.type === 'qr_redeemed' && p.item_name && (
-                                    <p className="text-xs font-bold text-white">📱 {p.item_name}</p>
-                                  )}
-                                  {/* rewards (gold/exp) — shown for all types that carry them */}
-                                  {(p.gold || p.exp || p.gold_reward) && (
-                                    <div className="flex gap-2 flex-wrap">
-                                      {(p.gold || p.gold_reward) ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{p.gold ?? p.gold_reward} 💰</span> : null}
-                                      {p.exp ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)', color: '#F7C841' }}>+{p.exp} ⭐</span> : null}
-                                    </div>
-                                  )}
+
                                   <p className="text-[10px] text-white/25">{fullDate}</p>
                                 </div>
                               </motion.div>

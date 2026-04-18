@@ -12,12 +12,12 @@
  * when multiple sounds fire in rapid succession (e.g. knockout + defeat).
  */
 
-import { getSharedAC } from './shared-ac'
+import { getSharedAC, getSoundStartTime } from './shared-ac'
 
 // ── Knockout ──────────────────────────────────────────────────────────────────
 export function playKnockout(vol = 0.55): void {
   const ac = getSharedAC(); if (!ac) return
-  const now = ac.currentTime
+  const now = getSoundStartTime(0.65)
 
   // Bass punch — sine that drops from 75 Hz to 32 Hz
   const bass  = ac.createOscillator()
@@ -62,7 +62,7 @@ export function playKnockout(vol = 0.55): void {
 // ── Flee ──────────────────────────────────────────────────────────────────────
 export function playFlee(vol = 0.40): void {
   const ac = getSharedAC(); if (!ac) return
-  const now = ac.currentTime
+  const now = getSoundStartTime(0.32)
 
   // Rising whoosh — bandpass noise sweeping 300 → 3500 Hz
   const noiseLen = Math.floor(ac.sampleRate * 0.3)
@@ -100,7 +100,7 @@ export function playFlee(vol = 0.40): void {
 // ── Level Up ──────────────────────────────────────────────────────────────────
 export function playLevelUp(vol = 0.55): void {
   const ac = getSharedAC(); if (!ac) return
-  const now = ac.currentTime
+  const now = getSoundStartTime(1.9)
 
   // C-major ascending arpeggio: C4 → E4 → G4 → C5 → E5
   const arpNotes = [261.63, 329.63, 392.0, 523.25, 659.25]
@@ -151,7 +151,7 @@ export function playLevelUp(vol = 0.55): void {
 // ── Mission Complete ───────────────────────────────────────────────────────────
 export function playMissionComplete(vol = 0.50): void {
   const ac = getSharedAC(); if (!ac) return
-  const now = ac.currentTime
+  const now = getSoundStartTime(1.1)
 
   // G-major ascending motif: G4 → B4 → D5 → G5
   const notes = [392.0, 493.88, 587.33, 783.99]
@@ -188,7 +188,7 @@ export function playMissionComplete(vol = 0.50): void {
 // ── Victory ───────────────────────────────────────────────────────────────────
 export function playVictory(vol = 0.60): void {
   const ac = getSharedAC(); if (!ac) return
-  const now = ac.currentTime
+  const now = getSoundStartTime(2.5)
 
   // Triumphant 5-note rising fanfare: C4 → E4 → G4 → C5 → E5
   const fanfare = [261.63, 329.63, 392.0, 523.25, 659.25]
@@ -241,7 +241,7 @@ export function playVictory(vol = 0.60): void {
 // ── Defeat ────────────────────────────────────────────────────────────────────
 export function playDefeat(vol = 0.45): void {
   const ac = getSharedAC(); if (!ac) return
-  const now = ac.currentTime
+  const now = getSoundStartTime(1.6)
 
   // Descending A-natural minor: A4 → F4 → D4 → Bb3
   const notes = [440.0, 349.23, 293.66, 233.08]

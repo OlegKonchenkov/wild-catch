@@ -375,9 +375,10 @@ export async function POST(request: Request, { params }: Params) {
 
     // ── Game event on loss ───────────────────────────────────────────────
     if (allPlayerFainted) {
+      const bossNameLost = (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss'
       createAdminClient().from('player_game_events').insert({
         user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
-        payload: { fight_id: id },
+        payload: { fight_id: id, boss_name: bossNameLost },
       }).then(undefined, () => {})
     }
 
@@ -441,10 +442,17 @@ export async function POST(request: Request, { params }: Params) {
       }
 
       // Game event
+      const bossName = (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss'
       admin.from('player_game_events').insert({
         user_id: user.id, session_id: fight.session_id, type: 'boss_won',
-        payload: { fight_id: id, gold: goldReward, exp: reward?.exp ?? 50 },
+        payload: { fight_id: id, gold: goldReward, exp: reward?.exp ?? 50, boss_name: bossName },
       }).then(undefined, () => {})
+      if (levelUp) {
+        admin.from('player_game_events').insert({
+          user_id: user.id, session_id: fight.session_id, type: 'level_up',
+          payload: { new_level: levelUp.newLevel, gold_reward: levelUp.goldReward },
+        }).then(undefined, () => {})
+      }
 
       // Item reward
       if (reward?.item_id) {

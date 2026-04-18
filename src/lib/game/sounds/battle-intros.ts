@@ -7,7 +7,7 @@
  * playBossSound       — Boss / Capo Palestra fight starts
  */
 
-import { getSharedAC } from './shared-ac'
+import { getSharedAC, getSoundStartTime } from './shared-ac'
 
 // ── Wild creature encounter ────────────────────────────────────────────────────
 // Ascending arpeggio (C4→E4→G4→C5) over a soft whoosh: "something appeared!"
@@ -15,7 +15,7 @@ export function playEncounterSound(vol = 0.55) {
   const ac = getSharedAC()
   if (!ac) return
 
-  const now = ac.currentTime
+  const now = getSoundStartTime(0.9)
 
   // Ascending arpeggio
   const notes = [261.63, 329.63, 392.00, 523.25] // C4 E4 G4 C5
@@ -80,7 +80,7 @@ export function playBattleSound(vol = 0.55) {
   const ac = getSharedAC()
   if (!ac) return
 
-  const now = ac.currentTime
+  const now = getSoundStartTime(0.7)
 
   // Sub bass thud
   const sub  = ac.createOscillator()
@@ -137,7 +137,7 @@ export function playBossSound(vol = 0.55) {
   const ac = getSharedAC()
   if (!ac) return
 
-  const now = ac.currentTime
+  const now = getSoundStartTime(1.0)
 
   // Double percussion hit (0ms + 110ms for drama)
   ;[0, 0.11].forEach((delay, hit) => {

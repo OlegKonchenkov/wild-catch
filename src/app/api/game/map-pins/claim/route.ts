@@ -346,5 +346,22 @@ export async function POST(request: Request) {
     sessionId,
   }).catch(() => [] as CompletedMission[])
 
+  // Game event for bell history (skip boss — it records its own boss_won / boss_lost)
+  if (pin.reward_type !== 'boss') {
+    const evtPayload: Record<string, unknown> = {
+      pin_name:    pin.name,
+      reward_type: pin.reward_type,
+    }
+    if ((result as any).amount      != null) evtPayload.amount       = (result as any).amount
+    if ((result as any).itemName)            evtPayload.item_name    = (result as any).itemName
+    if ((result as any).eggRarity)           evtPayload.egg_rarity   = (result as any).eggRarity
+    if ((result as any).creature?.name)      evtPayload.creature_name = (result as any).creature.name
+    if ((result as any).rewardType === 'exp')  evtPayload.exp  = (result as any).amount
+    if ((result as any).rewardType === 'gold') evtPayload.gold = (result as any).amount
+    admin.from('player_game_events').insert({
+      user_id: user.id, session_id: sessionId, type: 'pin_claimed', payload: evtPayload,
+    }).then(undefined, () => {})
+  }
+
   return NextResponse.json({ success: true, ...result, completedMissions })
 }
