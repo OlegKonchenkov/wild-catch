@@ -748,7 +748,7 @@ export default function SessionsPage() {
               <PinPayloadIndizio value={pinEditPayload} onChange={setPinEditPayload} />
             )}
             {pinEditRewardType === 'boss' && (
-              <PinPayloadBoss allCreatures={allCreatures} value={pinEditPayload} onChange={setPinEditPayload} />
+              <PinPayloadBoss allCreatures={allCreatures} allItems={allItems} value={pinEditPayload} onChange={setPinEditPayload} />
             )}
             {pinEditRewardType === 'evento' && (
               <PinPayloadEvento value={pinEditPayload} onChange={setPinEditPayload} />
