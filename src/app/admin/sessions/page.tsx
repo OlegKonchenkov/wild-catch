@@ -270,6 +270,13 @@ export default function SessionsPage() {
     if (pinEditRewardType !== 'none') {
       try { payload = JSON.parse(pinEditPayload || '{}') }
       catch { setPinEditError('Payload JSON non valido'); setPinEditSaving(false); return }
+      if (pinEditRewardType === 'boss') {
+        const hasCreatures = Array.isArray((payload as any)?.creatures) && (payload as any).creatures.length > 0
+        const hasLegacy    = !!(payload as any)?.creature_id
+        if (!hasCreatures && !hasLegacy) {
+          setPinEditError('Seleziona almeno una creatura per il boss.'); setPinEditSaving(false); return
+        }
+      }
     }
     const res = await fetch(`/api/admin/session-pins/${pinEditId}`, {
       method: 'PATCH',

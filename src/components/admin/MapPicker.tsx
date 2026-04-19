@@ -360,6 +360,17 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
         imageUrl = json.url ?? null
       }
     }
+    if (pinRewardType === 'boss') {
+      let parsed: any = {}
+      try { parsed = JSON.parse(pinRewardPayload || '{}') } catch { /* ignore */ }
+      const hasCreatures = Array.isArray(parsed?.creatures) && parsed.creatures.length > 0
+      if (!hasCreatures && !parsed?.creature_id) {
+        setSavingPin(false)
+        alert('Seleziona almeno una creatura per il boss prima di salvare.')
+        return
+      }
+    }
+
     await onAddPin({
       lat: pendingPin.lat, lng: pendingPin.lng,
       name: pinName.trim(), description: pinDesc.trim(),

@@ -863,8 +863,6 @@ function BossApproachModal({
       const d: any = await res.json()
       if ((d.success || d.alreadyClaimed) && d.bossFightId) {
         onFight(d as PinRewardData)
-      } else if (d.success && !d.bossFightId) {
-        setClaimError('Boss non configurato correttamente.')
       } else {
         setClaimError(d.error ?? 'Errore nell\'avviare la battaglia.')
       }

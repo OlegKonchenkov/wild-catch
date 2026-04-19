@@ -148,6 +148,10 @@ export async function POST(request: Request) {
     }
 
     case 'boss': {
+      if (!payload || typeof payload !== 'object') {
+        return NextResponse.json({ error: 'Boss non configurato correttamente' }, { status: 422 })
+      }
+
       const bossCreatureEntries: Array<{ creature_id: string; level_override?: number }> =
         Array.isArray(payload.creatures) && payload.creatures.length > 0
           ? payload.creatures.slice(0, 3)
@@ -156,7 +160,7 @@ export async function POST(request: Request) {
             : []
 
       if (bossCreatureEntries.length === 0) {
-        result = { ...result, error: 'Boss non configurato' }; break
+        return NextResponse.json({ error: 'Boss non configurato correttamente' }, { status: 422 })
       }
 
       const creatureIds = bossCreatureEntries.map(e => e.creature_id)
@@ -185,7 +189,7 @@ export async function POST(request: Request) {
       }).filter(Boolean)
 
       if (bossLineup.length === 0) {
-        result = { ...result, error: 'Creature boss non trovate' }; break
+        return NextResponse.json({ error: 'Creature boss non trovate nel database' }, { status: 422 })
       }
 
       // Reuse existing in-progress fight; allow rechallenge after loss; return won fight as-is
@@ -227,7 +231,7 @@ export async function POST(request: Request) {
           .select('id').single()
 
         if (fightErr || !newFight) {
-          result = { ...result, error: 'Errore creazione boss' }; break
+          return NextResponse.json({ error: 'Errore creazione boss fight' }, { status: 500 })
         }
         bossFightId = newFight.id
       }
