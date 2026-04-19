@@ -306,6 +306,7 @@ export default function EncounterPage() {
   const [result, setResult]     = useState<'caught' | 'fled' | 'evolved' | 'ko' | 'lost' | null>(null)
   const [caughtCreatureData, setCaughtCreatureData] = useState<any>(null)
   const [caughtExpGain, setCaughtExpGain]           = useState(0)
+  const [caughtGoldGain, setCaughtGoldGain]         = useState(0)
   const [completedMissions, setCompletedMissions]   = useState<Array<{ title: string; rewardGold: number; rewardExp: number; levelUp?: { newLevel: number; goldReward: number } | null }>>([])
   const [missionRewardIdx, setMissionRewardIdx]     = useState(-1)
   const [playerCreature, setPlayerCreature] = useState<{
@@ -635,6 +636,7 @@ export default function EncounterPage() {
         .eq('id', creatureId).single()
         .then(({ data: cr }) => { if (cr) setCaughtCreatureData(cr) })
       setCaughtExpGain(data.expGain ?? 0)
+      setCaughtGoldGain(data.goldGain ?? 0)
       if (data.completedMissions?.length) setCompletedMissions(data.completedMissions)
       setResult(data.evolved ? 'evolved' : 'caught')
       if (data.levelUp) { playLevelUp(); window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp })) }
@@ -1410,16 +1412,27 @@ export default function EncounterPage() {
                     </div>
                   )}
 
-                  {/* EXP gained */}
-                  {caughtExpGain > 0 && (
+                  {/* EXP + Gold gained */}
+                  {(caughtExpGain > 0 || caughtGoldGain > 0) && (
                     <motion.div
                       initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.55 }}
-                      className="flex items-center justify-between rounded-xl px-4 py-3 mb-5"
-                      style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}
+                      className="grid grid-cols-2 gap-2 mb-5"
                     >
-                      <span className="text-sm text-white/50">EXP guadagnata</span>
-                      <span className="font-extrabold text-[#34D399]">+{caughtExpGain} EXP</span>
+                      {caughtExpGain > 0 && (
+                        <div className="flex items-center justify-between rounded-xl px-4 py-3"
+                          style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                          <span className="text-sm text-white/50">EXP</span>
+                          <span className="font-extrabold text-[#34D399]">+{caughtExpGain}</span>
+                        </div>
+                      )}
+                      {caughtGoldGain > 0 && (
+                        <div className="flex items-center justify-between rounded-xl px-4 py-3"
+                          style={{ background: 'rgba(247,200,65,0.08)', border: '1px solid rgba(247,200,65,0.2)' }}>
+                          <span className="text-sm text-white/50">Oro</span>
+                          <span className="font-extrabold" style={{ color: '#F7C841' }}>+{caughtGoldGain}</span>
+                        </div>
+                      )}
                     </motion.div>
                   )}
 
