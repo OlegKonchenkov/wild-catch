@@ -168,8 +168,9 @@ export function PinPayloadIndizio({ value, onChange }: { value: string; onChange
 
 // ── Boss ──────────────────────────────────────────────────────────────────────
 
-export function PinPayloadBoss({ allCreatures, value, onChange }: {
+export function PinPayloadBoss({ allCreatures, allItems, value, onChange }: {
   allCreatures: { id: string; name: string; rarity: string }[]
+  allItems: { id: string; name: string; type: string }[]
   value: string
   onChange: (v: string) => void
 }) {
@@ -186,16 +187,25 @@ export function PinPayloadBoss({ allCreatures, value, onChange }: {
   const l2 = (rawCreatures[1]?.level_override as number) ?? 10
   const c3 = (rawCreatures[2]?.creature_id as string) ?? ''
   const l3 = (rawCreatures[2]?.level_override as number) ?? 10
-  const goldReward = ((p.reward as any)?.gold as number) ?? 200
-  const expReward  = ((p.reward as any)?.exp  as number) ?? 100
+  const goldReward     = ((p.reward as any)?.gold        as number) ?? 200
+  const expReward      = ((p.reward as any)?.exp         as number) ?? 100
+  const itemIdReward   = ((p.reward as any)?.item_id     as string) ?? ''
+  const itemQtyReward  = ((p.reward as any)?.item_qty    as number) ?? 1
+  const creatureReward = ((p.reward as any)?.creature_id as string) ?? ''
 
-  function save(nc1: string, nl1: number, nc2: string, nl2: number, nc3: string, nl3: number, gold: number, exp: number) {
+  function save(
+    nc1: string, nl1: number, nc2: string, nl2: number, nc3: string, nl3: number,
+    gold: number, exp: number, itemId: string, itemQty: number, rewardCreatureId: string,
+  ) {
     const creatures = [
       { creature_id: nc1, level_override: nl1 },
       { creature_id: nc2, level_override: nl2 },
       { creature_id: nc3, level_override: nl3 },
     ].filter(c => c.creature_id)
-    onChange(encodePayload({ creatures, reward: { gold, exp } }))
+    const reward: Record<string, unknown> = { gold, exp }
+    if (itemId)          { reward.item_id = itemId; reward.item_qty = itemQty }
+    if (rewardCreatureId) reward.creature_id = rewardCreatureId
+    onChange(encodePayload({ creatures, reward }))
   }
 
   const slots = [
@@ -216,7 +226,7 @@ export function PinPayloadBoss({ allCreatures, value, onChange }: {
               value={cid}
               onChange={e => {
                 const nv = [...vals]; nv[i] = e.target.value
-                save(nv[0], lvls[0], nv[1], lvls[1], nv[2], lvls[2], goldReward, expReward)
+                save(nv[0], lvls[0], nv[1], lvls[1], nv[2], lvls[2], goldReward, expReward, itemIdReward, itemQtyReward, creatureReward)
               }}
               className={SELECT}
             >
@@ -229,7 +239,7 @@ export function PinPayloadBoss({ allCreatures, value, onChange }: {
                 <input type="number" min={1} max={20} value={lv}
                   onChange={e => {
                     const nv = [...lvls]; nv[i] = +e.target.value
-                    save(vals[0], nv[0], vals[1], nv[1], vals[2], nv[2], goldReward, expReward)
+                    save(vals[0], nv[0], vals[1], nv[1], vals[2], nv[2], goldReward, expReward, itemIdReward, itemQtyReward, creatureReward)
                   }}
                   className={INPUT} />
               </div>
@@ -237,17 +247,48 @@ export function PinPayloadBoss({ allCreatures, value, onChange }: {
           </div>
         )
       })}
+
+      <p className="text-xs font-semibold text-white/40 uppercase tracking-wider pt-1">Ricompense vittoria</p>
+
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className={LABEL}>Gold reward</label>
+          <label className={LABEL}>Gold</label>
           <input type="number" min={0} value={goldReward}
-            onChange={e => save(c1, l1, c2, l2, c3, l3, +e.target.value, expReward)} className={INPUT} />
+            onChange={e => save(c1, l1, c2, l2, c3, l3, +e.target.value, expReward, itemIdReward, itemQtyReward, creatureReward)} className={INPUT} />
         </div>
         <div>
-          <label className={LABEL}>EXP reward</label>
+          <label className={LABEL}>EXP</label>
           <input type="number" min={0} value={expReward}
-            onChange={e => save(c1, l1, c2, l2, c3, l3, goldReward, +e.target.value)} className={INPUT} />
+            onChange={e => save(c1, l1, c2, l2, c3, l3, goldReward, +e.target.value, itemIdReward, itemQtyReward, creatureReward)} className={INPUT} />
         </div>
+      </div>
+
+      <div className="border border-white/10 rounded-xl p-3 space-y-2">
+        <label className={LABEL + ' font-semibold'}>Oggetto bonus (opzionale)</label>
+        <select value={itemIdReward}
+          onChange={e => save(c1, l1, c2, l2, c3, l3, goldReward, expReward, e.target.value, itemQtyReward, creatureReward)}
+          className={SELECT}>
+          <option value="">— Nessuno —</option>
+          {allItems.map(it => <option key={it.id} value={it.id}>{it.name}</option>)}
+        </select>
+        {itemIdReward && (
+          <div>
+            <label className={LABEL}>Quantità</label>
+            <input type="number" min={1} max={99} value={itemQtyReward}
+              onChange={e => save(c1, l1, c2, l2, c3, l3, goldReward, expReward, itemIdReward, +e.target.value, creatureReward)}
+              className={INPUT} />
+          </div>
+        )}
+      </div>
+
+      <div className="border border-white/10 rounded-xl p-3 space-y-2">
+        <label className={LABEL + ' font-semibold'}>Creatura bonus (opzionale)</label>
+        <select value={creatureReward}
+          onChange={e => save(c1, l1, c2, l2, c3, l3, goldReward, expReward, itemIdReward, itemQtyReward, e.target.value)}
+          className={SELECT}>
+          <option value="">— Nessuna —</option>
+          {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({RARITY_LABEL[c.rarity] ?? c.rarity})</option>)}
+        </select>
       </div>
     </div>
   )
@@ -422,7 +463,7 @@ export function PinPayloadFields({ type, value, onChange, allItems, allCreatures
   if (type === 'uovo')     return <PinPayloadUovo                                  value={value} onChange={onChange} />
   if (type === 'creatura') return <PinPayloadCreatura allCreatures={allCreatures}  value={value} onChange={onChange} />
   if (type === 'indizio')  return <PinPayloadIndizio                               value={value} onChange={onChange} />
-  if (type === 'boss')     return <PinPayloadBoss     allCreatures={allCreatures}  value={value} onChange={onChange} />
+  if (type === 'boss')     return <PinPayloadBoss     allCreatures={allCreatures} allItems={allItems} value={value} onChange={onChange} />
   if (type === 'evento')   return <PinPayloadEvento                                value={value} onChange={onChange} />
   if (type === 'enigma')   return <PinPayloadEnigma   allItems={allItems} allCreatures={allCreatures} value={value} onChange={onChange} />
   return null

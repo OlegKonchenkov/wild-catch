@@ -415,8 +415,14 @@ export async function POST(request: Request, { params }: Params) {
         .or('reward_claimed.is.null,reward_claimed.eq.false')
     }
 
+    let enrichedReward: Record<string, unknown> | null = null
+
     if (rewardGranted) {
-      const reward = fight.reward as { gold?: number; exp?: number; item_id?: string; item_qty?: number } | null
+      const reward = fight.reward as {
+        gold?: number; exp?: number
+        item_id?: string; item_qty?: number
+        creature_id?: string
+      } | null
       const admin = createAdminClient()
 
       // EXP + level-up check
@@ -443,18 +449,7 @@ export async function POST(request: Request, { params }: Params) {
         }
       }
 
-      // Game event
-      const bossName = (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss'
-      admin.from('player_game_events').insert({
-        user_id: user.id, session_id: fight.session_id, type: 'boss_won',
-        payload: { fight_id: id, gold: goldReward, exp: reward?.exp ?? 50, boss_name: bossName },
-      }).then(undefined, () => {})
-      if (levelUp) {
-        admin.from('player_game_events').insert({
-          user_id: user.id, session_id: fight.session_id, type: 'level_up',
-          payload: { new_level: levelUp.newLevel, gold_reward: levelUp.goldReward },
-        }).then(undefined, () => {})
-      }
+      enrichedReward = { gold: goldReward, exp: reward?.exp ?? 50 }
 
       // Item reward
       if (reward?.item_id) {
@@ -468,6 +463,44 @@ export async function POST(request: Request, { params }: Params) {
             user_id: user.id, session_id: fight.session_id, item_id: reward.item_id, quantity: qty,
           })
         }
+        const { data: itemData } = await admin.from('items').select('name').eq('id', reward.item_id).single()
+        enrichedReward.item_id  = reward.item_id
+        enrichedReward.item_qty = qty
+        enrichedReward.item_name = (itemData as any)?.name ?? null
+      }
+
+      // Creature reward
+      if (reward?.creature_id) {
+        const { data: rewardCreature } = await admin
+          .from('creatures')
+          .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def')
+          .eq('id', reward.creature_id)
+          .single()
+        if (rewardCreature) {
+          const { data: existingPc } = await admin.from('player_creatures').select('id, duplicates_count')
+            .eq('user_id', user.id).eq('session_id', fight.session_id).eq('creature_id', (rewardCreature as any).id).maybeSingle()
+          if (existingPc) {
+            await admin.from('player_creatures').update({ duplicates_count: existingPc.duplicates_count + 1 }).eq('id', existingPc.id)
+          } else {
+            await admin.from('player_creatures').upsert({
+              user_id: user.id, creature_id: (rewardCreature as any).id, session_id: fight.session_id, duplicates_count: 1,
+            }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
+          }
+          enrichedReward.creature = rewardCreature
+        }
+      }
+
+      // Game event
+      const bossName = (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss'
+      admin.from('player_game_events').insert({
+        user_id: user.id, session_id: fight.session_id, type: 'boss_won',
+        payload: { fight_id: id, gold: goldReward, exp: reward?.exp ?? 50, boss_name: bossName },
+      }).then(undefined, () => {})
+      if (levelUp) {
+        admin.from('player_game_events').insert({
+          user_id: user.id, session_id: fight.session_id, type: 'level_up',
+          payload: { new_level: levelUp.newLevel, gold_reward: levelUp.goldReward },
+        }).then(undefined, () => {})
       }
     }
 
@@ -489,7 +522,7 @@ export async function POST(request: Request, { params }: Params) {
       won,
       lost: newStatus === 'lost',
       levelUp,
-      reward: rewardGranted ? fight.reward : null,
+      reward: enrichedReward,
     })
   }
 
