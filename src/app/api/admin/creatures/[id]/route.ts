@@ -31,7 +31,8 @@ export async function PATCH(
   const body = await request.json()
   const { name, description, rarity, element, hp, atk, def: defVal, evolution_of, session_id, catch_difficulty,
     enigma_title, enigma_description, enigma_image_url, enigma_video_url, spawnable,
-    attack_sound_url, attack_sound_duration_ms } = body
+    attack_sound_url, attack_sound_duration_ms,
+    status_effect, status_effect_chance } = body
 
   if (name !== undefined && (typeof name !== 'string' || name.trim() === '')) {
     return NextResponse.json({ error: 'Il nome non può essere vuoto' }, { status: 400 })
@@ -70,6 +71,12 @@ export async function PATCH(
   if (spawnable !== undefined) updates.spawnable = Boolean(spawnable)
   if (attack_sound_url !== undefined) updates.attack_sound_url = attack_sound_url || null
   if (attack_sound_duration_ms !== undefined) updates.attack_sound_duration_ms = attack_sound_duration_ms ? Number(attack_sound_duration_ms) : null
+  const VALID_STATUS_EFFECTS = ['paralisi', 'confusione', 'sonno', 'veleno']
+  if (status_effect !== undefined) updates.status_effect = status_effect && VALID_STATUS_EFFECTS.includes(status_effect) ? status_effect : null
+  if (status_effect_chance !== undefined) {
+    const v = Number(status_effect_chance)
+    if (Number.isFinite(v) && v >= 0 && v <= 1) updates.status_effect_chance = v
+  }
 
   const admin = createAdminClient()
   const { data, error } = await admin.from('creatures').update(updates).eq('id', id).select().single()

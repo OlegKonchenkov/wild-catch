@@ -38,7 +38,8 @@ export async function POST(request: Request) {
   const body = await request.json()
   const { name, description, rarity, element, hp, atk, def: defVal, evolution_of, session_id, catch_difficulty,
     enigma_title, enigma_description, enigma_image_url, enigma_video_url, spawnable,
-    attack_sound_url, attack_sound_duration_ms } = body
+    attack_sound_url, attack_sound_duration_ms,
+    status_effect, status_effect_chance } = body
 
   if (!name || typeof name !== 'string' || name.trim() === '') {
     return NextResponse.json({ error: 'Il nome è obbligatorio' }, { status: 400 })
@@ -77,6 +78,8 @@ export async function POST(request: Request) {
     spawnable: spawnable !== false,
     attack_sound_url: attack_sound_url ?? null,
     attack_sound_duration_ms: attack_sound_duration_ms ? Number(attack_sound_duration_ms) : null,
+    status_effect: ['paralisi','confusione','sonno','veleno'].includes(status_effect) ? status_effect : null,
+    status_effect_chance: (status_effect_chance !== undefined && Number.isFinite(Number(status_effect_chance))) ? Math.min(1, Math.max(0, Number(status_effect_chance))) : 0.15,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

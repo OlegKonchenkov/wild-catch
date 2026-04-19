@@ -141,7 +141,7 @@ export default function CreaturesPage() {
       status_effect: c.status_effect ?? '', status_effect_chance: c.status_effect_chance != null ? Math.round(c.status_effect_chance * 100) : 15 } as any)
     setFormError(null); setImageMode('preview')
     setManualUrl(c.image_url ?? ''); setAiPrompt(c.description ?? ''); setArtworkError(null)
-    setSoundError(null)
+    setSoundError(null); setStatusOpen(!!c.status_effect)
   }
 
   function closePanel() {
@@ -177,7 +177,7 @@ export default function CreaturesPage() {
       })
       const d = await res.json()
       if (!res.ok) { setFormError(d.error ?? 'Errore salvataggio') }
-      else { closePanel(); await loadCreatures() }
+      else { await loadCreatures(); closePanel() }
     } catch { setFormError('Errore di rete') }
     finally { setFormLoading(false) }
   }
@@ -821,12 +821,16 @@ export default function CreaturesPage() {
                         <div className="flex items-center gap-2">
                           <span className="text-base">⚡</span>
                           <span className="text-sm font-bold text-white/70">Effetto di Stato</span>
-                          {(formData as any).status_effect && (
-                            <span className="text-xs px-1.5 py-0.5 rounded-full font-bold"
-                              style={{ background: 'rgba(251,191,36,0.15)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.3)' }}>
-                              {(formData as any).status_effect} — {(formData as any).status_effect_chance}%
-                            </span>
-                          )}
+                          {(formData as any).status_effect && (() => {
+                            const effectColors: Record<string, string> = { paralisi: '#FBBF24', confusione: '#C084FC', sonno: '#38BDF8', veleno: '#4ADE80' }
+                            const c = effectColors[(formData as any).status_effect] ?? '#9CA3AF'
+                            return (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full font-bold"
+                                style={{ background: `${c}22`, color: c, border: `1px solid ${c}44` }}>
+                                {(formData as any).status_effect} — {(formData as any).status_effect_chance}%
+                              </span>
+                            )
+                          })()}
                         </div>
                         <span className="text-white/30 text-xs">{statusOpen ? '▲' : '▼'}</span>
                       </button>
@@ -836,23 +840,27 @@ export default function CreaturesPage() {
                             <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Tipo di effetto</label>
                             <div className="flex flex-wrap gap-2">
                               {[
-                                { value: '', label: 'Nessuno', emoji: '—' },
-                                { value: 'paralisi', label: 'Paralisi', emoji: '⚡' },
-                                { value: 'confusione', label: 'Confusione', emoji: '💫' },
-                                { value: 'sonno', label: 'Sonno', emoji: '💤' },
-                                { value: 'veleno', label: 'Veleno', emoji: '☠️' },
-                              ].map(opt => (
-                                <button key={opt.value} type="button"
-                                  onClick={() => setFormData(f => ({ ...f, status_effect: opt.value } as any))}
-                                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-all"
-                                  style={{
-                                    background: (formData as any).status_effect === opt.value ? 'rgba(58,157,188,0.2)' : 'rgba(255,255,255,0.04)',
-                                    border: `1px solid ${(formData as any).status_effect === opt.value ? 'rgba(58,157,188,0.5)' : 'rgba(255,255,255,0.1)'}`,
-                                    color: (formData as any).status_effect === opt.value ? '#3A9DBC' : 'rgba(255,255,255,0.5)',
-                                  }}>
-                                  <span>{opt.emoji}</span><span>{opt.label}</span>
-                                </button>
-                              ))}
+                                { value: '', label: 'Nessuno', emoji: '—', color: '#9CA3AF', glow: 'rgba(156,163,175,0.35)' },
+                                { value: 'paralisi', label: 'Paralisi', emoji: '⚡', color: '#FBBF24', glow: 'rgba(251,191,36,0.35)' },
+                                { value: 'confusione', label: 'Confusione', emoji: '💫', color: '#C084FC', glow: 'rgba(192,132,252,0.35)' },
+                                { value: 'sonno', label: 'Sonno', emoji: '💤', color: '#38BDF8', glow: 'rgba(56,189,248,0.35)' },
+                                { value: 'veleno', label: 'Veleno', emoji: '☠️', color: '#4ADE80', glow: 'rgba(74,222,128,0.35)' },
+                              ].map(opt => {
+                                const active = (formData as any).status_effect === opt.value
+                                return (
+                                  <button key={opt.value} type="button"
+                                    onClick={() => setFormData(f => ({ ...f, status_effect: opt.value } as any))}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-all"
+                                    style={{
+                                      background: active ? `${opt.color}22` : 'rgba(255,255,255,0.04)',
+                                      border: `1px solid ${active ? `${opt.color}66` : 'rgba(255,255,255,0.1)'}`,
+                                      color: active ? opt.color : 'rgba(255,255,255,0.5)',
+                                      boxShadow: active ? `0 0 8px ${opt.glow}` : 'none',
+                                    }}>
+                                    <span>{opt.emoji}</span><span>{opt.label}</span>
+                                  </button>
+                                )
+                              })}
                             </div>
                           </div>
                           {(formData as any).status_effect && (
