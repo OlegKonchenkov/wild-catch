@@ -451,14 +451,30 @@ export default function DuelLobbyPage() {
             className="mx-4 mb-2 rounded-2xl overflow-hidden"
             style={{ background: 'rgba(232,93,47,0.12)', border: '1px solid rgba(232,93,47,0.35)' }}
           >
-            <button onClick={() => router.push(`/game/duel/${activeDuel.id}`)} className="w-full flex items-center gap-3 px-4 py-3">
+            <div className="flex items-center gap-3 px-4 py-3">
               <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }} className="text-xl shrink-0">⚔️</motion.div>
-              <div className="flex-1 text-left min-w-0">
+              <button onClick={() => router.push(`/game/duel/${activeDuel.id}`)} className="flex-1 text-left min-w-0">
                 <p className="text-sm font-extrabold text-[#E85D2F]">Duello in corso</p>
                 <p className="text-xs text-white/50 truncate">{activeDuel.roomCode ? `Stanza ${activeDuel.roomCode}` : 'Tocca per rientrare'}</p>
-              </div>
-              <span className="text-xs font-bold text-[#E85D2F] shrink-0">Rientra →</span>
-            </button>
+              </button>
+              <button
+                onClick={() => router.push(`/game/duel/${activeDuel.id}`)}
+                className="text-xs font-bold text-[#E85D2F] shrink-0 px-2"
+              >Rientra →</button>
+              <button
+                onClick={async () => {
+                  const duelId = activeDuel.id
+                  setActiveDuel(null)
+                  await fetch('/api/game/duel/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ duelId, action: 'surrender' }),
+                  })
+                }}
+                className="text-xs font-bold shrink-0 px-2 py-1 rounded-xl"
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171', border: '1px solid rgba(239,68,68,0.3)' }}
+              >Annulla</button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

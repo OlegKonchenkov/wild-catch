@@ -247,7 +247,7 @@ export default function DuelPage() {
   const [oppLineup, setOppLineup]           = useState<LineupEntry[]>([])
   const [log, setLog]                       = useState<string[]>([])
   const [waiting, setWaiting]               = useState(true)
-  const [result, setResult]                 = useState<'won' | 'lost' | null>(null)
+  const [result, setResult]                 = useState<'won' | 'lost' | 'cancelled' | null>(null)
   const [animState, setAnimState]           = useState<'idle' | 'attack' | 'damage'>('idle')
   const [oppAnimState, setOppAnimState]     = useState<'idle' | 'attack' | 'damage'>('idle')
   const [userId, setUserId]                 = useState<string | null>(null)
@@ -281,11 +281,18 @@ export default function DuelPage() {
   const [oppFainting, setOppFainting]         = useState(false)
   const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null>(null)
 
-  const realtimeUpdatedRef = useRef(false)
-  const surrenderedRef     = useRef(false)
-  const duelStatusRef      = useRef<string | null>(null)
-  const userIdRef          = useRef<string | null>(null)
-  const duelActivatedRef   = useRef(false)  // prevents lineup re-fetch on every turn change
+  const [oppDisconnected, setOppDisconnected]       = useState(false)
+  const [reconnectCountdown, setReconnectCountdown] = useState(60)
+
+  const realtimeUpdatedRef    = useRef(false)
+  const surrenderedRef        = useRef(false)
+  const duelStatusRef         = useRef<string | null>(null)
+  const userIdRef             = useRef<string | null>(null)
+  const duelActivatedRef      = useRef(false)  // prevents lineup re-fetch on every turn change
+  const reconnectTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
+  const reconnectCountdownRef = useRef(60)
+  const seenOppPresenceRef    = useRef(false)
+  const resultRef             = useRef<'won' | 'lost' | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   function flashFortuneNotice(fortune: CombatFortuneInfo | null | undefined) {
@@ -568,13 +575,17 @@ export default function DuelPage() {
           duelStatusRef.current = updated.status
           if (updated.status === 'ended') {
             releaseAttackFeedback(250)
-            supabase.auth.getUser().then(({ data: { user } }) => {
-              const didWin = updated.winner_id === user?.id
-              setResult(didWin ? 'won' : 'lost')
-              if (didWin) playVictory(); else playDefeat()
-              setIsMyTurn(false)
-              window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
-            })
+            setIsMyTurn(false)
+            if (updated.winner_id === null) {
+              setResult('cancelled')
+            } else {
+              supabase.auth.getUser().then(({ data: { user } }) => {
+                const didWin = updated.winner_id === user?.id
+                setResult(didWin ? 'won' : 'lost')
+                if (didWin) playVictory(); else playDefeat()
+              })
+            }
+            window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
           }
           realtimeUpdatedRef.current = true
           setWaiting(updated.status === 'waiting')
@@ -622,6 +633,14 @@ export default function DuelPage() {
   }, [clearAttackFeedbackTimers, id, loadPlayerLevels, releaseAttackFeedback, supabase])
 
   useEffect(() => {
+    resultRef.current = result
+    if (result) {
+      if (reconnectTimerRef.current) { clearInterval(reconnectTimerRef.current); reconnectTimerRef.current = null }
+      setOppDisconnected(false)
+    }
+  }, [result])
+
+  useEffect(() => {
     if (myLineup.length === 0 || result || waiting || surrenderedRef.current) return
     const allFainted = myLineup.length > 0 && myLineup.every(l => l.fainted_at !== null)
     if (allFainted) {
@@ -634,6 +653,53 @@ export default function DuelPage() {
       })
     }
   }, [myLineup, result, waiting, id])
+
+  // ── Presence tracking — detect opponent disconnect / reconnect ────────────
+  useEffect(() => {
+    if (!userId || waiting) return
+    seenOppPresenceRef.current = false
+    const presenceCh = supabase.channel(`duel-presence:${id}`)
+    presenceCh
+      .on('presence', { event: 'join' }, ({ newPresences }: { newPresences: any[] }) => {
+        const oppJoined = newPresences.some(p => p.userId !== userId)
+        if (oppJoined) {
+          seenOppPresenceRef.current = true
+          setOppDisconnected(false)
+          if (reconnectTimerRef.current) { clearInterval(reconnectTimerRef.current); reconnectTimerRef.current = null }
+        }
+      })
+      .on('presence', { event: 'leave' }, ({ leftPresences }: { leftPresences: any[] }) => {
+        const oppLeft = leftPresences.some(p => p.userId !== userId)
+        if (oppLeft && seenOppPresenceRef.current && !resultRef.current) {
+          setOppDisconnected(true)
+          reconnectCountdownRef.current = 60
+          setReconnectCountdown(60)
+          if (reconnectTimerRef.current) clearInterval(reconnectTimerRef.current)
+          reconnectTimerRef.current = setInterval(() => {
+            reconnectCountdownRef.current -= 1
+            setReconnectCountdown(reconnectCountdownRef.current)
+            if (reconnectCountdownRef.current <= 0) {
+              clearInterval(reconnectTimerRef.current!)
+              reconnectTimerRef.current = null
+              if (!resultRef.current) {
+                fetch('/api/game/duel/action', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ duelId: id, action: 'opponent_timeout' }),
+                })
+              }
+            }
+          }, 1000)
+        }
+      })
+      .subscribe(async (status: string) => {
+        if (status === 'SUBSCRIBED') await presenceCh.track({ userId })
+      })
+    return () => {
+      supabase.removeChannel(presenceCh)
+      if (reconnectTimerRef.current) { clearInterval(reconnectTimerRef.current); reconnectTimerRef.current = null }
+    }
+  }, [userId, id, supabase, waiting])
 
   // ── Turn timer ────────────────────────────────────────────────────────────────
   const resetTimer = useCallback(() => {
@@ -751,6 +817,7 @@ export default function DuelPage() {
   }
 
   async function handleSurrender() {
+    if (!confirm('Sei sicuro di voler abbandonare il duello? Verrai dichiarato perdente.')) return
     setIsMyTurn(false)
     await fetch('/api/game/duel/action', {
       method: 'POST',
@@ -820,6 +887,40 @@ export default function DuelPage() {
         <div className="absolute inset-x-0" style={{ top: '48%', height: 1, background: `linear-gradient(90deg, transparent, ${myTheme.glow}20, ${oppTheme.glow}20, transparent)` }} />
       </div>
 
+      {/* ── Opponent disconnect banner ── */}
+      <AnimatePresence>
+        {oppDisconnected && !result && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            className="absolute top-0 inset-x-0 z-20 mx-3 mt-2 rounded-2xl px-4 py-3 flex items-center gap-3"
+            style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.35)', backdropFilter: 'blur(8px)' }}
+          >
+            <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.2, repeat: Infinity }} className="text-lg shrink-0">⚠️</motion.div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-extrabold text-[#FBBF24]">Avversario disconnesso</p>
+              <p className="text-xs text-white/50">Rientra entro {reconnectCountdown}s o annulla</p>
+            </div>
+            <button
+              onClick={async () => {
+                if (reconnectTimerRef.current) { clearInterval(reconnectTimerRef.current); reconnectTimerRef.current = null }
+                setOppDisconnected(false)
+                await fetch('/api/game/duel/action', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ duelId: id, action: 'cancel' }),
+                })
+              }}
+              className="text-xs font-bold shrink-0 px-2.5 py-1.5 rounded-xl"
+              style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171', border: '1px solid rgba(239,68,68,0.3)' }}
+            >Abbandona</button>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.3)' }}>
+              <span className="text-xs font-extrabold text-[#FBBF24]">{reconnectCountdown}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Waiting overlay ── */}
       <AnimatePresence>
         {waiting && (
@@ -881,9 +982,11 @@ export default function DuelPage() {
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               className="flex flex-col items-center text-center"
             >
-              <div className="text-7xl mb-5">{result === 'won' ? '🏆' : '💀'}</div>
+              <div className="text-7xl mb-5">
+                {result === 'won' ? '🏆' : result === 'cancelled' ? '🤝' : '💀'}
+              </div>
               <p className="text-3xl font-extrabold text-white mb-2 tracking-tight">
-                {result === 'won' ? 'Vittoria!' : 'Sconfitta'}
+                {result === 'won' ? 'Vittoria!' : result === 'cancelled' ? 'Duello annullato' : 'Sconfitta'}
               </p>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full mb-8"
                 style={{
@@ -891,7 +994,7 @@ export default function DuelPage() {
                   border: `1px solid ${result === 'won' ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.1)'}`,
                 }}>
                 <span className="font-extrabold text-base" style={{ color: result === 'won' ? '#34D399' : 'rgba(255,255,255,0.35)' }}>
-                  {result === 'won' ? '+30 EXP · +20 punti' : '0 EXP'}
+                  {result === 'won' ? '+30 EXP · +20 punti' : result === 'cancelled' ? 'Duello non concluso' : '0 EXP'}
                 </span>
               </div>
               <motion.button

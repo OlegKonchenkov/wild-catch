@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const { duelId, action, itemId } = await request.json()
-  // action: 'attack' | 'surrender'
+  // action: 'attack' | 'heal' | 'surrender' | 'cancel' | 'opponent_timeout'
 
   const { data: duel } = await supabase
     .from('duels')
@@ -37,6 +37,43 @@ export async function POST(request: Request) {
 
   const myRole: 'challenger' | 'opponent' = isChallenger ? 'challenger' : 'opponent'
   const oppUserId = isChallenger ? duel.opponent_id : duel.challenger_id
+
+  // ── Cancel (mutual abort — no winner, no awards) ──────────────────────────
+  if (action === 'cancel') {
+    await supabase
+      .from('duels')
+      .update({ status: 'ended', winner_id: null, ended_at: new Date().toISOString() })
+      .eq('id', duelId)
+    return NextResponse.json({ ended: true, winnerId: null, cancelled: true })
+  }
+
+  // ── Opponent timeout (caller wins — opponent didn't reconnect in time) ────
+  if (action === 'opponent_timeout') {
+    await supabase
+      .from('duels')
+      .update({ status: 'ended', winner_id: user.id, ended_at: new Date().toISOString() })
+      .eq('id', duelId)
+    await awardDuelResults(supabase, duel.session_id, user.id, oppUserId!)
+    incrementMissionProgress({ type: 'duel', userId: user.id, sessionId: duel.session_id }).then(undefined, () => {})
+    const { createAdminClient: adminFactory } = await import('@/lib/supabase/admin')
+    const adminTimeout = adminFactory()
+    const { data: timeoutLineups } = await supabase
+      .from('duel_lineups')
+      .select('user_id, slot, player_creatures(creatures(name, element, hp, atk, def, image_url, sprite_url, rarity))')
+      .eq('duel_id', duelId)
+      .order('slot', { ascending: true })
+    const { data: timeoutProfiles } = await adminTimeout.from('profiles').select('user_id, nickname').in('user_id', [user.id, oppUserId!])
+    const timeoutProfileMap: Record<string, string | null> = Object.fromEntries(
+      (timeoutProfiles ?? []).map((r: any) => [r.user_id, r.nickname ?? null])
+    )
+    const myCreatures  = buildCreatureSummaries(timeoutLineups ?? [], user.id)
+    const oppCreatures = buildCreatureSummaries(timeoutLineups ?? [], oppUserId!)
+    adminTimeout.from('player_game_events').insert([
+      { user_id: user.id,    session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId, opponent_name: timeoutProfileMap[oppUserId!] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: myCreatures, opp_creatures: oppCreatures } },
+      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: user.id, winner_name: timeoutProfileMap[user.id] ?? null, my_creatures: oppCreatures, opp_creatures: myCreatures } },
+    ]).then(undefined, () => {})
+    return NextResponse.json({ ended: true, winnerId: user.id })
+  }
 
   // ── Surrender ──────────────────────────────────────────────────────────────
   if (action === 'surrender') {
