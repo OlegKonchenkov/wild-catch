@@ -129,3 +129,42 @@ export function calculateCombatDamage({
 
   return Math.max(1, Math.round(rawDamage * mitigation))
 }
+
+// ── Status effects ─────────────────────────────────────────────────────────
+
+export type StatusEffect = 'paralisi' | 'confusione' | 'sonno' | 'veleno'
+
+export interface StatusEffectMeta {
+  emoji: string
+  label: string
+  color: string       // hex for text / badge foreground
+  glow: string        // rgba for glow / shadow
+  turns: number       // initial turns (0 = permanent, i.e. veleno)
+  preventsAttack: boolean
+}
+
+export const STATUS_EFFECT_META: Record<StatusEffect, StatusEffectMeta> = {
+  paralisi:   { emoji: '⚡', label: 'Paralisi',   color: '#FBBF24', glow: 'rgba(251,191,36,0.40)',  turns: 1, preventsAttack: true  },
+  confusione: { emoji: '💫', label: 'Confusione', color: '#C084FC', glow: 'rgba(192,132,252,0.40)', turns: 3, preventsAttack: false },
+  sonno:      { emoji: '💤', label: 'Sonno',      color: '#60A5FA', glow: 'rgba(96,165,250,0.40)',  turns: 2, preventsAttack: true  },
+  veleno:     { emoji: '☠️', label: 'Veleno',     color: '#4ADE80', glow: 'rgba(74,222,128,0.40)',  turns: 0, preventsAttack: false },
+}
+
+/** Roll whether an attacker's status effect triggers this attack. */
+export function rollStatusEffect(
+  statusEffect: StatusEffect | null | undefined,
+  chance: number | null | undefined,
+): StatusEffect | null {
+  if (!statusEffect) return null
+  return Math.random() < (chance ?? 0.15) ? statusEffect : null
+}
+
+/** Self-damage from confusion: attacker hits themselves at 50% power (own ATK vs own DEF). */
+export function calculateConfusionSelfDamage(atk: number, def: number): number {
+  return calculateCombatDamage({ attackerAtk: atk, defenderDef: def, attackMultiplier: 0.5 })
+}
+
+/** Poison tick: 10% of scaled max HP per turn, minimum 1. */
+export function calculatePoisonDamage(maxHp: number): number {
+  return Math.max(1, Math.round(maxHp * 0.10))
+}

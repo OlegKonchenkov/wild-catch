@@ -9,7 +9,8 @@ import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import { GameBattleSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
-import { scaleCombatStats } from '@/lib/game/combat'
+import { scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
+import type { StatusEffect } from '@/lib/game/combat'
 import { playBattleSound } from '@/lib/game/battle-sounds'
 import { startDuelLoop } from '@/lib/game/sounds/battle-loop'
 import { playKnockout, playVictory, playDefeat, playLevelUp } from '@/lib/game/sounds/events'
@@ -24,6 +25,8 @@ interface LineupEntry {
   current_hp: number
   is_active: boolean
   fainted_at: string | null
+  active_status?: StatusEffect | null
+  status_turns_left?: number
   player_creatures: {
     creatures: {
       name: string
@@ -79,9 +82,11 @@ interface CardProps {
   lineup?: Array<{ color: string; isActive: boolean; fainted: boolean }>
   lineupLabel?: string
   fainting?: boolean
+  statusEffect?: StatusEffect | null
+  statusTurnsLeft?: number
 }
 
-function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, def, animState = 'idle', side, lineup, lineupLabel, fainting = false }: CardProps) {
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, def, animState = 'idle', side, lineup, lineupLabel, fainting = false, statusEffect, statusTurnsLeft }: CardProps) {
   const spriteSize = typeof window !== 'undefined'
     ? Math.round(Math.min(window.innerWidth * 0.35, window.innerHeight * 0.2, 158))
     : 122
@@ -159,6 +164,25 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
             <span className="text-[11px] leading-none">{elemEmoji}</span>
             <span className="text-[9px] text-white/35 capitalize">{element}</span>
           </div>
+          {statusEffect && STATUS_EFFECT_META[statusEffect] && (
+            <div className="mt-1 flex items-center gap-1">
+              <span
+                className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
+                style={{
+                  background: `${STATUS_EFFECT_META[statusEffect].color}18`,
+                  border: `1px solid ${STATUS_EFFECT_META[statusEffect].color}50`,
+                  color: STATUS_EFFECT_META[statusEffect].color,
+                  boxShadow: `0 0 6px ${STATUS_EFFECT_META[statusEffect].glow}`,
+                }}
+              >
+                <span>{STATUS_EFFECT_META[statusEffect].emoji}</span>
+                <span>{STATUS_EFFECT_META[statusEffect].label}</span>
+                {statusTurnsLeft != null && statusTurnsLeft > 0 && (
+                  <span className="opacity-60">×{statusTurnsLeft}</span>
+                )}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Lineup dots */}
@@ -263,6 +287,7 @@ export default function DuelPage() {
   const [showItemsModal, setShowItemsModal] = useState(false)
   const [switchNotice, setSwitchNotice]     = useState<string | null>(null)
   const [fortuneNotice, setFortuneNotice]   = useState<{ id: number; text: string; tone: CombatFortuneInfo['tone'] } | null>(null)
+  const [statusNotice, setStatusNotice]     = useState<{ id: number; emoji: string; text: string; color: string; glow: string } | null>(null)
   const [playerLevels, setPlayerLevels]     = useState<Record<string, number>>({})
   const [completedMissions, setCompletedMissions] = useState<CompletedMissionInfo[]>([])
   const [showMissionModal, setShowMissionModal] = useState(false)
@@ -312,6 +337,14 @@ export default function DuelPage() {
     setTimeout(() => {
       setCritNotice(current => current?.id === id ? null : current)
     }, 1600)
+  }
+
+  function flashStatusNotice(effect: StatusEffect, text: string) {
+    const meta = STATUS_EFFECT_META[effect]
+    if (!meta) return
+    const id = Date.now()
+    setStatusNotice({ id, emoji: meta.emoji, text, color: meta.color, glow: meta.glow })
+    setTimeout(() => setStatusNotice(current => current?.id === id ? null : current), 2400)
   }
 
   const loadPlayerLevels = useCallback(async (sessionId: string | undefined, duelUserIds: Array<string | null | undefined>) => {
@@ -460,8 +493,47 @@ export default function DuelPage() {
     const channel = supabase
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
-        const { actorId, action: broadcastAction, damage, fortune, isCrit, nextTurn, itemUsed, switchedTo, newOppHp, healAmount, newHp } = payload
+        const { actorId, action: broadcastAction, damage, fortune, isCrit, nextTurn, itemUsed, switchedTo, newOppHp, healAmount, newHp,
+          statusEvent, preTurnStatusEvent: preTurnSE, statusAppliedToOpp, oppStatusTurnsLeft } = payload
         const iAttacked = actorId === userIdRef.current
+
+        // ── Status tick broadcast ──────────────────────────────────────────────
+        if (broadcastAction === 'status_tick') {
+          if (statusEvent) {
+            const effect = statusEvent.type as StatusEffect
+            if (statusEvent.turnPassed) {
+              const cleared = statusEvent.cleared
+              const text = cleared ? `${STATUS_EFFECT_META[effect]?.label ?? effect} curato!` : `${STATUS_EFFECT_META[effect]?.label ?? effect} — turno saltato`
+              flashStatusNotice(effect, text)
+              setLog(prev => [`${STATUS_EFFECT_META[effect]?.emoji ?? ''} ${text}`, ...prev.slice(0, 3)])
+              // Update status on my/opp lineup
+              const updateStatus = (prev: LineupEntry[]) => prev.map(l => l.is_active
+                ? { ...l, active_status: cleared ? null : effect, status_turns_left: statusEvent.turnsLeft ?? 0 }
+                : l)
+              if (iAttacked) setMyLineup(updateStatus); else setOppLineup(updateStatus)
+            } else if (statusEvent.selfHit) {
+              const text = statusEvent.fainted
+                ? `Confusione — sviene da autolesionismo!`
+                : `Confusione — colpisce se stesso! (${statusEvent.selfDamage} dmg)`
+              flashStatusNotice(effect, text)
+              setLog(prev => [`💫 ${text}`, ...prev.slice(0, 3)])
+              if (statusEvent.newMyHp !== undefined) {
+                const updateHp = (prev: LineupEntry[]) => prev.map(l => l.is_active ? { ...l, current_hp: statusEvent.newMyHp, active_status: statusEvent.cleared ? null : effect, status_turns_left: statusEvent.turnsLeft ?? 0 } : l)
+                if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
+              }
+            } else if (statusEvent.poisonDamage !== undefined) {
+              const text = statusEvent.fainted ? 'Veleno — sviene!' : `Veleno — ${statusEvent.poisonDamage} danno`
+              flashStatusNotice(effect, text)
+              setLog(prev => [`☠️ ${text}`, ...prev.slice(0, 3)])
+              if (statusEvent.newMyHp !== undefined) {
+                const updateHp = (prev: LineupEntry[]) => prev.map(l => l.is_active ? { ...l, current_hp: statusEvent.newMyHp } : l)
+                if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
+              }
+            }
+          }
+          if (nextTurn) setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
+          return
+        }
 
         // ── Heal broadcast — update the healer's HP ────────────────────────────
         if (broadcastAction === 'heal') {
@@ -550,6 +622,28 @@ export default function DuelPage() {
         const fortuneText = formatFortuneText(fortune as CombatFortuneInfo | undefined)
         const critLabel = isCrit ? ' · ⚡ CRITICO! ×1.75' : ''
         setLog(prev => [`${atkLabel} ${damage} danno${critLabel}${fortuneText && !isCrit ? ` · ${fortuneText}` : ''}!`, ...prev.slice(0, 3)])
+
+        // Pre-turn confusion info
+        if (preTurnSE && !preTurnSE.selfHit) {
+          const effect = preTurnSE.type as StatusEffect
+          const text = preTurnSE.cleared ? `${STATUS_EFFECT_META[effect]?.label} curato` : `${STATUS_EFFECT_META[effect]?.label} — attacca lo stesso`
+          flashStatusNotice(effect, text)
+        }
+
+        // Status applied to opponent by this attack
+        if (statusAppliedToOpp) {
+          const effect = statusAppliedToOpp as StatusEffect
+          const meta = STATUS_EFFECT_META[effect]
+          const target = iAttacked ? 'Avversario' : 'Tu'
+          const text = `${target} afflitto da ${meta?.label ?? effect}!`
+          setTimeout(() => flashStatusNotice(effect, text), 1200)
+          setLog(prev => [`${meta?.emoji ?? ''} ${text}`, ...prev.slice(0, 3)])
+          // Update the affected lineup's status
+          const updateStatus = (prev: LineupEntry[]) => prev.map(l => l.is_active
+            ? { ...l, active_status: effect, status_turns_left: oppStatusTurnsLeft ?? 0 }
+            : l)
+          if (iAttacked) setOppLineup(updateStatus); else setMyLineup(updateStatus)
+        }
       })
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'duel_lineups', filter: `duel_id=eq.${id}` },
@@ -1139,6 +1233,8 @@ export default function DuelPage() {
                   side="right"
                   lineup={oppLineupDots}
                   fainting={oppFainting}
+                  statusEffect={oppActive?.active_status}
+                  statusTurnsLeft={oppActive?.status_turns_left}
                 />
               </motion.div>
             ) : (
@@ -1228,6 +1324,8 @@ export default function DuelPage() {
                   lineup={myLineupDots}
                   lineupLabel="Tu"
                   fainting={myFainting}
+                  statusEffect={myActive?.active_status}
+                  statusTurnsLeft={myActive?.status_turns_left}
                 />
               </motion.div>
             ) : (
@@ -1247,6 +1345,12 @@ export default function DuelPage() {
               className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold"
               style={{ background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.55)', color: '#FB923C' }}>
               ⚡ CRITICO! ×1.75
+            </motion.div>
+          ) : statusNotice ? (
+            <motion.div key={`status-${statusNotice.id}`} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
+              className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold"
+              style={{ background: `${statusNotice.color}18`, border: `1px solid ${statusNotice.color}50`, color: statusNotice.color, boxShadow: `0 0 8px ${statusNotice.glow}` }}>
+              {statusNotice.emoji} {statusNotice.text}
             </motion.div>
           ) : switchNotice ? (
             <motion.div key="switch" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}

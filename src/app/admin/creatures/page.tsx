@@ -30,6 +30,8 @@ interface Creature {
   enigma_video_url: string | null
   attack_sound_url: string | null
   attack_sound_duration_ms: number | null
+  status_effect: string | null
+  status_effect_chance: number
 }
 
 const RARITIES: Rarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
@@ -58,6 +60,7 @@ const EMPTY_FORM = {
   enigma_title: '', enigma_description: '', enigma_image_url: '', enigma_video_url: '',
   spawnable: true,
   attack_sound_url: '', attack_sound_duration_ms: '',
+  status_effect: '' as string, status_effect_chance: 15,
 }
 
 type ImageMode = 'preview' | 'url' | 'upload' | 'ai'
@@ -90,6 +93,7 @@ export default function CreaturesPage() {
   const enigmaFileRef = useRef<HTMLInputElement>(null)
 
   const [soundOpen, setSoundOpen] = useState(false)
+  const [statusOpen, setStatusOpen] = useState(false)
   const [soundUploading, setSoundUploading] = useState(false)
   const [soundError, setSoundError] = useState<string | null>(null)
   const soundFileRef = useRef<HTMLInputElement>(null)
@@ -122,7 +126,7 @@ export default function CreaturesPage() {
   function openNew() {
     setPanel('new'); setFormData({ ...EMPTY_FORM }); setFormError(null)
     setImageMode('preview'); setManualUrl(''); setAiPrompt(''); setArtworkError(null)
-    setEnigmaOpen(false); setSoundOpen(false); setSoundError(null)
+    setEnigmaOpen(false); setSoundOpen(false); setSoundError(null); setStatusOpen(false)
   }
 
   function openEdit(c: Creature) {
@@ -133,7 +137,8 @@ export default function CreaturesPage() {
       enigma_title: c.enigma_title ?? '', enigma_description: c.enigma_description ?? '',
       enigma_image_url: c.enigma_image_url ?? '', enigma_video_url: c.enigma_video_url ?? '',
       spawnable: (c as any).spawnable !== false,
-      attack_sound_url: c.attack_sound_url ?? '', attack_sound_duration_ms: c.attack_sound_duration_ms ?? '' } as any)
+      attack_sound_url: c.attack_sound_url ?? '', attack_sound_duration_ms: c.attack_sound_duration_ms ?? '',
+      status_effect: c.status_effect ?? '', status_effect_chance: c.status_effect_chance != null ? Math.round(c.status_effect_chance * 100) : 15 } as any)
     setFormError(null); setImageMode('preview')
     setManualUrl(c.image_url ?? ''); setAiPrompt(c.description ?? ''); setArtworkError(null)
     setSoundError(null)
@@ -161,6 +166,8 @@ export default function CreaturesPage() {
       attack_sound_url: (formData as any).attack_sound_url || null,
       attack_sound_duration_ms: (formData as any).attack_sound_duration_ms
         ? Number((formData as any).attack_sound_duration_ms) : null,
+      status_effect: (formData as any).status_effect || null,
+      status_effect_chance: Number((formData as any).status_effect_chance ?? 15) / 100,
     }
     try {
       const res = await fetch(isEdit ? `/api/admin/creatures/${panel}` : '/api/admin/creatures', {
@@ -803,6 +810,65 @@ export default function CreaturesPage() {
                               placeholder="Es. 1200"
                               className="w-full bg-white/5 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50" />
                           </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Effetto di Stato ── */}
+                    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+                      <button type="button" className="w-full flex items-center justify-between px-4 py-3"
+                        onClick={() => setStatusOpen(o => !o)}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">⚡</span>
+                          <span className="text-sm font-bold text-white/70">Effetto di Stato</span>
+                          {(formData as any).status_effect && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-bold"
+                              style={{ background: 'rgba(251,191,36,0.15)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.3)' }}>
+                              {(formData as any).status_effect} — {(formData as any).status_effect_chance}%
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-white/30 text-xs">{statusOpen ? '▲' : '▼'}</span>
+                      </button>
+                      {statusOpen && (
+                        <div className="px-4 pb-4 flex flex-col gap-3 border-t border-white/06">
+                          <div>
+                            <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Tipo di effetto</label>
+                            <div className="flex flex-wrap gap-2">
+                              {[
+                                { value: '', label: 'Nessuno', emoji: '—' },
+                                { value: 'paralisi', label: 'Paralisi', emoji: '⚡' },
+                                { value: 'confusione', label: 'Confusione', emoji: '💫' },
+                                { value: 'sonno', label: 'Sonno', emoji: '💤' },
+                                { value: 'veleno', label: 'Veleno', emoji: '☠️' },
+                              ].map(opt => (
+                                <button key={opt.value} type="button"
+                                  onClick={() => setFormData(f => ({ ...f, status_effect: opt.value } as any))}
+                                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-all"
+                                  style={{
+                                    background: (formData as any).status_effect === opt.value ? 'rgba(58,157,188,0.2)' : 'rgba(255,255,255,0.04)',
+                                    border: `1px solid ${(formData as any).status_effect === opt.value ? 'rgba(58,157,188,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                                    color: (formData as any).status_effect === opt.value ? '#3A9DBC' : 'rgba(255,255,255,0.5)',
+                                  }}>
+                                  <span>{opt.emoji}</span><span>{opt.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {(formData as any).status_effect && (
+                            <div>
+                              <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
+                                Probabilità: <span className="text-white/60">{(formData as any).status_effect_chance}%</span>
+                              </label>
+                              <input type="range" min="1" max="100"
+                                value={(formData as any).status_effect_chance}
+                                onChange={e => setFormData(f => ({ ...f, status_effect_chance: Number(e.target.value) } as any))}
+                                className="w-full accent-[#3A9DBC]" />
+                              <div className="flex justify-between text-[10px] text-white/25 mt-1">
+                                <span>1%</span><span>15% (default)</span><span>100%</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

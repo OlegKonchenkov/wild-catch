@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { calculateCombatDamage, rollCombatFortune, rollCrit, scaleCombatStats } from '@/lib/game/combat'
+import { calculateCombatDamage, calculateConfusionSelfDamage, calculatePoisonDamage, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
+import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
 
@@ -66,7 +67,7 @@ export async function POST(request: Request, { params }: Params) {
     const pcIds = lineup.map((e: any) => e.playerCreatureId)
     const { data: pcs } = await supabase
       .from('player_creatures')
-      .select('id, creatures(id, name, element, rarity, hp, atk, def, image_url)')
+      .select('id, creatures(id, name, element, rarity, hp, atk, def, image_url, status_effect, status_effect_chance)')
       .in('id', pcIds)
       .eq('user_id', user.id)
 
@@ -115,6 +116,10 @@ export async function POST(request: Request, { params }: Params) {
         image_url: cr?.image_url ?? '',
         attack_sound_url: crId ? (soundMap[crId]?.url ?? null) : null,
         attack_sound_duration_ms: crId ? (soundMap[crId]?.ms ?? null) : null,
+        status_effect: cr?.status_effect ?? null,
+        status_effect_chance: cr?.status_effect_chance ?? 0.15,
+        active_status: null,
+        status_turns_left: 0,
       }
     })
 
@@ -259,6 +264,74 @@ export async function POST(request: Request, { params }: Params) {
     if (!playerActive) return NextResponse.json({ error: 'Nessuna creatura attiva' }, { status: 400 })
     if (!bossActive || bossActive.fainted) return NextResponse.json({ error: 'Boss già sconfitto' }, { status: 400 })
 
+    // ── Status effect pre-turn (player) ──────────────────────────────────
+    const playerStatus    = playerActive.active_status as StatusEffect | null
+    const playerStatusTurns = playerActive.status_turns_left ?? 0
+    let preTurnStatusEvent: Record<string, unknown> | null = null
+    let skipPlayerAttack = false
+    let statusTickEvents: Record<string, unknown>[] = []
+
+    // Veleno tick on player
+    if (playerStatus === 'veleno') {
+      const poisonDmg = calculatePoisonDamage(playerActive.max_hp)
+      playerActive.current_hp = Math.max(0, playerActive.current_hp - poisonDmg)
+      if (playerActive.current_hp === 0) playerActive.fainted = true
+      statusTickEvents.push({ type: 'veleno', target: 'player', poisonDamage: poisonDmg, newHp: playerActive.current_hp, fainted: playerActive.current_hp === 0 })
+    }
+
+    // Veleno tick on boss
+    if (bossActive.active_status === 'veleno') {
+      const bPoisonDmg = calculatePoisonDamage(bossActive.max_hp)
+      bossActive.current_hp = Math.max(0, bossActive.current_hp - bPoisonDmg)
+      if (bossActive.current_hp === 0) bossActive.fainted = true
+      statusTickEvents.push({ type: 'veleno', target: 'boss', poisonDamage: bPoisonDmg, newHp: bossActive.current_hp, fainted: bossActive.current_hp === 0 })
+    }
+
+    // Paralisi / Sonno: skip player attack
+    if ((playerStatus === 'paralisi' || playerStatus === 'sonno') && !playerActive.fainted) {
+      const newTurns = playerStatusTurns - 1
+      const cleared = newTurns <= 0
+      playerActive.active_status    = cleared ? null : playerStatus
+      playerActive.status_turns_left = Math.max(0, newTurns)
+      skipPlayerAttack = true
+      preTurnStatusEvent = { type: playerStatus, turnPassed: true, cleared, turnsLeft: Math.max(0, newTurns) }
+    }
+
+    // Confusione: 50/50 self-hit or normal
+    let confusionSelfHit = false
+    if (playerStatus === 'confusione' && !skipPlayerAttack && !playerActive.fainted) {
+      const newTurns = playerStatusTurns - 1
+      const cleared = newTurns <= 0
+      playerActive.active_status    = cleared ? null : 'confusione'
+      playerActive.status_turns_left = Math.max(0, newTurns)
+      if (Math.random() < 0.5) {
+        confusionSelfHit = true
+        skipPlayerAttack = true
+        const selfDmg = calculateConfusionSelfDamage(playerActive.atk, playerActive.def ?? 0)
+        playerActive.current_hp = Math.max(0, playerActive.current_hp - selfDmg)
+        if (playerActive.current_hp === 0) playerActive.fainted = true
+        preTurnStatusEvent = { type: 'confusione', selfHit: true, selfDamage: selfDmg, selfHp: playerActive.current_hp, cleared, turnsLeft: Math.max(0, newTurns), fainted: playerActive.current_hp === 0 }
+      } else {
+        preTurnStatusEvent = { type: 'confusione', selfHit: false, cleared, turnsLeft: Math.max(0, newTurns) }
+      }
+    }
+
+    // Early exit if all player fainted from status
+    if (playerLineup.every((c: any) => c.fainted)) {
+      await supabase.from('boss_fights').update({
+        player_lineup: playerLineup, boss_lineup: bossLineup,
+        status: 'lost', ended_at: new Date().toISOString(),
+      }).eq('id', id)
+      createAdminClient().from('player_game_events').insert({
+        user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
+        payload: { fight_id: id, boss_name: (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss' },
+      }).then(undefined, () => {})
+      return NextResponse.json({
+        statusTick: true, statusTickEvents, preTurnStatusEvent, playerLineup, bossLineup,
+        status: 'lost', lost: true, playerDamage: 0, bossDamage: 0,
+      })
+    }
+
     // ── Optional battaglia item ──────────────────────────────────────────
     let atkMultiplier = 1
     if (itemId) {
@@ -277,21 +350,27 @@ export async function POST(request: Request, { params }: Params) {
 
     // ── Player → Boss ────────────────────────────────────────────────────
     const playerMult   = getElementMultiplier(playerActive.element as Element, bossActive.element as Element)
-    const playerFortune = rollCombatFortune({
-      attackerLevel: playerActive.level ?? 1,
-      defenderLevel: bossActive.level ?? 1,
-      attackerStats: { hp: playerActive.max_hp, atk: playerActive.atk, def: playerActive.def ?? 0 },
-      defenderStats: { hp: bossActive.max_hp, atk: bossActive.atk, def: bossActive.def ?? 0 },
-    })
-    const { isCrit: playerCrit, critMultiplier: playerCritMult } = rollCrit()
-    const playerDamage = calculateCombatDamage({
-      attackerAtk: playerActive.atk,
-      defenderDef: bossActive.def ?? 0,
-      attackMultiplier: atkMultiplier * playerCritMult,
-      elementMultiplier: playerMult,
-      varianceMultiplier: playerFortune.multiplier,
-    })
-    const newBossHp    = Math.max(0, bossActive.current_hp - playerDamage)
+    let playerFortune = null
+    let playerCrit = false
+    let playerDamage = 0
+    if (!skipPlayerAttack && !playerActive.fainted && !bossActive.fainted) {
+      playerFortune = rollCombatFortune({
+        attackerLevel: playerActive.level ?? 1,
+        defenderLevel: bossActive.level ?? 1,
+        attackerStats: { hp: playerActive.max_hp, atk: playerActive.atk, def: playerActive.def ?? 0 },
+        defenderStats: { hp: bossActive.max_hp, atk: bossActive.atk, def: bossActive.def ?? 0 },
+      })
+      const { isCrit: pc, critMultiplier: pcm } = rollCrit()
+      playerCrit = pc
+      playerDamage = calculateCombatDamage({
+        attackerAtk: playerActive.atk,
+        defenderDef: bossActive.def ?? 0,
+        attackMultiplier: atkMultiplier * pcm,
+        elementMultiplier: playerMult,
+        varianceMultiplier: playerFortune.multiplier,
+      })
+    }
+    const newBossHp = Math.max(0, bossActive.current_hp - playerDamage)
     bossActive.current_hp = newBossHp
     if (newBossHp === 0) bossActive.fainted = true
 
@@ -337,6 +416,33 @@ export async function POST(request: Request, { params }: Params) {
         newPlayerHp = Math.max(0, playerActive.current_hp - bossDamage)
         playerActive.current_hp = newPlayerHp
         if (newPlayerHp === 0) playerActive.fainted = true
+      }
+    }
+
+    // ── Post-attack status rolls ─────────────────────────────────────────
+    let statusAppliedToBoss: StatusEffect | null = null
+    let bossStatusTurnsLeft = 0
+    if (playerDamage > 0 && newBossHp > 0 && !bossActive.fainted) {
+      const triggered = rollStatusEffect(playerActive.status_effect as StatusEffect | null, playerActive.status_effect_chance)
+      if (triggered && !bossActive.active_status) {
+        statusAppliedToBoss = triggered
+        bossStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
+        bossActive.active_status    = triggered
+        bossActive.status_turns_left = bossStatusTurnsLeft
+      }
+    }
+
+    let statusAppliedToPlayer: StatusEffect | null = null
+    let playerStatusTurnsLeft = 0
+    if (bossDamage > 0 && newPlayerHp > 0 && !playerActive.fainted) {
+      const bossEffect = bossActive.status_effect as StatusEffect | null
+      const bossChance = bossActive.status_effect_chance ?? 0.15
+      const triggered = rollStatusEffect(bossEffect, bossChance)
+      if (triggered && !playerActive.active_status) {
+        statusAppliedToPlayer = triggered
+        playerStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
+        playerActive.active_status    = triggered
+        playerActive.status_turns_left = playerStatusTurnsLeft
       }
     }
 
@@ -523,6 +629,12 @@ export async function POST(request: Request, { params }: Params) {
       lost: newStatus === 'lost',
       levelUp,
       reward: enrichedReward,
+      statusTickEvents,
+      preTurnStatusEvent,
+      statusAppliedToBoss,
+      bossStatusTurnsLeft,
+      statusAppliedToPlayer,
+      playerStatusTurnsLeft,
     })
   }
 

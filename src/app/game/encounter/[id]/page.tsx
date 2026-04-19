@@ -11,6 +11,8 @@ import AttackAnimation from '@/components/battle/AttackAnimation'
 import { createClient } from '@/lib/supabase/client'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
+import { STATUS_EFFECT_META } from '@/lib/game/combat'
+import type { StatusEffect } from '@/lib/game/combat'
 import type { Creature, Element, Rarity } from '@/lib/types'
 
 interface SquadCreature {
@@ -587,6 +589,31 @@ export default function EncounterPage() {
         finishPendingAction()
         return
       }
+    }
+
+    // Status effect notifications
+    if (data.statusEvents?.length) {
+      for (const se of data.statusEvents as any[]) {
+        if (se.turnPassed) {
+          const effect = se.type as StatusEffect
+          const meta = STATUS_EFFECT_META[effect]
+          if (se.target === 'player') setMessage(`${meta?.emoji ?? ''} Hai saltato il turno (${meta?.label ?? effect})`)
+          else setMessage(`${meta?.emoji ?? ''} ${state.creature.name} ha saltato il turno (${meta?.label ?? effect})`)
+          await new Promise(r => setTimeout(r, 700))
+        }
+      }
+    }
+    if (data.statusAppliedToWild) {
+      const effect = data.statusAppliedToWild as StatusEffect
+      const meta = STATUS_EFFECT_META[effect]
+      setMessage(`${meta?.emoji ?? ''} ${state.creature.name} è afflitto da ${meta?.label ?? effect}!`)
+      await new Promise(r => setTimeout(r, 600))
+    }
+    if (data.statusAppliedToPlayer) {
+      const effect = data.statusAppliedToPlayer as StatusEffect
+      const meta = STATUS_EFFECT_META[effect]
+      setMessage(`${meta?.emoji ?? ''} Sei afflitto da ${meta?.label ?? effect}!`)
+      await new Promise(r => setTimeout(r, 600))
     }
 
     if (data.levelUp) { playLevelUp(); window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp })) }

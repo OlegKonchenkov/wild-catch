@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { calculateCombatDamage, rollCombatFortune, rollCrit, scaleCombatStats } from '@/lib/game/combat'
+import { calculateCombatDamage, calculateConfusionSelfDamage, calculatePoisonDamage, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
+import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
@@ -189,7 +190,7 @@ export async function POST(request: Request) {
   // ── Load all lineups ───────────────────────────────────────────────────────
   const { data: allLineups } = await supabase
     .from('duel_lineups')
-    .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_url, rarity))')
+    .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_url, rarity, status_effect, status_effect_chance))')
     .eq('duel_id', duelId)
     .order('slot', { ascending: true })
 
@@ -229,6 +230,112 @@ export async function POST(request: Request) {
     { hp: oppCreature.hp, atk: oppCreature.atk, def: oppCreature.def ?? 0 },
     levelByUser[oppUserId!] ?? 1,
   )
+
+  // ── Status effect pre-turn processing ─────────────────────────────────────
+  const attackerStatus    = (myActive as any).active_status as StatusEffect | null
+  const attackerTurnsLeft = (myActive as any).status_turns_left ?? 0
+  const nextTurnRole: 'challenger' | 'opponent' = isChallenger ? 'opponent' : 'challenger'
+
+  // Helper: end duel when the attacker faints from a status effect
+  async function endDuelFromStatusFaint() {
+    const allMyFainted = (allLineups ?? [])
+      .filter((l: any) => l.user_id === user!.id)
+      .every((l: any) => l.id === myActive.id || l.fainted_at !== null)
+    if (allMyFainted) {
+      await supabase.from('duels').update({ status: 'ended', winner_id: oppUserId, ended_at: new Date().toISOString() }).eq('id', duelId)
+      await awardDuelResults(supabase, duel.session_id, oppUserId!, user!.id)
+      incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel.session_id }).then(undefined, () => {})
+    }
+    return allMyFainted
+  }
+
+  // ── Veleno tick ────────────────────────────────────────────────────────────
+  if (attackerStatus === 'veleno') {
+    const poisonDmg  = calculatePoisonDamage(myCombatStats.hp)
+    const poisonedHp = Math.max(0, myActive.current_hp - poisonDmg)
+    await supabase.from('duel_lineups').update({
+      current_hp: poisonedHp,
+      ...(poisonedHp === 0 ? { fainted_at: new Date().toISOString(), is_active: false } : {}),
+    }).eq('id', myActive.id)
+
+    if (poisonedHp === 0) {
+      const duelEndedNow = await endDuelFromStatusFaint()
+      const ch = supabase.channel(`duel:${duelId}`)
+      await new Promise<void>(r => ch.subscribe(() => r()))
+      await ch.send({ type: 'broadcast', event: 'duel_action', payload: {
+        actorId: user.id, action: 'status_tick',
+        statusEvent: { type: 'veleno', poisonDamage: poisonDmg, poisonNewHp: 0, fainted: true },
+        nextTurn: duelEndedNow ? null : nextTurnRole,
+        duelOver: duelEndedNow, winnerId: duelEndedNow ? oppUserId : null,
+        newMyHp: 0,
+      }})
+      await supabase.removeChannel(ch)
+      return NextResponse.json({ statusTick: true, poisonFaint: true, duelOver: duelEndedNow })
+    }
+    // Poison tick applied, attacker still alive — continue with normal attack turn
+  }
+
+  // ── Paralisi / Sonno: skip turn ───────────────────────────────────────────
+  if (attackerStatus === 'paralisi' || attackerStatus === 'sonno') {
+    const newTurns = attackerTurnsLeft - 1
+    const cleared  = newTurns <= 0
+    await supabase.from('duel_lineups').update({
+      active_status: cleared ? null : attackerStatus,
+      status_turns_left: Math.max(0, newTurns),
+    }).eq('id', myActive.id)
+    await supabase.from('duels').update({ current_turn: nextTurnRole }).eq('id', duelId)
+
+    const ch = supabase.channel(`duel:${duelId}`)
+    await new Promise<void>(r => ch.subscribe(() => r()))
+    await ch.send({ type: 'broadcast', event: 'duel_action', payload: {
+      actorId: user.id, action: 'status_tick',
+      statusEvent: { type: attackerStatus, turnPassed: true, cleared, turnsLeft: Math.max(0, newTurns) },
+      nextTurn: nextTurnRole, duelOver: false,
+    }})
+    await supabase.removeChannel(ch)
+    return NextResponse.json({ turnPassed: true, statusEffect: attackerStatus, cleared })
+  }
+
+  // ── Confusione: 50/50 self-hit or normal attack ───────────────────────────
+  let confusionSelfHit = false
+  let preTurnStatusEvent: Record<string, unknown> | null = null
+  if (attackerStatus === 'confusione') {
+    const newTurns = attackerTurnsLeft - 1
+    const cleared  = newTurns <= 0
+    await supabase.from('duel_lineups').update({
+      active_status: cleared ? null : 'confusione',
+      status_turns_left: Math.max(0, newTurns),
+    }).eq('id', myActive.id)
+
+    if (Math.random() < 0.5) {
+      // Self-hit
+      confusionSelfHit = true
+      const selfDmg  = calculateConfusionSelfDamage(myCombatStats.atk, myCombatStats.def)
+      const selfHp   = Math.max(0, myActive.current_hp - selfDmg)
+      await supabase.from('duel_lineups').update({
+        current_hp: selfHp,
+        ...(selfHp === 0 ? { fainted_at: new Date().toISOString(), is_active: false } : {}),
+      }).eq('id', myActive.id)
+
+      let duelEndedNow = false
+      if (selfHp === 0) duelEndedNow = await endDuelFromStatusFaint()
+      if (!duelEndedNow) await supabase.from('duels').update({ current_turn: nextTurnRole }).eq('id', duelId)
+
+      const ch = supabase.channel(`duel:${duelId}`)
+      await new Promise<void>(r => ch.subscribe(() => r()))
+      await ch.send({ type: 'broadcast', event: 'duel_action', payload: {
+        actorId: user.id, action: 'status_tick',
+        statusEvent: { type: 'confusione', selfHit: true, selfDamage: selfDmg, selfHp, cleared, turnsLeft: Math.max(0, newTurns), fainted: selfHp === 0 },
+        nextTurn: duelEndedNow ? null : nextTurnRole,
+        duelOver: duelEndedNow, winnerId: duelEndedNow ? oppUserId : null,
+        newMyHp: selfHp,
+      }})
+      await supabase.removeChannel(ch)
+      return NextResponse.json({ confusionSelfHit: true, selfDamage: selfDmg, duelOver: duelEndedNow })
+    }
+    // Normal attack this turn — record the confusion decrement for broadcast
+    preTurnStatusEvent = { type: 'confusione', selfHit: false, cleared, turnsLeft: Math.max(0, newTurns) }
+  }
 
   // ── Optional battaglia item ────────────────────────────────────────────────
   let atkMultiplier = 1
@@ -324,6 +431,22 @@ export async function POST(request: Request) {
     await supabase.from('duels').update({ current_turn: nextTurn }).eq('id', duelId)
   }
 
+  // ── Roll post-attack status effect on opponent ─────────────────────────────
+  let statusAppliedToOpp: StatusEffect | null = null
+  let oppStatusTurnsLeft = 0
+  if (!duelOver && newOppHp > 0) {
+    const triggered = rollStatusEffect(myCreature.status_effect as StatusEffect | null, myCreature.status_effect_chance)
+    const oppAlreadyHasStatus = (oppActive as any).active_status != null
+    if (triggered && !oppAlreadyHasStatus) {
+      statusAppliedToOpp = triggered
+      oppStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
+      await supabase.from('duel_lineups').update({
+        active_status: triggered,
+        status_turns_left: oppStatusTurnsLeft,
+      }).eq('id', oppActive.id)
+    }
+  }
+
   // ── Awards ─────────────────────────────────────────────────────────────────
   let myLevelUp: { newLevel: number; goldReward: number } | null = null
   let completedMissions: CompletedMission[] = []
@@ -379,6 +502,9 @@ export async function POST(request: Request) {
       switchedTo,
       duelOver,
       winnerId,
+      preTurnStatusEvent: preTurnStatusEvent ?? null,
+      statusAppliedToOpp,
+      oppStatusTurnsLeft,
     },
   })
   await supabase.removeChannel(channel)

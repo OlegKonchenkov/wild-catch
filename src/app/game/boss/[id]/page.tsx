@@ -16,7 +16,8 @@ import type { Element, Rarity } from '@/lib/types'
 import { playBossSound } from '@/lib/game/battle-sounds'
 import { startBossLoop } from '@/lib/game/sounds/battle-loop'
 import { playKnockout, playVictory, playDefeat, playLevelUp } from '@/lib/game/sounds/events'
-import { scaleCombatStats } from '@/lib/game/combat'
+import { scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
+import type { StatusEffect } from '@/lib/game/combat'
 
 interface BossSlot {
   slot: number
@@ -31,6 +32,10 @@ interface BossSlot {
   fainted: boolean
   image_url: string
   sprite_url: string
+  active_status?: StatusEffect | null
+  status_turns_left?: number
+  status_effect?: StatusEffect | null
+  status_effect_chance?: number
 }
 
 interface PlayerSlot {
@@ -49,6 +54,10 @@ interface PlayerSlot {
   image_url: string
   attack_sound_url?: string | null
   attack_sound_duration_ms?: number | null
+  active_status?: StatusEffect | null
+  status_turns_left?: number
+  status_effect?: StatusEffect | null
+  status_effect_chance?: number
 }
 
 interface SquadCreature {
@@ -104,9 +113,11 @@ interface CardProps {
   lineup?: Array<{ color: string; isActive: boolean; fainted: boolean }>
   lineupLabel?: string
   isBoss?: boolean
+  statusEffect?: StatusEffect | null
+  statusTurnsLeft?: number
 }
 
-function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, animState = 'idle', side, lineup, lineupLabel, isBoss, fainting }: CardProps) {
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, animState = 'idle', side, lineup, lineupLabel, isBoss, fainting, statusEffect, statusTurnsLeft }: CardProps) {
   const spriteSize = typeof window !== 'undefined'
     ? Math.round(Math.min(window.innerWidth * 0.35, window.innerHeight * 0.2, 158))
     : 122
@@ -178,6 +189,21 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
             <span className="text-[11px] leading-none">{elemEmoji}</span>
             <span className="text-[9px] text-white/35 capitalize">{element}</span>
           </div>
+          {statusEffect && STATUS_EFFECT_META[statusEffect] && (
+            <div className="mt-1">
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 w-fit"
+                style={{
+                  background: `${STATUS_EFFECT_META[statusEffect].color}18`,
+                  border: `1px solid ${STATUS_EFFECT_META[statusEffect].color}50`,
+                  color: STATUS_EFFECT_META[statusEffect].color,
+                  boxShadow: `0 0 6px ${STATUS_EFFECT_META[statusEffect].glow}`,
+                }}>
+                <span>{STATUS_EFFECT_META[statusEffect].emoji}</span>
+                <span>{STATUS_EFFECT_META[statusEffect].label}</span>
+                {statusTurnsLeft != null && statusTurnsLeft > 0 && <span className="opacity-60">×{statusTurnsLeft}</span>}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Lineup dots */}
@@ -495,6 +521,7 @@ function BattleScreen({
   switchNotice,
   fortuneNotice,
   critNotice,
+  statusNotice,
   bossFainting,
   playerFainting,
   attackAnim,
@@ -518,6 +545,7 @@ function BattleScreen({
   switchNotice: string | null
   fortuneNotice: { id: number; text: string; tone: CombatFortuneInfo['tone'] } | null
   critNotice: { id: number } | null
+  statusNotice: { id: number; emoji: string; text: string; color: string; glow: string } | null
   bossFainting: boolean
   playerFainting: boolean
   attackAnim: { key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null
@@ -743,6 +771,8 @@ function BattleScreen({
                 lineupLabel="Boss"
                 isBoss
                 fainting={bossFainting}
+                statusEffect={activeBoss.active_status}
+                statusTurnsLeft={activeBoss.status_turns_left}
               />
             </motion.div>
           </AnimatePresence>
@@ -782,6 +812,8 @@ function BattleScreen({
                 lineup={playerLineupDots}
                 lineupLabel="Tu"
                 fainting={playerFainting}
+                statusEffect={activePlayer.active_status}
+                statusTurnsLeft={activePlayer.status_turns_left}
               />
             </motion.div>
           </AnimatePresence>
@@ -853,6 +885,12 @@ function BattleScreen({
               className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold"
               style={{ background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.55)', color: '#FB923C' }}>
               ⚡ CRITICO! ×1.75
+            </motion.div>
+          ) : statusNotice ? (
+            <motion.div key={`status-${statusNotice.id}`} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
+              className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold"
+              style={{ background: `${statusNotice.color}18`, border: `1px solid ${statusNotice.color}50`, color: statusNotice.color, boxShadow: `0 0 8px ${statusNotice.glow}` }}>
+              {statusNotice.emoji} {statusNotice.text}
             </motion.div>
           ) : bossAttacking ? (
             <motion.div key="boss-turn"
@@ -1299,6 +1337,7 @@ export default function BossFightPage() {
   const [bossFainting, setBossFainting]   = useState(false)
   const [playerFainting, setPlayerFainting] = useState(false)
   const [fortuneNotice, setFortuneNotice] = useState<{ id: number; text: string; tone: CombatFortuneInfo['tone'] } | null>(null)
+  const [statusNotice, setStatusNotice]   = useState<{ id: number; emoji: string; text: string; color: string; glow: string } | null>(null)
   const [finalResult, setFinalResult]     = useState<{ won: boolean; reward: any; levelUp: any } | null>(null)
   const [bossMissions, setBossMissions]   = useState<CompletedMissionInfo[]>([])
   const [showBossMissions, setShowBossMissions] = useState(false)
@@ -1323,6 +1362,14 @@ export default function BossFightPage() {
     setTimeout(() => {
       setCritNotice(current => current?.id === id ? null : current)
     }, 1600)
+  }
+
+  function flashStatusNotice(effect: StatusEffect, text: string) {
+    const meta = STATUS_EFFECT_META[effect]
+    if (!meta) return
+    const id = Date.now()
+    setStatusNotice({ id, emoji: meta.emoji, text, color: meta.color, glow: meta.glow })
+    setTimeout(() => setStatusNotice(current => current?.id === id ? null : current), 2400)
   }
 
   useEffect(() => {
@@ -1516,6 +1563,21 @@ export default function BossFightPage() {
     if (data.playerCrit) flashCritNotice()
     else flashFortuneNotice(data.playerFortune as CombatFortuneInfo | undefined)
 
+    // Status effects before attack
+    if (data.preTurnStatusEvent) {
+      const se = data.preTurnStatusEvent
+      const effect = se.type as StatusEffect
+      if (se.turnPassed) flashStatusNotice(effect, `${STATUS_EFFECT_META[effect]?.label ?? effect} — turno saltato`)
+      else if (se.selfHit) flashStatusNotice(effect, `Confusione — colpisce se stesso!`)
+    }
+    if (data.statusTickEvents?.length) {
+      for (const tick of data.statusTickEvents as any[]) {
+        const effect = tick.type as StatusEffect
+        if (tick.target === 'boss') flashStatusNotice(effect, `${STATUS_EFFECT_META[effect]?.label ?? effect} — ${tick.poisonDamage ?? ''} danno al Boss`)
+        if (tick.target === 'player') flashStatusNotice(effect, `${STATUS_EFFECT_META[effect]?.label ?? effect} — ${tick.poisonDamage ?? ''} danno a te`)
+      }
+    }
+
     // Phase 1: show damage on boss (update HP bar only, don't switch yet)
     setBossLineup(prev => prev.map((slot, i) =>
       i === bossActiveSlot ? { ...slot, current_hp: nextBossLineup[i]?.current_hp ?? slot.current_hp } : slot
@@ -1634,6 +1696,14 @@ export default function BossFightPage() {
         if (data.bossSwitchedTo) {
           setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
           setTimeout(() => setSwitchNotice(null), 2000)
+        }
+        if (data.statusAppliedToBoss) {
+          const effect = data.statusAppliedToBoss as StatusEffect
+          setTimeout(() => flashStatusNotice(effect, `Boss afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 400)
+        }
+        if (data.statusAppliedToPlayer) {
+          const effect = data.statusAppliedToPlayer as StatusEffect
+          setTimeout(() => flashStatusNotice(effect, `Sei afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 800)
         }
         if (isOver) {
           window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
@@ -1810,6 +1880,7 @@ export default function BossFightPage() {
             switchNotice={switchNotice}
             fortuneNotice={fortuneNotice}
             critNotice={critNotice}
+            statusNotice={statusNotice}
             bossFainting={bossFainting}
             playerFainting={playerFainting}
             attackAnim={attackAnim}
