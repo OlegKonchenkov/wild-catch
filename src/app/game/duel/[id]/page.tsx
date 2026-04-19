@@ -292,7 +292,7 @@ export default function DuelPage() {
   const reconnectTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
   const reconnectCountdownRef = useRef(60)
   const seenOppPresenceRef    = useRef(false)
-  const resultRef             = useRef<'won' | 'lost' | null>(null)
+  const resultRef             = useRef<'won' | 'lost' | 'cancelled' | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
   function flashFortuneNotice(fortune: CombatFortuneInfo | null | undefined) {
