@@ -68,13 +68,14 @@ function useHistory(supabase: ReturnType<typeof createClient>) {
       const duelEntries: HistoryEntry[] = duels.map(d => {
         const oppId = d.challenger_id === user.id ? d.opponent_id : d.challenger_id
         const oppNick = oppId ? nicknameMap[oppId] : null
+        const isCancelled = d.status === 'cancelled' || (d.status === 'ended' && !d.winner_id)
         return {
           id: d.id,
           type: 'duel',
           date: d.ended_at ?? d.started_at ?? '',
-          result: d.status === 'ended' ? (d.winner_id === user.id ? 'won' : 'lost') : 'unknown',
+          result: isCancelled ? 'unknown' : (d.winner_id === user.id ? 'won' : 'lost'),
           label: oppNick ? `⚔️ vs ${oppNick}` : `Duello · ${d.room_code ?? '—'}`,
-          detail: d.status === 'cancelled' ? 'Annullato' : d.winner_id === user.id ? 'Vittoria' : 'Sconfitta',
+          detail: isCancelled ? 'Annullato' : d.winner_id === user.id ? 'Vittoria' : 'Sconfitta',
         }
       })
 

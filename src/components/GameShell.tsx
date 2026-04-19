@@ -79,6 +79,8 @@ function formatGameEvent(ev: any): { icon: string; title: string; body: string }
       }
     case 'duel_lost':
       return { icon: '💀', title: p.winner_name ? `Perso vs ${p.winner_name}` : 'Duello perso', body: '' }
+    case 'duel_cancelled':
+      return { icon: '🤝', title: p.opponent_name ? `Duello annullato vs ${p.opponent_name}` : 'Duello annullato', body: 'Nessun punto assegnato' }
     case 'boss_won':
       return {
         icon: '👑',
@@ -142,6 +144,7 @@ const EVENT_THEMES: Record<string, { color: string; dimColor: string; label: str
   catch:             { color: '#3A9DBC', dimColor: 'rgba(58,157,188,0.12)',  label: 'Cattura'   },
   duel_won:          { color: '#34D399', dimColor: 'rgba(52,211,153,0.10)',  label: 'Duello'    },
   duel_lost:         { color: '#F87171', dimColor: 'rgba(248,113,113,0.08)', label: 'Duello'    },
+  duel_cancelled:    { color: '#94A3B8', dimColor: 'rgba(148,163,184,0.08)', label: 'Duello'    },
   boss_won:          { color: '#F7C841', dimColor: 'rgba(247,200,65,0.10)',  label: 'Boss'      },
   boss_lost:         { color: '#F87171', dimColor: 'rgba(248,113,113,0.08)', label: 'Boss'      },
   mission_completed: { color: '#A78BFA', dimColor: 'rgba(167,139,250,0.10)', label: 'Missione'  },
@@ -1065,6 +1068,17 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                         </>
                                       )
                                     })()}
+
+                                    {/* ── DUEL CANCELLED ───────────────────── */}
+                                    {ev.type === 'duel_cancelled' && (
+                                      <>
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-base font-extrabold" style={{ color: '#94A3B8' }}>🤝 Duello annullato</p>
+                                          {p.opponent_name && <span className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>vs {p.opponent_name as string}</span>}
+                                        </div>
+                                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Il duello è stato interrotto — nessun punto assegnato.</p>
+                                      </>
+                                    )}
 
                                     {/* ── BOSS WON ──────────────────────────── */}
                                     {ev.type === 'boss_won' && (

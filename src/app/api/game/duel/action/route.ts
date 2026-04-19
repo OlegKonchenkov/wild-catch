@@ -44,6 +44,16 @@ export async function POST(request: Request) {
       .from('duels')
       .update({ status: 'ended', winner_id: null, ended_at: new Date().toISOString() })
       .eq('id', duelId)
+    const { createAdminClient: adminCancel } = await import('@/lib/supabase/admin')
+    const adminC = adminCancel()
+    const { data: cancelProfiles } = await adminC.from('profiles').select('user_id, nickname').in('user_id', [user.id, oppUserId!])
+    const cancelProfileMap: Record<string, string | null> = Object.fromEntries(
+      (cancelProfiles ?? []).map((r: any) => [r.user_id, r.nickname ?? null])
+    )
+    adminC.from('player_game_events').insert([
+      { user_id: user.id,    session_id: duel.session_id, type: 'duel_cancelled', payload: { opponent_id: oppUserId, opponent_name: cancelProfileMap[oppUserId!] ?? null } },
+      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_cancelled', payload: { opponent_id: user.id,    opponent_name: cancelProfileMap[user.id]    ?? null } },
+    ]).then(undefined, () => {})
     return NextResponse.json({ ended: true, winnerId: null, cancelled: true })
   }
 
