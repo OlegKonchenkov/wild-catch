@@ -625,17 +625,29 @@ export default function EncounterPage() {
     if (data.statusEvents?.length) {
       await new Promise(r => setTimeout(r, 600))
       for (const se of data.statusEvents as any[]) {
-        if (se.turnPassed || se.selfHit) {
-          const effect = se.type as StatusEffect
-          const meta = STATUS_EFFECT_META[effect]
-          if (se.target === 'player') {
+        const effect = se.type as StatusEffect
+        const meta = STATUS_EFFECT_META[effect]
+        const isPlayer = se.target === 'player'
+
+        // Always tick the counter for any status event that carries turn info
+        if (isPlayer) {
+          if (se.cleared) setPlayerStatus(null)
+          else if (se.turnsLeft != null) setPlayerStatusTurns(se.turnsLeft)
+        } else {
+          if (se.cleared) setWildStatus(null)
+          else if (se.turnsLeft != null) setWildStatusTurns(se.turnsLeft)
+        }
+
+        // Show a message only for notable events (skip or self-hit)
+        const showMsg = se.turnPassed || se.selfHit || se.paralysisSkip === true
+        if (showMsg) {
+          if (isPlayer) {
             setMessage(`${meta?.emoji ?? ''} Hai saltato il turno (${meta?.label ?? effect})`)
-            if (se.cleared) setPlayerStatus(null)
-            else setPlayerStatusTurns(se.turnsLeft ?? 0)
           } else {
-            setMessage(`${meta?.emoji ?? ''} ${state.creature.name} ha saltato il turno (${meta?.label ?? effect})`)
-            if (se.cleared) setWildStatus(null)
-            else setWildStatusTurns(se.turnsLeft ?? 0)
+            const label = se.selfHit
+              ? `${state.creature.name} si è colpita da sola!`
+              : `${state.creature.name} è ${meta?.label ?? effect} e ha saltato il turno!`
+            setMessage(`${meta?.emoji ?? ''} ${label}`)
           }
           await new Promise(r => setTimeout(r, 700))
         }
@@ -716,7 +728,11 @@ export default function EncounterPage() {
       playFlee()
       setWildAnim('flee'); setMessage('La creatura è fuggita...'); setResult('fled')
     } else {
-      // ── Cattura fallita: shake della rete + messaggio casuale ─────────────
+      // ── Cattura fallita: aggiorna counter effetto di stato ────────────────
+      if (data.wildStatus !== undefined) setWildStatus(data.wildStatus)
+      if (data.wildStatusTurns != null) setWildStatusTurns(data.wildStatusTurns)
+
+      // ── Shake della rete + messaggio casuale ──────────────────────────────
       const failMsg = data.wildDamage > 0
         ? FAIL_COUNTER_MESSAGES[Math.floor(Math.random() * FAIL_COUNTER_MESSAGES.length)]
         : FAIL_RESIST_MESSAGES[Math.floor(Math.random() * FAIL_RESIST_MESSAGES.length)]

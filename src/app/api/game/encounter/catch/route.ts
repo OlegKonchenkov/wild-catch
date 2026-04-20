@@ -105,22 +105,24 @@ export async function POST(request: Request) {
     .update({ wild_status: newWildStatus, wild_status_turns: newWildStatusTurns })
     .eq('id', encounterId)
 
+  const statusPayload = { wildStatus: newWildStatus, wildStatusTurns: newWildStatusTurns }
+
   if (!caught) {
     // Sleeping: can't flee or counter-attack
     if (wildStatus === 'sonno') {
       await persistTickedStatus()
-      return NextResponse.json({ caught: false, fled: false, wildDamage: 0 })
+      return NextResponse.json({ caught: false, fled: false, wildDamage: 0, ...statusPayload })
     }
 
     // Paralysed: can't flee, but 35% chance it still counter-attacks
     if (wildStatus === 'paralisi') {
       if (Math.random() < 0.65) {
         await persistTickedStatus()
-        return NextResponse.json({ caught: false, fled: false, wildDamage: 0 })
+        return NextResponse.json({ caught: false, fled: false, wildDamage: 0, ...statusPayload })
       }
       const counterDamage = calculateFightDamage(creature.atk)
       await persistTickedStatus()
-      return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage })
+      return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage, ...statusPayload })
     }
 
     // 30% chance the creature flees (confused creatures still flee)
@@ -136,12 +138,12 @@ export async function POST(request: Request) {
     // Counter-attack: confused creatures have 50% chance of skipping; tick status
     if (wildStatus === 'confusione' && Math.random() < 0.5) {
       await persistTickedStatus()
-      return NextResponse.json({ caught: false, fled: false, wildDamage: 0 })
+      return NextResponse.json({ caught: false, fled: false, wildDamage: 0, ...statusPayload })
     }
 
     const counterDamage = calculateFightDamage(creature.atk)
     await persistTickedStatus()
-    return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage })
+    return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage, ...statusPayload })
   }
 
   await supabase
