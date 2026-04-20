@@ -123,8 +123,11 @@ Incrocio tra: calore Ghibli × graphic novel italiana × UI Pokémon GO outdoor-
 users              -- Supabase Auth: id, email, nickname, avatar_url,
                    --   is_admin(boolean, default false), gdpr_consent_at(timestamptz), gdpr_consent_minor(boolean)
 creatures          -- id, name, description, element, rarity, hp, atk, def,
-                   --   min_level, image_url, sprite_url, lottie_url, spawn_weight, evolution_of
-items              -- id, name, type(rete/esca/uovo/battaglia), effect_value, description, shop_price
+                   --   min_level, image_url, sprite_url, lottie_url, spawn_weight, evolution_of,
+                   --   status_effect(text null: 'paralisi'|'confusione'|'sonno'|'veleno'),
+                   --   status_effect_chance(float default 0.15),
+                   --   catch_difficulty(int 1–5, default 3)
+items              -- id, name, type(rete/esca/uovo/battaglia/cura/pozione), effect_value, description, shop_price
 ```
 
 ### Tabelle Sessione
@@ -144,13 +147,21 @@ player_creatures   -- id, user_id, creature_id, session_id, duplicates_count, ev
 player_inventory   -- id, user_id, session_id, item_id, quantity
 encounters         -- id, user_id, creature_id, session_id, status(active/caught/fled/fought),
                    --   trigger(gps/timer), wild_creature_hp, player_creature_id(uuid FK player_creatures, locked at start),
+                   --   wild_status(text null), wild_status_turns(int default 0),
+                   --   player_status(text null), player_status_turns(int default 0),
                    --   started_at, resolved_at
                    -- NOTA: player_creature_id viene letto da player_sessions.selected_creature_id al momento
                    --   di POST /api/game/encounter/start e salvato immutabile — non cambia tra i turni.
                    --   Questo previene il cambio di creatura mid-fight come exploit.
 duels              -- id, challenger_id, opponent_id, session_id, status, winner_id,
-                   --   challenger_creature_id, opponent_creature_id,
+                   --   challenger_creature_id, opponent_creature_id, current_turn('challenger'|'opponent'),
                    --   room_code(4char, no ambiguous chars: no 0/O/I/1), started_at, ended_at
+duel_lineups       -- id, duel_id, user_id, slot(0–2), player_creature_id, is_active, current_hp,
+                   --   fainted_at, active_status(text null), status_turns_left(int default 0)
+boss_fights        -- id, user_id, session_id, pin_id, qr_code_id, status(selecting/active/won/lost),
+                   --   player_lineup(JSONB array), boss_lineup(JSONB array),
+                   --   player_active_slot(int), boss_active_slot(int),
+                   --   reward(JSONB), reward_claimed(bool), ended_at
 ```
 
 ### Tabelle Missioni & QR
@@ -256,13 +267,34 @@ notifications      -- id, session_id, title, body, sent_at, sent_by_admin_id
 ### Combattimento in Incontro Selvaggio (azione COMBATTI)
 Il giocatore può scegliere di combattere la creatura selvatica **prima** di tentare la cattura. Logica:
 - Il giocatore usa la `player_creature_id` dell'`encounters` — copiata da `selected_creature_id` al momento di `encounter/start` e immutabile per tutta la durata dell'incontro (anti-exploit)
-- Ogni turno: danno = ATK creatura giocatore × dado(0.8–1.2). La creatura selvatica attacca per prima se Rara+
-- Ridurre l'HP della creatura selvatica a ≤ 30% → bonus cattura +20% sul prossimo tentativo con Rete
-- Ridurre HP a 0 → la creatura fugge (non catturabile). Il giocatore deve gestire il danno
-- Max 5 turni di combattimento per incontro, poi la creatura fugge automaticamente
+- Ogni turno: danno = ATK creatura giocatore × moltiplicatore elemento × dado(0.8–1.2). La creatura selvatica attacca per prima se Rara+
+- Ridurre l'HP della creatura selvatica a ≤ 50% → stato `catchable` attivo (bonus cattura su rete)
+- Ridurre HP a 0 → la creatura fugge (non catturabile)
 - Stato `encounters.wild_creature_hp` traccia l'HP rimanente lato server
 - Il giocatore non perde la propria creatura (HP si resettano dopo l'incontro)
-- API: `POST /api/game/encounter/fight` — esegue 1 turno, restituisce HP aggiornati + animazione
+- API: `POST /api/game/encounter/fight` — esegue 1 turno, restituisce HP aggiornati + animazione + eventuali effetti di stato applicati
+
+### Cattura
+- Probabilità base per rarità (vedi tabella Sezione 4)
+- Modificatori cumulativi: bonus HP (HP wild ≤ 50% = ×1.5, ≤ 25% = ×2), rete/esca item, effetto di stato (sonno ×2.0, paralisi/confusione ×1.5), livello giocatore
+- Se cattura fallisce: 30% fugge, 70% contrattacca. Creatura addormentata: non fugge né contrattacca. Creatura paralizzata: non fugge, 35% contrattacca comunque
+- Ogni azione del giocatore (attacco, rete, cura) conta come 1 turno e scala i counter degli effetti di stato
+- RNG eseguito esclusivamente server-side
+
+### Effetti di Stato
+Le creature possono applicare effetti di stato con ogni attacco, con probabilità configurabile per creatura (`status_effect_chance`). Valori in `combat.ts`.
+
+| Effetto | Durata | Comportamento | Bonus cattura |
+|---|---|---|---|
+| **Paralisi** ⚡ | 2 turni | 65% salta il turno, 35% attacca normalmente | ×1.5 |
+| **Sonno** 💤 | 2 turni | Salta sempre il turno (blocco totale) | ×2.0 |
+| **Confusione** 💫 | 3 turni | 50% si autoferisce invece di attaccare | ×1.5 |
+| **Veleno** ☠️ | Permanente | Subisce danno ogni turno, agisce normalmente | ×1.0 |
+
+**Regole generali:**
+- Effetto applicato **al momento del danno** — se l'attacco attiva l'effetto, la creatura non può già contrattaccare nello stesso turno (se paralisi/sonno)
+- Re-applicazione **resetta il counter** — applicare paralisi a una creatura già paralizzata riporta a 2 turni
+- Valido per incontri selvatici, duelli PvP e scontri boss
 
 ### Evoluzione
 - Trigger: automatico al momento della cattura quando `duplicates_count` raggiunge 3
@@ -275,11 +307,19 @@ Il giocatore può scegliere di combattere la creatura selvatica **prima** di ten
 
 ### Duelli
 - Connessione via codice stanza 4 caratteri o QR condiviso
-- Danno = (ATK creatura × livello) × moltiplicatore elemento × dado (0.8–1.2)
-- Creature rare+: attaccano per prime (effetto sorpresa animato)
-- Oggetti battaglia usabili durante il duello
-- Vincitore: +15 EXP + oggetto casuale | Perdente: +5 EXP consolazione
-- Realtime via WebSocket Supabase
+- Ogni giocatore sceglie una lineup di 1–3 creature; si combatte uno contro uno, se una sviene si avanza alla successiva
+- Danno = (ATK creatura × livello) × moltiplicatore elemento × dado (0.8–1.2) × critico (10% chance, ×1.75)
+- Oggetti battaglia (ATK boost) e cura usabili durante il duello al posto di un attacco
+- Effetti di stato applicabili in duello: paralisi/sonno auto-saltano il turno dell'avversario (65%/100%); l'avversario può comunque usare una pozione nel proprio turno
+- Vincitore: +30 EXP + oro | Perdente: niente (vedi progressione)
+- Realtime via WebSocket Supabase (broadcast + postgres_changes)
+
+### Scontri Boss (Capopalestra)
+- Attivati da QR code fisici sulla mappa (tipo `boss`)
+- Giocatore sceglie lineup 1–3 creature vs lineup boss configurata dall'admin
+- Stessa logica combattimento duello (effetti di stato, critico, elemento)
+- Ricompensa configurabile per boss: EXP, oro, item, creatura speciale
+- Un boss QR può essere conquistato una volta sola per sessione per giocatore (guard `reward_claimed`)
 
 ### Progressione & Punteggio
 | Azione | EXP | Punti classifica |

@@ -6361,6 +6361,68 @@ git commit -m "feat: session timer with warnings, admin notification banners, pr
 
 ---
 
+## Post-v1 Feature: Effetti di Stato
+
+Aggiunto dopo il piano iniziale. Implementato in migration `022_status_effects.sql`.
+
+### Schema aggiunto
+
+```sql
+-- creatures
+ALTER TABLE creatures
+  ADD COLUMN status_effect text CHECK (status_effect IN ('paralisi','confusione','sonno','veleno')),
+  ADD COLUMN status_effect_chance float DEFAULT 0.15,
+  ADD COLUMN catch_difficulty int DEFAULT 3;
+
+-- encounters
+ALTER TABLE encounters
+  ADD COLUMN wild_status text,
+  ADD COLUMN wild_status_turns int DEFAULT 0,
+  ADD COLUMN player_status text,
+  ADD COLUMN player_status_turns int DEFAULT 0;
+
+-- duel_lineups: active_status, status_turns_left
+-- boss_fights: player_lineup e boss_lineup JSONB con active_status/status_turns_left per slot
+```
+
+### Logica — `src/lib/game/combat.ts`
+
+`STATUS_EFFECT_META` definisce durata e comportamento per effetto:
+
+| Effetto | turns | preventsAttack |
+|---|---|---|
+| paralisi | 2 | false (65% skip, 35% attacca) |
+| sonno | 2 | true (sempre skip) |
+| confusione | 3 | false (50% self-hit) |
+| veleno | 0 (permanente) | false |
+
+### Regole di applicazione (tutte le modalità)
+
+1. Effetto applicato **al momento del danno** — non a fine turno
+2. Re-applicazione **resetta il counter** (nessun guard `!existingStatus`)
+3. Paralisi/sonno applicati questo turno → bloccano già il controattacco nello stesso turno
+4. Bonus catch rate: sonno ×2.0, paralisi/confusione ×1.5
+
+### Differenze per modalità
+
+**Encounter fight/catch** (`encounter/fight/route.ts`, `encounter/catch/route.ts`):
+- Pre-turn tick su wild e player prima del combattimento
+- Status applicato post-player-attack ma pre-counter-attack del wild
+- Catch route: addormentata = blocked; paralizzata = non fugge, 35% contrattacca
+
+**Boss fight** (`boss/[id]/route.ts`):
+- Pre-turn tick su player e boss (veleno + sonno/paralisi/confusione)
+- Player→boss status rollato PRIMA del counter-attack del boss
+- `skipBossAttack` flag analogamente a `skipWildAttack`
+
+**Duel** (`duel/action/route.ts`):
+- Sonno: return anticipato (skip turno automatico)
+- Paralisi: tick + 65% return anticipato, 35% cade attraverso all'attacco normale
+- Confusione: tick + 50% self-hit con return, 50% cade attraverso
+- Scrittura su `duel_lineups.active_status` PRIMA di flip `duels.current_turn` (evita race condition postgres_changes)
+
+---
+
 ## Appendix: Supabase MCP Setup
 
 When you receive MCP credentials from the user, configure the Supabase MCP server to allow direct database operations without copying SQL into the dashboard.
