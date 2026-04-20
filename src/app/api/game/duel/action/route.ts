@@ -433,24 +433,8 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Auto-skip opponent's turn when sleep or paralysis just applied ─────────
-  // Rather than giving the opponent a turn they cannot use, resolve the skip
-  // immediately here so current_turn stays with the attacker.
-  let oppTurnAutoSkipped = false
-  let oppAutoSkipCleared = false
-  if (!duelOver && (statusAppliedToOpp === 'sonno' || statusAppliedToOpp === 'paralisi')) {
-    oppTurnAutoSkipped = true
-    const remainingTurns = oppStatusTurnsLeft - 1
-    oppAutoSkipCleared = remainingTurns <= 0
-    await supabase.from('duel_lineups').update({
-      active_status: oppAutoSkipCleared ? null : statusAppliedToOpp,
-      status_turns_left: Math.max(0, remainingTurns),
-    }).eq('id', oppActive.id)
-    // current_turn stays with the attacker — no duels update needed
-  }
-
-  // Flip turn to opponent only when no auto-skip (and duel isn't over)
-  if (!duelOver && !oppTurnAutoSkipped) {
+  // Flip turn to opponent (status is already written above, before this update)
+  if (!duelOver) {
     await supabase.from('duels').update({ current_turn: nextTurn }).eq('id', duelId)
   }
 
@@ -534,7 +518,7 @@ export async function POST(request: Request) {
       isCrit,
       elementMultiplier: mult,
       itemUsed: atkMultiplier > 1,
-      nextTurn: (duelOver || velenoDuelOver) ? null : oppTurnAutoSkipped ? myRole : nextTurn,
+      nextTurn: (duelOver || velenoDuelOver) ? null : nextTurn,
       newOppHp,
       switchedTo,
       duelOver: duelOver || velenoDuelOver,
@@ -542,7 +526,6 @@ export async function POST(request: Request) {
       preTurnStatusEvent: preTurnStatusEvent ?? null,
       statusAppliedToOpp,
       oppStatusTurnsLeft,
-      oppTurnAutoSkipped: oppTurnAutoSkipped ? { effect: statusAppliedToOpp, cleared: oppAutoSkipCleared } : null,
       poisonEvent,
     },
   })

@@ -623,6 +623,7 @@ export default function EncounterPage() {
 
     // Status effect notifications + state updates
     if (data.statusEvents?.length) {
+      await new Promise(r => setTimeout(r, 600))
       for (const se of data.statusEvents as any[]) {
         if (se.turnPassed || se.selfHit) {
           const effect = se.type as StatusEffect
