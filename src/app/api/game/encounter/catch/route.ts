@@ -37,6 +37,16 @@ export async function POST(request: Request) {
   const creature = (encounter as any).creatures
   const wildStatus = (encounter as any).wild_status as StatusEffect | null
 
+  // Tick wild status on every catch attempt (one player action = one turn)
+  // veleno has turns=0 (permanent) and is handled only during fight turns; skip it.
+  const wildStatusTurnsNow = (encounter as any).wild_status_turns ?? 0
+  let newWildStatus: StatusEffect | null = wildStatus
+  let newWildStatusTurns = wildStatusTurnsNow
+  if (newWildStatus && newWildStatus !== 'veleno' && newWildStatusTurns > 0) {
+    newWildStatusTurns = Math.max(0, newWildStatusTurns - 1)
+    if (newWildStatusTurns <= 0) newWildStatus = null
+  }
+
   // Get item multiplier from effect_value (rete/esca stored as decimal, e.g. 2.0 = ×2)
   let itemMult = 1
   if (itemId) {
@@ -89,11 +99,18 @@ export async function POST(request: Request) {
   const catchRate = Math.min(1.0, baseRate * diffMult * hpMultiplier * statusCatchMult + levelBonus)
   const caught = Math.random() < catchRate
 
+  // Helper: persist ticked status when encounter stays active
+  const persistTickedStatus = () => supabase
+    .from('encounters')
+    .update({ wild_status: newWildStatus, wild_status_turns: newWildStatusTurns })
+    .eq('id', encounterId)
+
   if (!caught) {
     const wildBlocked = wildStatus === 'paralisi' || wildStatus === 'sonno'
 
-    // Paralyzed / sleeping: creature can't flee or counter-attack
+    // Paralyzed / sleeping: creature can't flee or counter-attack; tick status
     if (wildBlocked) {
+      await persistTickedStatus()
       return NextResponse.json({ caught: false, fled: false, wildDamage: 0 })
     }
 
@@ -107,12 +124,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ caught: false, fled: true, wildDamage: 0 })
     }
 
-    // Counter-attack: confused creatures have 50% chance of skipping
+    // Counter-attack: confused creatures have 50% chance of skipping; tick status
     if (wildStatus === 'confusione' && Math.random() < 0.5) {
+      await persistTickedStatus()
       return NextResponse.json({ caught: false, fled: false, wildDamage: 0 })
     }
 
     const counterDamage = calculateFightDamage(creature.atk)
+    await persistTickedStatus()
     return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage })
   }
 

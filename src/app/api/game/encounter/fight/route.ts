@@ -174,13 +174,9 @@ export async function POST(request: Request) {
     wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
   }
 
-  // Non-rare attacks after player (if not skipped by status)
-  if (!isRarePlus && wildHpRemaining > 0 && !skipWildAttack) {
-    wildDamage = calculateFightDamage(wildCreature.atk)
-    playerTookDamage = true
-  }
-
-  // ── Post-attack status application ───────────────────────────────────────
+  // ── Roll player→wild status BEFORE non-rare counter-attack ────────────────
+  // This ensures paralisi/sonno applied this turn prevents the counter-attack
+  // in the same action (otherwise the creature would attack and then be frozen).
   let statusAppliedToWild: StatusEffect | null = null
   let wildNewStatusTurns = 0
   if (playerDamage > 0 && wildHpRemaining > 0) {
@@ -190,9 +186,20 @@ export async function POST(request: Request) {
       wildNewStatusTurns = STATUS_EFFECT_META[triggered].turns
       newWildStatus = triggered
       newWildStatusTurns = wildNewStatusTurns
+      // Immobilising effects block the counter-attack this same turn
+      if (triggered === 'paralisi' || triggered === 'sonno') {
+        skipWildAttack = true
+      }
     }
   }
 
+  // Non-rare attacks after player (if not skipped by status — now includes freshly applied)
+  if (!isRarePlus && wildHpRemaining > 0 && !skipWildAttack) {
+    wildDamage = calculateFightDamage(wildCreature.atk)
+    playerTookDamage = true
+  }
+
+  // ── Wild→player status application ───────────────────────────────────────
   let statusAppliedToPlayer: StatusEffect | null = null
   let playerNewStatusTurns = 0
   if (wildDamage > 0 && !newPlayerStatus) {
