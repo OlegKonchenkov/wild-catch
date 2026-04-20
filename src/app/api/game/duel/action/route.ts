@@ -422,8 +422,7 @@ export async function POST(request: Request) {
   let oppStatusTurnsLeft = 0
   if (!duelOver && newOppHp > 0) {
     const triggered = rollStatusEffect(myCreature.status_effect as StatusEffect | null, myCreature.status_effect_chance)
-    const oppAlreadyHasStatus = (oppActive as any).active_status != null
-    if (triggered && !oppAlreadyHasStatus) {
+    if (triggered) {
       statusAppliedToOpp = triggered
       oppStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
       await supabase.from('duel_lineups').update({

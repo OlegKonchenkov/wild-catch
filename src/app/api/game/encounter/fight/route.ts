@@ -181,10 +181,10 @@ export async function POST(request: Request) {
   let wildNewStatusTurns = 0
   if (playerDamage > 0 && wildHpRemaining > 0) {
     const triggered = rollStatusEffect(playerCr.status_effect as StatusEffect | null, playerCr.status_effect_chance)
-    if (triggered && !newWildStatus) {
+    if (triggered) {
       statusAppliedToWild = triggered
       wildNewStatusTurns = STATUS_EFFECT_META[triggered].turns
-      newWildStatus = triggered
+      newWildStatus = triggered          // re-applies and resets counter if already has a status
       newWildStatusTurns = wildNewStatusTurns
       // Immobilising effects block the counter-attack this same turn
       if (triggered === 'paralisi' || triggered === 'sonno') {
@@ -202,7 +202,7 @@ export async function POST(request: Request) {
   // ── Wild→player status application ───────────────────────────────────────
   let statusAppliedToPlayer: StatusEffect | null = null
   let playerNewStatusTurns = 0
-  if (wildDamage > 0 && !newPlayerStatus) {
+  if (wildDamage > 0) {
     const triggered = rollStatusEffect(wildCreature.status_effect as StatusEffect | null, wildCreature.status_effect_chance)
     if (triggered) {
       statusAppliedToPlayer = triggered

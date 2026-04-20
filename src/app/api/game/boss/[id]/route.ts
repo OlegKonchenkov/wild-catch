@@ -287,6 +287,18 @@ export async function POST(request: Request, { params }: Params) {
       statusTickEvents.push({ type: 'veleno', target: 'boss', poisonDamage: bPoisonDmg, newHp: bossActive.current_hp, fainted: bossActive.current_hp === 0 })
     }
 
+    // Paralisi / Sonno on boss: skip counter-attack this turn
+    let skipBossAttack = false
+    if ((bossActive.active_status === 'paralisi' || bossActive.active_status === 'sonno') && !bossActive.fainted) {
+      const origBossStatus = bossActive.active_status as StatusEffect
+      const newT = (bossActive.status_turns_left ?? 0) - 1
+      const cleared = newT <= 0
+      bossActive.active_status    = cleared ? null : origBossStatus
+      bossActive.status_turns_left = Math.max(0, newT)
+      skipBossAttack = true
+      statusTickEvents.push({ type: origBossStatus, target: 'boss', turnPassed: true, cleared, turnsLeft: Math.max(0, newT) })
+    }
+
     // Paralisi / Sonno: skip player attack
     if ((playerStatus === 'paralisi' || playerStatus === 'sonno') && !playerActive.fainted) {
       const newTurns = playerStatusTurns - 1
@@ -387,6 +399,22 @@ export async function POST(request: Request, { params }: Params) {
 
     const allBossFainted = bossLineup.every((c: any) => c.fainted)
 
+    // ── Player→Boss status roll (before counter-attack so paralisi/sonno blocks it) ─
+    let statusAppliedToBoss: StatusEffect | null = null
+    let bossStatusTurnsLeft = 0
+    if (playerDamage > 0 && newBossHp > 0 && !bossActive.fainted) {
+      const triggered = rollStatusEffect(playerActive.status_effect as StatusEffect | null, playerActive.status_effect_chance)
+      if (triggered) {
+        statusAppliedToBoss = triggered
+        bossStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
+        bossActive.active_status    = triggered
+        bossActive.status_turns_left = bossStatusTurnsLeft
+        if (triggered === 'paralisi' || triggered === 'sonno') {
+          skipBossAttack = true
+        }
+      }
+    }
+
     // ── Boss → Player (only if boss still alive at start of counter-attack) ─
     // The boss that was alive before player's attack counter-attacks
     let bossDamage = 0
@@ -394,7 +422,7 @@ export async function POST(request: Request, { params }: Params) {
     let bossFortune = null
     let bossCrit = false
 
-    if (!allBossFainted && newBossHp > 0) {
+    if (!allBossFainted && newBossHp > 0 && !skipBossAttack) {
       const counterBoss = bossActive
       if (counterBoss && !counterBoss.fainted) {
         const bossMult = getElementMultiplier(counterBoss.element as Element, playerActive.element as Element)
@@ -419,26 +447,14 @@ export async function POST(request: Request, { params }: Params) {
       }
     }
 
-    // ── Post-attack status rolls ─────────────────────────────────────────
-    let statusAppliedToBoss: StatusEffect | null = null
-    let bossStatusTurnsLeft = 0
-    if (playerDamage > 0 && newBossHp > 0 && !bossActive.fainted) {
-      const triggered = rollStatusEffect(playerActive.status_effect as StatusEffect | null, playerActive.status_effect_chance)
-      if (triggered && !bossActive.active_status) {
-        statusAppliedToBoss = triggered
-        bossStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
-        bossActive.active_status    = triggered
-        bossActive.status_turns_left = bossStatusTurnsLeft
-      }
-    }
-
+    // ── Boss→Player status roll ──────────────────────────────────────────
     let statusAppliedToPlayer: StatusEffect | null = null
     let playerStatusTurnsLeft = 0
     if (bossDamage > 0 && newPlayerHp > 0 && !playerActive.fainted) {
       const bossEffect = bossActive.status_effect as StatusEffect | null
       const bossChance = bossActive.status_effect_chance ?? 0.15
       const triggered = rollStatusEffect(bossEffect, bossChance)
-      if (triggered && !playerActive.active_status) {
+      if (triggered) {
         statusAppliedToPlayer = triggered
         playerStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
         playerActive.active_status    = triggered
