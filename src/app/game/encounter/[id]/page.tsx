@@ -508,7 +508,8 @@ export default function EncounterPage() {
   // ── Handlers ─────────────────────────────────────────────────────────────────
   async function handleFight() {
     if (!state || loading) return
-    resetTimer(); setLoading(true); setPendingAction('fight'); setMessage(''); setIsCritMessage(false); setShowItemsModal(false)
+    const attackingName = playerCreature?.name ?? 'Creatura'
+    resetTimer(); setLoading(true); setPendingAction('fight'); setMessage(`⚔️ ${attackingName} all'attacco!`); setIsCritMessage(false); setShowItemsModal(false)
 
     const actionStartedAt = Date.now()
     setPlayerAnim('attack')
@@ -561,7 +562,7 @@ export default function EncounterPage() {
     }
 
     if (data.playerTookDamage && data.wildDamage > 0) {
-      await new Promise(r => setTimeout(r, 280))
+      await new Promise(r => setTimeout(r, 1200))
 
       // Wild creature counter-attack animation (side: 'right')
       setAttackAnim({

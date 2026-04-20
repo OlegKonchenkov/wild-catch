@@ -418,10 +418,6 @@ export async function POST(request: Request) {
   const nextTurn: 'challenger' | 'opponent' = isChallenger ? 'opponent' : 'challenger'
 
   // ── Roll post-attack status effect on opponent ─────────────────────────────
-  // IMPORTANT: apply to duel_lineups BEFORE flipping current_turn in duels.
-  // postgres_changes on 'duels' fires as soon as current_turn changes and sets
-  // isMyTurn=true on the opponent client — if the status isn't written yet the
-  // opponent could submit their action before the sleep/paralysis lands in DB.
   let statusAppliedToOpp: StatusEffect | null = null
   let oppStatusTurnsLeft = 0
   if (!duelOver && newOppHp > 0) {
@@ -437,7 +433,24 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!duelOver) {
+  // ── Auto-skip opponent's turn when sleep or paralysis just applied ─────────
+  // Rather than giving the opponent a turn they cannot use, resolve the skip
+  // immediately here so current_turn stays with the attacker.
+  let oppTurnAutoSkipped = false
+  let oppAutoSkipCleared = false
+  if (!duelOver && (statusAppliedToOpp === 'sonno' || statusAppliedToOpp === 'paralisi')) {
+    oppTurnAutoSkipped = true
+    const remainingTurns = oppStatusTurnsLeft - 1
+    oppAutoSkipCleared = remainingTurns <= 0
+    await supabase.from('duel_lineups').update({
+      active_status: oppAutoSkipCleared ? null : statusAppliedToOpp,
+      status_turns_left: Math.max(0, remainingTurns),
+    }).eq('id', oppActive.id)
+    // current_turn stays with the attacker — no duels update needed
+  }
+
+  // Flip turn to opponent only when no auto-skip (and duel isn't over)
+  if (!duelOver && !oppTurnAutoSkipped) {
     await supabase.from('duels').update({ current_turn: nextTurn }).eq('id', duelId)
   }
 
@@ -521,7 +534,7 @@ export async function POST(request: Request) {
       isCrit,
       elementMultiplier: mult,
       itemUsed: atkMultiplier > 1,
-      nextTurn: (duelOver || velenoDuelOver) ? null : nextTurn,
+      nextTurn: (duelOver || velenoDuelOver) ? null : oppTurnAutoSkipped ? myRole : nextTurn,
       newOppHp,
       switchedTo,
       duelOver: duelOver || velenoDuelOver,
@@ -529,6 +542,7 @@ export async function POST(request: Request) {
       preTurnStatusEvent: preTurnStatusEvent ?? null,
       statusAppliedToOpp,
       oppStatusTurnsLeft,
+      oppTurnAutoSkipped: oppTurnAutoSkipped ? { effect: statusAppliedToOpp, cleared: oppAutoSkipCleared } : null,
       poisonEvent,
     },
   })

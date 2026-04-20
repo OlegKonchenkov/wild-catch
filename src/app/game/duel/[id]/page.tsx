@@ -511,7 +511,7 @@ export default function DuelPage() {
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
         const { actorId, action: broadcastAction, damage, fortune, isCrit, nextTurn, itemUsed, switchedTo, newOppHp, healAmount, newHp,
-          statusEvent, preTurnStatusEvent: preTurnSE, statusAppliedToOpp, oppStatusTurnsLeft, poisonEvent, confSwitchedTo } = payload
+          statusEvent, preTurnStatusEvent: preTurnSE, statusAppliedToOpp, oppStatusTurnsLeft, oppTurnAutoSkipped, poisonEvent, confSwitchedTo } = payload
         const iAttacked = actorId === userIdRef.current
 
         // ── Status tick broadcast ──────────────────────────────────────────────
@@ -673,10 +673,22 @@ export default function DuelPage() {
           // Delay both the badge and log so the damage text stays visible first
           setTimeout(() => flashStatusNotice(effect, text), 1200)
           setTimeout(() => setLog(prev => [`${meta?.emoji ?? ''} ${text}`, ...prev.slice(0, 3)]), 1300)
+          const turnsLeft = oppTurnAutoSkipped ? (oppTurnAutoSkipped.cleared ? 0 : (oppStatusTurnsLeft ?? 0) - 1) : (oppStatusTurnsLeft ?? 0)
+          const activeStatus = oppTurnAutoSkipped?.cleared ? null : effect
           const updateStatus = (prev: LineupEntry[]) => prev.map(l => l.is_active
-            ? { ...l, active_status: effect, status_turns_left: oppStatusTurnsLeft ?? 0 }
+            ? { ...l, active_status: activeStatus, status_turns_left: turnsLeft }
             : l)
           if (iAttacked) setOppLineup(updateStatus); else setMyLineup(updateStatus)
+        }
+
+        // Opponent's first turn auto-skipped (sleep/paralysis applied)
+        if (oppTurnAutoSkipped) {
+          const effect = oppTurnAutoSkipped.effect as StatusEffect
+          const meta = STATUS_EFFECT_META[effect]
+          const target = iAttacked ? 'Avversario' : 'Tu'
+          const skipText = `${target}: turno saltato! (${meta?.label ?? effect})`
+          setTimeout(() => flashStatusNotice(effect, skipText), 2000)
+          setTimeout(() => setLog(prev => [`${meta?.emoji ?? ''} ${skipText}`, ...prev.slice(0, 3)]), 2100)
         }
 
         // Post-attack veleno tick on the attacker
