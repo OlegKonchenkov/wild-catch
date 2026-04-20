@@ -249,32 +249,6 @@ export async function POST(request: Request) {
     return allMyFainted
   }
 
-  // ── Veleno tick ────────────────────────────────────────────────────────────
-  if (attackerStatus === 'veleno') {
-    const poisonDmg  = calculatePoisonDamage(myCombatStats.hp)
-    const poisonedHp = Math.max(0, myActive.current_hp - poisonDmg)
-    await supabase.from('duel_lineups').update({
-      current_hp: poisonedHp,
-      ...(poisonedHp === 0 ? { fainted_at: new Date().toISOString(), is_active: false } : {}),
-    }).eq('id', myActive.id)
-
-    if (poisonedHp === 0) {
-      const duelEndedNow = await endDuelFromStatusFaint()
-      const ch = supabase.channel(`duel:${duelId}`)
-      await new Promise<void>(r => ch.subscribe(() => r()))
-      await ch.send({ type: 'broadcast', event: 'duel_action', payload: {
-        actorId: user.id, action: 'status_tick',
-        statusEvent: { type: 'veleno', poisonDamage: poisonDmg, poisonNewHp: 0, fainted: true },
-        nextTurn: duelEndedNow ? null : nextTurnRole,
-        duelOver: duelEndedNow, winnerId: duelEndedNow ? oppUserId : null,
-        newMyHp: 0,
-      }})
-      await supabase.removeChannel(ch)
-      return NextResponse.json({ statusTick: true, poisonFaint: true, duelOver: duelEndedNow })
-    }
-    // Poison tick applied, attacker still alive — continue with normal attack turn
-  }
-
   // ── Paralisi / Sonno: skip turn ───────────────────────────────────────────
   if (attackerStatus === 'paralisi' || attackerStatus === 'sonno') {
     const newTurns = attackerTurnsLeft - 1
@@ -318,7 +292,22 @@ export async function POST(request: Request) {
       }).eq('id', myActive.id)
 
       let duelEndedNow = false
-      if (selfHp === 0) duelEndedNow = await endDuelFromStatusFaint()
+      let confSwitchedTo: { userId: string; slot: number; playerCreatureId: string; name: string } | null = null
+      if (selfHp === 0) {
+        duelEndedNow = await endDuelFromStatusFaint()
+        if (!duelEndedNow) {
+          const myRemaining = allLineups
+            .filter((l: any) => l.user_id === user.id && !l.fainted_at && l.id !== myActive.id)
+            .sort((a: any, b: any) => a.slot - b.slot)
+          const nextMine = myRemaining[0]
+          if (nextMine) {
+            await supabase.from('duel_lineups').update({ is_active: true }).eq('id', nextMine.id)
+            const myField = isChallenger ? 'challenger_creature_id' : 'opponent_creature_id'
+            await supabase.from('duels').update({ [myField]: nextMine.player_creature_id }).eq('id', duelId)
+            confSwitchedTo = { userId: user.id, slot: nextMine.slot, playerCreatureId: nextMine.player_creature_id, name: (nextMine as any).player_creatures?.creatures?.name ?? 'Creatura' }
+          }
+        }
+      }
       if (!duelEndedNow) await supabase.from('duels').update({ current_turn: nextTurnRole }).eq('id', duelId)
 
       const ch = supabase.channel(`duel:${duelId}`)
@@ -328,7 +317,7 @@ export async function POST(request: Request) {
         statusEvent: { type: 'confusione', selfHit: true, selfDamage: selfDmg, selfHp, cleared, turnsLeft: Math.max(0, newTurns), fainted: selfHp === 0 },
         nextTurn: duelEndedNow ? null : nextTurnRole,
         duelOver: duelEndedNow, winnerId: duelEndedNow ? oppUserId : null,
-        newMyHp: selfHp,
+        newMyHp: selfHp, confSwitchedTo,
       }})
       await supabase.removeChannel(ch)
       return NextResponse.json({ confusionSelfHit: true, selfDamage: selfDmg, duelOver: duelEndedNow })
@@ -447,6 +436,36 @@ export async function POST(request: Request) {
     }
   }
 
+  // ── Post-attack veleno tick (attacker takes poison damage after attacking) ─
+  let poisonEvent: { damage: number; newHp: number; fainted: boolean; switchedTo?: { userId: string; slot: number; playerCreatureId: string; name: string } | null } | null = null
+  let velenoDuelOver = false
+  if (!duelOver && attackerStatus === 'veleno') {
+    const poisonDmg = calculatePoisonDamage(myCombatStats.hp)
+    const poisonHp  = Math.max(0, myActive.current_hp - poisonDmg)
+    await supabase.from('duel_lineups').update({
+      current_hp: poisonHp,
+      ...(poisonHp === 0 ? { fainted_at: new Date().toISOString(), is_active: false } : {}),
+    }).eq('id', myActive.id)
+
+    poisonEvent = { damage: poisonDmg, newHp: poisonHp, fainted: poisonHp === 0 }
+
+    if (poisonHp === 0) {
+      velenoDuelOver = await endDuelFromStatusFaint()
+      if (!velenoDuelOver) {
+        const myRemaining = (allLineups ?? [])
+          .filter((l: any) => l.user_id === user.id && !l.fainted_at && l.id !== myActive.id)
+          .sort((a: any, b: any) => a.slot - b.slot)
+        const nextMine = myRemaining[0]
+        if (nextMine) {
+          await supabase.from('duel_lineups').update({ is_active: true }).eq('id', nextMine.id)
+          const myField = isChallenger ? 'challenger_creature_id' : 'opponent_creature_id'
+          await supabase.from('duels').update({ [myField]: nextMine.player_creature_id }).eq('id', duelId)
+          poisonEvent.switchedTo = { userId: user.id, slot: nextMine.slot, playerCreatureId: nextMine.player_creature_id, name: (nextMine as any).player_creatures?.creatures?.name ?? 'Creatura' }
+        }
+      }
+    }
+  }
+
   // ── Awards ─────────────────────────────────────────────────────────────────
   let myLevelUp: { newLevel: number; goldReward: number } | null = null
   let completedMissions: CompletedMission[] = []
@@ -497,14 +516,15 @@ export async function POST(request: Request) {
       isCrit,
       elementMultiplier: mult,
       itemUsed: atkMultiplier > 1,
-      nextTurn: duelOver ? null : nextTurn,
+      nextTurn: (duelOver || velenoDuelOver) ? null : nextTurn,
       newOppHp,
       switchedTo,
-      duelOver,
-      winnerId,
+      duelOver: duelOver || velenoDuelOver,
+      winnerId: winnerId ?? (velenoDuelOver ? (oppUserId ?? null) : null),
       preTurnStatusEvent: preTurnStatusEvent ?? null,
       statusAppliedToOpp,
       oppStatusTurnsLeft,
+      poisonEvent,
     },
   })
   await supabase.removeChannel(channel)

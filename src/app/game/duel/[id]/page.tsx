@@ -445,6 +445,18 @@ export default function DuelPage() {
 
         if (duelData.status === 'active') setIsMyTurn(duelData.current_turn === role)
 
+        // Duel already ended while this player was offline — show result immediately
+        if (duelData.status === 'ended') {
+          setIsMyTurn(false)
+          if (duelData.winner_id === null) {
+            setResult('cancelled')
+          } else {
+            const didWin = duelData.winner_id === user.id
+            setResult(didWin ? 'won' : 'lost')
+          }
+          window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+        }
+
         const lineupsPromise = supabase
           .from('duel_lineups')
           .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, attack_sound_url, attack_sound_duration_ms))')
@@ -499,7 +511,7 @@ export default function DuelPage() {
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
         const { actorId, action: broadcastAction, damage, fortune, isCrit, nextTurn, itemUsed, switchedTo, newOppHp, healAmount, newHp,
-          statusEvent, preTurnStatusEvent: preTurnSE, statusAppliedToOpp, oppStatusTurnsLeft } = payload
+          statusEvent, preTurnStatusEvent: preTurnSE, statusAppliedToOpp, oppStatusTurnsLeft, poisonEvent, confSwitchedTo } = payload
         const iAttacked = actorId === userIdRef.current
 
         // ── Status tick broadcast ──────────────────────────────────────────────
@@ -522,9 +534,26 @@ export default function DuelPage() {
                 : `Confusione — colpisce se stesso! (${statusEvent.selfDamage} dmg)`
               flashStatusNotice(effect, text)
               setLog(prev => [`💫 ${text}`, ...prev.slice(0, 3)])
-              if (statusEvent.newMyHp !== undefined) {
-                const updateHp = (prev: LineupEntry[]) => prev.map(l => l.is_active ? { ...l, current_hp: statusEvent.newMyHp, active_status: statusEvent.cleared ? null : effect, status_turns_left: statusEvent.turnsLeft ?? 0 } : l)
+              if (statusEvent.selfHp !== undefined) {
+                const updateHp = (prev: LineupEntry[]) => prev.map(l => l.is_active ? { ...l, current_hp: statusEvent.selfHp, active_status: statusEvent.cleared ? null : effect, status_turns_left: statusEvent.turnsLeft ?? 0 } : l)
                 if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
+              }
+              if (statusEvent.fainted) {
+                if (iAttacked) setMyFainting(true); else setOppFainting(true)
+                playKnockout()
+              }
+              if (statusEvent.fainted && confSwitchedTo) {
+                const sw = confSwitchedTo
+                setTimeout(() => {
+                  const activateNext = (prev: LineupEntry[]) => prev.map(l => ({
+                    ...l,
+                    is_active: l.player_creature_id === sw.playerCreatureId,
+                    ...(l.is_active && l.player_creature_id !== sw.playerCreatureId ? { fainted_at: new Date().toISOString() } : {}),
+                  }))
+                  if (iAttacked) { setMyFainting(false); setMyLineup(activateNext) } else { setOppFainting(false); setOppLineup(activateNext) }
+                  setSwitchNotice(`${sw.name} entra in battaglia!`)
+                  setTimeout(() => setSwitchNotice(null), 2500)
+                }, 1400)
               }
             } else if (statusEvent.poisonDamage !== undefined) {
               const text = statusEvent.fainted ? 'Veleno — sviene!' : `Veleno — ${statusEvent.poisonDamage} danno`
@@ -643,11 +672,41 @@ export default function DuelPage() {
           const text = `${target} afflitto da ${meta?.label ?? effect}!`
           setTimeout(() => flashStatusNotice(effect, text), 1200)
           setLog(prev => [`${meta?.emoji ?? ''} ${text}`, ...prev.slice(0, 3)])
-          // Update the affected lineup's status
           const updateStatus = (prev: LineupEntry[]) => prev.map(l => l.is_active
             ? { ...l, active_status: effect, status_turns_left: oppStatusTurnsLeft ?? 0 }
             : l)
           if (iAttacked) setOppLineup(updateStatus); else setMyLineup(updateStatus)
+        }
+
+        // Post-attack veleno tick on the attacker
+        if (poisonEvent) {
+          const pe = poisonEvent
+          setTimeout(() => {
+            const text = pe.fainted ? 'Veleno — sviene!' : `Veleno — ${pe.damage} danno`
+            flashStatusNotice('veleno', text)
+            setLog(prev => [`☠️ ${text}`, ...prev.slice(0, 3)])
+            const updateHp = (prev: LineupEntry[]) => prev.map(l =>
+              l.is_active ? { ...l, current_hp: pe.newHp } : l
+            )
+            if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
+            if (pe.fainted) {
+              if (iAttacked) setMyFainting(true); else setOppFainting(true)
+              playKnockout()
+            }
+            if (pe.fainted && pe.switchedTo) {
+              const sw = pe.switchedTo
+              setTimeout(() => {
+                const activateNext = (prev: LineupEntry[]) => prev.map(l => ({
+                  ...l,
+                  is_active: l.player_creature_id === sw.playerCreatureId,
+                  ...(l.is_active && l.player_creature_id !== sw.playerCreatureId ? { fainted_at: new Date().toISOString() } : {}),
+                }))
+                if (iAttacked) { setMyFainting(false); setMyLineup(activateNext) } else { setOppFainting(false); setOppLineup(activateNext) }
+                setSwitchNotice(`${sw.name} entra in battaglia!`)
+                setTimeout(() => setSwitchNotice(null), 2500)
+              }, 1400)
+            }
+          }, 1200)
         }
       })
       .on('postgres_changes',
