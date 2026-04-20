@@ -98,6 +98,8 @@ interface CardProps {
   animState?: 'idle' | 'attack' | 'damage' | 'catch' | 'flee'
   fainting?: boolean
   side: 'left' | 'right'
+  statusEffect?: StatusEffect | null
+  statusTurnsLeft?: number
 }
 
 function formatCatchMultiplier(multiplier: number): string {
@@ -105,7 +107,7 @@ function formatCatchMultiplier(multiplier: number): string {
   return multiplier.toFixed(multiplier >= 2 ? 2 : 1).replace(/\.0$/, '')
 }
 
-function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, catchMultiplier, isWild, animState = 'idle', fainting, side }: CardProps) {
+function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, catchMultiplier, isWild, animState = 'idle', fainting, side, statusEffect, statusTurnsLeft }: CardProps) {
   const rarityColor = RARITY_COLORS[rarity as Rarity] ?? '#64748b'
   const elemEmoji   = ELEMENT_EMOJI[element as keyof typeof ELEMENT_EMOJI] ?? '✦'
   const hpPct       = Math.max(0, Math.min(100, (currentHp / maxHp) * 100))
@@ -226,6 +228,29 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
             <span className="text-[13px] leading-none">{elemEmoji}</span>
             <span className="text-[10px] text-white/35 capitalize">{element}</span>
           </div>
+          {statusEffect && STATUS_EFFECT_META[statusEffect] && (() => {
+            const meta = STATUS_EFFECT_META[statusEffect]
+            return (
+              <div className="mt-1.5">
+                <motion.span
+                  className="text-[10px] font-extrabold px-2 py-1 rounded-lg flex items-center gap-1 w-fit"
+                  animate={{ opacity: [1, 0.65, 1], scale: [1, 0.96, 1] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{
+                    background: `${meta.color}22`,
+                    border: `1px solid ${meta.color}70`,
+                    color: meta.color,
+                    boxShadow: `0 0 10px ${meta.glow}, 0 0 20px ${meta.color}18`,
+                  }}>
+                  <span className="text-[11px] leading-none">{meta.emoji}</span>
+                  <span>{meta.label}</span>
+                  {statusTurnsLeft != null && statusTurnsLeft > 0 && (
+                    <span className="opacity-50 text-[9px] font-bold ml-0.5">×{statusTurnsLeft}</span>
+                  )}
+                </motion.span>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Wild: catch stars + proportional HP catch bonus */}
@@ -316,6 +341,10 @@ export default function EncounterPage() {
     soundUrl?: string | null; soundDurationMs?: number | null
   } | null>(null)
   const [playerHp, setPlayerHp] = useState<number | null>(null)
+  const [wildStatus, setWildStatus]       = useState<StatusEffect | null>(null)
+  const [wildStatusTurns, setWildStatusTurns] = useState(0)
+  const [playerStatus, setPlayerStatus]   = useState<StatusEffect | null>(null)
+  const [playerStatusTurns, setPlayerStatusTurns] = useState(0)
 
   // Squad state
   const [squadCreatures, setSquadCreatures] = useState<SquadCreature[]>([])
@@ -591,14 +620,21 @@ export default function EncounterPage() {
       }
     }
 
-    // Status effect notifications
+    // Status effect notifications + state updates
     if (data.statusEvents?.length) {
       for (const se of data.statusEvents as any[]) {
-        if (se.turnPassed) {
+        if (se.turnPassed || se.selfHit) {
           const effect = se.type as StatusEffect
           const meta = STATUS_EFFECT_META[effect]
-          if (se.target === 'player') setMessage(`${meta?.emoji ?? ''} Hai saltato il turno (${meta?.label ?? effect})`)
-          else setMessage(`${meta?.emoji ?? ''} ${state.creature.name} ha saltato il turno (${meta?.label ?? effect})`)
+          if (se.target === 'player') {
+            setMessage(`${meta?.emoji ?? ''} Hai saltato il turno (${meta?.label ?? effect})`)
+            if (se.cleared) setPlayerStatus(null)
+            else setPlayerStatusTurns(se.turnsLeft ?? 0)
+          } else {
+            setMessage(`${meta?.emoji ?? ''} ${state.creature.name} ha saltato il turno (${meta?.label ?? effect})`)
+            if (se.cleared) setWildStatus(null)
+            else setWildStatusTurns(se.turnsLeft ?? 0)
+          }
           await new Promise(r => setTimeout(r, 700))
         }
       }
@@ -606,12 +642,16 @@ export default function EncounterPage() {
     if (data.statusAppliedToWild) {
       const effect = data.statusAppliedToWild as StatusEffect
       const meta = STATUS_EFFECT_META[effect]
+      setWildStatus(effect)
+      setWildStatusTurns(data.wildNewStatusTurns ?? 0)
       setMessage(`${meta?.emoji ?? ''} ${state.creature.name} è afflitto da ${meta?.label ?? effect}!`)
       await new Promise(r => setTimeout(r, 600))
     }
     if (data.statusAppliedToPlayer) {
       const effect = data.statusAppliedToPlayer as StatusEffect
       const meta = STATUS_EFFECT_META[effect]
+      setPlayerStatus(effect)
+      setPlayerStatusTurns(data.playerNewStatusTurns ?? 0)
       setMessage(`${meta?.emoji ?? ''} Sei afflitto da ${meta?.label ?? effect}!`)
       await new Promise(r => setTimeout(r, 600))
     }
@@ -841,6 +881,8 @@ export default function EncounterPage() {
               isWild
               animState={wildAnim}
               side="right"
+              statusEffect={wildStatus}
+              statusTurnsLeft={wildStatusTurns}
             />
           </motion.div>
         </div>
@@ -868,6 +910,8 @@ export default function EncounterPage() {
                 animState={playerAnim}
                 fainting={playerFainting}
                 side="left"
+                statusEffect={playerStatus}
+                statusTurnsLeft={playerStatusTurns}
               />
             </motion.div>
           </AnimatePresence>

@@ -189,21 +189,29 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
             <span className="text-[11px] leading-none">{elemEmoji}</span>
             <span className="text-[9px] text-white/35 capitalize">{element}</span>
           </div>
-          {statusEffect && STATUS_EFFECT_META[statusEffect] && (
-            <div className="mt-1">
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 w-fit"
-                style={{
-                  background: `${STATUS_EFFECT_META[statusEffect].color}18`,
-                  border: `1px solid ${STATUS_EFFECT_META[statusEffect].color}50`,
-                  color: STATUS_EFFECT_META[statusEffect].color,
-                  boxShadow: `0 0 6px ${STATUS_EFFECT_META[statusEffect].glow}`,
-                }}>
-                <span>{STATUS_EFFECT_META[statusEffect].emoji}</span>
-                <span>{STATUS_EFFECT_META[statusEffect].label}</span>
-                {statusTurnsLeft != null && statusTurnsLeft > 0 && <span className="opacity-60">×{statusTurnsLeft}</span>}
-              </span>
-            </div>
-          )}
+          {statusEffect && STATUS_EFFECT_META[statusEffect] && (() => {
+            const meta = STATUS_EFFECT_META[statusEffect]
+            return (
+              <div className="mt-1.5">
+                <motion.span
+                  className="text-[10px] font-extrabold px-2 py-1 rounded-lg flex items-center gap-1 w-fit"
+                  animate={{ opacity: [1, 0.65, 1], scale: [1, 0.96, 1] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{
+                    background: `${meta.color}22`,
+                    border: `1px solid ${meta.color}70`,
+                    color: meta.color,
+                    boxShadow: `0 0 10px ${meta.glow}, 0 0 20px ${meta.color}18, inset 0 0 6px ${meta.color}10`,
+                  }}>
+                  <span className="text-[11px] leading-none">{meta.emoji}</span>
+                  <span>{meta.label}</span>
+                  {statusTurnsLeft != null && statusTurnsLeft > 0 && (
+                    <span className="opacity-50 text-[9px] font-bold ml-0.5">×{statusTurnsLeft}</span>
+                  )}
+                </motion.span>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Lineup dots */}
@@ -1653,6 +1661,15 @@ export default function BossFightPage() {
               setTimeout(() => {
                 setPlayerFainting(false)
                 setPlayerLineup(nextPlayerLineup)
+                setBossLineup(nextBossLineup)
+                if (data.statusAppliedToBoss) {
+                  const effect = data.statusAppliedToBoss as StatusEffect
+                  flashStatusNotice(effect, `Boss afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`)
+                }
+                if (data.statusAppliedToPlayer) {
+                  const effect = data.statusAppliedToPlayer as StatusEffect
+                  setTimeout(() => flashStatusNotice(effect, `Sei afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 600)
+                }
                 if (data.playerSwitchedTo) {
                   setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`)
                   setTimeout(() => setSwitchNotice(null), 2000)
@@ -1670,8 +1687,17 @@ export default function BossFightPage() {
           } else {
             setTimeout(() => {
               setPlayerLineup(nextPlayerLineup)
+              setBossLineup(nextBossLineup)
               setAnimState('idle')
               setLastDamage(null)
+              if (data.statusAppliedToBoss) {
+                const effect = data.statusAppliedToBoss as StatusEffect
+                flashStatusNotice(effect, `Boss afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`)
+              }
+              if (data.statusAppliedToPlayer) {
+                const effect = data.statusAppliedToPlayer as StatusEffect
+                setTimeout(() => flashStatusNotice(effect, `Sei afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 600)
+              }
               if (data.playerSwitchedTo) {
                 setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`)
                 setTimeout(() => setSwitchNotice(null), 2000)
