@@ -6,7 +6,6 @@ import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
 
-const RARE_TIERS = ['raro', 'epico', 'leggendario', 'mitologico']
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -58,8 +57,6 @@ export async function POST(request: Request) {
   if (!playerCreature) return NextResponse.json({ error: 'Creatura giocatore non trovata' }, { status: 404 })
 
   const playerCr = (playerCreature as any).creatures
-  const isRarePlus = RARE_TIERS.includes(wildCreature.rarity)
-
   // Apply item effect: battaglia = ATK boost, pozione = anti-weakness (caps element mult at 1.0)
   let atkMultiplier = 1
   let antiWeakness = false
@@ -170,12 +167,6 @@ export async function POST(request: Request) {
   }
 
   // ── Combat ────────────────────────────────────────────────────────────────
-  // Rara+ attacks first (if not skipped by status)
-  if (isRarePlus && !skipWildAttack) {
-    wildDamage = calculateFightDamage(wildCreature.atk)
-    playerTookDamage = true
-  }
-
   // Player attacks with element multiplier (if not skipped by status)
   let elementMult = getElementMultiplier(
     playerCr.element as Element,
@@ -190,9 +181,9 @@ export async function POST(request: Request) {
     wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
   }
 
-  // ── Roll player→wild status BEFORE non-rare counter-attack ────────────────
-  // This ensures paralisi/sonno applied this turn prevents the counter-attack
-  // in the same action (otherwise the creature would attack and then be frozen).
+  // ── Roll player→wild status BEFORE wild attacks ───────────────────────────
+  // Status applied this turn takes effect immediately — blocks wild attack
+  // regardless of rarity (no more rare+ first-strike exception).
   let statusAppliedToWild: StatusEffect | null = null
   let wildNewStatusTurns = 0
   if (playerDamage > 0 && wildHpRemaining > 0) {
@@ -200,17 +191,16 @@ export async function POST(request: Request) {
     if (triggered) {
       statusAppliedToWild = triggered
       wildNewStatusTurns = STATUS_EFFECT_META[triggered].turns
-      newWildStatus = triggered          // re-applies and resets counter if already has a status
+      newWildStatus = triggered
       newWildStatusTurns = wildNewStatusTurns
-      // Immobilising effects block the counter-attack this same turn
       if (triggered === 'paralisi' || triggered === 'sonno') {
         skipWildAttack = true
       }
     }
   }
 
-  // Non-rare attacks after player (if not skipped by status — now includes freshly applied)
-  if (!isRarePlus && wildHpRemaining > 0 && !skipWildAttack) {
+  // Wild attacks (all rarities check skipWildAttack — status applied above takes effect now)
+  if (wildHpRemaining > 0 && !skipWildAttack) {
     wildDamage = calculateFightDamage(wildCreature.atk)
     playerTookDamage = true
   }

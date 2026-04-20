@@ -561,10 +561,8 @@ export default function EncounterPage() {
       setMessage(rnd(FIGHT_PLAYER_MSGS)(playerName, wildName))
     }
 
-    // Status applied this turn — show BEFORE counter only when no counter will follow
-    // (non-rare: player attacks first, status blocks counter → wildDamage=0)
-    // For rare+ (attacks first, wildDamage>0) show AFTER their attack animation below
-    if (data.statusAppliedToWild && !data.playerTookDamage) {
+    // Status applied by player's hit — always show BEFORE wild counter-attack
+    if (data.statusAppliedToWild) {
       const effect = data.statusAppliedToWild as StatusEffect
       const meta = STATUS_EFFECT_META[effect]
       setWildStatus(effect)
@@ -632,17 +630,6 @@ export default function EncounterPage() {
         finishPendingAction()
         return
       }
-    }
-
-    // For rare+ (attacked first): status applied after their first-strike → show after their animation
-    if (data.statusAppliedToWild && data.playerTookDamage) {
-      const effect = data.statusAppliedToWild as StatusEffect
-      const meta = STATUS_EFFECT_META[effect]
-      setWildStatus(effect)
-      setWildStatusTurns(data.wildNewStatusTurns ?? 0)
-      await new Promise(r => setTimeout(r, 400))
-      setMessage(`${meta?.emoji ?? ''} ${state.creature.name} è afflitto da ${meta?.label ?? effect}!`)
-      await new Promise(r => setTimeout(r, 600))
     }
 
     // Status effect notifications + state updates
