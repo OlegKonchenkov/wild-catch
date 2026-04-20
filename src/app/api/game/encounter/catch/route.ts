@@ -97,8 +97,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ caught: false, fled: false, wildDamage: 0 })
     }
 
-    // 40% chance the creature flees (confused creatures still flee)
-    const flees = Math.random() < 0.40
+    // 30% chance the creature flees (confused creatures still flee)
+    const flees = Math.random() < 0.30
     if (flees) {
       await supabase
         .from('encounters')
