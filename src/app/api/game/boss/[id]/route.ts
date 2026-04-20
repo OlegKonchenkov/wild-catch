@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { calculateCombatDamage, calculateConfusionSelfDamage, calculatePoisonDamage, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
+import { calculateCombatDamage, calculateConfusionSelfDamage, calculatePoisonDamage, rollCombatFortune, rollConfusionSelfHit, rollCrit, rollParalysisSkip, rollStatusEffect, scaleCombatStats, shouldSkipCounterattackOnStatusApply, STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
@@ -301,9 +301,32 @@ export async function POST(request: Request, { params }: Params) {
       const cleared = newT <= 0
       bossActive.active_status    = cleared ? null : 'paralisi'
       bossActive.status_turns_left = Math.max(0, newT)
-      const paralysisSkip = Math.random() < 0.65
+      const paralysisSkip = rollParalysisSkip()
       if (paralysisSkip) skipBossAttack = true
       statusTickEvents.push({ type: 'paralisi', target: 'boss', paralysisSkip, cleared, turnsLeft: Math.max(0, newT) })
+    } else if (bossActive.active_status === 'confusione' && !bossActive.fainted) {
+      const newT = (bossActive.status_turns_left ?? 0) - 1
+      const cleared = newT <= 0
+      bossActive.active_status = cleared ? null : 'confusione'
+      bossActive.status_turns_left = Math.max(0, newT)
+      if (rollConfusionSelfHit()) {
+        skipBossAttack = true
+        const selfDmg = calculateConfusionSelfDamage(bossActive.atk, bossActive.def ?? 0)
+        bossActive.current_hp = Math.max(0, bossActive.current_hp - selfDmg)
+        if (bossActive.current_hp === 0) bossActive.fainted = true
+        statusTickEvents.push({
+          type: 'confusione',
+          target: 'boss',
+          selfHit: true,
+          selfDamage: selfDmg,
+          selfHp: bossActive.current_hp,
+          cleared,
+          turnsLeft: Math.max(0, newT),
+          fainted: bossActive.current_hp === 0,
+        })
+      } else {
+        statusTickEvents.push({ type: 'confusione', target: 'boss', selfHit: false, cleared, turnsLeft: Math.max(0, newT) })
+      }
     }
 
     // Sonno: always skips. Paralisi: 65% skip, 35% attacks.
@@ -319,20 +342,18 @@ export async function POST(request: Request, { params }: Params) {
       const cleared = newTurns <= 0
       playerActive.active_status    = cleared ? null : 'paralisi'
       playerActive.status_turns_left = Math.max(0, newTurns)
-      const paralysisSkip = Math.random() < 0.65
+      const paralysisSkip = rollParalysisSkip()
       if (paralysisSkip) skipPlayerAttack = true
       preTurnStatusEvent = { type: 'paralisi', paralysisSkip, cleared, turnsLeft: Math.max(0, newTurns) }
     }
 
     // Confusione: 50/50 self-hit or normal
-    let confusionSelfHit = false
     if (playerStatus === 'confusione' && !skipPlayerAttack && !playerActive.fainted) {
       const newTurns = playerStatusTurns - 1
       const cleared = newTurns <= 0
       playerActive.active_status    = cleared ? null : 'confusione'
       playerActive.status_turns_left = Math.max(0, newTurns)
-      if (Math.random() < 0.5) {
-        confusionSelfHit = true
+      if (rollConfusionSelfHit()) {
         skipPlayerAttack = true
         const selfDmg = calculateConfusionSelfDamage(playerActive.atk, playerActive.def ?? 0)
         playerActive.current_hp = Math.max(0, playerActive.current_hp - selfDmg)
@@ -361,7 +382,7 @@ export async function POST(request: Request, { params }: Params) {
 
     // ── Optional battaglia item ──────────────────────────────────────────
     let atkMultiplier = 1
-    if (itemId) {
+    if (itemId && !skipPlayerAttack && !playerActive.fainted && !bossActive.fainted) {
       const { data: invItem } = await supabase
         .from('player_inventory')
         .select('quantity, items(effect_value, type)')
@@ -424,7 +445,7 @@ export async function POST(request: Request, { params }: Params) {
         bossStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
         bossActive.active_status    = triggered
         bossActive.status_turns_left = bossStatusTurnsLeft
-        if (triggered === 'paralisi' || triggered === 'sonno') {
+        if (shouldSkipCounterattackOnStatusApply(triggered)) {
           skipBossAttack = true
         }
       }

@@ -600,6 +600,11 @@ function BattleScreen({
 
   const activeBoss   = bossLineup[bossActiveSlot]
   const activePlayer = playerLineup.find(c => c.is_active && !c.fainted)
+  const playerSleeping = activePlayer?.active_status === 'sonno'
+
+  useEffect(() => {
+    if (playerSleeping && selectedItemId) onSelectItem(null)
+  }, [onSelectItem, playerSleeping, selectedItemId])
 
   if (!activeBoss || !activePlayer) return null
 
@@ -685,7 +690,7 @@ function BattleScreen({
                 </button>
               </div>
               <div className="px-4 pb-6 flex flex-col gap-3">
-                {battagliaItems.length > 0 && (
+                {!playerSleeping && battagliaItems.length > 0 && (
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-white/35 mb-2">⚔️ Battaglia — potenzia ATK questo turno</p>
                     <div className="flex flex-col gap-1.5">
@@ -1044,7 +1049,7 @@ function BattleScreen({
             </div>
           ) : (
             <span className="flex items-center justify-center gap-2">
-              ⚔️ {selectedItem ? `Attacca (+${selectedItem.effectValue}% ATK)` : 'Attacca!'}
+              {playerSleeping ? '💤 Passa' : `⚔️ ${selectedItem ? `Attacca (+${selectedItem.effectValue}% ATK)` : 'Attacca!'}`}
             </span>
           )}
         </motion.button>
@@ -1532,29 +1537,33 @@ export default function BossFightPage() {
     if (attackingRef.current) return
     attackingRef.current = true
     setAttacking(true)
-    setAnimState('attack')
-    setTimeout(() => setAnimState('idle'), 300)
     const actingPlayerNow = playerLineup.find((c: PlayerSlot) => c.is_active && !c.fainted)
-    if (actingPlayerNow) {
+    const isSleepingTurn = actingPlayerNow?.active_status === 'sonno'
+    const usedItemId = isSleepingTurn ? null : selectedItemId
+    if (!isSleepingTurn) {
+      setAnimState('attack')
+      setTimeout(() => setAnimState('idle'), 300)
+    }
+    if (!isSleepingTurn && actingPlayerNow) {
       setAttackAnim({ key: Date.now(), element: actingPlayerNow.element, rarity: actingPlayerNow.rarity, side: 'left', soundUrl: actingPlayerNow.attack_sound_url, soundDurationMs: actingPlayerNow.attack_sound_duration_ms })
     }
 
     const res = await fetch(`/api/game/boss/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'attack', itemId: selectedItemId || undefined }),
+      body: JSON.stringify({ action: 'attack', itemId: usedItemId || undefined }),
     })
     const data = await res.json()
 
     if (!res.ok) { showActionError(res.status, data.error ?? 'Errore attacco'); attackingRef.current = false; setAttacking(false); return }
 
-    setSelectedItemId(null)
-    if (selectedItemId) {
+    if (usedItemId && data.playerDamage > 0) {
       setBattagliaItems(prev => prev.map(item =>
-        item.inventoryId === selectedItemId
+        item.inventoryId === usedItemId
           ? { ...item, quantity: item.quantity - 1 }
           : item
       ).filter(item => item.quantity > 0))
+      setSelectedItemId(null)
     }
 
     const nextBossLineup = data.bossLineup as BossSlot[]
@@ -1570,6 +1579,10 @@ export default function BossFightPage() {
     addLog(`${actingPlayer?.name ?? 'Tu'} colpisce per ${data.playerDamage} danni${playerCritLabel}${playerFortuneText && !data.playerCrit ? ` · ${playerFortuneText}` : ''}!`)
     if (data.playerCrit) flashCritNotice()
     else flashFortuneNotice(data.playerFortune as CombatFortuneInfo | undefined)
+
+    if (data.playerDamage <= 0) {
+      setLog(prev => prev.filter(msg => !msg.includes('colpisce per 0 danni')).slice(-9))
+    }
 
     // Status effects before attack
     if (data.preTurnStatusEvent) {
@@ -1587,11 +1600,15 @@ export default function BossFightPage() {
     }
 
     // Phase 1: show damage on boss (update HP bar only, don't switch yet)
-    setBossLineup(prev => prev.map((slot, i) =>
-      i === bossActiveSlot ? { ...slot, current_hp: nextBossLineup[i]?.current_hp ?? slot.current_hp } : slot
-    ))
-    setLastDamage({ amount: data.playerDamage, target: 'boss', id: Date.now(), isCrit: !!data.playerCrit })
-    setBossAnimState('damage')
+    if (data.playerDamage > 0) {
+      setBossLineup(prev => prev.map((slot, i) =>
+        i === bossActiveSlot ? { ...slot, current_hp: nextBossLineup[i]?.current_hp ?? slot.current_hp } : slot
+      ))
+      setLastDamage({ amount: data.playerDamage, target: 'boss', id: Date.now(), isCrit: !!data.playerCrit })
+      setBossAnimState('damage')
+    } else {
+      setBossLineup(nextBossLineup)
+    }
 
     setTimeout(() => {
       setBossAnimState('idle')

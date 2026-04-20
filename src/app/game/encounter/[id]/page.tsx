@@ -510,14 +510,18 @@ export default function EncounterPage() {
   async function handleFight() {
     if (!state || loading) return
     const attackingName = playerCreature?.name ?? 'Creatura'
+    const usedBattagliaId = playerStatus === 'sonno' ? null : selectedBattagliaId
+    const usedPozioneId = playerStatus === 'sonno' ? null : selectedPozioneId
+    const sleepingTurn = playerStatus === 'sonno'
     resetTimer(); setLoading(true); setPendingAction('fight'); setMessage(`⚔️ ${attackingName} all'attacco!`); setIsCritMessage(false); setShowItemsModal(false)
 
     const actionStartedAt = Date.now()
-    setPlayerAnim('attack')
-    setAttackAnim({ key: Date.now(), element: playerCreature?.element ?? 'armonia', rarity: playerCreature?.rarity ?? 'comune', side: 'left', soundUrl: playerCreature?.soundUrl, soundDurationMs: playerCreature?.soundDurationMs })
+    if (sleepingTurn) setMessage(`ðŸ’¤ ${attackingName} prova a resistere al sonno...`)
+    if (!sleepingTurn) setPlayerAnim('attack')
+    if (!sleepingTurn) setAttackAnim({ key: Date.now(), element: playerCreature?.element ?? 'armonia', rarity: playerCreature?.rarity ?? 'comune', side: 'left', soundUrl: playerCreature?.soundUrl, soundDurationMs: playerCreature?.soundDurationMs })
     const attackReset = setTimeout(() => setPlayerAnim('idle'), 260)
 
-    const activeItemId = selectedPozioneId ?? selectedBattagliaId ?? null
+    const activeItemId = usedPozioneId ?? usedBattagliaId ?? null
     const activeSquadPcId = squadCreatures.length > 0 ? squadCreatures[activeSlot]?.pcId : undefined
     const shouldClearStatus = clearPlayerStatusRef.current
     if (shouldClearStatus) clearPlayerStatusRef.current = false
@@ -532,9 +536,14 @@ export default function EncounterPage() {
     })
     const data = await res.json()
 
-    if (selectedBattagliaId) setBattagliaItems(prev => prev.map(i => i.id === selectedBattagliaId ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))
-    if (selectedPozioneId)   setPozioneItems(prev => prev.map(i => i.id === selectedPozioneId   ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))
-    setSelectedBattagliaId(null); setSelectedPozioneId(null)
+    if (usedBattagliaId && data.playerDamage > 0) {
+      setBattagliaItems(prev => prev.map(i => i.id === usedBattagliaId ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))
+      setSelectedBattagliaId(null)
+    }
+    if (usedPozioneId && data.playerDamage > 0) {
+      setPozioneItems(prev => prev.map(i => i.id === usedPozioneId ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))
+      setSelectedPozioneId(null)
+    }
 
     clearTimeout(attackReset)
     setPlayerAnim('idle')
@@ -544,9 +553,42 @@ export default function EncounterPage() {
     const remainingAttackMs = Math.max(0, 260 - (Date.now() - actionStartedAt))
     if (remainingAttackMs > 0) await new Promise(r => setTimeout(r, remainingAttackMs))
 
-    setWildAnim('damage')
-    await new Promise(r => setTimeout(r, 380))
-    setWildAnim('idle')
+    let currentPlayerHp = playerHp ?? playerCreature?.maxHp ?? 100
+    const handlePlayerKnockout = async () => {
+      playKnockout()
+      setPlayerFainting(true)
+      await new Promise(r => setTimeout(r, 1000))
+      setPlayerFainting(false)
+
+      if (squadCreatures.length > 0) {
+        const nextSlot = activeSlot + 1
+        if (nextSlot < squadCreatures.length) {
+          const next = squadCreatures[nextSlot]
+          setActiveSlot(nextSlot)
+          setPlayerCreature({
+            name: next.name, maxHp: next.hp, atk: next.atk,
+            element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '',
+          })
+          setPlayerHp(slotHps[nextSlot] ?? next.hp)
+          setPlayerStatus(null)
+          setPlayerStatusTurns(0)
+          clearPlayerStatusRef.current = true
+          setMessage(`${squadCreatures[activeSlot].name} è svenuta! Entra ${next.name}!`)
+          finishPendingAction()
+          return
+        }
+      }
+
+      playDefeat()
+      setResult('lost')
+      finishPendingAction()
+    }
+
+    if (data.playerDamage > 0) {
+      setWildAnim('damage')
+      await new Promise(r => setTimeout(r, 380))
+      setWildAnim('idle')
+    }
 
     setState(prev => prev ? { ...prev, wildHp: data.wildHpRemaining, catchMultiplier: data.catchMultiplier, turns: prev.turns + 1 } : null)
 
@@ -557,12 +599,14 @@ export default function EncounterPage() {
 
     const playerName = playerCreature?.name ?? 'la tua creatura'
     const wildName   = state.creature.name ?? 'creatura selvatica'
-    if (data.playerCrit) {
+    if (data.playerDamage > 0 && data.playerCrit) {
       setIsCritMessage(true)
       setMessage(rnd(FIGHT_CRIT_MSGS))
-    } else {
+    } else if (data.playerDamage > 0) {
       setIsCritMessage(false)
       setMessage(rnd(FIGHT_PLAYER_MSGS)(playerName, wildName))
+    } else {
+      setIsCritMessage(false)
     }
 
     // Status applied by player's hit — always show BEFORE wild counter-attack
@@ -590,8 +634,8 @@ export default function EncounterPage() {
       setMessage(rnd(WILD_COUNTER_MSGS)(state.creature.name ?? 'creatura selvatica'))
       setIsCritMessage(false)
 
-      const curHp = playerHp ?? playerCreature?.maxHp ?? 100
-      const newHp = Math.max(0, curHp - data.wildDamage)
+      const newHp = Math.max(0, currentPlayerHp - data.wildDamage)
+      currentPlayerHp = newHp
 
       // Update squad HP tracking
       if (squadCreatures.length > 0) {
@@ -608,33 +652,7 @@ export default function EncounterPage() {
       setPlayerAnim('idle')
 
       if (newHp <= 0) {
-        playKnockout()
-        // Show faint animation before switching creature
-        setPlayerFainting(true)
-        await new Promise(r => setTimeout(r, 1000))
-        setPlayerFainting(false)
-        // Try next squad creature
-        if (squadCreatures.length > 0) {
-          const nextSlot = activeSlot + 1
-          if (nextSlot < squadCreatures.length) {
-            const next = squadCreatures[nextSlot]
-            setActiveSlot(nextSlot)
-            setPlayerCreature({
-              name: next.name, maxHp: next.hp, atk: next.atk,
-              element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '',
-            })
-            setPlayerHp(slotHps[nextSlot] ?? next.hp)
-            setPlayerStatus(null)
-            setPlayerStatusTurns(0)
-            clearPlayerStatusRef.current = true
-            setMessage(`${squadCreatures[activeSlot].name} è svenuta! Entra ${next.name}!`)
-            finishPendingAction()
-            return
-          }
-        }
-        playDefeat()
-        setResult('lost')
-        finishPendingAction()
+        await handlePlayerKnockout()
         return
       }
     }
@@ -654,6 +672,61 @@ export default function EncounterPage() {
         } else {
           if (se.cleared) setWildStatus(null)
           else if (se.turnsLeft != null) setWildStatusTurns(se.turnsLeft)
+        }
+
+        // Veleno: show poison damage message + animate HP decrease
+        if (effect === 'veleno' && se.poisonDamage > 0) {
+          if (isPlayer) {
+            const newHp = typeof se.newHp === 'number'
+              ? Math.max(0, se.newHp)
+              : Math.max(0, currentPlayerHp - se.poisonDamage)
+            currentPlayerHp = newHp
+            setPlayerAnim('damage')
+            setPlayerHp(newHp)
+            if (squadCreatures.length > 0) {
+              setSlotHps(prev => { const n = [...prev]; n[activeSlot] = newHp; return n })
+            }
+            setMessage(`☠️ Veleno — ${se.poisonDamage} danno a te!`)
+            await new Promise(r => setTimeout(r, 700))
+            setPlayerAnim('idle')
+            if (newHp <= 0) {
+              await handlePlayerKnockout()
+              return
+            }
+          } else {
+            setWildAnim('damage')
+            setMessage(`☠️ Veleno — ${se.poisonDamage} danno a ${state.creature.name}!`)
+            await new Promise(r => setTimeout(r, 700))
+            setWildAnim('idle')
+          }
+          continue
+        }
+
+        if (effect === 'confusione' && se.selfHit && se.selfDamage > 0) {
+          if (isPlayer) {
+            const newHp = typeof se.newHp === 'number'
+              ? Math.max(0, se.newHp)
+              : Math.max(0, currentPlayerHp - se.selfDamage)
+            currentPlayerHp = newHp
+            setPlayerAnim('damage')
+            setPlayerHp(newHp)
+            if (squadCreatures.length > 0) {
+              setSlotHps(prev => { const n = [...prev]; n[activeSlot] = newHp; return n })
+            }
+            setMessage(`ðŸ’« Confusione â€” ti colpisci da solo per ${se.selfDamage}!`)
+            await new Promise(r => setTimeout(r, 700))
+            setPlayerAnim('idle')
+            if (newHp <= 0) {
+              await handlePlayerKnockout()
+              return
+            }
+          } else {
+            setWildAnim('damage')
+            setMessage(`ðŸ’« ${state.creature.name} si colpisce da sola per ${se.selfDamage}!`)
+            await new Promise(r => setTimeout(r, 700))
+            setWildAnim('idle')
+          }
+          continue
         }
 
         // Show a message only for notable events (skip or self-hit)
@@ -860,11 +933,12 @@ export default function EncounterPage() {
   const wildTheme   = ELEMENT_THEME[wildElem]   ?? ELEMENT_THEME.bosco
   const playerTheme = ELEMENT_THEME[playerElem] ?? ELEMENT_THEME.adriatico
   const wildRarityColor = RARITY_COLORS[state.creature.rarity as Rarity ?? 'comune']
+  const playerSleeping = playerStatus === 'sonno'
   const hasItems = reteItems.length > 0 || battagliaItems.length > 0 || pozioneItems.length > 0 || curaItems.length > 0
   const timerPct    = (turnTimer / 45) * 100
   const timerUrgent = turnTimer <= 10
 
-  const activeItemLabel = selectedReteId ? '🎯' : selectedBattagliaId ? '⚔️' : selectedPozioneId ? '🧪' : null
+  const activeItemLabel = selectedReteId ? '🎯' : playerSleeping ? null : selectedBattagliaId ? '⚔️' : selectedPozioneId ? '🧪' : null
   const selectedReteMult = reteItems.find(i => i.id === selectedReteId)?.items.effect_value ?? 1
   const catchInfoParts = [
     state.catchMultiplier > 1.0 ? `+${Math.round((state.catchMultiplier - 1) * 100)}% cattura` : null,
@@ -1187,7 +1261,7 @@ export default function EncounterPage() {
               {pendingAction === 'fight'
                 ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 : <span className="text-base leading-none">⚔️</span>}
-              <span className="text-[10px] font-extrabold text-white tracking-wide">LOTTA</span>
+              <span className="text-[10px] font-extrabold text-white tracking-wide">{playerSleeping ? 'PASSA' : 'LOTTA'}</span>
               <span className="text-[8px] text-white/40 font-bold">{state.turns}/5</span>
             </motion.button>
 
@@ -1271,7 +1345,7 @@ export default function EncounterPage() {
                   </div>
                 )}
 
-                {battagliaItems.length > 0 && (
+                {!playerSleeping && battagliaItems.length > 0 && (
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-white/35 mb-2">⚔️ Potenziamento — +ATK</p>
                     <div className="flex flex-col gap-1.5">
@@ -1297,7 +1371,7 @@ export default function EncounterPage() {
                   </div>
                 )}
 
-                {pozioneItems.length > 0 && (
+                {!playerSleeping && pozioneItems.length > 0 && (
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-white/35 mb-2">🧪 Pozione — annulla debolezza</p>
                     <div className="flex flex-col gap-1.5">
@@ -1520,10 +1594,10 @@ export default function EncounterPage() {
                       paralisi: '1 turno', confusione: '3 turni', sonno: '2 turni', veleno: 'Finché in campo',
                     }
                     const EFFECT_DESCRIPTIONS: Record<StatusEffect, string> = {
-                      paralisi:   'Blocca l\'avversario per 1 turno',
-                      confusione: '50% chance di colpire se stesso per 3 turni',
-                      sonno:      'L\'avversario salta i turni per 2 turni',
-                      veleno:     'Perde il 10% degli HP dopo ogni attacco',
+                      paralisi:   '35% di attaccare, 65% di fallire per 2 turni',
+                      confusione: '50% di colpirsi da solo per 3 turni',
+                      sonno:      'Salta sempre l\'attacco per 2 turni',
+                      veleno:     'Perde il 10% degli HP a ogni turno',
                     }
                     return (
                       <motion.div

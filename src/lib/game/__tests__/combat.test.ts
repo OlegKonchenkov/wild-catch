@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { calculateCombatDamage, normalizeCombatLevel, rollCombatFortune, scaleCombatStats } from '@/lib/game/combat'
+import {
+  calculateCombatDamage,
+  calculatePoisonDamage,
+  normalizeCombatLevel,
+  rollConfusionSelfHit,
+  rollCombatFortune,
+  rollParalysisSkip,
+  scaleCombatStats,
+  shouldSkipCounterattackOnStatusApply,
+} from '@/lib/game/combat'
 
 describe('combat helpers', () => {
   it('normalizes invalid levels to 1', () => {
@@ -55,5 +64,32 @@ describe('combat helpers', () => {
 
     expect(underdogFight.multiplier).toBeGreaterThan(evenFight.multiplier)
     expect(underdogFight.isUnderdog).toBe(true)
+  })
+
+  it('only paralysis and sleep block the immediate counterattack on application', () => {
+    expect(shouldSkipCounterattackOnStatusApply('paralisi')).toBe(true)
+    expect(shouldSkipCounterattackOnStatusApply('sonno')).toBe(true)
+    expect(shouldSkipCounterattackOnStatusApply('confusione')).toBe(false)
+    expect(shouldSkipCounterattackOnStatusApply('veleno')).toBe(false)
+  })
+
+  it('keeps paralysis at 65% skip and 35% attack with the expected threshold', () => {
+    expect(rollParalysisSkip(0)).toBe(true)
+    expect(rollParalysisSkip(0.649999)).toBe(true)
+    expect(rollParalysisSkip(0.65)).toBe(false)
+    expect(rollParalysisSkip(0.99)).toBe(false)
+  })
+
+  it('keeps confusion at a flat 50% self-hit chance', () => {
+    expect(rollConfusionSelfHit(0)).toBe(true)
+    expect(rollConfusionSelfHit(0.499999)).toBe(true)
+    expect(rollConfusionSelfHit(0.5)).toBe(false)
+    expect(rollConfusionSelfHit(0.99)).toBe(false)
+  })
+
+  it('applies poison at 10% of max hp with a minimum of 1', () => {
+    expect(calculatePoisonDamage(100)).toBe(10)
+    expect(calculatePoisonDamage(55)).toBe(6)
+    expect(calculatePoisonDamage(1)).toBe(1)
   })
 })

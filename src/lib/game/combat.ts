@@ -159,6 +159,18 @@ export function rollStatusEffect(
   return Math.random() < (chance ?? 0.15) ? statusEffect : null
 }
 
+export function rollParalysisSkip(randomValue = Math.random()): boolean {
+  return randomValue < 0.65
+}
+
+export function rollConfusionSelfHit(randomValue = Math.random()): boolean {
+  return randomValue < 0.5
+}
+
+export function shouldSkipCounterattackOnStatusApply(effect: StatusEffect | null | undefined): boolean {
+  return effect === 'paralisi' || effect === 'sonno'
+}
+
 /** Self-damage from confusion: attacker hits themselves at 50% power (own ATK vs own DEF). */
 export function calculateConfusionSelfDamage(atk: number, def: number): number {
   return calculateCombatDamage({ attackerAtk: atk, defenderDef: def, attackMultiplier: 0.5 })

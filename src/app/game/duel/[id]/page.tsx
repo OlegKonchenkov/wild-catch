@@ -511,7 +511,7 @@ export default function DuelPage() {
       .channel(`duel:${id}`)
       .on('broadcast', { event: 'duel_action' }, ({ payload }) => {
         const { actorId, action: broadcastAction, damage, fortune, isCrit, nextTurn, itemUsed, switchedTo, newOppHp, healAmount, newHp,
-          statusEvent, preTurnStatusEvent: preTurnSE, statusAppliedToOpp, oppStatusTurnsLeft, poisonEvent, confSwitchedTo } = payload
+          statusEvent, preTurnStatusEvent: preTurnSE, statusAppliedToOpp, oppStatusTurnsLeft, poisonEvent, statusSwitchedTo } = payload
         const iAttacked = actorId === userIdRef.current
 
         // ── Status tick broadcast ──────────────────────────────────────────────
@@ -542,8 +542,8 @@ export default function DuelPage() {
                 if (iAttacked) setMyFainting(true); else setOppFainting(true)
                 playKnockout()
               }
-              if (statusEvent.fainted && confSwitchedTo) {
-                const sw = confSwitchedTo
+              if (statusEvent.fainted && statusSwitchedTo) {
+                const sw = statusSwitchedTo
                 setTimeout(() => {
                   const activateNext = (prev: LineupEntry[]) => prev.map(l => ({
                     ...l,
@@ -562,6 +562,23 @@ export default function DuelPage() {
               if (statusEvent.newMyHp !== undefined) {
                 const updateHp = (prev: LineupEntry[]) => prev.map(l => l.is_active ? { ...l, current_hp: statusEvent.newMyHp } : l)
                 if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
+              }
+              if (statusEvent.fainted) {
+                if (iAttacked) setMyFainting(true); else setOppFainting(true)
+                playKnockout()
+              }
+              if (statusEvent.fainted && statusSwitchedTo) {
+                const sw = statusSwitchedTo
+                setTimeout(() => {
+                  const activateNext = (prev: LineupEntry[]) => prev.map(l => ({
+                    ...l,
+                    is_active: l.player_creature_id === sw.playerCreatureId,
+                    ...(l.is_active && l.player_creature_id !== sw.playerCreatureId ? { fainted_at: new Date().toISOString() } : {}),
+                  }))
+                  if (iAttacked) { setMyFainting(false); setMyLineup(activateNext) } else { setOppFainting(false); setOppLineup(activateNext) }
+                  setSwitchNotice(`${sw.name} entra in battaglia!`)
+                  setTimeout(() => setSwitchNotice(null), 2500)
+                }, 1400)
               }
             }
           }
@@ -902,19 +919,27 @@ export default function DuelPage() {
     if (attackingRef.current || !isMyTurn) return
     if (timerRef.current) clearInterval(timerRef.current)
     autoFightRef.current = true
-    startAttackFeedback()
-    setAnimState('attack')
-    setTimeout(() => setAnimState('idle'), 400)
+    const isSleepingTurn = myActive?.active_status === 'sonno'
+    const usedItemId = isSleepingTurn ? null : selectedItemId
+    if (!isSleepingTurn) {
+      startAttackFeedback()
+      setAnimState('attack')
+      setTimeout(() => setAnimState('idle'), 400)
+    }
     const myActiveCrNow = myLineup.find(l => l.is_active)?.player_creatures?.creatures
-    if (myActiveCrNow) {
+    if (!isSleepingTurn && myActiveCrNow) {
       setAttackAnim({ key: Date.now(), element: myActiveCrNow.element, rarity: myActiveCrNow.rarity, side: 'left', soundUrl: myActiveCrNow.attack_sound_url, soundDurationMs: myActiveCrNow.attack_sound_duration_ms })
     }
 
     // Show attack label immediately — before server responds
     setLog(prev => [selectedItemId ? '⚔️+🗡️ Attacco!' : '⚔️ Attacco!', ...prev.slice(0, 3)])
 
+    if (isSleepingTurn) {
+      setLog(prev => ['Passo il turno', ...prev.filter(msg => !msg.includes('Attacco')).slice(0, 3)])
+    }
+
     const body: Record<string, string> = { duelId: id, action: 'attack' }
-    if (selectedItemId) body.itemId = selectedItemId
+    if (usedItemId) body.itemId = usedItemId
 
     const res = await fetch('/api/game/duel/action', {
       method: 'POST',
@@ -942,9 +967,9 @@ export default function DuelPage() {
       }
     }
 
-    if (selectedItemId && res.ok) {
+    if (usedItemId && res.ok && data.damage > 0) {
       setBattagliaItems(prev => prev
-        .map(it => it.inventoryId === selectedItemId ? { ...it, quantity: it.quantity - 1 } : it)
+        .map(it => it.inventoryId === usedItemId ? { ...it, quantity: it.quantity - 1 } : it)
         .filter(it => it.quantity > 0)
       )
       setSelectedItemId(null)
@@ -1022,7 +1047,12 @@ export default function DuelPage() {
   const turnColor = isMyTurn ? '#34D399' : '#64748b'
   const turnLabel = isMyTurn ? 'Il tuo turno' : 'Turno avversario'
 
+  const mySleeping = myActive?.active_status === 'sonno'
   const selectedItem = battagliaItems.find(it => it.inventoryId === selectedItemId)
+
+  useEffect(() => {
+    if (mySleeping && selectedItemId) setSelectedItemId(null)
+  }, [mySleeping, selectedItemId])
 
   if (loading) {
     return <GameBattleSkeleton />
@@ -1215,7 +1245,7 @@ export default function DuelPage() {
               </div>
               <div className="px-4 pb-6 flex flex-col gap-3">
                 {/* ── Battaglia items (boost ATK this turn) ── */}
-                {battagliaItems.length > 0 && (
+                {!mySleeping && battagliaItems.length > 0 && (
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-white/35 mb-2">⚔️ Battaglia — potenzia ATK questo turno</p>
                     <div className="flex flex-col gap-1.5">
@@ -1561,7 +1591,7 @@ export default function DuelPage() {
               </div>
             ) : isMyTurn ? (
               <span className="flex items-center justify-center gap-2">
-                ⚔️ {selectedItem ? `Attacca (+${selectedItem.effectValue}% ATK)` : 'Attacca'}
+                {mySleeping ? '💤 Passa' : `⚔️ ${selectedItem ? `Attacca (+${selectedItem.effectValue}% ATK)` : 'Attacca'}`}
               </span>
             ) : (
               <span className="text-white/35 text-sm">In attesa del tuo turno...</span>

@@ -1,23 +1,36 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
-import { calculatePoisonDamage, rollStatusEffect, STATUS_EFFECT_META } from '@/lib/game/combat'
+import {
+  calculateConfusionSelfDamage,
+  calculatePoisonDamage,
+  rollConfusionSelfHit,
+  rollParalysisSkip,
+  rollStatusEffect,
+  shouldSkipCounterattackOnStatusApply,
+  STATUS_EFFECT_META,
+} from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
 
-
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  }
 
   const body = await request.json().catch(() => ({}))
   const { encounterId, itemId, activePlayerCreatureId, clearPlayerStatus } = body
 
-  if (!encounterId) return NextResponse.json({ error: 'encounterId mancante' }, { status: 400 })
+  if (!encounterId) {
+    return NextResponse.json({ error: 'encounterId mancante' }, { status: 400 })
+  }
 
-  // Get encounter with creature data (including status columns from migration 022)
   const { data: encounter } = await supabase
     .from('encounters')
     .select('*, creatures(*)')
@@ -26,13 +39,18 @@ export async function POST(request: Request) {
     .eq('status', 'active')
     .single()
 
-  if (!encounter) return NextResponse.json({ error: 'Incontro non trovato' }, { status: 404 })
+  if (!encounter) {
+    return NextResponse.json({ error: 'Incontro non trovato' }, { status: 404 })
+  }
 
-  // Guard: session must still be active
-  const { data: sessionCheck } = await supabase.from('sessions').select('status').eq('id', encounter.session_id).single()
+  const { data: sessionCheck } = await supabase
+    .from('sessions')
+    .select('status')
+    .eq('id', encounter.session_id)
+    .single()
   if (!sessionCheck || sessionCheck.status !== 'active') {
     const notStarted = sessionCheck?.status === 'draft' || sessionCheck?.status === 'ready'
-    const errMsg = notStarted ? 'La sessione non è ancora iniziata' : 'La sessione è terminata'
+    const errMsg = notStarted ? 'La sessione non e ancora iniziata' : 'La sessione e terminata'
     return NextResponse.json({ error: errMsg }, { status: 403 })
   }
 
@@ -40,13 +58,11 @@ export async function POST(request: Request) {
 
   if (!encounter.player_creature_id && !activePlayerCreatureId) {
     return NextResponse.json({
-      error: 'Nessuna creatura selezionata. Seleziona una creatura dal DaimonDex prima di combattere.'
+      error: 'Nessuna creatura selezionata. Seleziona una creatura dal DaimonDex prima di combattere.',
     }, { status: 400 })
   }
 
-  // Use activePlayerCreatureId (squad switch) if provided, else the locked encounter creature
   const lookupId = activePlayerCreatureId ?? encounter.player_creature_id
-
   const { data: playerCreature } = await supabase
     .from('player_creatures')
     .select('*, creatures(*)')
@@ -54,12 +70,18 @@ export async function POST(request: Request) {
     .eq('user_id', user.id)
     .single()
 
-  if (!playerCreature) return NextResponse.json({ error: 'Creatura giocatore non trovata' }, { status: 404 })
+  if (!playerCreature) {
+    return NextResponse.json({ error: 'Creatura giocatore non trovata' }, { status: 404 })
+  }
 
   const playerCr = (playerCreature as any).creatures
-  // Apply item effect: battaglia = ATK boost, pozione = anti-weakness (caps element mult at 1.0)
+
   let atkMultiplier = 1
   let antiWeakness = false
+  let attackItemType: string | null = null
+  let attackItemEffectValue = 0
+  let attackItemQuantity = 0
+
   if (itemId) {
     const { data: invItem } = await supabase
       .from('player_inventory')
@@ -70,31 +92,22 @@ export async function POST(request: Request) {
 
     const inv = invItem as { quantity: number; items: { effect_value: number; type: string } } | null
     if (inv && inv.quantity > 0) {
-      if (inv.items?.type === 'battaglia') {
-        atkMultiplier = 1 + (inv.items.effect_value ?? 0) / 100
-        await supabase.from('player_inventory').update({ quantity: inv.quantity - 1 }).eq('id', itemId)
-      } else if (inv.items?.type === 'pozione') {
-        // REQ-INV-04: anti-weakness — neutralise type disadvantage (cap element mult at 1.0)
-        antiWeakness = true
-        await supabase.from('player_inventory').update({ quantity: inv.quantity - 1 }).eq('id', itemId)
-      }
+      attackItemType = inv.items?.type ?? null
+      attackItemEffectValue = inv.items?.effect_value ?? 0
+      attackItemQuantity = inv.quantity
     }
   }
 
-  // ── Status effect state from encounter columns ────────────────────────────
-  const wildStatus      = (encounter as any).wild_status      as StatusEffect | null
-  const wildStatusTurns = (encounter as any).wild_status_turns  ?? 0
-  // clearPlayerStatus: client sends this on first action after a creature switch (faint)
-  // so the previous creature's status is not inherited by the new one
-  const playerStatus    = clearPlayerStatus ? null : ((encounter as any).player_status    as StatusEffect | null)
-  const playerStatusTurns = clearPlayerStatus ? 0   : ((encounter as any).player_status_turns ?? 0)
+  const wildStatus = (encounter as any).wild_status as StatusEffect | null
+  const wildStatusTurns = (encounter as any).wild_status_turns ?? 0
+  const playerStatus = clearPlayerStatus ? null : ((encounter as any).player_status as StatusEffect | null)
+  const playerStatusTurns = clearPlayerStatus ? 0 : ((encounter as any).player_status_turns ?? 0)
 
   let wildHpRemaining = encounter.wild_creature_hp
   let playerTookDamage = false
   let playerDamage = 0
   let wildDamage = 0
 
-  // ── Status effect pre-turn processing ────────────────────────────────────
   const statusEvents: Record<string, unknown>[] = []
   let newWildStatus: StatusEffect | null = wildStatus
   let newWildStatusTurns = wildStatusTurns
@@ -103,89 +116,115 @@ export async function POST(request: Request) {
   let skipPlayerAttack = false
   let skipWildAttack = false
 
-  // Veleno tick on wild
   if (wildStatus === 'veleno') {
     const poisonDmg = calculatePoisonDamage(wildCreature.hp)
     wildHpRemaining = Math.max(0, wildHpRemaining - poisonDmg)
     statusEvents.push({ type: 'veleno', target: 'wild', poisonDamage: poisonDmg, newHp: wildHpRemaining })
   }
 
-  // Sonno: always skips. Paralisi: 65% skip, 35% attacks.
+  if (playerStatus === 'veleno') {
+    const poisonDmg = calculatePoisonDamage(playerCr.hp)
+    statusEvents.push({ type: 'veleno', target: 'player', poisonDamage: poisonDmg })
+  }
+
   if (wildStatus === 'sonno') {
-    const newT = wildStatusTurns - 1
-    const cleared = newT <= 0
+    const newTurns = wildStatusTurns - 1
+    const cleared = newTurns <= 0
     newWildStatus = cleared ? null : 'sonno'
-    newWildStatusTurns = Math.max(0, newT)
+    newWildStatusTurns = Math.max(0, newTurns)
     skipWildAttack = true
-    statusEvents.push({ type: 'sonno', target: 'wild', turnPassed: true, cleared, turnsLeft: Math.max(0, newT) })
+    statusEvents.push({ type: 'sonno', target: 'wild', turnPassed: true, cleared, turnsLeft: Math.max(0, newTurns) })
   } else if (wildStatus === 'paralisi') {
-    const newT = wildStatusTurns - 1
-    const cleared = newT <= 0
+    const newTurns = wildStatusTurns - 1
+    const cleared = newTurns <= 0
     newWildStatus = cleared ? null : 'paralisi'
-    newWildStatusTurns = Math.max(0, newT)
-    const paralysisSkip = Math.random() < 0.65
+    newWildStatusTurns = Math.max(0, newTurns)
+    const paralysisSkip = rollParalysisSkip()
     if (paralysisSkip) skipWildAttack = true
-    statusEvents.push({ type: 'paralisi', target: 'wild', paralysisSkip, cleared, turnsLeft: Math.max(0, newT) })
+    statusEvents.push({ type: 'paralisi', target: 'wild', paralysisSkip, cleared, turnsLeft: Math.max(0, newTurns) })
   } else if (wildStatus === 'confusione') {
-    const newT = wildStatusTurns - 1
-    const cleared = newT <= 0
+    const newTurns = wildStatusTurns - 1
+    const cleared = newTurns <= 0
     newWildStatus = cleared ? null : 'confusione'
-    newWildStatusTurns = Math.max(0, newT)
-    if (Math.random() < 0.5) {
+    newWildStatusTurns = Math.max(0, newTurns)
+    if (rollConfusionSelfHit()) {
       skipWildAttack = true
-      statusEvents.push({ type: 'confusione', target: 'wild', selfHit: true, cleared, turnsLeft: Math.max(0, newT) })
+      const selfDamage = calculateConfusionSelfDamage(wildCreature.atk, wildCreature.def ?? 0)
+      wildHpRemaining = Math.max(0, wildHpRemaining - selfDamage)
+      statusEvents.push({
+        type: 'confusione',
+        target: 'wild',
+        selfHit: true,
+        selfDamage,
+        newHp: wildHpRemaining,
+        fainted: wildHpRemaining === 0,
+        cleared,
+        turnsLeft: Math.max(0, newTurns),
+      })
     } else {
-      statusEvents.push({ type: 'confusione', target: 'wild', selfHit: false, cleared, turnsLeft: Math.max(0, newT) })
+      statusEvents.push({ type: 'confusione', target: 'wild', selfHit: false, cleared, turnsLeft: Math.max(0, newTurns) })
     }
   }
 
-  // Sonno: always skips. Paralisi: 65% skip, 35% attacks.
   if (playerStatus === 'sonno') {
-    const newT = playerStatusTurns - 1
-    const cleared = newT <= 0
+    const newTurns = playerStatusTurns - 1
+    const cleared = newTurns <= 0
     newPlayerStatus = cleared ? null : 'sonno'
-    newPlayerStatusTurns = Math.max(0, newT)
+    newPlayerStatusTurns = Math.max(0, newTurns)
     skipPlayerAttack = true
-    statusEvents.push({ type: 'sonno', target: 'player', turnPassed: true, cleared, turnsLeft: Math.max(0, newT) })
+    statusEvents.push({ type: 'sonno', target: 'player', turnPassed: true, cleared, turnsLeft: Math.max(0, newTurns) })
   } else if (playerStatus === 'paralisi') {
-    const newT = playerStatusTurns - 1
-    const cleared = newT <= 0
+    const newTurns = playerStatusTurns - 1
+    const cleared = newTurns <= 0
     newPlayerStatus = cleared ? null : 'paralisi'
-    newPlayerStatusTurns = Math.max(0, newT)
-    const paralysisSkip = Math.random() < 0.65
+    newPlayerStatusTurns = Math.max(0, newTurns)
+    const paralysisSkip = rollParalysisSkip()
     if (paralysisSkip) skipPlayerAttack = true
-    statusEvents.push({ type: 'paralisi', target: 'player', paralysisSkip, cleared, turnsLeft: Math.max(0, newT) })
+    statusEvents.push({ type: 'paralisi', target: 'player', paralysisSkip, cleared, turnsLeft: Math.max(0, newTurns) })
   } else if (playerStatus === 'confusione') {
-    const newT = playerStatusTurns - 1
-    const cleared = newT <= 0
+    const newTurns = playerStatusTurns - 1
+    const cleared = newTurns <= 0
     newPlayerStatus = cleared ? null : 'confusione'
-    newPlayerStatusTurns = Math.max(0, newT)
-    if (Math.random() < 0.5) {
+    newPlayerStatusTurns = Math.max(0, newTurns)
+    if (rollConfusionSelfHit()) {
       skipPlayerAttack = true
-      statusEvents.push({ type: 'confusione', target: 'player', selfHit: true, cleared, turnsLeft: Math.max(0, newT) })
+      const selfDamage = calculateConfusionSelfDamage(playerCr.atk, playerCr.def ?? 0)
+      statusEvents.push({
+        type: 'confusione',
+        target: 'player',
+        selfHit: true,
+        selfDamage,
+        cleared,
+        turnsLeft: Math.max(0, newTurns),
+      })
     } else {
-      statusEvents.push({ type: 'confusione', target: 'player', selfHit: false, cleared, turnsLeft: Math.max(0, newT) })
+      statusEvents.push({ type: 'confusione', target: 'player', selfHit: false, cleared, turnsLeft: Math.max(0, newTurns) })
     }
   }
 
-  // ── Combat ────────────────────────────────────────────────────────────────
-  // Player attacks with element multiplier (if not skipped by status)
+  if (!skipPlayerAttack && wildHpRemaining > 0 && itemId && attackItemQuantity > 0) {
+    if (attackItemType === 'battaglia') {
+      atkMultiplier = 1 + attackItemEffectValue / 100
+      await supabase.from('player_inventory').update({ quantity: attackItemQuantity - 1 }).eq('id', itemId)
+    } else if (attackItemType === 'pozione') {
+      antiWeakness = true
+      await supabase.from('player_inventory').update({ quantity: attackItemQuantity - 1 }).eq('id', itemId)
+    }
+  }
+
   let elementMult = getElementMultiplier(
     playerCr.element as Element,
-    wildCreature.element as Element
+    wildCreature.element as Element,
   )
-  // REQ-INV-04: anti-weakness potion neutralises disadvantage (mult < 1 → 1)
   if (antiWeakness && elementMult < 1) elementMult = 1
+
   const playerCrit = Math.random() < 0.10
-  const critMult   = playerCrit ? 1.75 : 1
+  const critMult = playerCrit ? 1.75 : 1
   if (!skipPlayerAttack && wildHpRemaining > 0) {
     playerDamage = Math.round(calculateFightDamage(playerCr.atk) * elementMult * atkMultiplier * critMult)
     wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
   }
 
-  // ── Roll player→wild status BEFORE wild attacks ───────────────────────────
-  // Status applied this turn takes effect immediately — blocks wild attack
-  // regardless of rarity (no more rare+ first-strike exception).
   let statusAppliedToWild: StatusEffect | null = null
   let wildNewStatusTurns = 0
   if (playerDamage > 0 && wildHpRemaining > 0) {
@@ -195,19 +234,17 @@ export async function POST(request: Request) {
       wildNewStatusTurns = STATUS_EFFECT_META[triggered].turns
       newWildStatus = triggered
       newWildStatusTurns = wildNewStatusTurns
-      if (triggered === 'paralisi' || triggered === 'sonno') {
+      if (shouldSkipCounterattackOnStatusApply(triggered)) {
         skipWildAttack = true
       }
     }
   }
 
-  // Wild attacks (all rarities check skipWildAttack — status applied above takes effect now)
   if (wildHpRemaining > 0 && !skipWildAttack) {
     wildDamage = calculateFightDamage(wildCreature.atk)
     playerTookDamage = true
   }
 
-  // ── Wild→player status application ───────────────────────────────────────
   let statusAppliedToPlayer: StatusEffect | null = null
   let playerNewStatusTurns = 0
   if (wildDamage > 0) {
@@ -220,14 +257,12 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Determine outcome ─────────────────────────────────────────────────────
   let fightResult: 'ongoing' | 'fled' | 'catchable' = 'ongoing'
-
   const hpRatioAfter = wildHpRemaining / wildCreature.hp
   if (wildHpRemaining === 0) {
-    fightResult = 'fled'  // HP 0 = flees
-  } else if (hpRatioAfter <= 0.50) {
-    fightResult = 'catchable'  // ≤50% HP = catch bonus active
+    fightResult = 'fled'
+  } else if (hpRatioAfter <= 0.5) {
+    fightResult = 'catchable'
   }
 
   const catchMultiplier = getCatchHealthMultiplier(wildHpRemaining, wildCreature.hp)
@@ -244,8 +279,6 @@ export async function POST(request: Request) {
       player_status_turns: fightResult === 'fled' ? 0 : newPlayerStatusTurns,
     })
     .eq('id', encounterId)
-
-  // REQ-XP-02: nessun XP per attacchi — XP solo da cattura
 
   return NextResponse.json({
     wildHpRemaining,
