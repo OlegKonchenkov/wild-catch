@@ -670,8 +670,9 @@ export default function DuelPage() {
           const meta = STATUS_EFFECT_META[effect]
           const target = iAttacked ? 'Avversario' : 'Tu'
           const text = `${target} afflitto da ${meta?.label ?? effect}!`
+          // Delay both the badge and log so the damage text stays visible first
           setTimeout(() => flashStatusNotice(effect, text), 1200)
-          setLog(prev => [`${meta?.emoji ?? ''} ${text}`, ...prev.slice(0, 3)])
+          setTimeout(() => setLog(prev => [`${meta?.emoji ?? ''} ${text}`, ...prev.slice(0, 3)]), 1300)
           const updateStatus = (prev: LineupEntry[]) => prev.map(l => l.is_active
             ? { ...l, active_status: effect, status_turns_left: oppStatusTurnsLeft ?? 0 }
             : l)
@@ -908,6 +909,9 @@ export default function DuelPage() {
     if (myActiveCrNow) {
       setAttackAnim({ key: Date.now(), element: myActiveCrNow.element, rarity: myActiveCrNow.rarity, side: 'left', soundUrl: myActiveCrNow.attack_sound_url, soundDurationMs: myActiveCrNow.attack_sound_duration_ms })
     }
+
+    // Show attack label immediately — before server responds
+    setLog(prev => [selectedItemId ? '⚔️+🗡️ Attacco!' : '⚔️ Attacco!', ...prev.slice(0, 3)])
 
     const body: Record<string, string> = { duelId: id, action: 'attack' }
     if (selectedItemId) body.itemId = selectedItemId
