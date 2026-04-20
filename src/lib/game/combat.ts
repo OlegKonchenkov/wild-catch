@@ -144,7 +144,7 @@ export interface StatusEffectMeta {
 }
 
 export const STATUS_EFFECT_META: Record<StatusEffect, StatusEffectMeta> = {
-  paralisi:   { emoji: '⚡', label: 'Paralisi',   color: '#FBBF24', glow: 'rgba(251,191,36,0.40)',  turns: 1, preventsAttack: true  },
+  paralisi:   { emoji: '⚡', label: 'Paralisi',   color: '#FBBF24', glow: 'rgba(251,191,36,0.40)',  turns: 2, preventsAttack: false },
   confusione: { emoji: '💫', label: 'Confusione', color: '#C084FC', glow: 'rgba(192,132,252,0.40)', turns: 3, preventsAttack: false },
   sonno:      { emoji: '💤', label: 'Sonno',      color: '#60A5FA', glow: 'rgba(96,165,250,0.40)',  turns: 2, preventsAttack: true  },
   veleno:     { emoji: '☠️', label: 'Veleno',     color: '#4ADE80', glow: 'rgba(74,222,128,0.40)',  turns: 0, preventsAttack: false },

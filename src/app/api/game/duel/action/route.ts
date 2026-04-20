@@ -249,12 +249,12 @@ export async function POST(request: Request) {
     return allMyFainted
   }
 
-  // ── Paralisi / Sonno: skip turn ───────────────────────────────────────────
-  if (attackerStatus === 'paralisi' || attackerStatus === 'sonno') {
+  // ── Sonno: always skip turn ───────────────────────────────────────────────
+  if (attackerStatus === 'sonno') {
     const newTurns = attackerTurnsLeft - 1
     const cleared  = newTurns <= 0
     await supabase.from('duel_lineups').update({
-      active_status: cleared ? null : attackerStatus,
+      active_status: cleared ? null : 'sonno',
       status_turns_left: Math.max(0, newTurns),
     }).eq('id', myActive.id)
     await supabase.from('duels').update({ current_turn: nextTurnRole }).eq('id', duelId)
@@ -263,16 +263,41 @@ export async function POST(request: Request) {
     await new Promise<void>(r => ch.subscribe(() => r()))
     await ch.send({ type: 'broadcast', event: 'duel_action', payload: {
       actorId: user.id, action: 'status_tick',
-      statusEvent: { type: attackerStatus, turnPassed: true, cleared, turnsLeft: Math.max(0, newTurns) },
+      statusEvent: { type: 'sonno', turnPassed: true, cleared, turnsLeft: Math.max(0, newTurns) },
       nextTurn: nextTurnRole, duelOver: false,
     }})
     await supabase.removeChannel(ch)
-    return NextResponse.json({ turnPassed: true, statusEffect: attackerStatus, cleared })
+    return NextResponse.json({ turnPassed: true, statusEffect: 'sonno', cleared })
   }
 
   // ── Confusione: 50/50 self-hit or normal attack ───────────────────────────
   let confusionSelfHit = false
   let preTurnStatusEvent: Record<string, unknown> | null = null
+
+  // ── Paralisi: 65% skip turn, 35% attack proceeds ─────────────────────────
+  if (attackerStatus === 'paralisi') {
+    const newTurns = attackerTurnsLeft - 1
+    const cleared  = newTurns <= 0
+    await supabase.from('duel_lineups').update({
+      active_status: cleared ? null : 'paralisi',
+      status_turns_left: Math.max(0, newTurns),
+    }).eq('id', myActive.id)
+
+    if (Math.random() < 0.65) {
+      await supabase.from('duels').update({ current_turn: nextTurnRole }).eq('id', duelId)
+      const ch = supabase.channel(`duel:${duelId}`)
+      await new Promise<void>(r => ch.subscribe(() => r()))
+      await ch.send({ type: 'broadcast', event: 'duel_action', payload: {
+        actorId: user.id, action: 'status_tick',
+        statusEvent: { type: 'paralisi', paralysisSkip: true, cleared, turnsLeft: Math.max(0, newTurns) },
+        nextTurn: nextTurnRole, duelOver: false,
+      }})
+      await supabase.removeChannel(ch)
+      return NextResponse.json({ turnPassed: true, statusEffect: 'paralisi', cleared })
+    }
+    // 35%: attack proceeds — record the tick for broadcast
+    preTurnStatusEvent = { type: 'paralisi', paralysisSkip: false, cleared, turnsLeft: Math.max(0, newTurns) }
+  }
   if (attackerStatus === 'confusione') {
     const newTurns = attackerTurnsLeft - 1
     const cleared  = newTurns <= 0

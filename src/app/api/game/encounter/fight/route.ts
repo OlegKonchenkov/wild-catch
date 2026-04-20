@@ -111,14 +111,22 @@ export async function POST(request: Request) {
     statusEvents.push({ type: 'veleno', target: 'wild', poisonDamage: poisonDmg, newHp: wildHpRemaining })
   }
 
-  // Paralisi / Sonno: skip wild attack (affects counter-attack below)
-  if (wildStatus === 'paralisi' || wildStatus === 'sonno') {
+  // Sonno: always skips. Paralisi: 65% skip, 35% attacks.
+  if (wildStatus === 'sonno') {
     const newT = wildStatusTurns - 1
     const cleared = newT <= 0
-    newWildStatus = cleared ? null : wildStatus
+    newWildStatus = cleared ? null : 'sonno'
     newWildStatusTurns = Math.max(0, newT)
     skipWildAttack = true
-    statusEvents.push({ type: wildStatus, target: 'wild', turnPassed: true, cleared, turnsLeft: Math.max(0, newT) })
+    statusEvents.push({ type: 'sonno', target: 'wild', turnPassed: true, cleared, turnsLeft: Math.max(0, newT) })
+  } else if (wildStatus === 'paralisi') {
+    const newT = wildStatusTurns - 1
+    const cleared = newT <= 0
+    newWildStatus = cleared ? null : 'paralisi'
+    newWildStatusTurns = Math.max(0, newT)
+    const paralysisSkip = Math.random() < 0.65
+    if (paralysisSkip) skipWildAttack = true
+    statusEvents.push({ type: 'paralisi', target: 'wild', paralysisSkip, cleared, turnsLeft: Math.max(0, newT) })
   } else if (wildStatus === 'confusione') {
     const newT = wildStatusTurns - 1
     const cleared = newT <= 0
@@ -132,14 +140,22 @@ export async function POST(request: Request) {
     }
   }
 
-  // Paralisi / Sonno: skip player attack
-  if (playerStatus === 'paralisi' || playerStatus === 'sonno') {
+  // Sonno: always skips. Paralisi: 65% skip, 35% attacks.
+  if (playerStatus === 'sonno') {
     const newT = playerStatusTurns - 1
     const cleared = newT <= 0
-    newPlayerStatus = cleared ? null : playerStatus
+    newPlayerStatus = cleared ? null : 'sonno'
     newPlayerStatusTurns = Math.max(0, newT)
     skipPlayerAttack = true
-    statusEvents.push({ type: playerStatus, target: 'player', turnPassed: true, cleared, turnsLeft: Math.max(0, newT) })
+    statusEvents.push({ type: 'sonno', target: 'player', turnPassed: true, cleared, turnsLeft: Math.max(0, newT) })
+  } else if (playerStatus === 'paralisi') {
+    const newT = playerStatusTurns - 1
+    const cleared = newT <= 0
+    newPlayerStatus = cleared ? null : 'paralisi'
+    newPlayerStatusTurns = Math.max(0, newT)
+    const paralysisSkip = Math.random() < 0.65
+    if (paralysisSkip) skipPlayerAttack = true
+    statusEvents.push({ type: 'paralisi', target: 'player', paralysisSkip, cleared, turnsLeft: Math.max(0, newT) })
   } else if (playerStatus === 'confusione') {
     const newT = playerStatusTurns - 1
     const cleared = newT <= 0

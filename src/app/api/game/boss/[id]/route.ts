@@ -287,26 +287,41 @@ export async function POST(request: Request, { params }: Params) {
       statusTickEvents.push({ type: 'veleno', target: 'boss', poisonDamage: bPoisonDmg, newHp: bossActive.current_hp, fainted: bossActive.current_hp === 0 })
     }
 
-    // Paralisi / Sonno on boss: skip counter-attack this turn
+    // Sonno on boss: always skip. Paralisi: 65% skip, 35% attacks.
     let skipBossAttack = false
-    if ((bossActive.active_status === 'paralisi' || bossActive.active_status === 'sonno') && !bossActive.fainted) {
-      const origBossStatus = bossActive.active_status as StatusEffect
+    if (bossActive.active_status === 'sonno' && !bossActive.fainted) {
       const newT = (bossActive.status_turns_left ?? 0) - 1
       const cleared = newT <= 0
-      bossActive.active_status    = cleared ? null : origBossStatus
+      bossActive.active_status    = cleared ? null : 'sonno'
       bossActive.status_turns_left = Math.max(0, newT)
       skipBossAttack = true
-      statusTickEvents.push({ type: origBossStatus, target: 'boss', turnPassed: true, cleared, turnsLeft: Math.max(0, newT) })
+      statusTickEvents.push({ type: 'sonno', target: 'boss', turnPassed: true, cleared, turnsLeft: Math.max(0, newT) })
+    } else if (bossActive.active_status === 'paralisi' && !bossActive.fainted) {
+      const newT = (bossActive.status_turns_left ?? 0) - 1
+      const cleared = newT <= 0
+      bossActive.active_status    = cleared ? null : 'paralisi'
+      bossActive.status_turns_left = Math.max(0, newT)
+      const paralysisSkip = Math.random() < 0.65
+      if (paralysisSkip) skipBossAttack = true
+      statusTickEvents.push({ type: 'paralisi', target: 'boss', paralysisSkip, cleared, turnsLeft: Math.max(0, newT) })
     }
 
-    // Paralisi / Sonno: skip player attack
-    if ((playerStatus === 'paralisi' || playerStatus === 'sonno') && !playerActive.fainted) {
+    // Sonno: always skips. Paralisi: 65% skip, 35% attacks.
+    if (playerStatus === 'sonno' && !playerActive.fainted) {
       const newTurns = playerStatusTurns - 1
       const cleared = newTurns <= 0
-      playerActive.active_status    = cleared ? null : playerStatus
+      playerActive.active_status    = cleared ? null : 'sonno'
       playerActive.status_turns_left = Math.max(0, newTurns)
       skipPlayerAttack = true
-      preTurnStatusEvent = { type: playerStatus, turnPassed: true, cleared, turnsLeft: Math.max(0, newTurns) }
+      preTurnStatusEvent = { type: 'sonno', turnPassed: true, cleared, turnsLeft: Math.max(0, newTurns) }
+    } else if (playerStatus === 'paralisi' && !playerActive.fainted) {
+      const newTurns = playerStatusTurns - 1
+      const cleared = newTurns <= 0
+      playerActive.active_status    = cleared ? null : 'paralisi'
+      playerActive.status_turns_left = Math.max(0, newTurns)
+      const paralysisSkip = Math.random() < 0.65
+      if (paralysisSkip) skipPlayerAttack = true
+      preTurnStatusEvent = { type: 'paralisi', paralysisSkip, cleared, turnsLeft: Math.max(0, newTurns) }
     }
 
     // Confusione: 50/50 self-hit or normal

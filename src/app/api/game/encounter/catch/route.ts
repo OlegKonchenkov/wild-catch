@@ -106,12 +106,21 @@ export async function POST(request: Request) {
     .eq('id', encounterId)
 
   if (!caught) {
-    const wildBlocked = wildStatus === 'paralisi' || wildStatus === 'sonno'
-
-    // Paralyzed / sleeping: creature can't flee or counter-attack; tick status
-    if (wildBlocked) {
+    // Sleeping: can't flee or counter-attack
+    if (wildStatus === 'sonno') {
       await persistTickedStatus()
       return NextResponse.json({ caught: false, fled: false, wildDamage: 0 })
+    }
+
+    // Paralysed: can't flee, but 35% chance it still counter-attacks
+    if (wildStatus === 'paralisi') {
+      if (Math.random() < 0.65) {
+        await persistTickedStatus()
+        return NextResponse.json({ caught: false, fled: false, wildDamage: 0 })
+      }
+      const counterDamage = calculateFightDamage(creature.atk)
+      await persistTickedStatus()
+      return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage })
     }
 
     // 30% chance the creature flees (confused creatures still flee)
