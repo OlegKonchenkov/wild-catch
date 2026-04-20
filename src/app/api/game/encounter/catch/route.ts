@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
 import { RARITY_CATCH_RATES, CATCH_DIFFICULTY_MULT } from '@/lib/types'
 import { incrementMissionProgress } from '@/lib/game/missions'
+import type { StatusEffect } from '@/lib/game/combat'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
   }
 
   const creature = (encounter as any).creatures
+  const wildStatus = (encounter as any).wild_status as StatusEffect | null
 
   // Get item multiplier from effect_value (rete/esca stored as decimal, e.g. 2.0 = ×2)
   let itemMult = 1
@@ -58,6 +60,11 @@ export async function POST(request: Request) {
   // HP weakness multiplier × item multiplier — both scale the base catch rate
   const hpMultiplier = getCatchHealthMultiplier(encounter.wild_creature_hp, creature.hp) * itemMult
 
+  // Status effect catch multiplier: sleeping ×2, paralyzed/confused ×1.5
+  const statusCatchMult = wildStatus === 'sonno' ? 2.0
+    : (wildStatus === 'paralisi' || wildStatus === 'confusione') ? 1.5
+    : 1.0
+
   // Fetch player level and global catch config in parallel
   const { createAdminClient: adminFactory } = await import('@/lib/supabase/admin')
   const adminCatch = adminFactory()
@@ -79,11 +86,18 @@ export async function POST(request: Request) {
   const levelBonus: number = cfg ? ((cfg[`${rarity}_level_bonus`] ?? 0) * playerLevel) : 0
 
   const diffMult = CATCH_DIFFICULTY_MULT[creature.catch_difficulty ?? 3] ?? 1.0
-  const catchRate = Math.min(1.0, baseRate * diffMult * hpMultiplier + levelBonus)
+  const catchRate = Math.min(1.0, baseRate * diffMult * hpMultiplier * statusCatchMult + levelBonus)
   const caught = Math.random() < catchRate
 
   if (!caught) {
-    // 40% chance the creature flees immediately, 60% chance it counter-attacks and stays
+    const wildBlocked = wildStatus === 'paralisi' || wildStatus === 'sonno'
+
+    // Paralyzed / sleeping: creature can't flee or counter-attack
+    if (wildBlocked) {
+      return NextResponse.json({ caught: false, fled: false, wildDamage: 0 })
+    }
+
+    // 40% chance the creature flees (confused creatures still flee)
     const flees = Math.random() < 0.40
     if (flees) {
       await supabase
@@ -91,11 +105,15 @@ export async function POST(request: Request) {
         .update({ status: 'fled', resolved_at: new Date().toISOString() })
         .eq('id', encounterId)
       return NextResponse.json({ caught: false, fled: true, wildDamage: 0 })
-    } else {
-      // Counter-attack: encounter stays active
-      const counterDamage = calculateFightDamage(creature.atk)
-      return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage })
     }
+
+    // Counter-attack: confused creatures have 50% chance of skipping
+    if (wildStatus === 'confusione' && Math.random() < 0.5) {
+      return NextResponse.json({ caught: false, fled: false, wildDamage: 0 })
+    }
+
+    const counterDamage = calculateFightDamage(creature.atk)
+    return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage })
   }
 
   await supabase
