@@ -561,6 +561,17 @@ export default function EncounterPage() {
       setMessage(rnd(FIGHT_PLAYER_MSGS)(playerName, wildName))
     }
 
+    // ── Status applied by player's hit: show BEFORE wild counter-attack ─────
+    if (data.statusAppliedToWild) {
+      const effect = data.statusAppliedToWild as StatusEffect
+      const meta = STATUS_EFFECT_META[effect]
+      setWildStatus(effect)
+      setWildStatusTurns(data.wildNewStatusTurns ?? 0)
+      await new Promise(r => setTimeout(r, 600))
+      setMessage(`${meta?.emoji ?? ''} ${state.creature.name} è afflitto da ${meta?.label ?? effect}!`)
+      await new Promise(r => setTimeout(r, 600))
+    }
+
     if (data.playerTookDamage && data.wildDamage > 0) {
       await new Promise(r => setTimeout(r, 1200))
 
@@ -652,14 +663,6 @@ export default function EncounterPage() {
           await new Promise(r => setTimeout(r, 700))
         }
       }
-    }
-    if (data.statusAppliedToWild) {
-      const effect = data.statusAppliedToWild as StatusEffect
-      const meta = STATUS_EFFECT_META[effect]
-      setWildStatus(effect)
-      setWildStatusTurns(data.wildNewStatusTurns ?? 0)
-      setMessage(`${meta?.emoji ?? ''} ${state.creature.name} è afflitto da ${meta?.label ?? effect}!`)
-      await new Promise(r => setTimeout(r, 600))
     }
     if (data.statusAppliedToPlayer) {
       const effect = data.statusAppliedToPlayer as StatusEffect

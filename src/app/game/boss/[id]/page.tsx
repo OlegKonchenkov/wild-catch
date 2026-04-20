@@ -1597,6 +1597,12 @@ export default function BossFightPage() {
       setBossAnimState('idle')
       setLastDamage(null)
 
+      // Show status applied to boss RIGHT HERE — before counter-attack, not after
+      if (data.statusAppliedToBoss) {
+        const effect = data.statusAppliedToBoss as StatusEffect
+        flashStatusNotice(effect, `Boss afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`)
+      }
+
       if (bossCreatureFainted) {
         // Boss creature fainted — show faint animation, then switch
         playKnockout()
@@ -1662,10 +1668,6 @@ export default function BossFightPage() {
                 setPlayerFainting(false)
                 setPlayerLineup(nextPlayerLineup)
                 setBossLineup(nextBossLineup)
-                if (data.statusAppliedToBoss) {
-                  const effect = data.statusAppliedToBoss as StatusEffect
-                  flashStatusNotice(effect, `Boss afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`)
-                }
                 if (data.statusAppliedToPlayer) {
                   const effect = data.statusAppliedToPlayer as StatusEffect
                   setTimeout(() => flashStatusNotice(effect, `Sei afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 600)
@@ -1690,10 +1692,6 @@ export default function BossFightPage() {
               setBossLineup(nextBossLineup)
               setAnimState('idle')
               setLastDamage(null)
-              if (data.statusAppliedToBoss) {
-                const effect = data.statusAppliedToBoss as StatusEffect
-                flashStatusNotice(effect, `Boss afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`)
-              }
               if (data.statusAppliedToPlayer) {
                 const effect = data.statusAppliedToPlayer as StatusEffect
                 setTimeout(() => flashStatusNotice(effect, `Sei afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 600)
@@ -1722,10 +1720,6 @@ export default function BossFightPage() {
         if (data.bossSwitchedTo) {
           setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
           setTimeout(() => setSwitchNotice(null), 2000)
-        }
-        if (data.statusAppliedToBoss) {
-          const effect = data.statusAppliedToBoss as StatusEffect
-          setTimeout(() => flashStatusNotice(effect, `Boss afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 400)
         }
         if (data.statusAppliedToPlayer) {
           const effect = data.statusAppliedToPlayer as StatusEffect
