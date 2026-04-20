@@ -416,11 +416,12 @@ export async function POST(request: Request) {
   }
 
   const nextTurn: 'challenger' | 'opponent' = isChallenger ? 'opponent' : 'challenger'
-  if (!duelOver) {
-    await supabase.from('duels').update({ current_turn: nextTurn }).eq('id', duelId)
-  }
 
   // ── Roll post-attack status effect on opponent ─────────────────────────────
+  // IMPORTANT: apply to duel_lineups BEFORE flipping current_turn in duels.
+  // postgres_changes on 'duels' fires as soon as current_turn changes and sets
+  // isMyTurn=true on the opponent client — if the status isn't written yet the
+  // opponent could submit their action before the sleep/paralysis lands in DB.
   let statusAppliedToOpp: StatusEffect | null = null
   let oppStatusTurnsLeft = 0
   if (!duelOver && newOppHp > 0) {
@@ -434,6 +435,10 @@ export async function POST(request: Request) {
         status_turns_left: oppStatusTurnsLeft,
       }).eq('id', oppActive.id)
     }
+  }
+
+  if (!duelOver) {
+    await supabase.from('duels').update({ current_turn: nextTurn }).eq('id', duelId)
   }
 
   // ── Post-attack veleno tick (attacker takes poison damage after attacking) ─
