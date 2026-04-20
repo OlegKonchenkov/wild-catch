@@ -180,6 +180,23 @@ qr_codes           -- id, session_id, type(uovo/indizio/oggetto/boss/evento),
 notifications      -- id, session_id, title, body, sent_at, sent_by_admin_id
 ```
 
+### Tabelle Pin Mappa
+```sql
+session_map_pins   -- id, session_id, lat(float), lng(float), name, description, image_url,
+                   --   reward_type(text null), reward_payload(JSONB null), reward_radius_m(int default 50)
+-- Payload schema per reward_type:
+-- 'oggetto':  { item_id: uuid, quantity: number }
+-- 'indizio':  { chapter_order: number, text: string, image_url?: string }
+-- 'uovo':     { egg_rarity: string, steps_required: number }
+-- 'boss':     { creatures: [{creature_id, level_override}], reward: {gold, exp, item_id?, creature_id?} }
+-- 'creatura': { creature_id: uuid }
+-- 'evento':   { event_type: string, effect: object }
+-- 'enigma':   { question: string, image_url?: string, solution: string,
+--               reward_type: 'exp'|'gold'|'oggetto'|'creatura', reward_payload: {...} }
+pin_claims         -- id, pin_id, user_id, session_id, claimed_at
+                   -- NOTA: non esiste per pin di tipo 'boss' — lo stato è tracciato in boss_fights
+```
+
 ---
 
 ## 6. Architettura Applicazione
@@ -218,6 +235,8 @@ notifications      -- id, session_id, title, body, sent_at, sent_by_admin_id
 | `POST /api/game/encounter/start` | Genera incontro — RNG creatura server-side |
 | `POST /api/game/encounter/catch` | RNG cattura server-side, aggiorna inventario, valuta evoluzione |
 | `POST /api/game/encounter/fight` | Esegue 1 turno combattimento selvaggio, aggiorna wild_creature_hp |
+| `GET /api/game/map-pins` | Carica tutti i pin della sessione con stato claimed per l'utente |
+| `POST /api/game/map-pins/claim` | Riscatta un pin (verifica prossimità GPS, dispensa reward) |
 | `POST /api/game/creature/evolve` | Trigger manuale evoluzione dal Bestiario (duplicates_count ≥ 3) |
 | `PUT /api/game/creature/select` | Imposta selected_creature_id in player_sessions |
 | `POST /api/game/duel/connect` | Crea/join lobby duello via room code |
@@ -321,6 +340,39 @@ Le creature possono applicare effetti di stato con ogni attacco, con probabilit�
 - Ricompensa configurabile per boss: EXP, oro, item, creatura speciale
 - Un boss QR può essere conquistato una volta sola per sessione per giocatore (guard `reward_claimed`)
 
+### Pin sulla Mappa
+I pin sono punti di interesse fisici piazzati dall'admin sulla mappa. Il giocatore li vede sulla mappa in tempo reale e può interagire avvicinandosi fisicamente.
+
+**Flusso:**
+1. Admin crea pin da `/admin/sessions` → mappa interattiva con click → assegna nome, icona, tipo reward, raggio (default 50m)
+2. Giocatore vede il pin sulla mappa con icona colorata per tipo
+3. Giocatore si avvicina fisicamente → pulsante "Riscatta" si sblocca quando è entro il raggio
+4. Server verifica prossimità via Haversine (distanza ≤ raggio + 20m tolleranza GPS)
+5. Reward dispensato server-side; pin marcato come claimed (non riscattabile di nuovo)
+
+**Tipi di reward:**
+
+| Tipo | Reward | Note |
+|---|---|---|
+| `oggetto` | Item aggiunto all'inventario | Qualsiasi item configurato dall'admin |
+| `indizio` | Testo/immagine narrativa | Avanza la trama della sessione |
+| `uovo` | Uovo aggiunto alla cova | Rarità e passi richiesti configurabili |
+| `boss` | Avvia uno scontro Capopalestra | Rechallengeable dopo sconfitta; claimed solo a vittoria |
+| `creatura` | Creatura aggiunta direttamente al DaimonDex | Senza combattimento |
+| `evento` | Trigger evento speciale | Es. bonus EXP, incontro raro |
+| `enigma` | Domanda + risposta → reward annidato | La soluzione non è mai esposta al client; reward può essere EXP, oro, item o creatura |
+
+**Regole:**
+- Ogni pin (eccetto `boss`) può essere riscattato **una sola volta** per giocatore per sessione
+- Per i pin `boss`: stato tracciato in `boss_fights` (non in `pin_claims`); il giocatore può riprovare dopo una sconfitta
+- La solution dell'enigma è lato server — il client riceve solo domanda e immagine
+- Il riscatto aggiorna il progresso missioni di tipo `pin`
+- L'evento `pin_claimed` viene registrato nel log storico del giocatore (campana)
+
+**Admin:**
+- `GET/POST /api/admin/session-pins` — lista e creazione pin per sessione
+- `PATCH/DELETE /api/admin/session-pins/[id]` — modifica o elimina singolo pin
+
 ### Progressione & Punteggio
 | Azione | EXP | Punti classifica |
 |---|---|---|
@@ -361,7 +413,8 @@ Le creature possono applicare effetti di stato con ogni attacco, con probabilit�
 ### Mappa
 - Leaflet + OpenStreetMap, cropped al bounding box sessione
 - Dot GPS giocatore (arancione) con radar pulse animato
-- Pin missione attiva
+- **Pin sulla mappa**: icone colorate per tipo (boss, enigma, oggetto, ecc.); pin già riscattati appaiono in grigio/dimmed
+- Pulsante "Riscatta" visibile sul pin quando il giocatore è entro il raggio configurato
 - Pulsante QR scan
 - Creature dot sulla mappa (solo area nelle vicinanze)
 - Popup incontro slide-up dal basso
