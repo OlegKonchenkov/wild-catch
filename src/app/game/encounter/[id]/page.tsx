@@ -699,7 +699,7 @@ export default function EncounterPage() {
       setShowCatchSuccess(false)
       const creatureId = data.newCreatureId ?? state.creature.id
       supabase.from('creatures')
-        .select('name, hp, atk, def, element, rarity, image_url, description')
+        .select('name, hp, atk, def, element, rarity, image_url, description, status_effect, status_effect_chance')
         .eq('id', creatureId).single()
         .then(({ data: cr }) => { if (cr) setCaughtCreatureData(cr) })
       setCaughtExpGain(data.expGain ?? 0)
@@ -1482,6 +1482,52 @@ export default function EncounterPage() {
                       ))}
                     </div>
                   )}
+
+                  {/* Status effect ability */}
+                  {cr?.status_effect && STATUS_EFFECT_META[cr.status_effect as StatusEffect] && (() => {
+                    const effect = cr.status_effect as StatusEffect
+                    const meta = STATUS_EFFECT_META[effect]
+                    const chancePercent = Math.round((cr.status_effect_chance ?? 0.15) * 100)
+                    const EFFECT_DURATIONS: Record<StatusEffect, string> = {
+                      paralisi: '1 turno', confusione: '3 turni', sonno: '2 turni', veleno: 'Finché in campo',
+                    }
+                    const EFFECT_DESCRIPTIONS: Record<StatusEffect, string> = {
+                      paralisi:   'Blocca l\'avversario per 1 turno',
+                      confusione: '50% chance di colpire se stesso per 3 turni',
+                      sonno:      'L\'avversario salta i turni per 2 turni',
+                      veleno:     'Perde il 10% degli HP dopo ogni attacco',
+                    }
+                    return (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.52 }}
+                        className="rounded-xl px-4 py-3 mb-4 flex items-center gap-3"
+                        style={{ background: `${meta.color}0e`, border: `1px solid ${meta.color}40`, boxShadow: `0 0 14px ${meta.glow}` }}
+                      >
+                        <motion.span
+                          className="text-2xl shrink-0"
+                          animate={{ scale: [1, 1.12, 1], opacity: [1, 0.7, 1] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                        >
+                          {meta.emoji}
+                        </motion.span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className="text-[13px] font-extrabold" style={{ color: meta.color }}>{meta.label}</p>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                              style={{ background: `${meta.color}22`, color: meta.color, border: `1px solid ${meta.color}40` }}>
+                              {chancePercent}% per attacco
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-white/45 leading-snug">{EFFECT_DESCRIPTIONS[effect]}</p>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-1 rounded-lg shrink-0"
+                          style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          {EFFECT_DURATIONS[effect]}
+                        </span>
+                      </motion.div>
+                    )
+                  })()}
 
                   {/* EXP + Gold gained */}
                   {(caughtExpGain > 0 || caughtGoldGain > 0) && (

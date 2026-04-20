@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
 import type { Creature, PlayerCreature, Element } from '@/lib/types'
+import { STATUS_EFFECT_META } from '@/lib/game/combat'
+import type { StatusEffect } from '@/lib/game/combat'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { GameGridSkeleton } from '@/components/game/GameLoading'
 
@@ -61,6 +63,7 @@ export default function BestiaryPage() {
   const [showFilters, setShowFilters]       = useState(false)
   const [showWeakness, setShowWeakness]     = useState(false)
   const [showEnigma, setShowEnigma]         = useState(false)
+  const [showStatusInfo, setShowStatusInfo] = useState(false)
   const [loading, setLoading]               = useState(true)
   const [selectedPcId, setSelectedPcId]     = useState<string | null>(null)
   const [playerLevel, setPlayerLevel]       = useState(1)
@@ -675,7 +678,7 @@ export default function BestiaryPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.02 }}
                 whileTap={{ scale: 0.93 }}
-                onClick={() => { setSelected({ creature, pc }); setShowEnigma(false) }}
+                onClick={() => { setSelected({ creature, pc }); setShowEnigma(false); setShowStatusInfo(false) }}
                 className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all
                   ${canEvolve
                     ? 'border-2 border-[#F7C841]'
@@ -735,6 +738,17 @@ export default function BestiaryPage() {
                       ×{pc.duplicates_count}
                     </div>
                   )}
+                  {/* Status effect indicator dot — bottom-left */}
+                  {caught && (creature as any).status_effect && STATUS_EFFECT_META[(creature as any).status_effect as StatusEffect] && (() => {
+                    const meta = STATUS_EFFECT_META[(creature as any).status_effect as StatusEffect]
+                    return (
+                      <div className="absolute bottom-1 left-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] leading-none"
+                        style={{ background: `${meta.color}22`, border: `1px solid ${meta.color}70`, boxShadow: `0 0 6px ${meta.glow}` }}
+                        title={meta.label}>
+                        {meta.emoji}
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 {/* Name + element + rarity */}
@@ -918,6 +932,89 @@ export default function BestiaryPage() {
                                 </div>
                               ))}
                             </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* ── Abilità Speciale (status effect) ── */}
+                      {(creature as any).status_effect && STATUS_EFFECT_META[(creature as any).status_effect as StatusEffect] && (() => {
+                        const effect = (creature as any).status_effect as StatusEffect
+                        const meta = STATUS_EFFECT_META[effect]
+                        const chancePercent = Math.round(((creature as any).status_effect_chance ?? 0.15) * 100)
+                        const EFFECT_DETAILS: Record<StatusEffect, { description: string; duration: string }> = {
+                          paralisi:   { description: 'L\'avversario è bloccato e non può attaccare il turno successivo.', duration: '1 turno' },
+                          confusione: { description: 'Ogni turno c\'è il 50% di probabilità che l\'avversario colpisca se stesso invece di attaccare.', duration: '3 turni' },
+                          sonno:      { description: 'L\'avversario si addormenta e salta i suoi turni di attacco.', duration: '2 turni' },
+                          veleno:     { description: 'L\'avversario è avvelenato e perde il 10% degli HP massimi dopo ogni suo attacco.', duration: 'Finché in campo' },
+                        }
+                        const detail = EFFECT_DETAILS[effect]
+                        return (
+                          <div>
+                            <div
+                              className="flex items-center gap-3 rounded-xl px-4 py-3 cursor-pointer select-none transition-all"
+                              style={{
+                                background: `${meta.color}0e`,
+                                border: `1px solid ${meta.color}35`,
+                                boxShadow: showStatusInfo ? `0 0 16px ${meta.glow}` : 'none',
+                              }}
+                              onClick={() => setShowStatusInfo(v => !v)}
+                            >
+                              <motion.span
+                                className="text-xl shrink-0 leading-none"
+                                animate={{ opacity: [1, 0.6, 1] }}
+                                transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                              >
+                                {meta.emoji}
+                              </motion.span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-[13px] font-extrabold leading-tight" style={{ color: meta.color }}>{meta.label}</p>
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                    style={{ background: `${meta.color}22`, color: meta.color, border: `1px solid ${meta.color}40` }}>
+                                    {chancePercent}%
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-white/35 mt-0.5">Abilità speciale · tocca per dettagli</p>
+                              </div>
+                              <motion.span
+                                className="text-white/30 text-xs font-bold shrink-0"
+                                animate={{ rotate: showStatusInfo ? 180 : 0 }}
+                                transition={{ duration: 0.22 }}
+                              >▼</motion.span>
+                            </div>
+                            <AnimatePresence initial={false}>
+                              {showStatusInfo && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="mt-1.5 rounded-xl px-4 py-3 space-y-2.5"
+                                    style={{ background: `${meta.color}08`, border: `1px solid ${meta.color}22` }}>
+                                    <p className="text-[11px] font-bold text-white/50 uppercase tracking-widest">Come funziona</p>
+                                    <p className="text-sm text-white/70 leading-relaxed">{detail.description}</p>
+                                    <div className="flex items-center gap-2 pt-0.5">
+                                      <span className="text-[10px] px-2 py-1 rounded-lg font-bold"
+                                        style={{ background: `${meta.color}18`, color: meta.color, border: `1px solid ${meta.color}35` }}>
+                                        ⏱ {detail.duration}
+                                      </span>
+                                      <span className="text-[10px] px-2 py-1 rounded-lg font-bold"
+                                        style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                        ~{chancePercent}% per attacco
+                                      </span>
+                                      {meta.preventsAttack && (
+                                        <span className="text-[10px] px-2 py-1 rounded-lg font-bold"
+                                          style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}>
+                                          🚫 Blocca attacco
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         )
                       })()}

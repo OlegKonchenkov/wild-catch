@@ -3,6 +3,8 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import type { ItemType } from '@/lib/types'
+import { STATUS_EFFECT_META } from '@/lib/game/combat'
+import type { StatusEffect } from '@/lib/game/combat'
 import { GameListSkeleton } from '@/components/game/GameLoading'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
@@ -75,6 +77,8 @@ interface HatchResult {
   element: string
   image_url: string | null
   sprite_url: string | null
+  status_effect?: string | null
+  status_effect_chance?: number | null
 }
 
 // ── Hatching animation overlay ──────────────────────────────────────────────
@@ -121,7 +125,7 @@ function HatchingAnimation({
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="flex flex-col items-center gap-4 px-8">
+            className="flex flex-col items-center gap-4 px-8 w-full max-w-xs">
             <div className="text-4xl mb-1">✨</div>
             {result.image_url ? (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -140,6 +144,33 @@ function HatchingAnimation({
                 {RARITY_LABEL[result.rarity] ?? result.rarity}
               </p>
             </div>
+            {result.status_effect && STATUS_EFFECT_META[result.status_effect as StatusEffect] && (() => {
+              const meta = STATUS_EFFECT_META[result.status_effect as StatusEffect]
+              const chancePercent = Math.round((result.status_effect_chance ?? 0.15) * 100)
+              return (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.35, type: 'spring', stiffness: 280, damping: 22 }}
+                  className="flex items-center gap-2.5 rounded-xl px-4 py-2.5 w-full"
+                  style={{ background: `${meta.color}14`, border: `1px solid ${meta.color}45`, boxShadow: `0 0 16px ${meta.glow}` }}
+                >
+                  <motion.span
+                    animate={{ opacity: [1, 0.6, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="text-xl"
+                  >{meta.emoji}</motion.span>
+                  <div className="flex-1">
+                    <p className="text-[12px] font-extrabold" style={{ color: meta.color }}>{meta.label}</p>
+                    <p className="text-[10px] text-white/40">~{chancePercent}% per attacco</p>
+                  </div>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.35)' }}>
+                    Abilità
+                  </span>
+                </motion.div>
+              )
+            })()}
             <p className="text-white/40 text-xs mt-2">Tocca per continuare</p>
           </motion.div>
         )}
