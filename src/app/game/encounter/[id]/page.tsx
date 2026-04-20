@@ -366,6 +366,7 @@ export default function EncounterPage() {
   const [turnTimer, setTurnTimer] = useState(45)
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoFightRef = useRef(false)
+  const clearPlayerStatusRef = useRef(false) // set true after creature faint+switch
 
   // ── Data loading ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -518,12 +519,15 @@ export default function EncounterPage() {
 
     const activeItemId = selectedPozioneId ?? selectedBattagliaId ?? null
     const activeSquadPcId = squadCreatures.length > 0 ? squadCreatures[activeSlot]?.pcId : undefined
+    const shouldClearStatus = clearPlayerStatusRef.current
+    if (shouldClearStatus) clearPlayerStatusRef.current = false
     const res = await fetch('/api/game/encounter/fight', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         encounterId: state.encounterId,
         itemId: activeItemId,
         ...(activeSlot > 0 && activeSquadPcId ? { activePlayerCreatureId: activeSquadPcId } : {}),
+        ...(shouldClearStatus ? { clearPlayerStatus: true } : {}),
       }),
     })
     const data = await res.json()
@@ -620,6 +624,9 @@ export default function EncounterPage() {
               element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '',
             })
             setPlayerHp(slotHps[nextSlot] ?? next.hp)
+            setPlayerStatus(null)
+            setPlayerStatusTurns(0)
+            clearPlayerStatusRef.current = true
             setMessage(`${squadCreatures[activeSlot].name} è svenuta! Entra ${next.name}!`)
             finishPendingAction()
             return

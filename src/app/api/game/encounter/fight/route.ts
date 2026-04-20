@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const body = await request.json().catch(() => ({}))
-  const { encounterId, itemId, activePlayerCreatureId } = body
+  const { encounterId, itemId, activePlayerCreatureId, clearPlayerStatus } = body
 
   if (!encounterId) return NextResponse.json({ error: 'encounterId mancante' }, { status: 400 })
 
@@ -84,8 +84,10 @@ export async function POST(request: Request) {
   // ── Status effect state from encounter columns ────────────────────────────
   const wildStatus      = (encounter as any).wild_status      as StatusEffect | null
   const wildStatusTurns = (encounter as any).wild_status_turns  ?? 0
-  const playerStatus    = (encounter as any).player_status    as StatusEffect | null
-  const playerStatusTurns = (encounter as any).player_status_turns ?? 0
+  // clearPlayerStatus: client sends this on first action after a creature switch (faint)
+  // so the previous creature's status is not inherited by the new one
+  const playerStatus    = clearPlayerStatus ? null : ((encounter as any).player_status    as StatusEffect | null)
+  const playerStatusTurns = clearPlayerStatus ? 0   : ((encounter as any).player_status_turns ?? 0)
 
   let wildHpRemaining = encounter.wild_creature_hp
   let playerTookDamage = false
