@@ -588,12 +588,31 @@ export default function DuelPage() {
 
         // ── Heal broadcast — update the healer's HP ────────────────────────────
         if (broadcastAction === 'heal') {
-          if (iAttacked) {
-            // I healed — HP already updated locally in handleHeal
-          } else {
-            // Opponent healed — update their HP
-            setOppLineup(prev => prev.map(l => l.is_active ? { ...l, current_hp: newHp } : l))
+          if (preTurnSE) {
+            const effect = preTurnSE.type as StatusEffect
+            if (preTurnSE.type === 'veleno') {
+              flashStatusNotice(effect, `${STATUS_EFFECT_META[effect]?.label ?? effect} — ${preTurnSE.poisonDamage} danno`)
+            } else {
+              const text = preTurnSE.cleared ? `${STATUS_EFFECT_META[effect]?.label ?? effect} curato!` : `${STATUS_EFFECT_META[effect]?.label ?? effect} — si cura lo stesso`
+              flashStatusNotice(effect, text)
+            }
           }
+          const updateActive = (prev: LineupEntry[]) => prev.map(l => {
+            if (!l.is_active) return l
+            const nextEffect = preTurnSE?.type as StatusEffect | undefined
+            return {
+              ...l,
+              ...(newHp != null ? { current_hp: newHp } : {}),
+              ...(nextEffect
+                ? {
+                    active_status: preTurnSE?.cleared ? null : nextEffect,
+                    status_turns_left: preTurnSE?.turnsLeft ?? l.status_turns_left,
+                  }
+                : {}),
+            }
+          })
+          if (iAttacked) setMyLineup(updateActive)
+          else setOppLineup(updateActive)
           if (nextTurn) setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
           setLog(prev => [`💚 Cura +${healAmount} HP`, ...prev.slice(0, 3)])
           return
@@ -1012,10 +1031,10 @@ export default function DuelPage() {
     if (res.ok) {
       const data = await res.json()
       // Update local HP optimistically (broadcast also updates it via channel)
-      if (data.newHp != null) {
+      if (data.healed && data.newHp != null) {
         setMyLineup(prev => prev.map(l => l.is_active ? { ...l, current_hp: data.newHp } : l))
+        setCuraItems(prev => prev.map(it => it.inventoryId === itemId ? { ...it, quantity: it.quantity - 1 } : it).filter(it => it.quantity > 0))
       }
-      setCuraItems(prev => prev.map(it => it.inventoryId === itemId ? { ...it, quantity: it.quantity - 1 } : it).filter(it => it.quantity > 0))
       setIsMyTurn(false)
       setShowItemsModal(false)
     }

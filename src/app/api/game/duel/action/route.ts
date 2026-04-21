@@ -136,50 +136,175 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Oggetto non valido' }, { status: 400 })
     }
 
-    // Load my active creature
-    const { data: healLineups } = await supabase
+    const { data: allHealLineups } = await supabase
       .from('duel_lineups')
-      .select('id, current_hp, player_creatures(creatures(hp, atk, def))')
+      .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_url, rarity, status_effect, status_effect_chance))')
       .eq('duel_id', duelId)
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
+      .order('slot', { ascending: true })
 
-    if (!healLineups) return NextResponse.json({ error: 'Nessuna creatura attiva' }, { status: 400 })
+    if (!allHealLineups || allHealLineups.length < 2) {
+      return NextResponse.json({ error: 'Lineup non trovato' }, { status: 500 })
+    }
 
-    const { data: healPsRow } = await supabase
+    const myHealActive = allHealLineups.find((lineup: any) => lineup.user_id === user.id && lineup.is_active)
+    if (!myHealActive) return NextResponse.json({ error: 'Nessuna creatura attiva' }, { status: 400 })
+
+    const myHealCreature = (myHealActive as any).player_creatures?.creatures
+    if (!myHealCreature) {
+      return NextResponse.json({ error: 'Dati creatura non disponibili' }, { status: 500 })
+    }
+
+    const { data: healPlayerSessions } = await supabase
       .from('player_sessions')
-      .select('level')
-      .eq('user_id', user.id)
+      .select('user_id, level')
       .eq('session_id', duel.session_id)
-      .maybeSingle()
-    const healLevel = healPsRow?.level ?? 1
-    const baseCreature = (healLineups as any).player_creatures?.creatures
-    const maxHp = scaleCombatStats(
-      { hp: baseCreature?.hp ?? 100, atk: baseCreature?.atk ?? 10, def: baseCreature?.def ?? 0 },
-      healLevel,
-    ).hp
+      .in('user_id', [user.id, oppUserId].filter(Boolean))
 
-    const healAmount = Math.round(maxHp * ((inv.items.effect_value ?? 20) / 100))
-    const newHp = Math.min(maxHp, (healLineups as any).current_hp + healAmount)
+    const healLevels = Object.fromEntries(
+      (healPlayerSessions ?? []).map((row: { user_id: string; level: number | null }) => [row.user_id, row.level ?? 1]),
+    ) as Record<string, number>
+    const healStats = scaleCombatStats(
+      { hp: myHealCreature.hp, atk: myHealCreature.atk, def: myHealCreature.def ?? 0 },
+      healLevels[user.id],
+    )
+
+    const attackerStatus = (myHealActive as any).active_status as StatusEffect | null
+    const attackerTurnsLeft = (myHealActive as any).status_turns_left ?? 0
+    const nextTurn: 'challenger' | 'opponent' = isChallenger ? 'opponent' : 'challenger'
+
+    async function endHealDuelFromStatusFaint() {
+      const allMyFainted = allHealLineups
+        .filter((lineup: any) => lineup.user_id === user.id)
+        .every((lineup: any) => lineup.id === myHealActive.id || lineup.fainted_at !== null)
+      if (allMyFainted) {
+        await supabase
+          .from('duels')
+          .update({ status: 'ended', winner_id: oppUserId, ended_at: new Date().toISOString() })
+          .eq('id', duelId)
+        await awardDuelResults(supabase, duel.session_id, oppUserId!, user.id)
+        incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel.session_id }).then(undefined, () => {})
+      }
+      return allMyFainted
+    }
+
+    async function switchToNextHealCreature() {
+      const remaining = allHealLineups
+        .filter((lineup: any) => lineup.user_id === user.id && !lineup.fainted_at && lineup.id !== myHealActive.id)
+        .sort((a: any, b: any) => a.slot - b.slot)
+      const nextMine = remaining[0]
+      if (!nextMine) return null
+
+      await supabase.from('duel_lineups').update({ is_active: true }).eq('id', nextMine.id)
+      const myField = isChallenger ? 'challenger_creature_id' : 'opponent_creature_id'
+      await supabase.from('duels').update({ [myField]: nextMine.player_creature_id }).eq('id', duelId)
+
+      return {
+        userId: user.id,
+        slot: nextMine.slot,
+        playerCreatureId: nextMine.player_creature_id,
+        name: (nextMine as any).player_creatures?.creatures?.name ?? 'Creatura',
+      }
+    }
+
+    let preTurnStatusEvent: Record<string, unknown> | null = null
+    if (attackerStatus) {
+      const statusTick = resolveTurnStartStatus({
+        effect: attackerStatus,
+        turnsLeft: attackerTurnsLeft,
+        currentHp: myHealActive.current_hp,
+        maxHp: healStats.hp,
+        atk: healStats.atk,
+        def: healStats.def,
+      })
+
+      await supabase.from('duel_lineups').update({
+        active_status: statusTick.nextEffect,
+        status_turns_left: statusTick.nextTurnsLeft,
+        current_hp: statusTick.currentHp,
+        ...(statusTick.fainted ? { fainted_at: new Date().toISOString(), is_active: false } : {}),
+      }).eq('id', myHealActive.id)
+
+      if (statusTick.fainted || statusTick.preventedAction) {
+        let duelEndedNow = false
+        let statusSwitchedTo: { userId: string; slot: number; playerCreatureId: string; name: string } | null = null
+        if (statusTick.fainted) {
+          duelEndedNow = await endHealDuelFromStatusFaint()
+          if (!duelEndedNow) statusSwitchedTo = await switchToNextHealCreature()
+        }
+        if (!duelEndedNow) {
+          await supabase.from('duels').update({ current_turn: nextTurn }).eq('id', duelId)
+        }
+
+        const baseStatusEvent = statusTick.event ?? { type: attackerStatus }
+        const statusEvent = baseStatusEvent.type === 'veleno'
+          ? { ...baseStatusEvent, newMyHp: statusTick.currentHp }
+          : baseStatusEvent.type === 'confusione' && baseStatusEvent.selfHit
+            ? { ...baseStatusEvent, selfHp: statusTick.currentHp }
+            : baseStatusEvent
+
+        const ch = supabase.channel(`duel:${duelId}`)
+        await new Promise<void>(resolve => ch.subscribe(() => resolve()))
+        await ch.send({
+          type: 'broadcast',
+          event: 'duel_action',
+          payload: {
+            actorId: user.id,
+            action: 'status_tick',
+            statusEvent,
+            nextTurn: duelEndedNow ? null : nextTurn,
+            duelOver: duelEndedNow,
+            winnerId: duelEndedNow ? oppUserId : null,
+            statusSwitchedTo,
+          },
+        })
+        await supabase.removeChannel(ch)
+
+        return NextResponse.json({
+          turnPassed: true,
+          statusEffect: attackerStatus,
+          duelOver: duelEndedNow,
+          ...(statusTick.event?.type === 'veleno' ? { poisonDamage: statusTick.event.poisonDamage } : {}),
+          ...(statusTick.event?.type === 'confusione' && statusTick.event.selfHit ? { selfDamage: statusTick.event.selfDamage } : {}),
+        })
+      }
+
+      if (statusTick.event) {
+        preTurnStatusEvent = statusTick.event.type === 'veleno'
+          ? { ...statusTick.event, newMyHp: statusTick.currentHp }
+          : statusTick.event
+      }
+    }
+
+    const healAmount = Math.round(healStats.hp * ((inv.items.effect_value ?? 20) / 100))
+    const currentHp = preTurnStatusEvent?.type === 'veleno'
+      ? Number(preTurnStatusEvent.newMyHp ?? myHealActive.current_hp)
+      : myHealActive.current_hp
+    const newHp = Math.min(healStats.hp, currentHp + healAmount)
 
     await Promise.all([
-      supabase.from('duel_lineups').update({ current_hp: newHp }).eq('id', (healLineups as any).id),
+      supabase.from('duel_lineups').update({ current_hp: newHp }).eq('id', (myHealActive as any).id),
       supabase.from('player_inventory').update({ quantity: inv.quantity - 1 }).eq('id', itemId),
-      supabase.from('duels').update({ current_turn: isChallenger ? 'opponent' : 'challenger' }).eq('id', duelId),
+      supabase.from('duels').update({ current_turn: nextTurn }).eq('id', duelId),
     ])
 
-    const nextTurn: 'challenger' | 'opponent' = isChallenger ? 'opponent' : 'challenger'
     const channel = supabase.channel(`duel:${duelId}`)
     await new Promise<void>(resolve => channel.subscribe(() => resolve()))
     await channel.send({
       type: 'broadcast',
       event: 'duel_action',
-      payload: { actorId: user.id, action: 'heal', healAmount, newHp, nextTurn, duelOver: false },
+      payload: {
+        actorId: user.id,
+        action: 'heal',
+        healAmount,
+        newHp,
+        nextTurn,
+        duelOver: false,
+        preTurnStatusEvent,
+      },
     })
     await supabase.removeChannel(channel)
 
-    return NextResponse.json({ healed: true, healAmount, newHp, nextTurn })
+    return NextResponse.json({ healed: true, healAmount, newHp, nextTurn, preTurnStatusEvent })
   }
 
   // ── Turn check ─────────────────────────────────────────────────────────────

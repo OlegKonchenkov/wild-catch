@@ -8,6 +8,248 @@ import type { Element } from '@/lib/types'
 
 type Params = { params: Promise<{ id: string }> }
 
+type BossLineupSlot = {
+  creature_id?: string
+  status_effect?: StatusEffect | null
+  status_effect_chance?: number | null
+  active_status?: StatusEffect | null
+  status_turns_left?: number | null
+  [key: string]: unknown
+}
+
+async function hydrateBossLineupStatusFields(
+  fightId: string,
+  bossLineup: BossLineupSlot[] | null | undefined,
+): Promise<BossLineupSlot[]> {
+  const lineup = Array.isArray(bossLineup) ? bossLineup : []
+  const needsHydration = lineup.some(slot =>
+    slot?.creature_id && (
+      slot.status_effect === undefined ||
+      slot.status_effect_chance === undefined ||
+      slot.active_status === undefined ||
+      slot.status_turns_left === undefined
+    ),
+  )
+
+  if (!needsHydration) return lineup
+
+  const creatureIds = lineup
+    .map(slot => slot?.creature_id)
+    .filter((creatureId): creatureId is string => Boolean(creatureId))
+
+  const admin = createAdminClient()
+  const { data: creatureRows } = creatureIds.length > 0
+    ? await admin
+        .from('creatures')
+        .select('id, status_effect, status_effect_chance')
+        .in('id', creatureIds)
+    : { data: [] }
+
+  const creatureMap: Record<string, { status_effect: StatusEffect | null; status_effect_chance: number | null }> =
+    Object.fromEntries(
+      (creatureRows ?? []).map((row: any) => [
+        row.id,
+        {
+          status_effect: (row.status_effect as StatusEffect | null) ?? null,
+          status_effect_chance: row.status_effect_chance ?? 0.15,
+        },
+      ]),
+    )
+
+  const hydratedLineup = lineup.map(slot => {
+    const creatureStatus = slot?.creature_id ? creatureMap[slot.creature_id] : null
+
+    return {
+      ...slot,
+      status_effect: slot.status_effect ?? creatureStatus?.status_effect ?? null,
+      status_effect_chance: slot.status_effect_chance ?? creatureStatus?.status_effect_chance ?? 0.15,
+      active_status: slot.active_status ?? null,
+      status_turns_left: slot.status_turns_left ?? 0,
+    }
+  })
+
+  await admin
+    .from('boss_fights')
+    .update({ boss_lineup: hydratedLineup })
+    .eq('id', fightId)
+
+  return hydratedLineup
+}
+
+async function grantBossFightRewards({
+  fight,
+  fightId,
+  supabase,
+  userId,
+}: {
+  fight: Record<string, any>
+  fightId: string
+  supabase: Awaited<ReturnType<typeof createClient>>
+  userId: string
+}): Promise<{
+  levelUp: { newLevel: number; goldReward: number } | null
+  reward: Record<string, unknown> | null
+}> {
+  let levelUp: { newLevel: number; goldReward: number } | null = null
+  let rewardGranted = false
+
+  const { data: priorRewardedFight } = fight.qr_code_id
+    ? await supabase
+        .from('boss_fights')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('qr_code_id', fight.qr_code_id)
+        .eq('reward_claimed', true)
+        .neq('id', fightId)
+        .limit(1)
+        .maybeSingle()
+    : { data: null }
+
+  if (!priorRewardedFight) {
+    const { data: claimedRows } = await supabase
+      .from('boss_fights')
+      .update({ reward_claimed: true })
+      .eq('id', fightId)
+      .or('reward_claimed.is.null,reward_claimed.eq.false')
+      .select('id')
+
+    rewardGranted = (claimedRows?.length ?? 0) > 0
+  } else {
+    await supabase
+      .from('boss_fights')
+      .update({ reward_claimed: true })
+      .eq('id', fightId)
+      .or('reward_claimed.is.null,reward_claimed.eq.false')
+  }
+
+  if (!rewardGranted) {
+    return { levelUp, reward: null }
+  }
+
+  const reward = fight.reward as {
+    gold?: number
+    exp?: number
+    item_id?: string
+    item_qty?: number
+    creature_id?: string
+  } | null
+  const admin = createAdminClient()
+
+  const { data: rpcData } = await admin.rpc('increment_player_stats', {
+    p_user_id: userId,
+    p_session_id: fight.session_id,
+    p_exp: reward?.exp ?? 50,
+    p_score: 20,
+  })
+  const rpcRow = Array.isArray(rpcData) ? rpcData[0] : null
+  if (rpcRow?.leveled_up) {
+    levelUp = { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
+  }
+
+  const goldReward = (reward?.gold ?? 0) + (levelUp?.goldReward ?? 0)
+  if (goldReward > 0) {
+    const { data: playerSession } = await admin
+      .from('player_sessions')
+      .select('gold')
+      .eq('user_id', userId)
+      .eq('session_id', fight.session_id)
+      .single()
+
+    if (playerSession) {
+      await admin
+        .from('player_sessions')
+        .update({ gold: (playerSession.gold ?? 0) + goldReward })
+        .eq('user_id', userId)
+        .eq('session_id', fight.session_id)
+    }
+  }
+
+  const enrichedReward: Record<string, unknown> = { gold: goldReward, exp: reward?.exp ?? 50 }
+
+  if (reward?.item_id) {
+    const qty = reward.item_qty ?? 1
+    const { data: existingInv } = await admin
+      .from('player_inventory')
+      .select('id, quantity')
+      .eq('user_id', userId)
+      .eq('session_id', fight.session_id)
+      .eq('item_id', reward.item_id)
+      .maybeSingle()
+
+    if (existingInv) {
+      await admin
+        .from('player_inventory')
+        .update({ quantity: existingInv.quantity + qty })
+        .eq('id', existingInv.id)
+    } else {
+      await admin.from('player_inventory').insert({
+        user_id: userId,
+        session_id: fight.session_id,
+        item_id: reward.item_id,
+        quantity: qty,
+      })
+    }
+
+    const { data: itemData } = await admin.from('items').select('name').eq('id', reward.item_id).single()
+    enrichedReward.item_id = reward.item_id
+    enrichedReward.item_qty = qty
+    enrichedReward.item_name = (itemData as any)?.name ?? null
+  }
+
+  if (reward?.creature_id) {
+    const { data: rewardCreature } = await admin
+      .from('creatures')
+      .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def')
+      .eq('id', reward.creature_id)
+      .single()
+
+    if (rewardCreature) {
+      const { data: existingPc } = await admin
+        .from('player_creatures')
+        .select('id, duplicates_count')
+        .eq('user_id', userId)
+        .eq('session_id', fight.session_id)
+        .eq('creature_id', (rewardCreature as any).id)
+        .maybeSingle()
+
+      if (existingPc) {
+        await admin
+          .from('player_creatures')
+          .update({ duplicates_count: existingPc.duplicates_count + 1 })
+          .eq('id', existingPc.id)
+      } else {
+        await admin.from('player_creatures').upsert({
+          user_id: userId,
+          creature_id: (rewardCreature as any).id,
+          session_id: fight.session_id,
+          duplicates_count: 1,
+        }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
+      }
+
+      enrichedReward.creature = rewardCreature
+    }
+  }
+
+  const bossName = (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss'
+  admin.from('player_game_events').insert({
+    user_id: userId,
+    session_id: fight.session_id,
+    type: 'boss_won',
+    payload: { fight_id: fightId, gold: goldReward, exp: reward?.exp ?? 50, boss_name: bossName },
+  }).then(undefined, () => {})
+
+  if (levelUp) {
+    admin.from('player_game_events').insert({
+      user_id: userId,
+      session_id: fight.session_id,
+      type: 'level_up',
+      payload: { new_level: levelUp.newLevel, gold_reward: levelUp.goldReward },
+    }).then(undefined, () => {})
+  }
+
+  return { levelUp, reward: enrichedReward }
+}
+
 // ── GET: load boss fight state ─────────────────────────────────────────────
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params
@@ -15,14 +257,20 @@ export async function GET(_req: Request, { params }: Params) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
-  const { data: fight } = await supabase
+  const { data: rawFight } = await supabase
     .from('boss_fights')
     .select('*')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
 
-  if (!fight) return NextResponse.json({ error: 'Boss fight non trovato' }, { status: 404 })
+  if (!rawFight) return NextResponse.json({ error: 'Boss fight non trovato' }, { status: 404 })
+
+  const fight = {
+    ...rawFight,
+    boss_lineup: await hydrateBossLineupStatusFields(rawFight.id, rawFight.boss_lineup as BossLineupSlot[]),
+  }
+
   return NextResponse.json({ fight })
 }
 
@@ -37,14 +285,19 @@ export async function POST(request: Request, { params }: Params) {
   const body = await request.json().catch(() => ({}))
   const { action, lineup, itemId } = body
 
-  const { data: fight } = await supabase
+  const { data: rawFight } = await supabase
     .from('boss_fights')
     .select('*')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
 
-  if (!fight) return NextResponse.json({ error: 'Boss fight non trovato' }, { status: 404 })
+  if (!rawFight) return NextResponse.json({ error: 'Boss fight non trovato' }, { status: 404 })
+
+  const fight = {
+    ...rawFight,
+    boss_lineup: await hydrateBossLineupStatusFields(rawFight.id, rawFight.boss_lineup as BossLineupSlot[]),
+  }
 
   // ── Start: submit player lineup ──────────────────────────────────────────
   if (action === 'start') {
@@ -177,75 +430,253 @@ export async function POST(request: Request, { params }: Params) {
     if (!healPlayerActive) return NextResponse.json({ error: 'Nessuna creatura attiva' }, { status: 400 })
     if (!healBossActive || healBossActive.fainted) return NextResponse.json({ error: 'Boss già sconfitto' }, { status: 400 })
 
-    const healAmount = Math.round(healPlayerActive.max_hp * ((healInv.items.effect_value ?? 20) / 100))
-    const healedHp = Math.min(healPlayerActive.max_hp, healPlayerActive.current_hp + healAmount)
-    healPlayerActive.current_hp = healedHp
-
-    // Boss counter-attacks even when player heals
-    const bossHealMult = getElementMultiplier(healBossActive.element as Element, healPlayerActive.element as Element)
-    const bossHealFortune = rollCombatFortune({
-      attackerLevel: healBossActive.level ?? 1,
-      defenderLevel: healPlayerActive.level ?? 1,
-      attackerStats: { hp: healBossActive.max_hp, atk: healBossActive.atk, def: healBossActive.def ?? 0 },
-      defenderStats: { hp: healPlayerActive.max_hp, atk: healPlayerActive.atk, def: healPlayerActive.def ?? 0 },
+    const playerStatusTick = resolveTurnStartStatus({
+      effect: healPlayerActive.active_status as StatusEffect | null,
+      turnsLeft: healPlayerActive.status_turns_left ?? 0,
+      currentHp: healPlayerActive.current_hp,
+      maxHp: healPlayerActive.max_hp,
+      atk: healPlayerActive.atk,
+      def: healPlayerActive.def ?? 0,
     })
-    const { isCrit: healBossCrit, critMultiplier: healBossCritMult } = rollCrit()
-    const counterDamage = calculateCombatDamage({
-      attackerAtk: healBossActive.atk,
-      defenderDef: healPlayerActive.def ?? 0,
-      attackMultiplier: healBossCritMult,
-      elementMultiplier: bossHealMult,
-      varianceMultiplier: bossHealFortune.multiplier,
-    })
-    const afterCounterHp = Math.max(0, healedHp - counterDamage)
-    healPlayerActive.current_hp = afterCounterHp
-    if (afterCounterHp === 0) healPlayerActive.fainted = true
+    healPlayerActive.active_status = playerStatusTick.nextEffect
+    healPlayerActive.status_turns_left = playerStatusTick.nextTurnsLeft
+    healPlayerActive.current_hp = playerStatusTick.currentHp
+    if (playerStatusTick.fainted) healPlayerActive.fainted = true
 
+    const statusTickEvents: Record<string, unknown>[] = []
+    let preTurnStatusEvent: Record<string, unknown> | null = null
+    if (playerStatusTick.event?.type === 'veleno') {
+      statusTickEvents.push({ ...playerStatusTick.event, target: 'player' })
+    } else {
+      preTurnStatusEvent = playerStatusTick.event
+    }
+
+    let skipHeal = playerStatusTick.preventedAction
+    let skipBossAttack = false
     let healPlayerActiveSlot = fight.player_active_slot
-    let healPlayerSwitchedTo: string | null = null
-    if (afterCounterHp === 0) {
+    let playerSwitchedTo: string | null = null
+
+    if (healPlayerActive.fainted) {
       healPlayerActive.is_active = false
       const nextIdx = healPlayerLineup.findIndex((c: any) => !c.fainted)
       if (nextIdx !== -1) {
         healPlayerLineup[nextIdx].is_active = true
         healPlayerActiveSlot = nextIdx
-        healPlayerSwitchedTo = healPlayerLineup[nextIdx].name
+        playerSwitchedTo = healPlayerLineup[nextIdx].name
+        skipHeal = true
+        skipBossAttack = true
+      }
+    }
+
+    const allPlayerFaintedFromStatus = healPlayerLineup.every((c: any) => c.fainted)
+    if (allPlayerFaintedFromStatus) {
+      await supabase.from('boss_fights').update({
+        player_lineup: healPlayerLineup,
+        boss_lineup: healBossLineup,
+        player_active_slot: healPlayerActiveSlot,
+        status: 'lost',
+        ended_at: new Date().toISOString(),
+      }).eq('id', id)
+
+      createAdminClient().from('player_game_events').insert({
+        user_id: user.id,
+        session_id: fight.session_id,
+        type: 'boss_lost',
+        payload: { fight_id: id, boss_name: (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss' },
+      }).then(undefined, () => {})
+
+      return NextResponse.json({
+        healed: false,
+        healAmount: 0,
+        healedHp: null,
+        playerHpBeforeBossAttack: playerStatusTick.currentHp,
+        bossDamage: 0,
+        newPlayerHp: playerStatusTick.currentHp,
+        playerLineup: healPlayerLineup,
+        bossLineup: healBossLineup,
+        playerSwitchedTo,
+        status: 'lost',
+        lost: true,
+        won: false,
+        preTurnStatusEvent,
+        statusTickEvents,
+      })
+    }
+
+    let healAmount = 0
+    let healedHp: number | null = null
+    let consumedHealItem = false
+    if (!skipHeal && !healPlayerActive.fainted) {
+      healAmount = Math.round(healPlayerActive.max_hp * ((healInv.items.effect_value ?? 20) / 100))
+      healedHp = Math.min(healPlayerActive.max_hp, healPlayerActive.current_hp + healAmount)
+      healPlayerActive.current_hp = healedHp
+      consumedHealItem = true
+    }
+
+    let playerHpBeforeBossAttack = healPlayerActive.current_hp
+    let healBossActiveSlot = fight.boss_active_slot
+    let bossSwitchedTo: string | null = null
+
+    if (!healBossActive.fainted && !skipBossAttack) {
+      const bossStatusTick = resolveTurnStartStatus({
+        effect: healBossActive.active_status as StatusEffect | null,
+        turnsLeft: healBossActive.status_turns_left ?? 0,
+        currentHp: healBossActive.current_hp,
+        maxHp: healBossActive.max_hp,
+        atk: healBossActive.atk,
+        def: healBossActive.def ?? 0,
+      })
+      healBossActive.active_status = bossStatusTick.nextEffect
+      healBossActive.status_turns_left = bossStatusTick.nextTurnsLeft
+      healBossActive.current_hp = bossStatusTick.currentHp
+      if (bossStatusTick.fainted) healBossActive.fainted = true
+      if (bossStatusTick.event) {
+        statusTickEvents.push({ ...bossStatusTick.event, target: 'boss' })
+      }
+      if (bossStatusTick.preventedAction || bossStatusTick.fainted) {
+        skipBossAttack = true
+      }
+    }
+
+    if (healBossActive.fainted) {
+      const nextBossIdx = healBossLineup.findIndex((c: any, i: number) => i > fight.boss_active_slot && !c.fainted)
+      if (nextBossIdx !== -1) {
+        healBossActiveSlot = nextBossIdx
+        bossSwitchedTo = healBossLineup[nextBossIdx].name
+      }
+    }
+
+    const allBossFaintedAfterTick = healBossLineup.every((c: any) => c.fainted)
+
+    let bossDamage = 0
+    let newPlayerHp = playerHpBeforeBossAttack
+    let bossFortune: ReturnType<typeof rollCombatFortune> | null = null
+    let bossCrit = false
+    let bossElementMult: number | null = null
+
+    if (!allBossFaintedAfterTick && !skipBossAttack && !healPlayerActive.fainted) {
+      const counterBoss = healBossLineup[fight.boss_active_slot]
+      bossElementMult = getElementMultiplier(counterBoss.element as Element, healPlayerActive.element as Element)
+      bossFortune = rollCombatFortune({
+        attackerLevel: counterBoss.level ?? 1,
+        defenderLevel: healPlayerActive.level ?? 1,
+        attackerStats: { hp: counterBoss.max_hp, atk: counterBoss.atk, def: counterBoss.def ?? 0 },
+        defenderStats: { hp: healPlayerActive.max_hp, atk: healPlayerActive.atk, def: healPlayerActive.def ?? 0 },
+      })
+      const { isCrit: healBossCrit, critMultiplier: healBossCritMult } = rollCrit()
+      bossCrit = healBossCrit
+      bossDamage = calculateCombatDamage({
+        attackerAtk: counterBoss.atk,
+        defenderDef: healPlayerActive.def ?? 0,
+        attackMultiplier: healBossCritMult,
+        elementMultiplier: bossElementMult,
+        varianceMultiplier: bossFortune.multiplier,
+      })
+      newPlayerHp = Math.max(0, healPlayerActive.current_hp - bossDamage)
+      healPlayerActive.current_hp = newPlayerHp
+      if (newPlayerHp === 0) healPlayerActive.fainted = true
+    }
+
+    let statusAppliedToPlayer: StatusEffect | null = null
+    let playerStatusTurnsLeft = 0
+    if (bossDamage > 0 && newPlayerHp > 0 && !healPlayerActive.fainted) {
+      const triggered = rollStatusEffect(
+        healBossActive.status_effect as StatusEffect | null,
+        healBossActive.status_effect_chance,
+      )
+      if (triggered) {
+        statusAppliedToPlayer = triggered
+        playerStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
+        healPlayerActive.active_status = triggered
+        healPlayerActive.status_turns_left = playerStatusTurnsLeft
+      }
+    }
+
+    if (newPlayerHp === 0) {
+      healPlayerActive.is_active = false
+      const nextIdx = healPlayerLineup.findIndex((c: any) => !c.fainted)
+      if (nextIdx !== -1) {
+        healPlayerLineup[nextIdx].is_active = true
+        healPlayerActiveSlot = nextIdx
+        playerSwitchedTo = healPlayerLineup[nextIdx].name
       }
     }
 
     const allHealPlayerFainted = healPlayerLineup.every((c: any) => c.fainted)
-    const healStatus = allHealPlayerFainted ? 'lost' : fight.status
+    const allHealBossFainted = healBossLineup.every((c: any) => c.fainted)
 
-    await Promise.all([
-      supabase.from('player_inventory').update({ quantity: healInv.quantity - 1 }).eq('id', itemId),
+    let healStatus = fight.status
+    let won = false
+    if (allHealBossFainted) {
+      healStatus = 'won'
+      won = true
+    } else if (allHealPlayerFainted) {
+      healStatus = 'lost'
+    }
+
+    const updates: Promise<unknown>[] = [
       supabase.from('boss_fights').update({
         player_lineup: healPlayerLineup,
+        boss_lineup: healBossLineup,
         player_active_slot: healPlayerActiveSlot,
+        boss_active_slot: healBossActiveSlot,
         ...(healStatus !== fight.status ? { status: healStatus, ended_at: new Date().toISOString() } : {}),
       }).eq('id', id),
-    ])
+    ]
 
-    if (allHealPlayerFainted) {
+    if (consumedHealItem) {
+      updates.push(
+        supabase.from('player_inventory').update({ quantity: healInv.quantity - 1 }).eq('id', itemId),
+      )
+    }
+
+    await Promise.all(updates)
+
+    let levelUp: { newLevel: number; goldReward: number } | null = null
+    let reward: Record<string, unknown> | null = null
+
+    if (won) {
+      const rewardResult = await grantBossFightRewards({
+        fight,
+        fightId: id,
+        supabase,
+        userId: user.id,
+      })
+      levelUp = rewardResult.levelUp
+      reward = rewardResult.reward
+    } else if (allHealPlayerFainted) {
       const bossNameHeal = (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss'
       createAdminClient().from('player_game_events').insert({
-        user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
+        user_id: user.id,
+        session_id: fight.session_id,
+        type: 'boss_lost',
         payload: { fight_id: id, boss_name: bossNameHeal },
       }).then(undefined, () => {})
     }
 
     return NextResponse.json({
-      healed: true,
+      healed: consumedHealItem,
       healAmount,
       healedHp,
-      bossDamage: counterDamage,
-      newPlayerHp: afterCounterHp,
-      bossFortune: bossHealFortune,
-      bossCrit: healBossCrit,
-      bossElementMult: bossHealMult,
-      playerSwitchedTo: healPlayerSwitchedTo,
+      playerHpBeforeBossAttack,
+      bossDamage,
+      newPlayerHp,
+      bossFortune,
+      bossCrit,
+      bossElementMult,
+      bossSwitchedTo,
+      playerSwitchedTo,
       playerLineup: healPlayerLineup,
+      bossLineup: healBossLineup,
       status: healStatus,
+      won,
       lost: healStatus === 'lost',
+      levelUp,
+      reward,
+      preTurnStatusEvent,
+      statusTickEvents,
+      statusAppliedToPlayer,
+      playerStatusTurnsLeft,
     })
   }
 
@@ -423,6 +854,7 @@ export async function POST(request: Request, { params }: Params) {
     // ── Boss → Player (only if boss still alive at start of counter-attack) ─
     // The boss that was alive before player's attack counter-attacks
     let bossDamage = 0
+    const playerHpBeforeBossAttack = playerActive.current_hp
     let newPlayerHp = playerActive.current_hp
     let bossFortune = null
     let bossCrit = false
@@ -513,127 +945,22 @@ export async function POST(request: Request, { params }: Params) {
 
     // ── Grant reward on win ──────────────────────────────────────────────
     let levelUp: { newLevel: number; goldReward: number } | null = null
-    let rewardGranted = false
-    const { data: priorRewardedFight } = won && fight.qr_code_id
-      ? await supabase
-          .from('boss_fights')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('qr_code_id', fight.qr_code_id)
-          .eq('reward_claimed', true)
-          .neq('id', id)
-          .limit(1)
-          .maybeSingle()
-      : { data: null }
-
-    if (won && !priorRewardedFight) {
-      const { data: claimedRows } = await supabase
-        .from('boss_fights')
-        .update({ reward_claimed: true })
-        .eq('id', id)
-        .or('reward_claimed.is.null,reward_claimed.eq.false')
-        .select('id')
-      rewardGranted = (claimedRows?.length ?? 0) > 0
-    } else if (won && priorRewardedFight) {
-      await supabase
-        .from('boss_fights')
-        .update({ reward_claimed: true })
-        .eq('id', id)
-        .or('reward_claimed.is.null,reward_claimed.eq.false')
-    }
-
     let enrichedReward: Record<string, unknown> | null = null
-
-    if (rewardGranted) {
-      const reward = fight.reward as {
-        gold?: number; exp?: number
-        item_id?: string; item_qty?: number
-        creature_id?: string
-      } | null
-      const admin = createAdminClient()
-
-      // EXP + level-up check
-      const { data: rpcData } = await admin.rpc('increment_player_stats', {
-        p_user_id: user.id,
-        p_session_id: fight.session_id,
-        p_exp: reward?.exp ?? 50,
-        p_score: 20,
+    if (won) {
+      const rewardResult = await grantBossFightRewards({
+        fight,
+        fightId: id,
+        supabase,
+        userId: user.id,
       })
-      const rpcRow = Array.isArray(rpcData) ? rpcData[0] : null
-      if (rpcRow?.leveled_up) {
-        levelUp = { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
-      }
-
-      // Gold reward
-      const goldReward = (reward?.gold ?? 0) + (levelUp?.goldReward ?? 0)
-      if (goldReward > 0) {
-        const { data: ps } = await admin.from('player_sessions')
-          .select('gold').eq('user_id', user.id).eq('session_id', fight.session_id).single()
-        if (ps) {
-          await admin.from('player_sessions')
-            .update({ gold: (ps.gold ?? 0) + goldReward })
-            .eq('user_id', user.id).eq('session_id', fight.session_id)
-        }
-      }
-
-      enrichedReward = { gold: goldReward, exp: reward?.exp ?? 50 }
-
-      // Item reward
-      if (reward?.item_id) {
-        const qty = reward.item_qty ?? 1
-        const { data: existingInv } = await admin.from('player_inventory').select('id, quantity')
-          .eq('user_id', user.id).eq('session_id', fight.session_id).eq('item_id', reward.item_id).maybeSingle()
-        if (existingInv) {
-          await admin.from('player_inventory').update({ quantity: existingInv.quantity + qty }).eq('id', existingInv.id)
-        } else {
-          await admin.from('player_inventory').insert({
-            user_id: user.id, session_id: fight.session_id, item_id: reward.item_id, quantity: qty,
-          })
-        }
-        const { data: itemData } = await admin.from('items').select('name').eq('id', reward.item_id).single()
-        enrichedReward.item_id  = reward.item_id
-        enrichedReward.item_qty = qty
-        enrichedReward.item_name = (itemData as any)?.name ?? null
-      }
-
-      // Creature reward
-      if (reward?.creature_id) {
-        const { data: rewardCreature } = await admin
-          .from('creatures')
-          .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def')
-          .eq('id', reward.creature_id)
-          .single()
-        if (rewardCreature) {
-          const { data: existingPc } = await admin.from('player_creatures').select('id, duplicates_count')
-            .eq('user_id', user.id).eq('session_id', fight.session_id).eq('creature_id', (rewardCreature as any).id).maybeSingle()
-          if (existingPc) {
-            await admin.from('player_creatures').update({ duplicates_count: existingPc.duplicates_count + 1 }).eq('id', existingPc.id)
-          } else {
-            await admin.from('player_creatures').upsert({
-              user_id: user.id, creature_id: (rewardCreature as any).id, session_id: fight.session_id, duplicates_count: 1,
-            }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
-          }
-          enrichedReward.creature = rewardCreature
-        }
-      }
-
-      // Game event
-      const bossName = (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss'
-      admin.from('player_game_events').insert({
-        user_id: user.id, session_id: fight.session_id, type: 'boss_won',
-        payload: { fight_id: id, gold: goldReward, exp: reward?.exp ?? 50, boss_name: bossName },
-      }).then(undefined, () => {})
-      if (levelUp) {
-        admin.from('player_game_events').insert({
-          user_id: user.id, session_id: fight.session_id, type: 'level_up',
-          payload: { new_level: levelUp.newLevel, gold_reward: levelUp.goldReward },
-        }).then(undefined, () => {})
-      }
+      levelUp = rewardResult.levelUp
+      enrichedReward = rewardResult.reward
     }
 
     return NextResponse.json({
       playerDamage,
       bossDamage,
+      playerHpBeforeBossAttack,
       playerFortune,
       bossFortune,
       playerCrit,

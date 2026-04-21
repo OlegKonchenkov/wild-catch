@@ -1607,6 +1607,13 @@ export default function BossFightPage() {
         if (tick.target === 'player') flashStatusNotice(effect, `${STATUS_EFFECT_META[effect]?.label ?? effect} — ${tick.poisonDamage ?? ''} danno a te`)
       }
     }
+    const playerTookPreTurnStatusDamage = Boolean(data.preTurnStatusEvent?.selfHit)
+      || Boolean((data.statusTickEvents as Array<{ target?: string }> | undefined)?.some(tick => tick.target === 'player'))
+    if (playerTookPreTurnStatusDamage && data.playerHpBeforeBossAttack != null) {
+      setPlayerLineup(prev => prev.map(slot =>
+        slot.is_active ? { ...slot, current_hp: data.playerHpBeforeBossAttack } : slot,
+      ))
+    }
 
     // Phase 1: show damage on boss (update HP bar only, don't switch yet)
     if (data.playerDamage > 0) {
@@ -1777,24 +1784,56 @@ export default function BossFightPage() {
 
     if (!res.ok) { showActionError(res.status, data.error ?? 'Errore cura'); attackingRef.current = false; setAttacking(false); return }
 
-    setCuraItems(prev => prev.map(it => it.inventoryId === itemId ? { ...it, quantity: it.quantity - 1 } : it).filter(it => it.quantity > 0))
+    if (data.healed) {
+      setCuraItems(prev => prev.map(it => it.inventoryId === itemId ? { ...it, quantity: it.quantity - 1 } : it).filter(it => it.quantity > 0))
+    }
 
-    // Update player HP — heal then boss counter
+    const nextPlayerLineup = data.playerLineup as PlayerSlot[] | undefined
+    const nextBossLineup = data.bossLineup as BossSlot[] | undefined
+    const isOver = data.status === 'won' || data.status === 'lost'
+
+    if (data.preTurnStatusEvent) {
+      const se = data.preTurnStatusEvent
+      const effect = se.type as StatusEffect
+      if (se.turnPassed) flashStatusNotice(effect, `${STATUS_EFFECT_META[effect]?.label ?? effect} — turno saltato`)
+      else if (se.selfHit) flashStatusNotice(effect, `Confusione — colpisce se stesso!`)
+    }
+    if (data.statusTickEvents?.length) {
+      for (const tick of data.statusTickEvents as any[]) {
+        const effect = tick.type as StatusEffect
+        if (tick.target === 'boss') flashStatusNotice(effect, `${STATUS_EFFECT_META[effect]?.label ?? effect} — ${tick.poisonDamage ?? ''} danno al Boss`)
+        if (tick.target === 'player') flashStatusNotice(effect, `${STATUS_EFFECT_META[effect]?.label ?? effect} — ${tick.poisonDamage ?? ''} danno a te`)
+      }
+    }
+
+    if (data.playerHpBeforeBossAttack != null) {
+      setPlayerLineup(prev => prev.map(slot =>
+        slot.is_active ? { ...slot, current_hp: data.playerHpBeforeBossAttack } : slot,
+      ))
+    }
+
     if (data.healedHp != null) {
-      setPlayerLineup(prev => prev.map(slot => slot.is_active ? { ...slot, current_hp: data.healedHp } : slot))
       addLog(`💚 Cura +${data.healAmount} HP`)
     }
 
     // Boss counter-attack animation
-    if (data.bossDamage > 0 && data.newPlayerHp != null) {
+    if (data.bossDamage > 0 && data.newPlayerHp != null && nextPlayerLineup && nextBossLineup) {
       setBossAttacking(true)
       setTimeout(() => {
         setBossAttacking(false)
-        setPlayerLineup(data.playerLineup as PlayerSlot[])
+        setPlayerLineup(nextPlayerLineup)
+        setBossLineup(nextBossLineup)
         setLastDamage({ amount: data.bossDamage, target: 'me', id: Date.now(), isCrit: !!data.bossCrit })
         setAnimState('damage')
         addLog(`Il Capo Palestra risponde con ${data.bossDamage} danni!`)
-        const isOver = data.status === 'won' || data.status === 'lost'
+        if (data.bossSwitchedTo) {
+          setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
+          setTimeout(() => setSwitchNotice(null), 2000)
+        }
+        if (data.statusAppliedToPlayer) {
+          const effect = data.statusAppliedToPlayer as StatusEffect
+          setTimeout(() => flashStatusNotice(effect, `Sei afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 450)
+        }
         if (data.playerSwitchedTo) {
           setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`)
           setTimeout(() => setSwitchNotice(null), 2000)
@@ -1811,6 +1850,24 @@ export default function BossFightPage() {
         }, 900)
       }, 1100)
     } else {
+      if (nextPlayerLineup) setPlayerLineup(nextPlayerLineup)
+      if (nextBossLineup) setBossLineup(nextBossLineup)
+      if (data.bossSwitchedTo) {
+        setSwitchNotice(`${data.bossSwitchedTo} entra in battaglia!`)
+        setTimeout(() => setSwitchNotice(null), 2000)
+      }
+      if (data.playerSwitchedTo) {
+        setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`)
+        setTimeout(() => setSwitchNotice(null), 2000)
+      }
+      if (data.statusAppliedToPlayer) {
+        const effect = data.statusAppliedToPlayer as StatusEffect
+        setTimeout(() => flashStatusNotice(effect, `Sei afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 450)
+      }
+      if (isOver) {
+        if (data.won) playVictory(); else playDefeat()
+        setTimeout(() => setFinalResult({ won: data.won, reward: data.reward ?? null, levelUp: data.levelUp ?? null }), 400)
+      }
       attackingRef.current = false
       setAttacking(false)
     }

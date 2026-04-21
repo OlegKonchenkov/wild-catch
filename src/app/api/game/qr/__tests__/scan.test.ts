@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }))
-vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn(() => ({})) }))
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(() => ({
+    from: vi.fn(() => ({
+      insert: vi.fn(() => Promise.resolve({ error: null })),
+    })),
+  })),
+}))
 vi.mock('@/lib/game/missions', () => ({ incrementMissionProgress: vi.fn(() => Promise.resolve([])) }))
 
 import { POST } from '../scan/route'
