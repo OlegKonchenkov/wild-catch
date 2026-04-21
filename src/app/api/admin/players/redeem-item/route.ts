@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getLevelForExp } from '@/lib/game/leveling'
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
       .eq('session_id', sessionId)
       .single()
     const newExp = (ps?.exp ?? 0) + reward.exp
-    const newLevel = Math.floor(newExp / 50) + 1
+    const newLevel = getLevelForExp(newExp)
     await admin.from('player_sessions')
       .update({ exp: newExp, level: Math.max(ps?.level ?? 1, newLevel) })
       .eq('user_id', userId)

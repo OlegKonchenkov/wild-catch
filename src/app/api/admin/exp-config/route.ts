@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { FIXED_EXP_PER_LEVEL_FROM_20, MAX_PLAYER_LEVEL } from '@/lib/game/leveling'
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -20,6 +21,7 @@ export async function GET() {
   const { data } = await admin
     .from('level_exp_config')
     .select('level, exp_to_next')
+    .lte('level', MAX_PLAYER_LEVEL)
     .order('level')
 
   return NextResponse.json({ config: data ?? [] })
@@ -33,11 +35,17 @@ export async function PUT(request: Request) {
 
   const body = await request.json().catch(() => ({}))
   const level = Number(body.level)
-  const exp_to_next = Number(body.exp_to_next)
+  const requestedExpToNext = Number(body.exp_to_next)
 
-  if (!level || level < 1 || !exp_to_next || exp_to_next < 1) {
+  if (!level || level < 1 || level > MAX_PLAYER_LEVEL) {
+    return NextResponse.json({ error: `Il livello deve essere compreso tra 1 e ${MAX_PLAYER_LEVEL}` }, { status: 400 })
+  }
+
+  if (!requestedExpToNext || requestedExpToNext < 1) {
     return NextResponse.json({ error: 'Parametri non validi' }, { status: 400 })
   }
+
+  const exp_to_next = level >= 20 ? FIXED_EXP_PER_LEVEL_FROM_20 : requestedExpToNext
 
   const admin = createAdminClient()
   const { data, error } = await admin

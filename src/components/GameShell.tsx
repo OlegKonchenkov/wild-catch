@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import { getExpProgress } from '@/lib/game/leveling'
 import { ELEMENT_EMOJI } from '@/lib/types'
 
 const NAV_ITEMS = [
@@ -20,11 +21,8 @@ const NAV_ITEMS = [
   { href: '/home',          icon: '🏠', label: 'Profilo'   },
 ]
 
-// XP formula: level = floor(exp/50) + 1
-// Level N starts at (N-1)*50 EXP
 function xpProgress(exp: number, level: number): number {
-  const xpInLevel = exp - (level - 1) * 50
-  return Math.min(100, Math.max(0, (xpInLevel / 50) * 100))
+  return getExpProgress(exp, level).percent
 }
 
 interface LevelUpInfo {
