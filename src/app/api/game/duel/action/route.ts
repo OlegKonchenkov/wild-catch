@@ -11,6 +11,7 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  const userId = user.id
 
   const { duelId, action, itemId } = await request.json()
   // action: 'attack' | 'heal' | 'surrender' | 'cancel' | 'opponent_timeout'
@@ -32,8 +33,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errMsg }, { status: 403 })
   }
 
-  const isChallenger = duel.challenger_id === user.id
-  const isOpponent   = duel.opponent_id   === user.id
+  const isChallenger = duel.challenger_id === userId
+  const isOpponent   = duel.opponent_id   === userId
   if (!isChallenger && !isOpponent) return NextResponse.json({ error: 'Non sei in questo duello' }, { status: 403 })
 
   const myRole: 'challenger' | 'opponent' = isChallenger ? 'challenger' : 'opponent'
@@ -47,13 +48,13 @@ export async function POST(request: Request) {
       .eq('id', duelId)
     const { createAdminClient: adminCancel } = await import('@/lib/supabase/admin')
     const adminC = adminCancel()
-    const { data: cancelProfiles } = await adminC.from('profiles').select('user_id, nickname').in('user_id', [user.id, oppUserId!])
+    const { data: cancelProfiles } = await adminC.from('profiles').select('user_id, nickname').in('user_id', [userId, oppUserId!])
     const cancelProfileMap: Record<string, string | null> = Object.fromEntries(
       (cancelProfiles ?? []).map((r: any) => [r.user_id, r.nickname ?? null])
     )
     adminC.from('player_game_events').insert([
-      { user_id: user.id,    session_id: duel.session_id, type: 'duel_cancelled', payload: { opponent_id: oppUserId, opponent_name: cancelProfileMap[oppUserId!] ?? null } },
-      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_cancelled', payload: { opponent_id: user.id,    opponent_name: cancelProfileMap[user.id]    ?? null } },
+      { user_id: userId,     session_id: duel.session_id, type: 'duel_cancelled', payload: { opponent_id: oppUserId, opponent_name: cancelProfileMap[oppUserId!] ?? null } },
+      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_cancelled', payload: { opponent_id: userId,    opponent_name: cancelProfileMap[userId]    ?? null } },
     ]).then(undefined, () => {})
     return NextResponse.json({ ended: true, winnerId: null, cancelled: true })
   }
@@ -62,10 +63,10 @@ export async function POST(request: Request) {
   if (action === 'opponent_timeout') {
     await supabase
       .from('duels')
-      .update({ status: 'ended', winner_id: user.id, ended_at: new Date().toISOString() })
+      .update({ status: 'ended', winner_id: userId, ended_at: new Date().toISOString() })
       .eq('id', duelId)
-    await awardDuelResults(supabase, duel.session_id, user.id, oppUserId!)
-    incrementMissionProgress({ type: 'duel', userId: user.id, sessionId: duel.session_id }).then(undefined, () => {})
+    await awardDuelResults(supabase, duel.session_id, userId, oppUserId!)
+    incrementMissionProgress({ type: 'duel', userId, sessionId: duel.session_id }).then(undefined, () => {})
     const { createAdminClient: adminFactory } = await import('@/lib/supabase/admin')
     const adminTimeout = adminFactory()
     const { data: timeoutLineups } = await supabase
@@ -73,17 +74,17 @@ export async function POST(request: Request) {
       .select('user_id, slot, player_creatures(creatures(name, element, hp, atk, def, image_url, sprite_url, rarity))')
       .eq('duel_id', duelId)
       .order('slot', { ascending: true })
-    const { data: timeoutProfiles } = await adminTimeout.from('profiles').select('user_id, nickname').in('user_id', [user.id, oppUserId!])
+    const { data: timeoutProfiles } = await adminTimeout.from('profiles').select('user_id, nickname').in('user_id', [userId, oppUserId!])
     const timeoutProfileMap: Record<string, string | null> = Object.fromEntries(
       (timeoutProfiles ?? []).map((r: any) => [r.user_id, r.nickname ?? null])
     )
-    const myCreatures  = buildCreatureSummaries(timeoutLineups ?? [], user.id)
+    const myCreatures  = buildCreatureSummaries(timeoutLineups ?? [], userId)
     const oppCreatures = buildCreatureSummaries(timeoutLineups ?? [], oppUserId!)
     adminTimeout.from('player_game_events').insert([
-      { user_id: user.id,    session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId, opponent_name: timeoutProfileMap[oppUserId!] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: myCreatures, opp_creatures: oppCreatures } },
-      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: user.id, winner_name: timeoutProfileMap[user.id] ?? null, my_creatures: oppCreatures, opp_creatures: myCreatures } },
+      { user_id: userId,     session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId, opponent_name: timeoutProfileMap[oppUserId!] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: myCreatures, opp_creatures: oppCreatures } },
+      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: userId, winner_name: timeoutProfileMap[userId] ?? null, my_creatures: oppCreatures, opp_creatures: myCreatures } },
     ]).then(undefined, () => {})
-    return NextResponse.json({ ended: true, winnerId: user.id })
+    return NextResponse.json({ ended: true, winnerId: userId })
   }
 
   // ── Surrender ──────────────────────────────────────────────────────────────
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
       .from('duels')
       .update({ status: 'ended', winner_id: oppUserId, ended_at: new Date().toISOString() })
       .eq('id', duelId)
-    await awardDuelResults(supabase, duel.session_id, oppUserId!, user.id)
+    await awardDuelResults(supabase, duel.session_id, oppUserId!, userId)
     incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel.session_id }).then(undefined, () => {})
     // Game events on surrender
     const { createAdminClient: adminClientFactory } = await import('@/lib/supabase/admin')
@@ -103,15 +104,15 @@ export async function POST(request: Request) {
       .select('user_id, slot, player_creatures(creatures(name, element, hp, atk, def, image_url, sprite_url, rarity))')
       .eq('duel_id', duelId)
       .order('slot', { ascending: true })
-    const { data: surrenderProfiles } = await adminSurrender.from('profiles').select('user_id, nickname').in('user_id', [user.id, oppUserId!])
+    const { data: surrenderProfiles } = await adminSurrender.from('profiles').select('user_id, nickname').in('user_id', [userId, oppUserId!])
     const surrenderProfileMap: Record<string, string | null> = Object.fromEntries(
       (surrenderProfiles ?? []).map((r: any) => [r.user_id, r.nickname ?? null])
     )
-    const surrenderMine = buildCreatureSummaries(surrenderLineups ?? [], user.id)
+    const surrenderMine = buildCreatureSummaries(surrenderLineups ?? [], userId)
     const surrenderOpp  = buildCreatureSummaries(surrenderLineups ?? [], oppUserId!)
     adminSurrender.from('player_game_events').insert([
-      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: user.id, opponent_name: surrenderProfileMap[user.id] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: surrenderOpp, opp_creatures: surrenderMine } },
-      { user_id: user.id,    session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: oppUserId, winner_name: surrenderProfileMap[oppUserId!] ?? null, my_creatures: surrenderMine, opp_creatures: surrenderOpp } },
+      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: userId, opponent_name: surrenderProfileMap[userId] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: surrenderOpp, opp_creatures: surrenderMine } },
+      { user_id: userId,     session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: oppUserId, winner_name: surrenderProfileMap[oppUserId!] ?? null, my_creatures: surrenderMine, opp_creatures: surrenderOpp } },
     ]).then(undefined, () => {})
     return NextResponse.json({ ended: true, winnerId: oppUserId })
   }
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
       .from('player_inventory')
       .select('id, quantity, items(effect_value, type)')
       .eq('id', itemId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('session_id', duel.session_id)
       .single()
 
@@ -146,7 +147,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Lineup non trovato' }, { status: 500 })
     }
 
-    const myHealActive = allHealLineups.find((lineup: any) => lineup.user_id === user.id && lineup.is_active)
+    const healLineups = allHealLineups
+    const myHealActive = healLineups.find((lineup: any) => lineup.user_id === userId && lineup.is_active)
     if (!myHealActive) return NextResponse.json({ error: 'Nessuna creatura attiva' }, { status: 400 })
 
     const myHealCreature = (myHealActive as any).player_creatures?.creatures
@@ -158,14 +160,14 @@ export async function POST(request: Request) {
       .from('player_sessions')
       .select('user_id, level')
       .eq('session_id', duel.session_id)
-      .in('user_id', [user.id, oppUserId].filter(Boolean))
+      .in('user_id', [userId, oppUserId].filter(Boolean))
 
     const healLevels = Object.fromEntries(
       (healPlayerSessions ?? []).map((row: { user_id: string; level: number | null }) => [row.user_id, row.level ?? 1]),
     ) as Record<string, number>
     const healStats = scaleCombatStats(
       { hp: myHealCreature.hp, atk: myHealCreature.atk, def: myHealCreature.def ?? 0 },
-      healLevels[user.id],
+      healLevels[userId],
     )
 
     const attackerStatus = (myHealActive as any).active_status as StatusEffect | null
@@ -173,23 +175,23 @@ export async function POST(request: Request) {
     const nextTurn: 'challenger' | 'opponent' = isChallenger ? 'opponent' : 'challenger'
 
     async function endHealDuelFromStatusFaint() {
-      const allMyFainted = allHealLineups
-        .filter((lineup: any) => lineup.user_id === user.id)
+      const allMyFainted = healLineups
+        .filter((lineup: any) => lineup.user_id === userId)
         .every((lineup: any) => lineup.id === myHealActive.id || lineup.fainted_at !== null)
       if (allMyFainted) {
         await supabase
           .from('duels')
           .update({ status: 'ended', winner_id: oppUserId, ended_at: new Date().toISOString() })
           .eq('id', duelId)
-        await awardDuelResults(supabase, duel.session_id, oppUserId!, user.id)
+        await awardDuelResults(supabase, duel.session_id, oppUserId!, userId)
         incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel.session_id }).then(undefined, () => {})
       }
       return allMyFainted
     }
 
     async function switchToNextHealCreature() {
-      const remaining = allHealLineups
-        .filter((lineup: any) => lineup.user_id === user.id && !lineup.fainted_at && lineup.id !== myHealActive.id)
+      const remaining = healLineups
+        .filter((lineup: any) => lineup.user_id === userId && !lineup.fainted_at && lineup.id !== myHealActive.id)
         .sort((a: any, b: any) => a.slot - b.slot)
       const nextMine = remaining[0]
       if (!nextMine) return null
@@ -199,7 +201,7 @@ export async function POST(request: Request) {
       await supabase.from('duels').update({ [myField]: nextMine.player_creature_id }).eq('id', duelId)
 
       return {
-        userId: user.id,
+        userId,
         slot: nextMine.slot,
         playerCreatureId: nextMine.player_creature_id,
         name: (nextMine as any).player_creatures?.creatures?.name ?? 'Creatura',
@@ -248,7 +250,7 @@ export async function POST(request: Request) {
           type: 'broadcast',
           event: 'duel_action',
           payload: {
-            actorId: user.id,
+            actorId: userId,
             action: 'status_tick',
             statusEvent,
             nextTurn: duelEndedNow ? null : nextTurn,
@@ -293,7 +295,7 @@ export async function POST(request: Request) {
       type: 'broadcast',
       event: 'duel_action',
       payload: {
-        actorId: user.id,
+        actorId: userId,
         action: 'heal',
         healAmount,
         newHp,
@@ -323,7 +325,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Lineup non trovato' }, { status: 500 })
   }
 
-  const myActive  = allLineups.find(l => l.user_id === user.id    && l.is_active)
+  const myActive  = allLineups.find(l => l.user_id === userId     && l.is_active)
   const oppActive = allLineups.find(l => l.user_id === oppUserId  && l.is_active)
 
   if (!myActive || !oppActive) {
@@ -337,7 +339,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Dati creature non disponibili' }, { status: 500 })
   }
 
-  const duelUserIds = [user.id, oppUserId].filter(Boolean)
+  const duelUserIds = [userId, oppUserId].filter(Boolean)
   const { data: playerSessions } = await supabase
     .from('player_sessions')
     .select('user_id, level')
@@ -349,7 +351,7 @@ export async function POST(request: Request) {
   ) as Record<string, number>
   const myCombatStats = scaleCombatStats(
     { hp: myCreature.hp, atk: myCreature.atk, def: myCreature.def ?? 0 },
-    levelByUser[user.id],
+    levelByUser[userId],
   )
   const oppCombatStats = scaleCombatStats(
     { hp: oppCreature.hp, atk: oppCreature.atk, def: oppCreature.def ?? 0 },
@@ -360,7 +362,7 @@ export async function POST(request: Request) {
   const attackerStatus    = (myActive as any).active_status as StatusEffect | null
   const attackerTurnsLeft = (myActive as any).status_turns_left ?? 0
   const nextTurnRole: 'challenger' | 'opponent' = isChallenger ? 'opponent' : 'challenger'
-  const currentUserId = user.id
+  const currentUserId = userId
   const duelLineups = allLineups ?? []
 
   // Helper: end duel when the attacker faints from a status effect
@@ -435,7 +437,7 @@ export async function POST(request: Request) {
       const ch = supabase.channel(`duel:${duelId}`)
       await new Promise<void>(r => ch.subscribe(() => r()))
       await ch.send({ type: 'broadcast', event: 'duel_action', payload: {
-        actorId: user.id,
+        actorId: userId,
         action: 'status_tick',
         statusEvent,
         nextTurn: duelEndedNow ? null : nextTurnRole,
@@ -468,7 +470,7 @@ export async function POST(request: Request) {
       .from('player_inventory')
       .select('quantity, items(effect_value, type)')
       .eq('id', itemId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('session_id', duel.session_id)
       .single()
 
@@ -485,7 +487,7 @@ export async function POST(request: Request) {
   // ── Damage calculation ─────────────────────────────────────────────────────
   const mult   = getElementMultiplier(myCreature.element as Element, oppCreature.element as Element)
   const fortune = rollCombatFortune({
-    attackerLevel: levelByUser[user.id],
+    attackerLevel: levelByUser[userId],
     defenderLevel: levelByUser[oppUserId!] ?? 1,
     attackerStats: myCombatStats,
     defenderStats: oppCombatStats,
@@ -523,10 +525,10 @@ export async function POST(request: Request) {
     if (oppRemaining.length === 0) {
       // All fainted — we win
       duelOver = true
-      winnerId = user.id
+      winnerId = userId
       await supabase
         .from('duels')
-        .update({ status: 'ended', winner_id: user.id, ended_at: new Date().toISOString() })
+        .update({ status: 'ended', winner_id: userId, ended_at: new Date().toISOString() })
         .eq('id', duelId)
     } else {
       // Switch to next creature
@@ -580,8 +582,8 @@ export async function POST(request: Request) {
   let completedMissions: CompletedMission[] = []
   if (duelOver) {
     const [levelUps, missions] = await Promise.all([
-      awardDuelResults(supabase, duel.session_id, user.id, oppUserId!),
-      incrementMissionProgress({ type: 'duel', userId: user.id, sessionId: duel.session_id }).catch(() => [] as CompletedMission[]),
+      awardDuelResults(supabase, duel.session_id, userId, oppUserId!),
+      incrementMissionProgress({ type: 'duel', userId, sessionId: duel.session_id }).catch(() => [] as CompletedMission[]),
     ])
     myLevelUp = levelUps.winnerLevelUp
     completedMissions = missions
@@ -589,21 +591,21 @@ export async function POST(request: Request) {
     const { createAdminClient } = await import('@/lib/supabase/admin')
     const adminClient = createAdminClient()
     // Build creature summaries from allLineups for event payload
-    const myCreatures   = buildCreatureSummaries(allLineups ?? [], user.id)
+    const myCreatures   = buildCreatureSummaries(allLineups ?? [], userId)
     const oppCreatures  = buildCreatureSummaries(allLineups ?? [], oppUserId!)
     // Fetch opponent nickname
-    const { data: profileRows } = await adminClient.from('profiles').select('user_id, nickname').in('user_id', [user.id, oppUserId!])
+    const { data: profileRows } = await adminClient.from('profiles').select('user_id, nickname').in('user_id', [userId, oppUserId!])
     const profileMap: Record<string, string | null> = Object.fromEntries(
       (profileRows ?? []).map((r: any) => [r.user_id, r.nickname ?? null])
     )
     const eventsToInsert = [
-      { user_id: user.id,    session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId, opponent_name: profileMap[oppUserId!] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: myCreatures, opp_creatures: oppCreatures } },
-      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: user.id, winner_name: profileMap[user.id] ?? null, my_creatures: oppCreatures, opp_creatures: myCreatures } },
+      { user_id: userId,     session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId, opponent_name: profileMap[oppUserId!] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: myCreatures, opp_creatures: oppCreatures } },
+      { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: userId, winner_name: profileMap[userId] ?? null, my_creatures: oppCreatures, opp_creatures: myCreatures } },
     ]
     adminClient.from('player_game_events').insert(eventsToInsert).then(undefined, () => {})
     if (myLevelUp) {
       adminClient.from('player_game_events').insert({
-        user_id: user.id,
+        user_id: userId,
         session_id: duel.session_id,
         type: 'level_up',
         payload: { new_level: myLevelUp.newLevel, gold_reward: myLevelUp.goldReward },
@@ -618,7 +620,7 @@ export async function POST(request: Request) {
     type: 'broadcast',
     event: 'duel_action',
     payload: {
-      actorId: user.id,
+      actorId: userId,
       action,
       damage,
       fortune,

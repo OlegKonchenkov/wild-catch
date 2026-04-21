@@ -614,7 +614,7 @@ export async function POST(request: Request, { params }: Params) {
       healStatus = 'lost'
     }
 
-    const updates: Promise<unknown>[] = [
+    const updates = [
       supabase.from('boss_fights').update({
         player_lineup: healPlayerLineup,
         boss_lineup: healBossLineup,
