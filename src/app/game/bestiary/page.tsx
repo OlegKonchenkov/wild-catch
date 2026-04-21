@@ -942,10 +942,10 @@ export default function BestiaryPage() {
                         const meta = STATUS_EFFECT_META[effect]
                         const chancePercent = Math.round(((creature as any).status_effect_chance ?? 0.15) * 100)
                         const EFFECT_DETAILS: Record<StatusEffect, { description: string; duration: string }> = {
-                          paralisi:   { description: 'L\'avversario è bloccato e non può attaccare il turno successivo.', duration: '1 turno' },
-                          confusione: { description: 'Ogni turno c\'è il 50% di probabilità che l\'avversario colpisca se stesso invece di attaccare.', duration: '3 turni' },
-                          sonno:      { description: 'L\'avversario si addormenta e salta i suoi turni di attacco.', duration: '2 turni' },
-                          veleno:     { description: 'L\'avversario è avvelenato e perde il 10% degli HP massimi dopo ogni suo attacco.', duration: 'Finché in campo' },
+                          paralisi:   { description: 'Per 2 turni ha il 35% di attaccare normalmente e il 65% di fallire il turno.', duration: '2 turni' },
+                          confusione: { description: 'Per 3 turni ha il 50% di attaccare normalmente e il 50% di colpirsi da solo.', duration: '3 turni' },
+                          sonno:      { description: "Per 2 turni salta sempre l'attacco.", duration: '2 turni' },
+                          veleno:     { description: "All'inizio del suo turno perde il 10% degli HP massimi finché resta in campo.", duration: 'Finché in campo' },
                         }
                         const detail = EFFECT_DETAILS[effect]
                         return (

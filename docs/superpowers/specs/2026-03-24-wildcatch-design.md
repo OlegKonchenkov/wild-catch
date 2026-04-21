@@ -308,12 +308,14 @@ Le creature possono applicare effetti di stato con ogni attacco, con probabilit�
 | **Paralisi** ⚡ | 2 turni | 65% salta il turno, 35% attacca normalmente | ×1.5 |
 | **Sonno** 💤 | 2 turni | Salta sempre il turno (blocco totale) | ×2.0 |
 | **Confusione** 💫 | 3 turni | 50% si autoferisce invece di attaccare | ×1.5 |
-| **Veleno** ☠️ | Permanente | Subisce danno ogni turno, agisce normalmente | ×1.0 |
+| **Veleno** ☠️ | Permanente | Perde il 10% degli HP massimi all'inizio del proprio turno, agisce normalmente se sopravvive | ×1.0 |
 
 **Regole generali:**
-- Effetto applicato **al momento del danno** — se l'attacco attiva l'effetto, la creatura non può già contrattaccare nello stesso turno (se paralisi/sonno)
+- Effetto applicato **al momento del danno**: viene salvato subito, ma si risolve sempre all'inizio del turno della creatura affetta
+- Negli incontri e nei boss fight il turno del wild/boss parte subito dopo l'attacco del giocatore, quindi uno status appena applicato puo` gia` influenzare il contrattacco di quel round
 - Re-applicazione **resetta il counter** — applicare paralisi a una creatura già paralizzata riporta a 2 turni
 - Valido per incontri selvatici, duelli PvP e scontri boss
+- Se una creatura con status sviene e viene sostituita, la nuova creatura entra senza ereditare lo stato della precedente
 
 ### Evoluzione
 - Trigger: automatico al momento della cattura quando `duplicates_count` raggiunge 3
@@ -329,7 +331,7 @@ Le creature possono applicare effetti di stato con ogni attacco, con probabilit�
 - Ogni giocatore sceglie una lineup di 1–3 creature; si combatte uno contro uno, se una sviene si avanza alla successiva
 - Danno = (ATK creatura × livello) × moltiplicatore elemento × dado (0.8–1.2) × critico (10% chance, ×1.75)
 - Oggetti battaglia (ATK boost) e cura usabili durante il duello al posto di un attacco
-- Effetti di stato applicabili in duello: paralisi/sonno auto-saltano il turno dell'avversario (65%/100%); l'avversario può comunque usare una pozione nel proprio turno
+- Effetti di stato applicabili in duello: paralisi = 65% fallisce / 35% attacca, sonno = salta sempre l'attacco, confusione = 50% si colpisce da sola, veleno = perde il 10% degli HP all'inizio del proprio turno
 - Vincitore: +30 EXP + oro | Perdente: niente (vedi progressione)
 - Realtime via WebSocket Supabase (broadcast + postgres_changes)
 

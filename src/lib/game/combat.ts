@@ -167,10 +167,6 @@ export function rollConfusionSelfHit(randomValue = Math.random()): boolean {
   return randomValue < 0.5
 }
 
-export function shouldSkipCounterattackOnStatusApply(effect: StatusEffect | null | undefined): boolean {
-  return effect === 'paralisi' || effect === 'sonno'
-}
-
 /** Self-damage from confusion: attacker hits themselves at 50% power (own ATK vs own DEF). */
 export function calculateConfusionSelfDamage(atk: number, def: number): number {
   return calculateCombatDamage({ attackerAtk: atk, defenderDef: def, attackMultiplier: 0.5 })
@@ -179,4 +175,138 @@ export function calculateConfusionSelfDamage(atk: number, def: number): number {
 /** Poison tick: 10% of scaled max HP per turn, minimum 1. */
 export function calculatePoisonDamage(maxHp: number): number {
   return Math.max(1, Math.round(maxHp * 0.10))
+}
+
+export interface ResolveTurnStartStatusOptions {
+  effect: StatusEffect | null | undefined
+  turnsLeft?: number | null
+  currentHp: number
+  maxHp: number
+  atk: number
+  def: number
+  randomValue?: number
+}
+
+export interface ResolveTurnStartStatusResult {
+  nextEffect: StatusEffect | null
+  nextTurnsLeft: number
+  currentHp: number
+  preventedAction: boolean
+  fainted: boolean
+  event: Record<string, unknown> | null
+}
+
+export function resolveTurnStartStatus({
+  effect,
+  turnsLeft = 0,
+  currentHp,
+  maxHp,
+  atk,
+  def,
+  randomValue,
+}: ResolveTurnStartStatusOptions): ResolveTurnStartStatusResult {
+  const safeMaxHp = Math.max(1, maxHp)
+  const safeHp = Math.max(0, Math.min(currentHp, safeMaxHp))
+
+  if (!effect) {
+    return {
+      nextEffect: null,
+      nextTurnsLeft: 0,
+      currentHp: safeHp,
+      preventedAction: false,
+      fainted: safeHp === 0,
+      event: null,
+    }
+  }
+
+  if (effect === 'veleno') {
+    const poisonDamage = calculatePoisonDamage(safeMaxHp)
+    const nextHp = Math.max(0, safeHp - poisonDamage)
+    return {
+      nextEffect: 'veleno',
+      nextTurnsLeft: 0,
+      currentHp: nextHp,
+      preventedAction: nextHp === 0,
+      fainted: nextHp === 0,
+      event: {
+        type: 'veleno',
+        poisonDamage,
+        newHp: nextHp,
+        fainted: nextHp === 0,
+      },
+    }
+  }
+
+  const nextTurns = Math.max(0, (turnsLeft ?? 0) - 1)
+  const cleared = nextTurns <= 0
+  const nextEffect = cleared ? null : effect
+
+  if (effect === 'sonno') {
+    return {
+      nextEffect,
+      nextTurnsLeft: nextTurns,
+      currentHp: safeHp,
+      preventedAction: true,
+      fainted: safeHp === 0,
+      event: {
+        type: 'sonno',
+        turnPassed: true,
+        cleared,
+        turnsLeft: nextTurns,
+      },
+    }
+  }
+
+  if (effect === 'paralisi') {
+    const paralysisSkip = rollParalysisSkip(randomValue)
+    return {
+      nextEffect,
+      nextTurnsLeft: nextTurns,
+      currentHp: safeHp,
+      preventedAction: paralysisSkip,
+      fainted: safeHp === 0,
+      event: {
+        type: 'paralisi',
+        paralysisSkip,
+        cleared,
+        turnsLeft: nextTurns,
+      },
+    }
+  }
+
+  const selfHit = rollConfusionSelfHit(randomValue)
+  if (!selfHit) {
+    return {
+      nextEffect,
+      nextTurnsLeft: nextTurns,
+      currentHp: safeHp,
+      preventedAction: false,
+      fainted: safeHp === 0,
+      event: {
+        type: 'confusione',
+        selfHit: false,
+        cleared,
+        turnsLeft: nextTurns,
+      },
+    }
+  }
+
+  const selfDamage = calculateConfusionSelfDamage(atk, def)
+  const nextHp = Math.max(0, safeHp - selfDamage)
+  return {
+    nextEffect,
+    nextTurnsLeft: nextTurns,
+    currentHp: nextHp,
+    preventedAction: true,
+    fainted: nextHp === 0,
+    event: {
+      type: 'confusione',
+      selfHit: true,
+      selfDamage,
+      newHp: nextHp,
+      fainted: nextHp === 0,
+      cleared,
+      turnsLeft: nextTurns,
+    },
+  }
 }

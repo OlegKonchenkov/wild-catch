@@ -675,7 +675,14 @@ export default function DuelPage() {
         setLog(prev => [`${atkLabel} ${damage} danno${critLabel}${fortuneText && !isCrit ? ` · ${fortuneText}` : ''}!`, ...prev.slice(0, 3)])
 
         // Pre-turn confusion info
-        if (preTurnSE && !preTurnSE.selfHit) {
+        if (preTurnSE?.type === 'veleno' && preTurnSE.poisonDamage !== undefined) {
+          const text = preTurnSE.fainted ? 'Veleno - sviene!' : `Veleno - ${preTurnSE.poisonDamage} danno`
+          flashStatusNotice('veleno', text)
+          const updateHp = (prev: LineupEntry[]) => prev.map(l =>
+            l.is_active ? { ...l, current_hp: preTurnSE.newMyHp ?? l.current_hp } : l
+          )
+          if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
+        } else if (preTurnSE && !preTurnSE.selfHit) {
           const effect = preTurnSE.type as StatusEffect
           const text = preTurnSE.cleared ? `${STATUS_EFFECT_META[effect]?.label} curato` : `${STATUS_EFFECT_META[effect]?.label} — attacca lo stesso`
           flashStatusNotice(effect, text)
@@ -920,19 +927,26 @@ export default function DuelPage() {
     if (timerRef.current) clearInterval(timerRef.current)
     autoFightRef.current = true
     const isSleepingTurn = myActive?.active_status === 'sonno'
+    const statusMayChangeAttack = myActive?.active_status === 'paralisi'
+      || myActive?.active_status === 'confusione'
+      || myActive?.active_status === 'veleno'
     const usedItemId = isSleepingTurn ? null : selectedItemId
-    if (!isSleepingTurn) {
+    if (!isSleepingTurn && !statusMayChangeAttack) {
       startAttackFeedback()
       setAnimState('attack')
       setTimeout(() => setAnimState('idle'), 400)
     }
     const myActiveCrNow = myLineup.find(l => l.is_active)?.player_creatures?.creatures
-    if (!isSleepingTurn && myActiveCrNow) {
+    if (!isSleepingTurn && !statusMayChangeAttack && myActiveCrNow) {
       setAttackAnim({ key: Date.now(), element: myActiveCrNow.element, rarity: myActiveCrNow.rarity, side: 'left', soundUrl: myActiveCrNow.attack_sound_url, soundDurationMs: myActiveCrNow.attack_sound_duration_ms })
     }
 
     // Show attack label immediately — before server responds
     setLog(prev => [selectedItemId ? '⚔️+🗡️ Attacco!' : '⚔️ Attacco!', ...prev.slice(0, 3)])
+
+    if (statusMayChangeAttack) {
+      setLog(prev => ['Prepari l\'azione...', ...prev.filter(msg => !msg.includes('Attacco')).slice(0, 3)])
+    }
 
     if (isSleepingTurn) {
       setLog(prev => ['Passo il turno', ...prev.filter(msg => !msg.includes('Attacco')).slice(0, 3)])
@@ -956,6 +970,12 @@ export default function DuelPage() {
 
     const data = await res.json()
     if (res.ok) {
+      if (statusMayChangeAttack && data.damage > 0 && myActiveCrNow) {
+        startAttackFeedback()
+        setAnimState('attack')
+        setTimeout(() => setAnimState('idle'), 400)
+        setAttackAnim({ key: Date.now(), element: myActiveCrNow.element, rarity: myActiveCrNow.rarity, side: 'left', soundUrl: myActiveCrNow.attack_sound_url, soundDurationMs: myActiveCrNow.attack_sound_duration_ms })
+      }
       if (data.levelUp) { playLevelUp(); window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp })) }
       if (data.duelOver) {
         // Immediately mark as won for the attacker — don't wait for postgres_changes

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { calculateCombatDamage, calculateConfusionSelfDamage, calculatePoisonDamage, rollCombatFortune, rollConfusionSelfHit, rollCrit, rollParalysisSkip, rollStatusEffect, scaleCombatStats, shouldSkipCounterattackOnStatusApply, STATUS_EFFECT_META } from '@/lib/game/combat'
+import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
@@ -271,96 +271,39 @@ export async function POST(request: Request, { params }: Params) {
     let skipPlayerAttack = false
     let statusTickEvents: Record<string, unknown>[] = []
 
-    // Veleno tick on player
-    if (playerStatus === 'veleno') {
-      const poisonDmg = calculatePoisonDamage(playerActive.max_hp)
-      playerActive.current_hp = Math.max(0, playerActive.current_hp - poisonDmg)
-      if (playerActive.current_hp === 0) playerActive.fainted = true
-      statusTickEvents.push({ type: 'veleno', target: 'player', poisonDamage: poisonDmg, newHp: playerActive.current_hp, fainted: playerActive.current_hp === 0 })
-    }
-
-    // Veleno tick on boss
-    if (bossActive.active_status === 'veleno') {
-      const bPoisonDmg = calculatePoisonDamage(bossActive.max_hp)
-      bossActive.current_hp = Math.max(0, bossActive.current_hp - bPoisonDmg)
-      if (bossActive.current_hp === 0) bossActive.fainted = true
-      statusTickEvents.push({ type: 'veleno', target: 'boss', poisonDamage: bPoisonDmg, newHp: bossActive.current_hp, fainted: bossActive.current_hp === 0 })
-    }
-
-    // Sonno on boss: always skip. Paralisi: 65% skip, 35% attacks.
     let skipBossAttack = false
-    if (bossActive.active_status === 'sonno' && !bossActive.fainted) {
-      const newT = (bossActive.status_turns_left ?? 0) - 1
-      const cleared = newT <= 0
-      bossActive.active_status    = cleared ? null : 'sonno'
-      bossActive.status_turns_left = Math.max(0, newT)
-      skipBossAttack = true
-      statusTickEvents.push({ type: 'sonno', target: 'boss', turnPassed: true, cleared, turnsLeft: Math.max(0, newT) })
-    } else if (bossActive.active_status === 'paralisi' && !bossActive.fainted) {
-      const newT = (bossActive.status_turns_left ?? 0) - 1
-      const cleared = newT <= 0
-      bossActive.active_status    = cleared ? null : 'paralisi'
-      bossActive.status_turns_left = Math.max(0, newT)
-      const paralysisSkip = rollParalysisSkip()
-      if (paralysisSkip) skipBossAttack = true
-      statusTickEvents.push({ type: 'paralisi', target: 'boss', paralysisSkip, cleared, turnsLeft: Math.max(0, newT) })
-    } else if (bossActive.active_status === 'confusione' && !bossActive.fainted) {
-      const newT = (bossActive.status_turns_left ?? 0) - 1
-      const cleared = newT <= 0
-      bossActive.active_status = cleared ? null : 'confusione'
-      bossActive.status_turns_left = Math.max(0, newT)
-      if (rollConfusionSelfHit()) {
-        skipBossAttack = true
-        const selfDmg = calculateConfusionSelfDamage(bossActive.atk, bossActive.def ?? 0)
-        bossActive.current_hp = Math.max(0, bossActive.current_hp - selfDmg)
-        if (bossActive.current_hp === 0) bossActive.fainted = true
-        statusTickEvents.push({
-          type: 'confusione',
-          target: 'boss',
-          selfHit: true,
-          selfDamage: selfDmg,
-          selfHp: bossActive.current_hp,
-          cleared,
-          turnsLeft: Math.max(0, newT),
-          fainted: bossActive.current_hp === 0,
-        })
-      } else {
-        statusTickEvents.push({ type: 'confusione', target: 'boss', selfHit: false, cleared, turnsLeft: Math.max(0, newT) })
-      }
-    }
 
-    // Sonno: always skips. Paralisi: 65% skip, 35% attacks.
-    if (playerStatus === 'sonno' && !playerActive.fainted) {
-      const newTurns = playerStatusTurns - 1
-      const cleared = newTurns <= 0
-      playerActive.active_status    = cleared ? null : 'sonno'
-      playerActive.status_turns_left = Math.max(0, newTurns)
-      skipPlayerAttack = true
-      preTurnStatusEvent = { type: 'sonno', turnPassed: true, cleared, turnsLeft: Math.max(0, newTurns) }
-    } else if (playerStatus === 'paralisi' && !playerActive.fainted) {
-      const newTurns = playerStatusTurns - 1
-      const cleared = newTurns <= 0
-      playerActive.active_status    = cleared ? null : 'paralisi'
-      playerActive.status_turns_left = Math.max(0, newTurns)
-      const paralysisSkip = rollParalysisSkip()
-      if (paralysisSkip) skipPlayerAttack = true
-      preTurnStatusEvent = { type: 'paralisi', paralysisSkip, cleared, turnsLeft: Math.max(0, newTurns) }
+    const playerStatusTick = resolveTurnStartStatus({
+      effect: playerStatus,
+      turnsLeft: playerStatusTurns,
+      currentHp: playerActive.current_hp,
+      maxHp: playerActive.max_hp,
+      atk: playerActive.atk,
+      def: playerActive.def ?? 0,
+    })
+    playerActive.active_status = playerStatusTick.nextEffect
+    playerActive.status_turns_left = playerStatusTick.nextTurnsLeft
+    playerActive.current_hp = playerStatusTick.currentHp
+    if (playerStatusTick.fainted) playerActive.fainted = true
+    if (playerStatusTick.event?.type === 'veleno') {
+      statusTickEvents.push({ ...playerStatusTick.event, target: 'player' })
+      preTurnStatusEvent = null
+    } else {
+      preTurnStatusEvent = playerStatusTick.event
     }
+    if (playerStatusTick.preventedAction) skipPlayerAttack = true
 
-    // Confusione: 50/50 self-hit or normal
-    if (playerStatus === 'confusione' && !skipPlayerAttack && !playerActive.fainted) {
-      const newTurns = playerStatusTurns - 1
-      const cleared = newTurns <= 0
-      playerActive.active_status    = cleared ? null : 'confusione'
-      playerActive.status_turns_left = Math.max(0, newTurns)
-      if (rollConfusionSelfHit()) {
+    let preTurnPlayerSwitchedTo: string | null = null
+    let preTurnPlayerActiveSlot = fight.player_active_slot
+    if (playerActive.fainted) {
+      playerActive.is_active = false
+      const nextPlayerIdx = playerLineup.findIndex((c: any) => !c.fainted)
+      if (nextPlayerIdx !== -1) {
+        playerLineup[nextPlayerIdx].is_active = true
+        preTurnPlayerActiveSlot = nextPlayerIdx
+        preTurnPlayerSwitchedTo = playerLineup[nextPlayerIdx].name
         skipPlayerAttack = true
-        const selfDmg = calculateConfusionSelfDamage(playerActive.atk, playerActive.def ?? 0)
-        playerActive.current_hp = Math.max(0, playerActive.current_hp - selfDmg)
-        if (playerActive.current_hp === 0) playerActive.fainted = true
-        preTurnStatusEvent = { type: 'confusione', selfHit: true, selfDamage: selfDmg, selfHp: playerActive.current_hp, cleared, turnsLeft: Math.max(0, newTurns), fainted: playerActive.current_hp === 0 }
-      } else {
-        preTurnStatusEvent = { type: 'confusione', selfHit: false, cleared, turnsLeft: Math.max(0, newTurns) }
+        skipBossAttack = true
       }
     }
 
@@ -418,7 +361,7 @@ export async function POST(request: Request, { params }: Params) {
         varianceMultiplier: playerFortune.multiplier,
       })
     }
-    const newBossHp = Math.max(0, bossActive.current_hp - playerDamage)
+    let newBossHp = Math.max(0, bossActive.current_hp - playerDamage)
     bossActive.current_hp = newBossHp
     if (newBossHp === 0) bossActive.fainted = true
 
@@ -433,7 +376,7 @@ export async function POST(request: Request, { params }: Params) {
       }
     }
 
-    const allBossFainted = bossLineup.every((c: any) => c.fainted)
+    let allBossFainted = bossLineup.every((c: any) => c.fainted)
 
     // ── Player→Boss status roll (before counter-attack so paralisi/sonno blocks it) ─
     let statusAppliedToBoss: StatusEffect | null = null
@@ -445,11 +388,37 @@ export async function POST(request: Request, { params }: Params) {
         bossStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
         bossActive.active_status    = triggered
         bossActive.status_turns_left = bossStatusTurnsLeft
-        if (shouldSkipCounterattackOnStatusApply(triggered)) {
-          skipBossAttack = true
-        }
       }
     }
+
+    if (newBossHp > 0 && !bossActive.fainted) {
+      const bossStatusTick = resolveTurnStartStatus({
+        effect: bossActive.active_status as StatusEffect | null,
+        turnsLeft: bossActive.status_turns_left ?? 0,
+        currentHp: bossActive.current_hp,
+        maxHp: bossActive.max_hp,
+        atk: bossActive.atk,
+        def: bossActive.def ?? 0,
+      })
+      bossActive.active_status = bossStatusTick.nextEffect
+      bossActive.status_turns_left = bossStatusTick.nextTurnsLeft
+      bossActive.current_hp = bossStatusTick.currentHp
+      newBossHp = bossStatusTick.currentHp
+      if (bossStatusTick.fainted) bossActive.fainted = true
+      if (bossStatusTick.event) {
+        statusTickEvents.push({ ...bossStatusTick.event, target: 'boss' })
+      }
+      if (bossStatusTick.preventedAction || bossStatusTick.fainted) skipBossAttack = true
+    }
+
+    if (bossActive.fainted && newBossActiveSlot === fight.boss_active_slot) {
+      const nextBossIdx = bossLineup.findIndex((c: any, i: number) => i > fight.boss_active_slot && !c.fainted)
+      if (nextBossIdx !== -1) {
+        newBossActiveSlot = nextBossIdx
+        bossSwitchedTo = bossLineup[nextBossIdx].name
+      }
+    }
+    allBossFainted = bossLineup.every((c: any) => c.fainted)
 
     // ── Boss → Player (only if boss still alive at start of counter-attack) ─
     // The boss that was alive before player's attack counter-attacks
@@ -499,8 +468,8 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     // ── Auto-advance player slot if fainted ─────────────────────────────
-    let newPlayerActiveSlot = fight.player_active_slot
-    let playerSwitchedTo: string | null = null
+    let newPlayerActiveSlot = preTurnPlayerActiveSlot
+    let playerSwitchedTo: string | null = preTurnPlayerSwitchedTo
     if (newPlayerHp === 0) {
       playerActive.is_active = false
       const nextPlayerIdx = playerLineup.findIndex((c: any) => !c.fainted)

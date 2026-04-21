@@ -3,11 +3,11 @@ import {
   calculateCombatDamage,
   calculatePoisonDamage,
   normalizeCombatLevel,
+  resolveTurnStartStatus,
   rollConfusionSelfHit,
   rollCombatFortune,
   rollParalysisSkip,
   scaleCombatStats,
-  shouldSkipCounterattackOnStatusApply,
 } from '@/lib/game/combat'
 
 describe('combat helpers', () => {
@@ -66,13 +66,6 @@ describe('combat helpers', () => {
     expect(underdogFight.isUnderdog).toBe(true)
   })
 
-  it('only paralysis and sleep block the immediate counterattack on application', () => {
-    expect(shouldSkipCounterattackOnStatusApply('paralisi')).toBe(true)
-    expect(shouldSkipCounterattackOnStatusApply('sonno')).toBe(true)
-    expect(shouldSkipCounterattackOnStatusApply('confusione')).toBe(false)
-    expect(shouldSkipCounterattackOnStatusApply('veleno')).toBe(false)
-  })
-
   it('keeps paralysis at 65% skip and 35% attack with the expected threshold', () => {
     expect(rollParalysisSkip(0)).toBe(true)
     expect(rollParalysisSkip(0.649999)).toBe(true)
@@ -91,5 +84,71 @@ describe('combat helpers', () => {
     expect(calculatePoisonDamage(100)).toBe(10)
     expect(calculatePoisonDamage(55)).toBe(6)
     expect(calculatePoisonDamage(1)).toBe(1)
+  })
+
+  it('keeps poison as a damage tick and never as an automatic skipped turn', () => {
+    const result = resolveTurnStartStatus({
+      effect: 'veleno',
+      turnsLeft: 0,
+      currentHp: 40,
+      maxHp: 100,
+      atk: 20,
+      def: 10,
+    })
+
+    expect(result.preventedAction).toBe(false)
+    expect(result.nextEffect).toBe('veleno')
+    expect(result.currentHp).toBe(30)
+    expect(result.event).toMatchObject({
+      type: 'veleno',
+      poisonDamage: 10,
+      newHp: 30,
+      fainted: false,
+    })
+  })
+
+  it('resolves paralysis as 65% skip and decrements the duration', () => {
+    const result = resolveTurnStartStatus({
+      effect: 'paralisi',
+      turnsLeft: 2,
+      currentHp: 50,
+      maxHp: 100,
+      atk: 20,
+      def: 10,
+      randomValue: 0.3,
+    })
+
+    expect(result.preventedAction).toBe(true)
+    expect(result.nextEffect).toBe('paralisi')
+    expect(result.nextTurnsLeft).toBe(1)
+    expect(result.event).toMatchObject({
+      type: 'paralisi',
+      paralysisSkip: true,
+      cleared: false,
+      turnsLeft: 1,
+    })
+  })
+
+  it('resolves confusion self-hit with real self-damage and duration decrement', () => {
+    const result = resolveTurnStartStatus({
+      effect: 'confusione',
+      turnsLeft: 3,
+      currentHp: 28,
+      maxHp: 100,
+      atk: 40,
+      def: 10,
+      randomValue: 0.2,
+    })
+
+    expect(result.preventedAction).toBe(true)
+    expect(result.nextEffect).toBe('confusione')
+    expect(result.nextTurnsLeft).toBe(2)
+    expect(result.currentHp).toBeLessThan(28)
+    expect(result.event).toMatchObject({
+      type: 'confusione',
+      selfHit: true,
+      cleared: false,
+      turnsLeft: 2,
+    })
   })
 })

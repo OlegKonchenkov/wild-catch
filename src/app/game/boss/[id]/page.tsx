@@ -1539,12 +1539,15 @@ export default function BossFightPage() {
     setAttacking(true)
     const actingPlayerNow = playerLineup.find((c: PlayerSlot) => c.is_active && !c.fainted)
     const isSleepingTurn = actingPlayerNow?.active_status === 'sonno'
+    const statusMayChangeAttack = actingPlayerNow?.active_status === 'paralisi'
+      || actingPlayerNow?.active_status === 'confusione'
+      || actingPlayerNow?.active_status === 'veleno'
     const usedItemId = isSleepingTurn ? null : selectedItemId
-    if (!isSleepingTurn) {
+    if (!isSleepingTurn && !statusMayChangeAttack) {
       setAnimState('attack')
       setTimeout(() => setAnimState('idle'), 300)
     }
-    if (!isSleepingTurn && actingPlayerNow) {
+    if (!isSleepingTurn && !statusMayChangeAttack && actingPlayerNow) {
       setAttackAnim({ key: Date.now(), element: actingPlayerNow.element, rarity: actingPlayerNow.rarity, side: 'left', soundUrl: actingPlayerNow.attack_sound_url, soundDurationMs: actingPlayerNow.attack_sound_duration_ms })
     }
 
@@ -1556,6 +1559,12 @@ export default function BossFightPage() {
     const data = await res.json()
 
     if (!res.ok) { showActionError(res.status, data.error ?? 'Errore attacco'); attackingRef.current = false; setAttacking(false); return }
+
+    if (statusMayChangeAttack && data.playerDamage > 0 && actingPlayerNow) {
+      setAnimState('attack')
+      setTimeout(() => setAnimState('idle'), 300)
+      setAttackAnim({ key: Date.now(), element: actingPlayerNow.element, rarity: actingPlayerNow.rarity, side: 'left', soundUrl: actingPlayerNow.attack_sound_url, soundDurationMs: actingPlayerNow.attack_sound_duration_ms })
+    }
 
     if (usedItemId && data.playerDamage > 0) {
       setBattagliaItems(prev => prev.map(item =>

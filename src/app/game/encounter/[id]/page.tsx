@@ -513,13 +513,16 @@ export default function EncounterPage() {
     const usedBattagliaId = playerStatus === 'sonno' ? null : selectedBattagliaId
     const usedPozioneId = playerStatus === 'sonno' ? null : selectedPozioneId
     const sleepingTurn = playerStatus === 'sonno'
+    const statusMayChangeAttack = playerStatus === 'paralisi' || playerStatus === 'confusione' || playerStatus === 'veleno'
+    const playedAttackOptimistically = !sleepingTurn && !statusMayChangeAttack
     resetTimer(); setLoading(true); setPendingAction('fight'); setMessage(`⚔️ ${attackingName} all'attacco!`); setIsCritMessage(false); setShowItemsModal(false)
 
+    if (statusMayChangeAttack) setMessage(`${attackingName} si prepara...`)
     const actionStartedAt = Date.now()
-    if (sleepingTurn) setMessage(`ðŸ’¤ ${attackingName} prova a resistere al sonno...`)
-    if (!sleepingTurn) setPlayerAnim('attack')
-    if (!sleepingTurn) setAttackAnim({ key: Date.now(), element: playerCreature?.element ?? 'armonia', rarity: playerCreature?.rarity ?? 'comune', side: 'left', soundUrl: playerCreature?.soundUrl, soundDurationMs: playerCreature?.soundDurationMs })
-    const attackReset = setTimeout(() => setPlayerAnim('idle'), 260)
+    if (sleepingTurn) setMessage(`💤 ${attackingName} prova a resistere al sonno...`)
+    if (playedAttackOptimistically) setPlayerAnim('attack')
+    if (playedAttackOptimistically) setAttackAnim({ key: Date.now(), element: playerCreature?.element ?? 'armonia', rarity: playerCreature?.rarity ?? 'comune', side: 'left', soundUrl: playerCreature?.soundUrl, soundDurationMs: playerCreature?.soundDurationMs })
+    const attackReset = playedAttackOptimistically ? setTimeout(() => setPlayerAnim('idle'), 260) : null
 
     const activeItemId = usedPozioneId ?? usedBattagliaId ?? null
     const activeSquadPcId = squadCreatures.length > 0 ? squadCreatures[activeSlot]?.pcId : undefined
@@ -530,6 +533,7 @@ export default function EncounterPage() {
       body: JSON.stringify({
         encounterId: state.encounterId,
         itemId: activeItemId,
+        currentPlayerHp: playerHp ?? playerCreature?.maxHp ?? 100,
         ...(activeSlot > 0 && activeSquadPcId ? { activePlayerCreatureId: activeSquadPcId } : {}),
         ...(shouldClearStatus ? { clearPlayerStatus: true } : {}),
       }),
@@ -545,12 +549,12 @@ export default function EncounterPage() {
       setSelectedPozioneId(null)
     }
 
-    clearTimeout(attackReset)
+    if (attackReset) clearTimeout(attackReset)
     setPlayerAnim('idle')
 
     if (!res.ok) { setMessage(data.error); finishPendingAction(); return }
 
-    const remainingAttackMs = Math.max(0, 260 - (Date.now() - actionStartedAt))
+    const remainingAttackMs = playedAttackOptimistically ? Math.max(0, 260 - (Date.now() - actionStartedAt)) : 0
     if (remainingAttackMs > 0) await new Promise(r => setTimeout(r, remainingAttackMs))
 
     let currentPlayerHp = playerHp ?? playerCreature?.maxHp ?? 100
@@ -573,6 +577,11 @@ export default function EncounterPage() {
           setPlayerStatus(null)
           setPlayerStatusTurns(0)
           clearPlayerStatusRef.current = true
+          fetch('/api/game/encounter/clear-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ encounterId: state.encounterId }),
+          }).catch(() => undefined)
           setMessage(`${squadCreatures[activeSlot].name} è svenuta! Entra ${next.name}!`)
           finishPendingAction()
           return
@@ -584,6 +593,81 @@ export default function EncounterPage() {
       finishPendingAction()
     }
 
+    const updateCurrentPlayerHp = (newHp: number) => {
+      currentPlayerHp = newHp
+      setPlayerHp(newHp)
+      if (squadCreatures.length > 0) {
+        setSlotHps(prev => {
+          const next = [...prev]
+          next[activeSlot] = newHp
+          return next
+        })
+      }
+    }
+
+    const playerStatusEvents = ((data.statusEvents ?? []) as any[]).filter(se => se.target === 'player')
+    if (playerStatusEvents.length) {
+      await new Promise(r => setTimeout(r, 300))
+      for (const se of playerStatusEvents) {
+        const effect = se.type as StatusEffect
+        const meta = STATUS_EFFECT_META[effect]
+
+        if (se.cleared) setPlayerStatus(null)
+        else if (se.turnsLeft != null) setPlayerStatusTurns(se.turnsLeft)
+
+        if (effect === 'veleno' && se.poisonDamage > 0) {
+          const newHp = typeof se.newHp === 'number'
+            ? Math.max(0, se.newHp)
+            : Math.max(0, currentPlayerHp - se.poisonDamage)
+          updateCurrentPlayerHp(newHp)
+          setPlayerAnim('damage')
+          setMessage(`☠️ Veleno - ${se.poisonDamage} danno a te!`)
+          await new Promise(r => setTimeout(r, 700))
+          setPlayerAnim('idle')
+          if (newHp <= 0) {
+            await handlePlayerKnockout()
+            return
+          }
+          continue
+        }
+
+        if (effect === 'confusione' && se.selfHit && se.selfDamage > 0) {
+          const newHp = typeof se.newHp === 'number'
+            ? Math.max(0, se.newHp)
+            : Math.max(0, currentPlayerHp - se.selfDamage)
+          updateCurrentPlayerHp(newHp)
+          setPlayerAnim('damage')
+          setMessage(`💫 Confusione - ti colpisci da solo per ${se.selfDamage}!`)
+          await new Promise(r => setTimeout(r, 700))
+          setPlayerAnim('idle')
+          if (newHp <= 0) {
+            await handlePlayerKnockout()
+            return
+          }
+          continue
+        }
+
+        if (se.turnPassed || se.paralysisSkip === true) {
+          setMessage(`${meta?.emoji ?? ''} Hai saltato il turno (${meta?.label ?? effect})`)
+          await new Promise(r => setTimeout(r, 700))
+        }
+      }
+    }
+
+    if (!playedAttackOptimistically && data.playerDamage > 0) {
+      setPlayerAnim('attack')
+      setAttackAnim({
+        key: Date.now(),
+        element: playerCreature?.element ?? 'armonia',
+        rarity: playerCreature?.rarity ?? 'comune',
+        side: 'left',
+        soundUrl: playerCreature?.soundUrl,
+        soundDurationMs: playerCreature?.soundDurationMs,
+      })
+      await new Promise(r => setTimeout(r, 260))
+      setPlayerAnim('idle')
+    }
+
     if (data.playerDamage > 0) {
       setWildAnim('damage')
       await new Promise(r => setTimeout(r, 380))
@@ -592,10 +676,7 @@ export default function EncounterPage() {
 
     setState(prev => prev ? { ...prev, wildHp: data.wildHpRemaining, catchMultiplier: data.catchMultiplier, turns: prev.turns + 1 } : null)
 
-    if (data.fightResult === 'fled') {
-      playKnockout()
-      setWildAnim('flee'); setMessage(''); setResult('ko'); finishPendingAction(); return
-    }
+    const wildWasDefeated = data.fightResult === 'fled'
 
     const playerName = playerCreature?.name ?? 'la tua creatura'
     const wildName   = state.creature.name ?? 'creatura selvatica'
@@ -609,7 +690,7 @@ export default function EncounterPage() {
       setIsCritMessage(false)
     }
 
-    // Status applied by player's hit — always show BEFORE wild counter-attack
+    // Status applied by player's hit — always show BEFORE wild turn-start effects
     if (data.statusAppliedToWild) {
       const effect = data.statusAppliedToWild as StatusEffect
       const meta = STATUS_EFFECT_META[effect]
@@ -618,6 +699,45 @@ export default function EncounterPage() {
       await new Promise(r => setTimeout(r, 600))
       setMessage(`${meta?.emoji ?? ''} ${state.creature.name} è afflitto da ${meta?.label ?? effect}!`)
       await new Promise(r => setTimeout(r, 600))
+    }
+
+    const wildStatusEvents = ((data.statusEvents ?? []) as any[]).filter(se => se.target === 'wild')
+    if (wildStatusEvents.length) {
+      await new Promise(r => setTimeout(r, 600))
+      for (const se of wildStatusEvents) {
+        const effect = se.type as StatusEffect
+        const meta = STATUS_EFFECT_META[effect]
+
+        if (se.cleared) setWildStatus(null)
+        else if (se.turnsLeft != null) setWildStatusTurns(se.turnsLeft)
+
+        if (effect === 'veleno' && se.poisonDamage > 0) {
+          setWildAnim('damage')
+          setMessage(`☠️ Veleno - ${se.poisonDamage} danno a ${state.creature.name}!`)
+          await new Promise(r => setTimeout(r, 700))
+          setWildAnim('idle')
+          continue
+        }
+
+        if (effect === 'confusione' && se.selfHit && se.selfDamage > 0) {
+          setWildAnim('damage')
+          setMessage(`💫 ${state.creature.name} si colpisce da sola per ${se.selfDamage}!`)
+          await new Promise(r => setTimeout(r, 700))
+          setWildAnim('idle')
+          continue
+        }
+
+        if (se.turnPassed || se.paralysisSkip === true) {
+          const label = `${state.creature.name} è ${meta?.label ?? effect} e ha saltato il turno!`
+          setMessage(`${meta?.emoji ?? ''} ${label}`)
+          await new Promise(r => setTimeout(r, 700))
+        }
+      }
+    }
+
+    if (wildWasDefeated) {
+      playKnockout()
+      setWildAnim('flee'); setMessage(''); setResult('ko'); finishPendingAction(); return
     }
 
     if (data.playerTookDamage && data.wildDamage > 0) {
@@ -634,19 +754,10 @@ export default function EncounterPage() {
       setMessage(rnd(WILD_COUNTER_MSGS)(state.creature.name ?? 'creatura selvatica'))
       setIsCritMessage(false)
 
-      const newHp = Math.max(0, currentPlayerHp - data.wildDamage)
-      currentPlayerHp = newHp
-
-      // Update squad HP tracking
-      if (squadCreatures.length > 0) {
-        setSlotHps(prev => {
-          const next = [...prev]
-          next[activeSlot] = Math.max(0, (next[activeSlot] ?? squadCreatures[activeSlot]?.hp ?? 100) - data.wildDamage)
-          return next
-        })
-      }
-
-      setPlayerHp(newHp)
+      const newHp = typeof data.playerHpRemaining === 'number'
+        ? Math.max(0, data.playerHpRemaining)
+        : Math.max(0, currentPlayerHp - data.wildDamage)
+      updateCurrentPlayerHp(newHp)
       setPlayerAnim('damage')
       await new Promise(r => setTimeout(r, 420))
       setPlayerAnim('idle')
@@ -654,94 +765,6 @@ export default function EncounterPage() {
       if (newHp <= 0) {
         await handlePlayerKnockout()
         return
-      }
-    }
-
-    // Status effect notifications + state updates
-    if (data.statusEvents?.length) {
-      await new Promise(r => setTimeout(r, 600))
-      for (const se of data.statusEvents as any[]) {
-        const effect = se.type as StatusEffect
-        const meta = STATUS_EFFECT_META[effect]
-        const isPlayer = se.target === 'player'
-
-        // Always tick the counter for any status event that carries turn info
-        if (isPlayer) {
-          if (se.cleared) setPlayerStatus(null)
-          else if (se.turnsLeft != null) setPlayerStatusTurns(se.turnsLeft)
-        } else {
-          if (se.cleared) setWildStatus(null)
-          else if (se.turnsLeft != null) setWildStatusTurns(se.turnsLeft)
-        }
-
-        // Veleno: show poison damage message + animate HP decrease
-        if (effect === 'veleno' && se.poisonDamage > 0) {
-          if (isPlayer) {
-            const newHp = typeof se.newHp === 'number'
-              ? Math.max(0, se.newHp)
-              : Math.max(0, currentPlayerHp - se.poisonDamage)
-            currentPlayerHp = newHp
-            setPlayerAnim('damage')
-            setPlayerHp(newHp)
-            if (squadCreatures.length > 0) {
-              setSlotHps(prev => { const n = [...prev]; n[activeSlot] = newHp; return n })
-            }
-            setMessage(`☠️ Veleno — ${se.poisonDamage} danno a te!`)
-            await new Promise(r => setTimeout(r, 700))
-            setPlayerAnim('idle')
-            if (newHp <= 0) {
-              await handlePlayerKnockout()
-              return
-            }
-          } else {
-            setWildAnim('damage')
-            setMessage(`☠️ Veleno — ${se.poisonDamage} danno a ${state.creature.name}!`)
-            await new Promise(r => setTimeout(r, 700))
-            setWildAnim('idle')
-          }
-          continue
-        }
-
-        if (effect === 'confusione' && se.selfHit && se.selfDamage > 0) {
-          if (isPlayer) {
-            const newHp = typeof se.newHp === 'number'
-              ? Math.max(0, se.newHp)
-              : Math.max(0, currentPlayerHp - se.selfDamage)
-            currentPlayerHp = newHp
-            setPlayerAnim('damage')
-            setPlayerHp(newHp)
-            if (squadCreatures.length > 0) {
-              setSlotHps(prev => { const n = [...prev]; n[activeSlot] = newHp; return n })
-            }
-            setMessage(`ðŸ’« Confusione â€” ti colpisci da solo per ${se.selfDamage}!`)
-            await new Promise(r => setTimeout(r, 700))
-            setPlayerAnim('idle')
-            if (newHp <= 0) {
-              await handlePlayerKnockout()
-              return
-            }
-          } else {
-            setWildAnim('damage')
-            setMessage(`ðŸ’« ${state.creature.name} si colpisce da sola per ${se.selfDamage}!`)
-            await new Promise(r => setTimeout(r, 700))
-            setWildAnim('idle')
-          }
-          continue
-        }
-
-        // Show a message only for notable events (skip or self-hit)
-        const showMsg = se.turnPassed || se.selfHit || se.paralysisSkip === true
-        if (showMsg) {
-          if (isPlayer) {
-            setMessage(`${meta?.emoji ?? ''} Hai saltato il turno (${meta?.label ?? effect})`)
-          } else {
-            const label = se.selfHit
-              ? `${state.creature.name} si è colpita da sola!`
-              : `${state.creature.name} è ${meta?.label ?? effect} e ha saltato il turno!`
-            setMessage(`${meta?.emoji ?? ''} ${label}`)
-          }
-          await new Promise(r => setTimeout(r, 700))
-        }
       }
     }
     if (data.statusAppliedToPlayer) {
@@ -861,6 +884,14 @@ export default function EncounterPage() {
                 element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '',
               })
               setPlayerHp(slotHps[nextSlot] ?? next.hp)
+              setPlayerStatus(null)
+              setPlayerStatusTurns(0)
+              clearPlayerStatusRef.current = true
+              fetch('/api/game/encounter/clear-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ encounterId: state.encounterId }),
+              }).catch(() => undefined)
               setMessage(`${squadCreatures[activeSlot].name} è svenuta! Entra ${next.name}!`)
               finishPendingAction()
               return
@@ -1591,13 +1622,13 @@ export default function EncounterPage() {
                     const meta = STATUS_EFFECT_META[effect]
                     const chancePercent = Math.round((cr.status_effect_chance ?? 0.15) * 100)
                     const EFFECT_DURATIONS: Record<StatusEffect, string> = {
-                      paralisi: '1 turno', confusione: '3 turni', sonno: '2 turni', veleno: 'Finché in campo',
+                      paralisi: '2 turni', confusione: '3 turni', sonno: '2 turni', veleno: 'Finché in campo',
                     }
                     const EFFECT_DESCRIPTIONS: Record<StatusEffect, string> = {
                       paralisi:   '35% di attaccare, 65% di fallire per 2 turni',
                       confusione: '50% di colpirsi da solo per 3 turni',
                       sonno:      'Salta sempre l\'attacco per 2 turni',
-                      veleno:     'Perde il 10% degli HP a ogni turno',
+                      veleno:     "All'inizio del turno perde il 10% degli HP finché resta in campo",
                     }
                     return (
                       <motion.div
