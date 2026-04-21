@@ -324,6 +324,7 @@ export default function EncounterPage() {
   const [wildAnim, setWildAnim]     = useState<'idle' | 'damage' | 'catch' | 'flee'>('idle')
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null>(null)
+  const [lastDamage, setLastDamage] = useState<{ amount: number; target: 'wild' | 'player'; id: number; isCrit?: boolean; tone?: 'normal' | 'poison' } | null>(null)
   const [catchPhase, setCatchPhase] = useState<'idle' | 'throwing' | 'hit'>('idle')
   const [showCatchSuccess, setShowCatchSuccess] = useState(false)
   const [message, setMessage]   = useState('')
@@ -367,6 +368,7 @@ export default function EncounterPage() {
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoFightRef = useRef(false)
   const clearPlayerStatusRef = useRef(false) // set true after creature faint+switch
+  const damageFloatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Data loading ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -501,6 +503,31 @@ export default function EncounterPage() {
     return () => { stopEncounterLoopRef.current?.(); stopEncounterLoopRef.current = null }
   }, [state?.encounterId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    return () => {
+      if (damageFloatTimeoutRef.current) clearTimeout(damageFloatTimeoutRef.current)
+    }
+  }, [])
+
+  const showDamageFloat = useCallback((
+    amount: number,
+    target: 'wild' | 'player',
+    options?: { isCrit?: boolean; tone?: 'normal' | 'poison' },
+  ) => {
+    const next = {
+      amount,
+      target,
+      id: Date.now(),
+      isCrit: options?.isCrit,
+      tone: options?.tone ?? 'normal',
+    }
+    setLastDamage(next)
+    if (damageFloatTimeoutRef.current) clearTimeout(damageFloatTimeoutRef.current)
+    damageFloatTimeoutRef.current = setTimeout(() => {
+      setLastDamage(current => current?.id === next.id ? null : current)
+    }, 900)
+  }, [])
+
   function finishPendingAction() {
     setPendingAction(null)
     setLoading(false)
@@ -558,6 +585,7 @@ export default function EncounterPage() {
     if (remainingAttackMs > 0) await new Promise(r => setTimeout(r, remainingAttackMs))
 
     let currentPlayerHp = playerHp ?? playerCreature?.maxHp ?? 100
+    let currentWildHp = state.wildHp
     const handlePlayerKnockout = async () => {
       playKnockout()
       setPlayerFainting(true)
@@ -605,6 +633,15 @@ export default function EncounterPage() {
       }
     }
 
+    const updateCurrentWildHp = (newHp: number) => {
+      currentWildHp = newHp
+      setState(prev => prev ? {
+        ...prev,
+        wildHp: newHp,
+        catchMultiplier: getCatchHealthMultiplier(newHp, prev.wildHpMax),
+      } : null)
+    }
+
     const playerStatusEvents = ((data.statusEvents ?? []) as any[]).filter(se => se.target === 'player')
     if (playerStatusEvents.length) {
       await new Promise(r => setTimeout(r, 300))
@@ -620,6 +657,7 @@ export default function EncounterPage() {
             ? Math.max(0, se.newHp)
             : Math.max(0, currentPlayerHp - se.poisonDamage)
           updateCurrentPlayerHp(newHp)
+          showDamageFloat(se.poisonDamage, 'player', { tone: 'poison' })
           setPlayerAnim('damage')
           setMessage(`☠️ Veleno - ${se.poisonDamage} danno a te!`)
           await new Promise(r => setTimeout(r, 700))
@@ -636,6 +674,7 @@ export default function EncounterPage() {
             ? Math.max(0, se.newHp)
             : Math.max(0, currentPlayerHp - se.selfDamage)
           updateCurrentPlayerHp(newHp)
+          showDamageFloat(se.selfDamage, 'player')
           setPlayerAnim('damage')
           setMessage(`💫 Confusione - ti colpisci da solo per ${se.selfDamage}!`)
           await new Promise(r => setTimeout(r, 700))
@@ -668,13 +707,16 @@ export default function EncounterPage() {
       setPlayerAnim('idle')
     }
 
+    setState(prev => prev ? { ...prev, turns: prev.turns + 1 } : null)
+
     if (data.playerDamage > 0) {
+      const newWildHp = Math.max(0, currentWildHp - data.playerDamage)
+      updateCurrentWildHp(newWildHp)
+      showDamageFloat(data.playerDamage, 'wild', { isCrit: !!data.playerCrit })
       setWildAnim('damage')
       await new Promise(r => setTimeout(r, 380))
       setWildAnim('idle')
     }
-
-    setState(prev => prev ? { ...prev, wildHp: data.wildHpRemaining, catchMultiplier: data.catchMultiplier, turns: prev.turns + 1 } : null)
 
     const wildWasDefeated = data.fightResult === 'fled'
 
@@ -712,6 +754,11 @@ export default function EncounterPage() {
         else if (se.turnsLeft != null) setWildStatusTurns(se.turnsLeft)
 
         if (effect === 'veleno' && se.poisonDamage > 0) {
+          const newHp = typeof se.newHp === 'number'
+            ? Math.max(0, se.newHp)
+            : Math.max(0, currentWildHp - se.poisonDamage)
+          updateCurrentWildHp(newHp)
+          showDamageFloat(se.poisonDamage, 'wild', { tone: 'poison' })
           setWildAnim('damage')
           setMessage(`☠️ Veleno - ${se.poisonDamage} danno a ${state.creature.name}!`)
           await new Promise(r => setTimeout(r, 700))
@@ -720,6 +767,11 @@ export default function EncounterPage() {
         }
 
         if (effect === 'confusione' && se.selfHit && se.selfDamage > 0) {
+          const newHp = typeof se.newHp === 'number'
+            ? Math.max(0, se.newHp)
+            : Math.max(0, currentWildHp - se.selfDamage)
+          updateCurrentWildHp(newHp)
+          showDamageFloat(se.selfDamage, 'wild')
           setWildAnim('damage')
           setMessage(`💫 ${state.creature.name} si colpisce da sola per ${se.selfDamage}!`)
           await new Promise(r => setTimeout(r, 700))
@@ -733,6 +785,10 @@ export default function EncounterPage() {
           await new Promise(r => setTimeout(r, 700))
         }
       }
+    }
+
+    if (currentWildHp !== data.wildHpRemaining) {
+      updateCurrentWildHp(data.wildHpRemaining)
     }
 
     if (wildWasDefeated) {
@@ -758,6 +814,7 @@ export default function EncounterPage() {
         ? Math.max(0, data.playerHpRemaining)
         : Math.max(0, currentPlayerHp - data.wildDamage)
       updateCurrentPlayerHp(newHp)
+      showDamageFloat(data.wildDamage, 'player')
       setPlayerAnim('damage')
       await new Promise(r => setTimeout(r, 420))
       setPlayerAnim('idle')
@@ -867,6 +924,7 @@ export default function EncounterPage() {
           })
         }
         setPlayerHp(newHp)
+        showDamageFloat(data.wildDamage, 'player')
         setPlayerAnim('damage')
         await new Promise(r => setTimeout(r, 420))
         setPlayerAnim('idle')
@@ -1049,6 +1107,51 @@ export default function EncounterPage() {
             </motion.div>
           </AnimatePresence>
         </div>
+
+        <AnimatePresence>
+          {lastDamage?.target === 'wild' && (
+            <motion.div
+              key={`wild-dmg-${lastDamage.id}`}
+              initial={{ opacity: 1, y: 0, scale: lastDamage.isCrit ? 1.4 : 1 }}
+              animate={{ opacity: 0, y: -80, scale: 2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9 }}
+              className="absolute pointer-events-none z-50"
+              style={{ top: '26%', left: '50%', transform: 'translateX(-50%)' }}
+            >
+              <span style={lastDamage.isCrit
+                ? { color: '#FB923C', fontSize: 44, fontWeight: 900, textShadow: '0 0 28px rgba(249,115,22,0.95), 0 0 56px rgba(249,115,22,0.5), 0 2px 8px rgba(0,0,0,0.9)' }
+                : lastDamage.tone === 'poison'
+                  ? { color: '#4ADE80', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(74,222,128,0.9), 0 0 48px rgba(74,222,128,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+                  : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+              }>
+                -{lastDamage.amount}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {lastDamage?.target === 'player' && (
+            <motion.div
+              key={`player-dmg-${lastDamage.id}`}
+              initial={{ opacity: 1, y: 0, scale: lastDamage.isCrit ? 1.4 : 1 }}
+              animate={{ opacity: 0, y: -80, scale: 2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9 }}
+              className="absolute pointer-events-none z-50"
+              style={{ bottom: '30%', left: '50%', transform: 'translateX(-50%)' }}
+            >
+              <span style={lastDamage.isCrit
+                ? { color: '#FB923C', fontSize: 44, fontWeight: 900, textShadow: '0 0 28px rgba(249,115,22,0.95), 0 0 56px rgba(249,115,22,0.5), 0 2px 8px rgba(0,0,0,0.9)' }
+                : lastDamage.tone === 'poison'
+                  ? { color: '#4ADE80', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(74,222,128,0.9), 0 0 48px rgba(74,222,128,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+                  : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+              }>
+                -{lastDamage.amount}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── Attack animation overlay ── */}
         {attackAnim && (
