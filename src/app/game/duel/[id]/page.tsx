@@ -284,7 +284,7 @@ export default function DuelPage() {
   const [isMyTurn, setIsMyTurn]             = useState(false)
   const [attacking, setAttacking]           = useState(false)
   const attackingRef = useRef(false)
-  const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp'; id: number; isCrit?: boolean } | null>(null)
+  const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp'; id: number; isCrit?: boolean; tone?: 'normal' | 'poison' } | null>(null)
   const [critNotice, setCritNotice]         = useState<{ id: number } | null>(null)
   const [battagliaItems, setBattagliaItems] = useState<BattagliaItem[]>([])
   const [curaItems, setCuraItems]           = useState<BattagliaItem[]>([])
@@ -350,6 +350,64 @@ export default function DuelPage() {
     const id = Date.now()
     setStatusNotice({ id, emoji: meta.emoji, text, color: meta.color, glow: meta.glow })
     setTimeout(() => setStatusNotice(current => current?.id === id ? null : current), 2400)
+  }
+
+  function queueAfter(delayMs: number, callback: () => void) {
+    if (delayMs > 0) {
+      setTimeout(callback, delayMs)
+      return
+    }
+
+    callback()
+  }
+
+  function getStatusPresentationDelay(event: Record<string, any> | null | undefined) {
+    if (!event) return 0
+    if (event.selfHit) return 900
+    if (event.poisonDamage != null) return 900
+    if (event.turnPassed || event.paralysisSkip) return 700
+    return 300
+  }
+
+  function scheduleActiveLineupPatch(
+    target: 'me' | 'opp',
+    patch: (line: LineupEntry) => Partial<LineupEntry>,
+    delayMs = 0,
+  ) {
+    const setter = target === 'me' ? setMyLineup : setOppLineup
+    const applyPatch = () => {
+      setter(prev => prev.map(line => (
+        line.is_active
+          ? { ...line, ...patch(line) }
+          : line
+      )))
+    }
+
+    if (delayMs > 0) {
+      setTimeout(applyPatch, delayMs)
+      return
+    }
+
+    applyPatch()
+  }
+
+  function flashStatusDamage(
+    target: 'me' | 'opp',
+    amount: number,
+    tone: 'normal' | 'poison' = 'normal',
+  ) {
+    if (!Number.isFinite(amount) || amount <= 0) return
+
+    const id = Date.now()
+    setLastDamage({ amount, target, id, tone })
+    if (target === 'me') setAnimState('damage')
+    else setOppAnimState('damage')
+
+    setTimeout(() => {
+      if (target === 'me') setAnimState('idle')
+      else setOppAnimState('idle')
+      setLastDamage(current => current?.id === id ? null : current)
+    }, 900)
   }
 
   const loadPlayerLevels = useCallback(async (sessionId: string | undefined, duelUserIds: Array<string | null | undefined>) => {
@@ -518,26 +576,38 @@ export default function DuelPage() {
         if (broadcastAction === 'status_tick') {
           if (statusEvent) {
             const effect = statusEvent.type as StatusEffect
+            const statusDelay = getStatusPresentationDelay(statusEvent)
             if (statusEvent.turnPassed) {
-              const cleared = statusEvent.cleared
-              const text = cleared ? `${STATUS_EFFECT_META[effect]?.label ?? effect} curato!` : `${STATUS_EFFECT_META[effect]?.label ?? effect} — turno saltato`
+              const cleared = Boolean(statusEvent.cleared)
+              const text = effect === 'sonno'
+                ? (cleared ? 'Sonno curato, ma il turno salta' : 'Sonno — turno saltato')
+                : effect === 'paralisi'
+                  ? (cleared ? 'Paralisi curata, ma il turno salta' : 'Paralisi — turno saltato')
+                  : `${STATUS_EFFECT_META[effect]?.label ?? effect} — turno saltato`
               flashStatusNotice(effect, text)
-              setLog(prev => [`${STATUS_EFFECT_META[effect]?.emoji ?? ''} ${text}`, ...prev.slice(0, 3)])
-              // Update status on my/opp lineup
-              const updateStatus = (prev: LineupEntry[]) => prev.map(l => l.is_active
-                ? { ...l, active_status: cleared ? null : effect, status_turns_left: statusEvent.turnsLeft ?? 0 }
-                : l)
-              if (iAttacked) setMyLineup(updateStatus); else setOppLineup(updateStatus)
+              scheduleActiveLineupPatch(
+                iAttacked ? 'me' : 'opp',
+                line => ({
+                  active_status: cleared ? null : effect,
+                  status_turns_left: statusEvent.turnsLeft ?? line.status_turns_left,
+                }),
+                statusDelay,
+              )
             } else if (statusEvent.selfHit) {
               const text = statusEvent.fainted
-                ? `Confusione — sviene da autolesionismo!`
-                : `Confusione — colpisce se stesso! (${statusEvent.selfDamage} dmg)`
+                ? 'Confusione — si colpisce e sviene!'
+                : `Confusione — si colpisce da solo! (${statusEvent.selfDamage} danni)`
               flashStatusNotice(effect, text)
-              setLog(prev => [`💫 ${text}`, ...prev.slice(0, 3)])
-              if (statusEvent.selfHp !== undefined) {
-                const updateHp = (prev: LineupEntry[]) => prev.map(l => l.is_active ? { ...l, current_hp: statusEvent.selfHp, active_status: statusEvent.cleared ? null : effect, status_turns_left: statusEvent.turnsLeft ?? 0 } : l)
-                if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
-              }
+              flashStatusDamage(iAttacked ? 'me' : 'opp', Number(statusEvent.selfDamage ?? 0))
+              scheduleActiveLineupPatch(
+                iAttacked ? 'me' : 'opp',
+                line => ({
+                  ...(statusEvent.selfHp !== undefined ? { current_hp: statusEvent.selfHp } : {}),
+                  active_status: statusEvent.cleared ? null : effect,
+                  status_turns_left: statusEvent.turnsLeft ?? line.status_turns_left,
+                }),
+                statusDelay,
+              )
               if (statusEvent.fainted) {
                 if (iAttacked) setMyFainting(true); else setOppFainting(true)
                 playKnockout()
@@ -556,13 +626,18 @@ export default function DuelPage() {
                 }, 1400)
               }
             } else if (statusEvent.poisonDamage !== undefined) {
-              const text = statusEvent.fainted ? 'Veleno — sviene!' : `Veleno — ${statusEvent.poisonDamage} danno`
+              const text = statusEvent.fainted ? 'Veleno — sviene!' : `Veleno — ${statusEvent.poisonDamage} danni`
               flashStatusNotice(effect, text)
-              setLog(prev => [`☠️ ${text}`, ...prev.slice(0, 3)])
-              if (statusEvent.newMyHp !== undefined) {
-                const updateHp = (prev: LineupEntry[]) => prev.map(l => l.is_active ? { ...l, current_hp: statusEvent.newMyHp } : l)
-                if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
-              }
+              flashStatusDamage(iAttacked ? 'me' : 'opp', Number(statusEvent.poisonDamage ?? 0), 'poison')
+              scheduleActiveLineupPatch(
+                iAttacked ? 'me' : 'opp',
+                line => ({
+                  ...(statusEvent.newMyHp !== undefined ? { current_hp: statusEvent.newMyHp } : {}),
+                  active_status: statusEvent.cleared ? null : effect,
+                  status_turns_left: statusEvent.turnsLeft ?? line.status_turns_left,
+                }),
+                statusDelay,
+              )
               if (statusEvent.fainted) {
                 if (iAttacked) setMyFainting(true); else setOppFainting(true)
                 playKnockout()
@@ -582,176 +657,212 @@ export default function DuelPage() {
               }
             }
           }
-          if (nextTurn) setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
+          if (statusEvent) {
+            queueAfter(getStatusPresentationDelay(statusEvent), () => {
+              if (nextTurn) setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
+            })
+          } else if (nextTurn) {
+            setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
+          }
           return
         }
 
         // ── Heal broadcast — update the healer's HP ────────────────────────────
         if (broadcastAction === 'heal') {
+          const preTurnDelay = getStatusPresentationDelay(preTurnSE as Record<string, any> | undefined)
           if (preTurnSE) {
             const effect = preTurnSE.type as StatusEffect
             if (preTurnSE.type === 'veleno') {
-              flashStatusNotice(effect, `${STATUS_EFFECT_META[effect]?.label ?? effect} — ${preTurnSE.poisonDamage} danno`)
+              flashStatusNotice(effect, `Veleno — ${preTurnSE.poisonDamage} danni prima della cura`)
+              flashStatusDamage(iAttacked ? 'me' : 'opp', Number(preTurnSE.poisonDamage ?? 0), 'poison')
             } else {
-              const text = preTurnSE.cleared ? `${STATUS_EFFECT_META[effect]?.label ?? effect} curato!` : `${STATUS_EFFECT_META[effect]?.label ?? effect} — si cura lo stesso`
+              const text = effect === 'paralisi'
+                ? (preTurnSE.cleared ? 'Paralisi curata — si cura!' : 'Paralisi — riesce comunque a curarsi')
+                : effect === 'confusione'
+                  ? (preTurnSE.cleared ? 'Confusione curata — si cura!' : 'Confusione — si controlla e si cura')
+                  : `${STATUS_EFFECT_META[effect]?.label ?? effect} — si cura lo stesso`
               flashStatusNotice(effect, text)
             }
           }
-          const updateActive = (prev: LineupEntry[]) => prev.map(l => {
-            if (!l.is_active) return l
-            const nextEffect = preTurnSE?.type as StatusEffect | undefined
-            return {
-              ...l,
-              ...(newHp != null ? { current_hp: newHp } : {}),
-              ...(nextEffect
-                ? {
-                    active_status: preTurnSE?.cleared ? null : nextEffect,
-                    status_turns_left: preTurnSE?.turnsLeft ?? l.status_turns_left,
-                  }
-                : {}),
-            }
+          scheduleActiveLineupPatch(
+            iAttacked ? 'me' : 'opp',
+            line => {
+              const nextEffect = preTurnSE?.type as StatusEffect | undefined
+              return {
+                ...(newHp != null ? { current_hp: newHp } : {}),
+                ...(nextEffect
+                  ? {
+                      active_status: preTurnSE?.cleared ? null : nextEffect,
+                      status_turns_left: preTurnSE?.turnsLeft ?? line.status_turns_left,
+                    }
+                  : {}),
+              }
+            },
+            preTurnDelay,
+          )
+          queueAfter(preTurnDelay, () => {
+            if (nextTurn) setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
+            setLog(prev => [`💚 Cura +${healAmount} HP`, ...prev.slice(0, 3)])
           })
-          if (iAttacked) setMyLineup(updateActive)
-          else setOppLineup(updateActive)
-          if (nextTurn) setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
-          setLog(prev => [`💚 Cura +${healAmount} HP`, ...prev.slice(0, 3)])
           return
         }
 
-        const isFaint   = newOppHp === 0 && switchedTo
+        const isFaint = newOppHp === 0 && switchedTo
+        const preTurnDelay = getStatusPresentationDelay(preTurnSE as Record<string, any> | undefined)
 
-        // ── HP update (immediate) ──────────────────────────────────────────────
-        if (newOppHp !== undefined && newOppHp !== null) {
-          // Drop HP to 0; keep is_active=true so the card stays visible for faint anim
-          const updateHp = (prev: LineupEntry[]) => prev.map(l =>
-            l.is_active ? { ...l, current_hp: newOppHp } : l
+        if (preTurnSE?.type === 'veleno' && preTurnSE.poisonDamage !== undefined) {
+          const text = preTurnSE.fainted
+            ? 'Veleno — sviene!'
+            : `Veleno — ${preTurnSE.poisonDamage} danni prima dell'attacco`
+          flashStatusNotice('veleno', text)
+          flashStatusDamage(iAttacked ? 'me' : 'opp', Number(preTurnSE.poisonDamage ?? 0), 'poison')
+          scheduleActiveLineupPatch(
+            iAttacked ? 'me' : 'opp',
+            line => ({
+              current_hp: preTurnSE.newMyHp ?? line.current_hp,
+              active_status: preTurnSE.cleared ? null : 'veleno',
+              status_turns_left: preTurnSE.turnsLeft ?? line.status_turns_left,
+            }),
+            preTurnDelay,
           )
+        } else if (preTurnSE && !preTurnSE.selfHit) {
+          const effect = preTurnSE.type as StatusEffect
+          const text = effect === 'paralisi'
+            ? (preTurnSE.cleared ? 'Paralisi curata — attacca!' : 'Paralisi — riesce comunque ad attaccare')
+            : effect === 'confusione'
+              ? (preTurnSE.cleared ? 'Confusione curata — attacca!' : 'Confusione — si controlla e attacca')
+              : `${STATUS_EFFECT_META[effect]?.label ?? effect} — attacca lo stesso`
+          flashStatusNotice(effect, text)
+          scheduleActiveLineupPatch(
+            iAttacked ? 'me' : 'opp',
+            line => ({
+              active_status: preTurnSE.cleared ? null : effect,
+              status_turns_left: preTurnSE.turnsLeft ?? line.status_turns_left,
+            }),
+            preTurnDelay,
+          )
+        }
+
+        const resolveAttackAction = () => {
+          // ── HP update (immediate) ────────────────────────────────────────────
+          if (newOppHp !== undefined && newOppHp !== null) {
+            // Drop HP to 0; keep is_active=true so the card stays visible for faint anim
+            const updateHp = (prev: LineupEntry[]) => prev.map(l =>
+              l.is_active ? { ...l, current_hp: newOppHp } : l
+            )
+            if (iAttacked) {
+              setOppLineup(updateHp)
+              if (newOppHp === 0) { setOppFainting(true); playKnockout() }
+            } else {
+              setMyLineup(updateHp)
+              if (newOppHp === 0) { setMyFainting(true); playKnockout() }
+            }
+          }
+
+          // ── Creature switch (delayed when faint, immediate otherwise) ───────
+          if (switchedTo) {
+            const switchDelay = isFaint ? 1400 : 0
+            setTimeout(() => {
+              const activateNext = (prev: LineupEntry[]) => prev.map(l => ({
+                ...l,
+                is_active: l.player_creature_id === switchedTo.playerCreatureId,
+                ...(l.is_active && l.player_creature_id !== switchedTo.playerCreatureId
+                  ? { fainted_at: new Date().toISOString() }
+                  : {}),
+              }))
+              if (iAttacked) {
+                setOppFainting(false)
+                setOppLineup(activateNext)
+              } else {
+                setMyFainting(false)
+                setMyLineup(activateNext)
+              }
+            }, switchDelay)
+            setTimeout(() => {
+              setSwitchNotice(`${switchedTo.name} entra in battaglia!`)
+              setTimeout(() => setSwitchNotice(null), 2500)
+            }, isFaint ? 1300 : 0)
+          }
+
+          // ── Animations & turn ───────────────────────────────────────────────
           if (iAttacked) {
-            setOppLineup(updateHp)
-            if (newOppHp === 0) { setOppFainting(true); playKnockout() }
+            setOppAnimState('damage')
+            setLastDamage({ amount: damage, target: 'opp', id: Date.now(), isCrit: !!isCrit })
+            setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 900)
+            if (isCrit) flashCritNotice()
+            releaseAttackFeedback(450)
           } else {
-            setMyLineup(updateHp)
-            if (newOppHp === 0) { setMyFainting(true); playKnockout() }
+            setAnimState('damage')
+            setLastDamage({ amount: damage, target: 'me', id: Date.now(), isCrit: !!isCrit })
+            setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 900)
+            if (isCrit) flashCritNotice()
+            setOppLineup(prev => {
+              const oppActiveLine = prev.find(l => l.is_active)
+              const cr = oppActiveLine?.player_creatures?.creatures
+              if (cr) {
+                setAttackAnim({ key: Date.now(), element: cr.element, rarity: cr.rarity, side: 'right', soundUrl: cr.attack_sound_url, soundDurationMs: cr.attack_sound_duration_ms })
+              }
+              return prev
+            })
+          }
+          if (nextTurn) {
+            setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
+          }
+
+          if (!isCrit) flashFortuneNotice(fortune as CombatFortuneInfo | undefined)
+          const atkLabel = itemUsed ? '⚔️+🗡️' : '⚔️'
+          const fortuneText = formatFortuneText(fortune as CombatFortuneInfo | undefined)
+          const critLabel = isCrit ? ' · ⚡ CRITICO! ×1.75' : ''
+          setLog(prev => [`${atkLabel} ${damage} danno${critLabel}${fortuneText && !isCrit ? ` · ${fortuneText}` : ''}!`, ...prev.slice(0, 3)])
+
+          if (statusAppliedToOpp) {
+            const effect = statusAppliedToOpp as StatusEffect
+            const meta = STATUS_EFFECT_META[effect]
+            const target = iAttacked ? 'Avversario' : 'Tu'
+            const text = `${target} afflitto da ${meta?.label ?? effect}!`
+            setTimeout(() => flashStatusNotice(effect, text), 1200)
+            scheduleActiveLineupPatch(
+              iAttacked ? 'opp' : 'me',
+              () => ({
+                active_status: effect,
+                status_turns_left: oppStatusTurnsLeft ?? 0,
+              }),
+              1200,
+            )
+          }
+
+          if (poisonEvent) {
+            const pe = poisonEvent
+            setTimeout(() => {
+              const text = pe.fainted ? 'Veleno — sviene!' : `Veleno — ${pe.damage} danni`
+              flashStatusNotice('veleno', text)
+              flashStatusDamage(iAttacked ? 'me' : 'opp', Number(pe.damage ?? 0), 'poison')
+              const updateHp = (prev: LineupEntry[]) => prev.map(l =>
+                l.is_active ? { ...l, current_hp: pe.newHp } : l
+              )
+              if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
+              if (pe.fainted) {
+                if (iAttacked) setMyFainting(true); else setOppFainting(true)
+                playKnockout()
+              }
+              if (pe.fainted && pe.switchedTo) {
+                const sw = pe.switchedTo
+                setTimeout(() => {
+                  const activateNext = (prev: LineupEntry[]) => prev.map(l => ({
+                    ...l,
+                    is_active: l.player_creature_id === sw.playerCreatureId,
+                    ...(l.is_active && l.player_creature_id !== sw.playerCreatureId ? { fainted_at: new Date().toISOString() } : {}),
+                  }))
+                  if (iAttacked) { setMyFainting(false); setMyLineup(activateNext) } else { setOppFainting(false); setOppLineup(activateNext) }
+                  setSwitchNotice(`${sw.name} entra in battaglia!`)
+                  setTimeout(() => setSwitchNotice(null), 2500)
+                }, 1400)
+              }
+            }, 1200)
           }
         }
 
-        // ── Creature switch (delayed when faint, immediate otherwise) ─────────
-        if (switchedTo) {
-          const switchDelay = isFaint ? 1400 : 0
-          setTimeout(() => {
-            const activateNext = (prev: LineupEntry[]) => prev.map(l => ({
-              ...l,
-              is_active: l.player_creature_id === switchedTo.playerCreatureId,
-              ...(l.is_active && l.player_creature_id !== switchedTo.playerCreatureId
-                ? { fainted_at: new Date().toISOString() }
-                : {}),
-            }))
-            if (iAttacked) {
-              setOppFainting(false)
-              setOppLineup(activateNext)
-            } else {
-              setMyFainting(false)
-              setMyLineup(activateNext)
-            }
-          }, switchDelay)
-          // Show "X entra in battaglia!" after the faint animation
-          setTimeout(() => {
-            setSwitchNotice(`${switchedTo.name} entra in battaglia!`)
-            setTimeout(() => setSwitchNotice(null), 2500)
-          }, isFaint ? 1300 : 0)
-        }
-
-        // ── Animations & turn ─────────────────────────────────────────────────
-        if (iAttacked) {
-          setOppAnimState('damage')
-          setLastDamage({ amount: damage, target: 'opp', id: Date.now(), isCrit: !!isCrit })
-          setTimeout(() => { setOppAnimState('idle'); setLastDamage(null) }, 900)
-          if (isCrit) flashCritNotice()
-          releaseAttackFeedback(450)
-        } else {
-          setAnimState('damage')
-          setLastDamage({ amount: damage, target: 'me', id: Date.now(), isCrit: !!isCrit })
-          setTimeout(() => { setAnimState('idle'); setLastDamage(null) }, 900)
-          if (isCrit) flashCritNotice()
-          // Show opponent attack animation
-          setOppLineup(prev => {
-            const oppActiveLine = prev.find(l => l.is_active)
-            const cr = oppActiveLine?.player_creatures?.creatures
-            if (cr) {
-              setAttackAnim({ key: Date.now(), element: cr.element, rarity: cr.rarity, side: 'right', soundUrl: cr.attack_sound_url, soundDurationMs: cr.attack_sound_duration_ms })
-            }
-            return prev
-          })
-        }
-        if (nextTurn) {
-          setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
-        }
-
-        if (!isCrit) flashFortuneNotice(fortune as CombatFortuneInfo | undefined)
-        const atkLabel = itemUsed ? '⚔️+🗡️' : '⚔️'
-        const fortuneText = formatFortuneText(fortune as CombatFortuneInfo | undefined)
-        const critLabel = isCrit ? ' · ⚡ CRITICO! ×1.75' : ''
-        setLog(prev => [`${atkLabel} ${damage} danno${critLabel}${fortuneText && !isCrit ? ` · ${fortuneText}` : ''}!`, ...prev.slice(0, 3)])
-
-        // Pre-turn confusion info
-        if (preTurnSE?.type === 'veleno' && preTurnSE.poisonDamage !== undefined) {
-          const text = preTurnSE.fainted ? 'Veleno - sviene!' : `Veleno - ${preTurnSE.poisonDamage} danno`
-          flashStatusNotice('veleno', text)
-          const updateHp = (prev: LineupEntry[]) => prev.map(l =>
-            l.is_active ? { ...l, current_hp: preTurnSE.newMyHp ?? l.current_hp } : l
-          )
-          if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
-        } else if (preTurnSE && !preTurnSE.selfHit) {
-          const effect = preTurnSE.type as StatusEffect
-          const text = preTurnSE.cleared ? `${STATUS_EFFECT_META[effect]?.label} curato` : `${STATUS_EFFECT_META[effect]?.label} — attacca lo stesso`
-          flashStatusNotice(effect, text)
-        }
-
-        // Status applied to opponent by this attack
-        if (statusAppliedToOpp) {
-          const effect = statusAppliedToOpp as StatusEffect
-          const meta = STATUS_EFFECT_META[effect]
-          const target = iAttacked ? 'Avversario' : 'Tu'
-          const text = `${target} afflitto da ${meta?.label ?? effect}!`
-          // Delay both the badge and log so the damage text stays visible first
-          setTimeout(() => flashStatusNotice(effect, text), 1200)
-          setTimeout(() => setLog(prev => [`${meta?.emoji ?? ''} ${text}`, ...prev.slice(0, 3)]), 1300)
-          const updateStatus = (prev: LineupEntry[]) => prev.map(l => l.is_active
-            ? { ...l, active_status: effect, status_turns_left: oppStatusTurnsLeft ?? 0 }
-            : l)
-          if (iAttacked) setOppLineup(updateStatus); else setMyLineup(updateStatus)
-        }
-
-        // Post-attack veleno tick on the attacker
-        if (poisonEvent) {
-          const pe = poisonEvent
-          setTimeout(() => {
-            const text = pe.fainted ? 'Veleno — sviene!' : `Veleno — ${pe.damage} danno`
-            flashStatusNotice('veleno', text)
-            setLog(prev => [`☠️ ${text}`, ...prev.slice(0, 3)])
-            const updateHp = (prev: LineupEntry[]) => prev.map(l =>
-              l.is_active ? { ...l, current_hp: pe.newHp } : l
-            )
-            if (iAttacked) setMyLineup(updateHp); else setOppLineup(updateHp)
-            if (pe.fainted) {
-              if (iAttacked) setMyFainting(true); else setOppFainting(true)
-              playKnockout()
-            }
-            if (pe.fainted && pe.switchedTo) {
-              const sw = pe.switchedTo
-              setTimeout(() => {
-                const activateNext = (prev: LineupEntry[]) => prev.map(l => ({
-                  ...l,
-                  is_active: l.player_creature_id === sw.playerCreatureId,
-                  ...(l.is_active && l.player_creature_id !== sw.playerCreatureId ? { fainted_at: new Date().toISOString() } : {}),
-                }))
-                if (iAttacked) { setMyFainting(false); setMyLineup(activateNext) } else { setOppFainting(false); setOppLineup(activateNext) }
-                setSwitchNotice(`${sw.name} entra in battaglia!`)
-                setTimeout(() => setSwitchNotice(null), 2500)
-              }, 1400)
-            }
-          }, 1200)
-        }
+        queueAfter(preTurnDelay, resolveAttackAction)
       })
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'duel_lineups', filter: `duel_id=eq.${id}` },
@@ -1030,11 +1141,12 @@ export default function DuelPage() {
 
     if (res.ok) {
       const data = await res.json()
-      // Update local HP optimistically (broadcast also updates it via channel)
-      if (data.healed && data.newHp != null) {
+      const shouldOptimisticallyApplyHeal = !data.preTurnStatusEvent
+      // If a status resolves before the heal, let the broadcast present that sequence first.
+      if (data.healed && data.newHp != null && shouldOptimisticallyApplyHeal) {
         setMyLineup(prev => prev.map(l => l.is_active ? { ...l, current_hp: data.newHp } : l))
-        setCuraItems(prev => prev.map(it => it.inventoryId === itemId ? { ...it, quantity: it.quantity - 1 } : it).filter(it => it.quantity > 0))
       }
+      setCuraItems(prev => prev.map(it => it.inventoryId === itemId ? { ...it, quantity: it.quantity - 1 } : it).filter(it => it.quantity > 0))
       setIsMyTurn(false)
       setShowItemsModal(false)
     }
@@ -1394,7 +1506,9 @@ export default function DuelPage() {
             >
               <span style={lastDamage.isCrit
                 ? { color: '#FB923C', fontSize: 44, fontWeight: 900, textShadow: '0 0 28px rgba(249,115,22,0.95), 0 0 56px rgba(249,115,22,0.5), 0 2px 8px rgba(0,0,0,0.9)' }
-                : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+                : lastDamage.tone === 'poison'
+                  ? { color: '#4ADE80', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(74,222,128,0.9), 0 0 48px rgba(74,222,128,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+                  : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
               }>
                 -{lastDamage.amount}
               </span>
@@ -1414,7 +1528,9 @@ export default function DuelPage() {
             >
               <span style={lastDamage.isCrit
                 ? { color: '#FB923C', fontSize: 44, fontWeight: 900, textShadow: '0 0 28px rgba(249,115,22,0.95), 0 0 56px rgba(249,115,22,0.5), 0 2px 8px rgba(0,0,0,0.9)' }
-                : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+                : lastDamage.tone === 'poison'
+                  ? { color: '#4ADE80', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(74,222,128,0.9), 0 0 48px rgba(74,222,128,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
+                  : { color: '#EF4444', fontSize: 38, fontWeight: 900, textShadow: '0 0 24px rgba(239,68,68,0.9), 0 0 48px rgba(239,68,68,0.4), 0 2px 8px rgba(0,0,0,0.9)' }
               }>
                 -{lastDamage.amount}
               </span>
@@ -1436,6 +1552,31 @@ export default function DuelPage() {
         )}
 
         {/* Player card — bottom-left, flush to left edge */}
+        <div className="absolute inset-x-0 z-20 pointer-events-none" style={{ top: '46%', transform: 'translateY(-50%)' }}>
+          <div className="flex items-center justify-center px-4">
+            <AnimatePresence mode="wait">
+              {statusNotice && (
+                <motion.div
+                  key={`status-center-${statusNotice.id}`}
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.18 }}
+                  className="text-xs font-bold px-3 py-1.5 rounded-full text-center"
+                  style={{
+                    background: `${statusNotice.color}18`,
+                    border: `1px solid ${statusNotice.color}55`,
+                    color: statusNotice.color,
+                    boxShadow: `0 0 12px ${statusNotice.glow}`,
+                    maxWidth: 240,
+                  }}>
+                  {statusNotice.emoji} {statusNotice.text}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
         <div className="absolute z-10" style={{ bottom: 12, left: 0, right: '8%' }}>
           <AnimatePresence mode="wait">
             {myActiveCr ? (
@@ -1482,12 +1623,6 @@ export default function DuelPage() {
               className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold"
               style={{ background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.55)', color: '#FB923C' }}>
               ⚡ CRITICO! ×1.75
-            </motion.div>
-          ) : statusNotice ? (
-            <motion.div key={`status-${statusNotice.id}`} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
-              className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold"
-              style={{ background: `${statusNotice.color}18`, border: `1px solid ${statusNotice.color}50`, color: statusNotice.color, boxShadow: `0 0 8px ${statusNotice.glow}` }}>
-              {statusNotice.emoji} {statusNotice.text}
             </motion.div>
           ) : switchNotice ? (
             <motion.div key="switch" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}

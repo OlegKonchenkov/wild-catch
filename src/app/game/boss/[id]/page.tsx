@@ -1258,6 +1258,35 @@ function BattleScreen({
             </motion.div>
           )}
         </AnimatePresence>
+
+        <div
+          className="absolute inset-x-0 z-20 pointer-events-none"
+          style={{ top: "46%", transform: "translateY(-50%)" }}
+        >
+          <div className="flex items-center justify-center px-4">
+            <AnimatePresence mode="wait">
+              {statusNotice && (
+                <motion.div
+                  key={`status-center-${statusNotice.id}`}
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.18 }}
+                  className="text-xs font-bold px-3 py-1.5 rounded-full text-center"
+                  style={{
+                    background: `${statusNotice.color}18`,
+                    border: `1px solid ${statusNotice.color}55`,
+                    color: statusNotice.color,
+                    boxShadow: `0 0 12px ${statusNotice.glow}`,
+                    maxWidth: 240,
+                  }}
+                >
+                  {statusNotice.emoji} {statusNotice.text}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
 
       {/* ── Turn / Log strip ── */}
@@ -1285,22 +1314,6 @@ function BattleScreen({
               }}
             >
               ⚡ CRITICO! ×1.75
-            </motion.div>
-          ) : statusNotice ? (
-            <motion.div
-              key={`status-${statusNotice.id}`}
-              initial={{ opacity: 0, scale: 0.85 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.85 }}
-              className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold"
-              style={{
-                background: `${statusNotice.color}18`,
-                border: `1px solid ${statusNotice.color}50`,
-                color: statusNotice.color,
-                boxShadow: `0 0 8px ${statusNotice.glow}`,
-              }}
-            >
-              {statusNotice.emoji} {statusNotice.text}
             </motion.div>
           ) : bossAttacking ? (
             <motion.div
@@ -2155,6 +2168,28 @@ export default function BossFightPage() {
           ? {
               ...slot,
               current_hp: hpOverride ?? nextSlot.current_hp,
+              fainted: nextSlot.fainted,
+            }
+          : slot,
+      ),
+    );
+  }
+
+  function syncActivePlayerStatus(
+    activePlayerId: string | undefined,
+    nextPlayerLineup: PlayerSlot[] | undefined,
+  ) {
+    if (!activePlayerId || !nextPlayerLineup) return;
+    const nextSlot = nextPlayerLineup.find(
+      (slot) => slot.player_creature_id === activePlayerId,
+    );
+    if (!nextSlot) return;
+
+    setPlayerLineup((prev) =>
+      prev.map((slot) =>
+        slot.player_creature_id === activePlayerId
+          ? {
+              ...slot,
               active_status: nextSlot.active_status,
               status_turns_left: nextSlot.status_turns_left,
               fainted: nextSlot.fainted,
@@ -2179,6 +2214,26 @@ export default function BossFightPage() {
           ? {
               ...slot,
               current_hp: hpOverride ?? nextSlot.current_hp,
+              fainted: nextSlot.fainted,
+            }
+          : slot,
+      ),
+    );
+  }
+
+  function syncActiveBossStatus(
+    activeBossSlot: number,
+    nextBossLineup: BossSlot[] | undefined,
+  ) {
+    if (!nextBossLineup) return;
+    const nextSlot = nextBossLineup[activeBossSlot];
+    if (!nextSlot) return;
+
+    setBossLineup((prev) =>
+      prev.map((slot, index) =>
+        index === activeBossSlot
+          ? {
+              ...slot,
               active_status: nextSlot.active_status,
               status_turns_left: nextSlot.status_turns_left,
               fainted: nextSlot.fainted,
@@ -2221,6 +2276,7 @@ export default function BossFightPage() {
       flashStatusNotice("sonno", text);
       addLog(`💤 ${text}`);
       await wait(650);
+      syncActivePlayerStatus(activePlayerId, nextPlayerLineup);
       return;
     }
 
@@ -2234,6 +2290,7 @@ export default function BossFightPage() {
       flashStatusNotice("paralisi", text);
       addLog(`⚡ ${text}`);
       await wait(skipped ? 650 : 300);
+      syncActivePlayerStatus(activePlayerId, nextPlayerLineup);
       return;
     }
 
@@ -2262,6 +2319,7 @@ export default function BossFightPage() {
         addLog(`💫 ${text}`);
         await wait(300);
       }
+      syncActivePlayerStatus(activePlayerId, nextPlayerLineup);
       return;
     }
 
@@ -2281,6 +2339,7 @@ export default function BossFightPage() {
       } else {
         await wait(650);
       }
+      syncActivePlayerStatus(activePlayerId, nextPlayerLineup);
     }
   }
 
@@ -2307,7 +2366,10 @@ export default function BossFightPage() {
       await wait(350);
     }
 
-    if (!bossStatusTick) return;
+    if (!bossStatusTick) {
+      syncActiveBossStatus(activeBossSlot, nextBossLineup);
+      return;
+    }
 
     const effect = bossStatusTick.type as StatusEffect;
     syncActiveBossPreview(
@@ -2323,6 +2385,7 @@ export default function BossFightPage() {
       flashStatusNotice(effect, text);
       addLog(`💤 ${text}`);
       await wait(650);
+      syncActiveBossStatus(activeBossSlot, nextBossLineup);
       return;
     }
 
@@ -2336,6 +2399,7 @@ export default function BossFightPage() {
       flashStatusNotice(effect, text);
       addLog(`⚡ ${text}`);
       await wait(skipped ? 650 : 300);
+      syncActiveBossStatus(activeBossSlot, nextBossLineup);
       return;
     }
 
@@ -2364,6 +2428,7 @@ export default function BossFightPage() {
         addLog(`💫 ${text}`);
         await wait(300);
       }
+      syncActiveBossStatus(activeBossSlot, nextBossLineup);
       return;
     }
 
@@ -2383,6 +2448,7 @@ export default function BossFightPage() {
       } else {
         await wait(650);
       }
+      syncActiveBossStatus(activeBossSlot, nextBossLineup);
     }
   }
 
