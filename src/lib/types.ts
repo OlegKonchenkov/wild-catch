@@ -35,6 +35,39 @@ export interface Creature {
   enigma_description: string | null
   enigma_image_url: string | null
   enigma_video_url: string | null
+  enigma_frammento_id: string | null
+}
+
+export interface EnigmaFrammento {
+  id: string
+  enigma_id: string
+  title: string
+  description: string | null
+  image_url: string | null
+  video_url: string | null
+  order_index: number
+}
+
+export interface EnigmaSuggerimento {
+  id: string
+  enigma_id: string
+  text: string
+  image_url: string | null
+  order_index: number
+}
+
+export interface Enigma {
+  id: string
+  session_id: string | null
+  title: string
+  description: string | null
+  solution: string
+  difficulty: 'facile' | 'medio' | 'difficile'
+  reward_type: 'exp' | 'gold' | 'oggetto' | 'creatura' | null
+  reward_payload: Record<string, unknown> | null
+  created_at: string
+  frammenti?: EnigmaFrammento[]
+  suggerimenti?: EnigmaSuggerimento[]
 }
 
 export interface Session {
