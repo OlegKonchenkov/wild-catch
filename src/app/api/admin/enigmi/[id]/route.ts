@@ -66,7 +66,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .eq('id', id)
       .select()
       .single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: error.message }, { status: error.code === 'PGRST116' ? 404 : 500 })
     enigma = data
   } else {
     // No scalar fields to update — fetch the current record
@@ -82,7 +82,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   let frammenti: any[] = []
   let suggerimenti: any[] = []
 
-  // Full replace frammenti if provided
+  // Non-atomic: delete then insert. If insert fails after delete, sub-entities are lost.
+  // Admin-only context; acceptable risk until a stored procedure handles atomicity.
   if (Array.isArray(body.frammenti)) {
     const { error: delError } = await admin
       .from('enigma_frammenti')
@@ -116,7 +117,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     frammenti = framData ?? []
   }
 
-  // Full replace suggerimenti if provided
+  // Non-atomic: same caveat as frammenti replace above.
   if (Array.isArray(body.suggerimenti)) {
     const { error: delError } = await admin
       .from('enigma_suggerimenti')

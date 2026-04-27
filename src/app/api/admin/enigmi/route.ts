@@ -53,6 +53,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Parametri mancanti: session_id, title, solution, difficulty sono obbligatori' }, { status: 400 })
   }
 
+  const VALID_DIFFICULTIES = ['facile', 'medio', 'difficile']
+  if (!VALID_DIFFICULTIES.includes(difficulty)) {
+    return NextResponse.json({ error: 'difficulty non valida: usa facile, medio o difficile' }, { status: 400 })
+  }
+
   const admin = createAdminClient()
 
   // Insert the enigma
@@ -76,6 +81,8 @@ export async function POST(request: Request) {
   let frammenti: any[] = []
   let suggerimenti: any[] = []
 
+  // Non-atomic: if frammenti/suggerimenti insert fails after enigma insert, a bare enigma row remains.
+  // Admin-only context; acceptable risk until a stored procedure handles atomicity.
   // Insert frammenti if provided
   if (Array.isArray(body.frammenti) && body.frammenti.length > 0) {
     const rows = body.frammenti.map((f: any) => ({
