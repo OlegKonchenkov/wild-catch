@@ -1,3 +1,5 @@
+export type EnigmaDifficulty = 'facile' | 'medio' | 'difficile'
+
 export type Element = 'fiamma' | 'adriatico' | 'bosco' | 'terra' | 'armonia'
 export type Rarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario' | 'mitologico'
 export type SessionStatus = 'draft' | 'ready' | 'active' | 'ended'
@@ -46,6 +48,7 @@ export interface EnigmaFrammento {
   image_url: string | null
   video_url: string | null
   order_index: number
+  created_at: string
 }
 
 export interface EnigmaSuggerimento {
@@ -54,15 +57,16 @@ export interface EnigmaSuggerimento {
   text: string
   image_url: string | null
   order_index: number
+  created_at: string
 }
 
 export interface Enigma {
   id: string
-  session_id: string | null
+  session_id: string
   title: string
   description: string | null
   solution: string
-  difficulty: 'facile' | 'medio' | 'difficile'
+  difficulty: EnigmaDifficulty
   reward_type: 'exp' | 'gold' | 'oggetto' | 'creatura' | null
   reward_payload: Record<string, unknown> | null
   created_at: string
@@ -187,6 +191,7 @@ export interface QRCode {
   uses_remaining: number | null
   label: string
   created_at: string
+  enigma_suggerimento_id: string | null
 }
 
 export interface HallOfFame {
