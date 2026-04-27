@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Mission } from '@/lib/types'
+import { getMissionUnlockState, type MissionUnlockState } from '@/lib/game/mission-unlocks'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
@@ -74,7 +75,7 @@ function ScanResultCard({ result, onClose, onBossFight }: { result: ScanResult; 
               {result.chapterOrder && <p className="text-white/40 text-xs">Capitolo {result.chapterOrder}</p>}
             </div>
             <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-              <p className="text-white/80 text-sm leading-relaxed italic">"{result.text}"</p>
+              <p className="text-white/80 text-sm leading-relaxed italic">&quot;{result.text}&quot;</p>
             </div>
             {result.imageUrl && (
               <img src={result.imageUrl} alt="Indizio" className="w-full rounded-xl max-h-48 object-cover" />
@@ -87,7 +88,7 @@ function ScanResultCard({ result, onClose, onBossFight }: { result: ScanResult; 
             <span className="text-5xl block">🥚</span>
             <p className="text-white font-bold">Uovo trovato!</p>
             <p className="text-[#C084FC] font-bold capitalize">{result.eggRarity}</p>
-            <p className="text-white/50 text-sm">L'uovo sarà incubato durante il gioco</p>
+            <p className="text-white/50 text-sm">L&apos;uovo sarà incubato durante il gioco</p>
           </div>
         )
       case 'boss':
@@ -161,18 +162,20 @@ interface PlayerMissionData {
 }
 
 function MissionDetailModal({
-  mission, playerData, creaturePreview, isCaught, onClose, onScanQR,
+  mission, playerData, creaturePreview, isCaught, unlockState, onClose, onScanQR,
 }: {
   mission: Mission
   playerData: PlayerMissionData | undefined
   creaturePreview?: CreaturePreview | null
   isCaught?: boolean
+  unlockState: MissionUnlockState
   onClose: () => void
   onScanQR: () => void
 }) {
   const meta = typeMeta(mission.type)
   const progress = playerData?.progress ?? 0
   const completed = !!playerData?.completed_at
+  const locked = !unlockState.unlocked && !completed
   const pct = Math.min(100, Math.round((progress / Math.max(1, mission.target_count)) * 100))
 
   return (
@@ -205,6 +208,11 @@ function MissionDetailModal({
                   ✅ Completata
                 </span>
               )}
+              {locked && (
+                <span className="text-xs bg-white/8 text-white/45 border border-white/15 px-2 py-0.5 rounded-md font-semibold">
+                  🔒 Bloccata
+                </span>
+              )}
             </div>
             <h2 className="text-white font-extrabold text-base leading-tight">
               #{mission.chapter_order} {mission.title}
@@ -220,6 +228,15 @@ function MissionDetailModal({
         )}
 
         {/* Creature preview — cattura missions only */}
+        {locked && (
+          <div className="bg-white/4 border border-white/10 rounded-xl px-4 py-3 mb-4">
+            <p className="text-xs font-semibold text-white/45 uppercase tracking-wider mb-1">Si sblocca quando</p>
+            <p className="text-white/70 text-sm leading-relaxed">
+              {unlockState.reasons.join(' oppure ')}
+            </p>
+          </div>
+        )}
+
         {mission.type === 'cattura' && creaturePreview?.image_url && (
           <div className="mb-4 rounded-2xl overflow-hidden border border-white/10 relative" style={{ background: 'rgba(255,255,255,0.03)' }}>
             {/* Hero image */}
@@ -264,7 +281,7 @@ function MissionDetailModal({
         )}
 
         {/* How to complete */}
-        <div className="mb-4">
+        <div className={`mb-4 ${locked ? 'opacity-45' : ''}`}>
           <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Come completare</p>
           <div className="flex items-start gap-3 bg-white/4 border border-white/8 rounded-xl px-4 py-3">
             <span className="text-xl mt-0.5">{meta.icon}</span>
@@ -283,7 +300,7 @@ function MissionDetailModal({
         </div>
 
         {/* Progress */}
-        <div className="mb-4">
+        <div className={`mb-4 ${locked ? 'opacity-45' : ''}`}>
           <div className="flex items-center justify-between text-xs mb-1.5">
             <span className="text-white/40 font-semibold uppercase tracking-wider">Progresso</span>
             <span style={{ color: completed ? '#34D399' : meta.color }} className="font-bold">
@@ -318,7 +335,7 @@ function MissionDetailModal({
         </div>
 
         {/* QR button if mission type is qr */}
-        {mission.type === 'qr' && !completed && (
+        {mission.type === 'qr' && !completed && !locked && (
           <button
             onClick={() => { onClose(); onScanQR() }}
             className="w-full bg-[#34D399] text-[#0a1520] font-extrabold py-3.5 rounded-xl text-sm mb-3 flex items-center justify-center gap-2"
@@ -352,6 +369,8 @@ function ProgressRing({ pct, color, size = 36 }: { pct: number; color: string; s
 
 /* ── Page ────────────────────────────────────── */
 interface CreaturePreview { image_url: string | null; rarity: string }
+interface CreaturePreviewRow { name: string; image_url: string | null; rarity: string }
+interface PlayerCreatureNameRow { creatures?: { name?: string | null } | Array<{ name?: string | null }> | null }
 
 export default function MissionsPage() {
   const router = useRouter()
@@ -366,6 +385,7 @@ export default function MissionsPage() {
   const [scanning, setScanning]       = useState(false)
   const [pendingMissions, setPendingMissions] = useState<CompletedMissionInfo[]>([])
   const [filter, setFilter]           = useState<'all' | 'todo' | 'done'>('all')
+  const [playerLevel, setPlayerLevel] = useState(1)
   // creature_name → { image_url, rarity }
   const [creaturePreviews, setCreaturePreviews] = useState<Record<string, CreaturePreview>>({})
   // creature_name → whether player has caught it
@@ -377,24 +397,32 @@ export default function MissionsPage() {
     if (!sessionId) { setLoading(false); return }
 
     async function load() {
-      const [missRes, pmRes, userRes] = await Promise.all([
+      const [missRes, userRes] = await Promise.all([
         supabase.from('missions').select('*').or(`session_id.eq.${sessionId},session_id.is.null`).order('chapter_order'),
         supabase.auth.getUser(),
-        Promise.resolve(null), // placeholder
       ])
 
       const missionList = (missRes.data ?? []) as Mission[]
       setMissions(missionList)
 
-      const user = pmRes.data.user
+      const user = userRes.data.user
       if (user && missionList.length > 0) {
         const missionIds = missionList.map(m => m.id)
-        const { data: pm } = await supabase
-          .from('player_missions')
-          .select('mission_id, progress, completed_at')
-          .eq('user_id', user.id)
-          .in('mission_id', missionIds)
+        const [{ data: pm }, { data: ps }] = await Promise.all([
+          supabase
+            .from('player_missions')
+            .select('mission_id, progress, completed_at')
+            .eq('user_id', user.id)
+            .in('mission_id', missionIds),
+          supabase
+            .from('player_sessions')
+            .select('level')
+            .eq('user_id', user.id)
+            .eq('session_id', sessionId)
+            .maybeSingle(),
+        ])
         setPlayerMissions((pm ?? []) as PlayerMissionData[])
+        setPlayerLevel(typeof ps?.level === 'number' ? ps.level : 1)
 
         // Load creature previews for cattura missions
         const captureTargets = [...new Set(
@@ -411,12 +439,14 @@ export default function MissionsPage() {
               : Promise.resolve({ data: [] }),
           ])
           const previews: Record<string, CreaturePreview> = {}
-          for (const c of (crRes.data ?? []) as any[]) {
+          for (const c of (crRes.data ?? []) as CreaturePreviewRow[]) {
             previews[c.name] = { image_url: c.image_url, rarity: c.rarity }
           }
           setCreaturePreviews(previews)
           const caught = new Set<string>(
-            ((pcRes.data ?? []) as any[]).map((pc: any) => pc.creatures?.name).filter(Boolean)
+            ((pcRes.data ?? []) as PlayerCreatureNameRow[])
+              .map(pc => Array.isArray(pc.creatures) ? pc.creatures[0]?.name : pc.creatures?.name)
+              .filter((name): name is string => !!name)
           )
           setCaughtNames(caught)
         }
@@ -464,13 +494,37 @@ export default function MissionsPage() {
     [playerMissions]
   )
 
+  const missionTitleById = useMemo(() =>
+    Object.fromEntries(missions.map(m => [m.id, m.title])),
+    [missions]
+  )
+
+  const completedMissionIds = useMemo(() =>
+    playerMissions.filter(pm => pm.completed_at).map(pm => pm.mission_id),
+    [playerMissions]
+  )
+
+  const unlockMap = useMemo(() =>
+    Object.fromEntries(missions.map(m => [
+      m.id,
+      getMissionUnlockState(m, {
+        playerLevel,
+        completedMissionIds,
+        missionTitleById,
+      }),
+    ])),
+    [missions, playerLevel, completedMissionIds, missionTitleById]
+  )
+
   const filtered = useMemo(() => {
-    if (filter === 'todo') return missions.filter(m => !pmMap[m.id]?.completed_at)
+    if (filter === 'todo') return missions.filter(m => !pmMap[m.id]?.completed_at && unlockMap[m.id]?.unlocked)
     if (filter === 'done') return missions.filter(m => !!pmMap[m.id]?.completed_at)
     return missions
-  }, [missions, pmMap, filter])
+  }, [missions, pmMap, unlockMap, filter])
 
   const doneCount = missions.filter(m => !!pmMap[m.id]?.completed_at).length
+  const unlockedCount = missions.filter(m => pmMap[m.id]?.completed_at || unlockMap[m.id]?.unlocked).length
+  const lockedCount = Math.max(0, missions.length - unlockedCount)
   const totalCount = missions.length
 
   return (
@@ -489,7 +543,8 @@ export default function MissionsPage() {
             <h1 className="text-lg font-extrabold tracking-tight">🎯 Missioni</h1>
             {totalCount > 0 && (
               <p className="text-xs text-white/35 mt-0.5">
-                {doneCount}/{totalCount} completate
+                {doneCount}/{unlockedCount || totalCount} completate
+                {lockedCount > 0 && <span className="text-white/25"> · {lockedCount} bloccate</span>}
               </p>
             )}
           </div>
@@ -511,7 +566,7 @@ export default function MissionsPage() {
           <div className="h-1.5 bg-white/8 rounded-full overflow-hidden mb-3">
             <div
               className="h-full bg-[#34D399] rounded-full transition-all"
-              style={{ width: `${Math.round((doneCount / totalCount) * 100)}%` }}
+              style={{ width: `${Math.round((doneCount / Math.max(1, unlockedCount)) * 100)}%` }}
             />
           </div>
         )}
@@ -549,16 +604,18 @@ export default function MissionsPage() {
             const pm = pmMap[mission.id]
             const progress = pm?.progress ?? 0
             const completed = !!pm?.completed_at
+            const unlockState = unlockMap[mission.id]
+            const locked = !completed && !unlockState?.unlocked
             const pct = Math.min(100, Math.round((progress / Math.max(1, mission.target_count)) * 100))
 
             return (
               <button
                 key={mission.id}
                 onClick={() => setDetailMission(mission)}
-                className="w-full text-left flex items-center gap-3 rounded-2xl p-3.5 border transition-all active:scale-[0.98]"
+                className={`w-full text-left flex items-center gap-3 rounded-2xl p-3.5 border transition-all active:scale-[0.98] ${locked ? 'opacity-70' : ''}`}
                 style={{
-                  background: completed ? `${meta.color}07` : `${meta.color}0a`,
-                  borderColor: completed ? `${meta.color}25` : `${meta.color}28`,
+                  background: locked ? 'rgba(255,255,255,0.035)' : completed ? `${meta.color}07` : `${meta.color}0a`,
+                  borderColor: locked ? 'rgba(255,255,255,0.10)' : completed ? `${meta.color}25` : `${meta.color}28`,
                 }}
               >
                 {/* Progress ring OR creature thumbnail for cattura missions */}
@@ -571,7 +628,7 @@ export default function MissionsPage() {
                       alt={mission.target}
                       className="w-full h-full object-contain"
                       style={caughtNames.has(mission.target) ? undefined : {
-                        filter: 'blur(3px) brightness(0.5) saturate(0.2)',
+                        filter: locked ? 'blur(4px) brightness(0.38) saturate(0.1)' : 'blur(3px) brightness(0.5) saturate(0.2)',
                       }}
                     />
                     {completed && (
@@ -580,9 +637,9 @@ export default function MissionsPage() {
                   </div>
                 ) : (
                   <div className="relative shrink-0">
-                    <ProgressRing pct={pct} color={completed ? '#34D399' : meta.color} />
+                    <ProgressRing pct={pct} color={locked ? 'rgba(255,255,255,0.35)' : completed ? '#34D399' : meta.color} />
                     <span className="absolute inset-0 flex items-center justify-center text-base">
-                      {completed ? '✅' : meta.icon}
+                      {completed ? '✅' : locked ? '🔒' : meta.icon}
                     </span>
                   </div>
                 )}
@@ -602,11 +659,18 @@ export default function MissionsPage() {
                     {completed && (
                       <span className="text-xs text-[#34D399]/70 shrink-0 font-semibold">Completata</span>
                     )}
+                    {locked && (
+                      <span className="text-xs text-white/45 shrink-0 font-semibold">🔒 Bloccata</span>
+                    )}
                   </div>
                   <p className="font-bold text-white text-sm leading-tight truncate">
                     {mission.title}
                   </p>
-                  {mission.type === 'cattura' && mission.target ? (
+                  {locked ? (
+                    <p className="text-xs text-white/40 mt-0.5 leading-relaxed line-clamp-1">
+                      {unlockState?.reasons.join(' oppure ') || 'Missione non ancora sbloccata'}
+                    </p>
+                  ) : mission.type === 'cattura' && mission.target ? (
                     <p className="text-xs text-white/40 mt-0.5 leading-relaxed line-clamp-1">
                       Cattura: <span className="text-white/65 font-semibold">{mission.target}</span>
                     </p>
@@ -616,7 +680,7 @@ export default function MissionsPage() {
                     </p>
                   ) : null}
                   {/* Progress text + rewards */}
-                  <div className="flex items-center gap-2 mt-1.5">
+                  <div className={`flex items-center gap-2 mt-1.5 ${locked ? 'opacity-45' : ''}`}>
                     <span className="text-xs font-semibold" style={{ color: completed ? '#34D399' : meta.color }}>
                       {progress}/{mission.target_count}
                     </span>
@@ -686,6 +750,11 @@ export default function MissionsPage() {
           playerData={pmMap[detailMission.id]}
           creaturePreview={detailMission.target ? creaturePreviews[detailMission.target] : null}
           isCaught={detailMission.target ? caughtNames.has(detailMission.target) : false}
+          unlockState={unlockMap[detailMission.id] ?? getMissionUnlockState(detailMission, {
+            playerLevel,
+            completedMissionIds,
+            missionTitleById,
+          })}
           onClose={() => setDetailMission(null)}
           onScanQR={() => { setDetailMission(null); setShowScanner(true) }}
         />

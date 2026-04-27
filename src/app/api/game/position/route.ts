@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isWithinBounds, haversineDistance, parsePoint } from '@/lib/game/anti-cheat'
+import { loadMissionUnlockContext } from '@/lib/game/missions'
+import { getMissionUnlockState } from '@/lib/game/mission-unlocks'
+
+type SupabaseLike = ReturnType<typeof createAdminClient>
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -106,32 +110,51 @@ async function updateWalkMissions(
   sessionId: string,
   userId: string,
   stepsWalked: number,
-  supabase: any,
+  supabase: SupabaseLike,
 ): Promise<Array<{ title: string; rewardGold: number; rewardExp: number }>> {
+  type WalkMission = {
+    id: string
+    title: string
+    target_count: number
+    reward_gold: number
+    reward_exp: number
+    reward_item_id: string | null
+    unlock_level: number | null
+    unlock_after_mission_id: string | null
+  }
+
   // Load walk missions for this session (session-scoped OR global)
   const { data: walkMissions } = await supabase
     .from('missions')
-    .select('id, title, target_count, reward_gold, reward_exp, reward_item_id')
+    .select('id, title, target_count, reward_gold, reward_exp, reward_item_id, unlock_level, unlock_after_mission_id')
     .or(`session_id.eq.${sessionId},session_id.is.null`)
     .eq('type', 'walk')
 
   if (!walkMissions?.length) return []
 
+  const walkMissionRows = walkMissions as WalkMission[]
+  const unlockContext = await loadMissionUnlockContext(supabase, userId, sessionId, walkMissionRows)
+  const unlockedWalkMissions = walkMissionRows.filter(mission =>
+    getMissionUnlockState(mission, unlockContext).unlocked
+  )
+  if (!unlockedWalkMissions.length) return []
+
   // Load existing player_missions entries
-  const missionIds = walkMissions.map((m: any) => m.id)
+  const missionIds = unlockedWalkMissions.map(m => m.id)
   const { data: playerMissions } = await supabase
     .from('player_missions')
     .select('id, mission_id, progress, completed_at')
     .eq('user_id', userId)
     .in('mission_id', missionIds)
 
-  const pmMap: Record<string, any> = Object.fromEntries(
-    (playerMissions ?? []).map((pm: any) => [pm.mission_id, pm])
+  type PlayerMissionProgressRow = { id: string; mission_id: string; progress: number; completed_at: string | null }
+  const pmMap: Record<string, PlayerMissionProgressRow> = Object.fromEntries(
+    ((playerMissions ?? []) as PlayerMissionProgressRow[]).map(pm => [pm.mission_id, pm])
   )
 
   const justCompletedMissions: Array<{ title: string; rewardGold: number; rewardExp: number }> = []
 
-  for (const mission of walkMissions as any[]) {
+  for (const mission of unlockedWalkMissions) {
     const existing = pmMap[mission.id]
     if (existing?.completed_at) continue // already done
 
@@ -242,8 +265,10 @@ async function checkAndHatchEggs(
   sessionId: string,
   userId: string,
   stepsWalked: number,
-  supabase: any,
+  supabase: SupabaseLike,
 ): Promise<Array<{ name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null }>> {
+  type EggRow = { id: string; egg_rarity: string; steps_required: number; steps_at_pickup: number }
+  type HatchedCreatureRow = { id: string; name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null }
   const { data: eggs } = await supabase
     .from('player_eggs')
     .select('id, egg_rarity, steps_required, steps_at_pickup')
@@ -253,7 +278,7 @@ async function checkAndHatchEggs(
 
   if (!eggs?.length) return []
 
-  const readyEggs = (eggs as any[]).filter(egg =>
+  const readyEggs = ((eggs ?? []) as EggRow[]).filter(egg =>
     egg.steps_required === 0 || (stepsWalked - egg.steps_at_pickup) >= egg.steps_required
   )
   if (!readyEggs.length) return []
@@ -281,11 +306,11 @@ async function checkAndHatchEggs(
       .eq('rarity', targetRarity)
       .limit(100)
 
-    let pool: any[] = candidates ?? []
+    let pool: HatchedCreatureRow[] = (candidates ?? []) as HatchedCreatureRow[]
     if (!pool.length) {
       const { data: fallback } = await supabase
         .from('creatures').select('id, name, rarity, element, image_url, hp, atk, def, description').eq('rarity', 'comune').limit(50)
-      pool = fallback ?? []
+      pool = (fallback ?? []) as HatchedCreatureRow[]
     }
     if (!pool.length) continue
 

@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getMissionUnlockState, type MissionUnlockContext, type MissionUnlockFields } from '@/lib/game/mission-unlocks'
 
 interface MissionRow {
   id: string
@@ -10,7 +11,20 @@ interface MissionRow {
   reward_item_id: string | null
   reward_items: Array<{ item_id: string; quantity: number }> | null
   reward_creature_id: string | null
+  unlock_level: number | null
+  unlock_after_mission_id: string | null
 }
+
+interface PlayerMissionProgressRow {
+  id: string
+  mission_id: string
+  progress: number
+  completed_at: string | null
+}
+
+interface GoldRow { gold: number }
+interface InventoryRow { id: string; quantity: number }
+interface PlayerCreatureRow { id: string; duplicates_count: number }
 
 export interface CompletedMission {
   title: string
@@ -43,7 +57,7 @@ export async function incrementMissionProgress({
   // Load matching missions for this session and type (include global missions with null session_id)
   const { data: missions } = await admin
     .from('missions')
-    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_items, reward_creature_id')
+    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_items, reward_creature_id, unlock_level, unlock_after_mission_id')
     .or(`session_id.eq.${sessionId},session_id.is.null`)
     .eq('type', type)
 
@@ -56,21 +70,27 @@ export async function incrementMissionProgress({
   )
   if (!matching.length) return []
 
+  const unlockContext = await loadMissionUnlockContext(admin, userId, sessionId, matching)
+  const unlockedMatching = matching.filter(m =>
+    getMissionUnlockState(m, unlockContext).unlocked
+  )
+  if (!unlockedMatching.length) return []
+
   // Load existing player_missions entries
-  const missionIds = matching.map(m => m.id)
+  const missionIds = unlockedMatching.map(m => m.id)
   const { data: playerMissions } = await admin
     .from('player_missions')
     .select('id, mission_id, progress, completed_at')
     .eq('user_id', userId)
     .in('mission_id', missionIds)
 
-  const pmMap: Record<string, any> = Object.fromEntries(
-    (playerMissions ?? []).map((pm: any) => [pm.mission_id, pm])
+  const pmMap: Record<string, PlayerMissionProgressRow> = Object.fromEntries(
+    ((playerMissions ?? []) as PlayerMissionProgressRow[]).map(pm => [pm.mission_id, pm])
   )
 
   const completed: CompletedMission[] = []
 
-  for (const mission of matching) {
+  for (const mission of unlockedMatching) {
     const existing = pmMap[mission.id]
     if (existing?.completed_at) continue  // already completed
 
@@ -127,6 +147,50 @@ export async function incrementMissionProgress({
   return completed
 }
 
+export async function loadMissionUnlockContext(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  sessionId: string,
+  missions: MissionUnlockFields[],
+): Promise<MissionUnlockContext> {
+  const prerequisiteIds = [...new Set(
+    missions
+      .map(m => m.unlock_after_mission_id)
+      .filter((id): id is string => !!id),
+  )]
+
+  const [{ data: playerSession }, { data: completedRows }, { data: prerequisiteRows }] = await Promise.all([
+    admin
+      .from('player_sessions')
+      .select('level')
+      .eq('user_id', userId)
+      .eq('session_id', sessionId)
+      .maybeSingle(),
+    prerequisiteIds.length
+      ? admin
+          .from('player_missions')
+          .select('mission_id')
+          .eq('user_id', userId)
+          .in('mission_id', prerequisiteIds)
+          .not('completed_at', 'is', null)
+      : Promise.resolve({ data: [] }),
+    prerequisiteIds.length
+      ? admin
+          .from('missions')
+          .select('id, title')
+          .in('id', prerequisiteIds)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  return {
+    playerLevel: typeof playerSession?.level === 'number' ? playerSession.level : 1,
+    completedMissionIds: ((completedRows ?? []) as Array<{ mission_id: string }>).map(row => row.mission_id),
+    missionTitleById: Object.fromEntries(
+      ((prerequisiteRows ?? []) as Array<{ id: string; title: string | null }>).map(row => [row.id, row.title]),
+    ),
+  }
+}
+
 export function normalizeMissionTargets(target?: string | string[]): string[] {
   const rawTargets = Array.isArray(target) ? target : target ? [target] : []
   return [...new Set(
@@ -170,9 +234,10 @@ async function grantMissionReward(
       .eq('user_id', userId)
       .eq('session_id', sessionId)
       .single()
-    if (ps) {
+    const goldRow = ps as GoldRow | null
+    if (goldRow) {
       await admin.from('player_sessions')
-        .update({ gold: (ps as any).gold + mission.reward_gold })
+        .update({ gold: goldRow.gold + mission.reward_gold })
         .eq('user_id', userId)
         .eq('session_id', sessionId)
     }
@@ -197,10 +262,11 @@ async function grantMissionReward(
       .eq('session_id', sessionId)
       .eq('item_id', ri.item_id)
       .maybeSingle()
-    if (existing) {
+    const inventoryRow = existing as InventoryRow | null
+    if (inventoryRow) {
       await admin.from('player_inventory')
-        .update({ quantity: (existing as any).quantity + ri.quantity })
-        .eq('id', (existing as any).id)
+        .update({ quantity: inventoryRow.quantity + ri.quantity })
+        .eq('id', inventoryRow.id)
     } else {
       await admin.from('player_inventory').insert({
         user_id: userId,
@@ -219,10 +285,11 @@ async function grantMissionReward(
       .eq('session_id', sessionId)
       .eq('creature_id', mission.reward_creature_id)
       .maybeSingle()
-    if (existing) {
+    const creatureRow = existing as PlayerCreatureRow | null
+    if (creatureRow) {
       await admin.from('player_creatures')
-        .update({ duplicates_count: (existing as any).duplicates_count + 1 })
-        .eq('id', (existing as any).id)
+        .update({ duplicates_count: creatureRow.duplicates_count + 1 })
+        .eq('id', creatureRow.id)
     } else {
       await admin.from('player_creatures').upsert({
         user_id: userId,
