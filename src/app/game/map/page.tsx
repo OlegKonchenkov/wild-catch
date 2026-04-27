@@ -702,6 +702,8 @@ function PinRewardModal({ reward, onDone }: { reward: PinRewardData; onDone: () 
 
 // ── EnigmaModal ───────────────────────────────────────────────────────────────
 // Shown when the player taps or enters range of an enigma pin.
+// Supports both new-format pins (enigma_id → frammenti/suggerimenti) and
+// old-format pins (inline question/image_url in reward_payload).
 function EnigmaModal({
   pin,
   sessionId,
@@ -715,18 +717,34 @@ function EnigmaModal({
   onSuccess: (reward: PinRewardData) => void
   onClose: () => void
 }) {
-  const [visible, setVisible] = useState(false)
-  const [solution, setSolution] = useState('')
+  const [visible, setVisible]     = useState(false)
+  const [solution, setSolution]   = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [errorMsg, setErrorMsg]   = useState<string | null>(null)
+  const [shaking, setShaking]     = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 60)
     return () => clearTimeout(t)
   }, [])
 
-  const question: string = (pin as any).reward_payload?.question ?? ''
-  const imageUrl: string | null = (pin as any).reward_payload?.image_url ?? null
+  const payload = (pin as any).reward_payload ?? {}
+  const isNewFormat = Array.isArray(payload.frammenti)
+
+  // New-format fields
+  const enigmaTitle: string    = payload.title ?? pin.name
+  const enigmaDesc: string | null = payload.description ?? null
+  type FrammentoPublic  = { id: string; title: string; order_index: number; player_has: boolean }
+  type SuggerimentoPublic = { id: string; text: string | null; image_url: string | null; order_index: number; player_has: boolean }
+  const frammenti: FrammentoPublic[]      = payload.frammenti   ?? []
+  const suggerimenti: SuggerimentoPublic[] = payload.suggerimenti ?? []
+
+  // Old-format fields (fallback)
+  const question: string       = payload.question  ?? ''
+  const imageUrl: string | null = payload.image_url ?? null
+
+  const suggerimentoHas   = suggerimenti.filter(s => s.player_has).length
+  const suggerimentoTotal = suggerimenti.length
 
   async function handleSubmit() {
     if (!solution.trim() || submitting) return
@@ -747,6 +765,8 @@ function EnigmaModal({
         onSuccess(d as PinRewardData)
       } else if (d.wrongSolution) {
         setErrorMsg('Soluzione errata, riprova!')
+        setShaking(true)
+        setTimeout(() => setShaking(false), 600)
         setSubmitting(false)
       } else {
         setErrorMsg(d.error ?? 'Errore')
@@ -760,67 +780,246 @@ function EnigmaModal({
 
   return (
     <div className="fixed inset-0 z-[1200] flex flex-col items-end justify-end">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Bottom sheet */}
       <div
         className="relative w-full rounded-t-3xl overflow-hidden"
         style={{
-          background: 'linear-gradient(180deg, #08040F 0%, #0F0820 100%)',
-          border: '1px solid rgba(139,92,246,0.3)',
+          background: 'linear-gradient(180deg, #080C1A 0%, #0B1020 100%)',
+          border: '1px solid rgba(247,200,65,0.22)',
           borderBottom: 'none',
+          maxHeight: '88vh',
           transform: visible ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
+          transition: 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)',
         }}
       >
-        <div className="flex justify-center pt-3 mb-1">
-          <div className="w-10 h-1 rounded-full bg-white/20" />
+        {/* Radial teal atmosphere from top */}
+        <div
+          className="absolute inset-x-0 top-0 pointer-events-none"
+          style={{
+            height: 180,
+            background: 'radial-gradient(ellipse 70% 100% at 50% -10%, rgba(58,157,188,0.18) 0%, transparent 100%)',
+          }}
+        />
+
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 mb-2 relative">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(247,200,65,0.3)' }} />
         </div>
-        <div className="px-5 pb-8 space-y-4 pt-2">
-          <div className="flex items-start gap-3 bg-violet-500/10 border border-violet-400/25 rounded-2xl p-3">
-            <span className="text-2xl leading-none mt-0.5">🔐</span>
-            <div>
-              <p className="text-xs font-bold text-violet-300 uppercase tracking-wide">Enigma</p>
-              <p className="text-base font-extrabold text-white mt-0.5">{pin.name}</p>
+
+        {/* Scrollable content */}
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(88vh - 24px)' }}>
+          <div className="px-5 pb-8 space-y-5 pt-1">
+
+            {/* Header badge */}
+            <div
+              className="flex items-center gap-3 rounded-2xl p-3"
+              style={{ background: 'rgba(247,200,65,0.08)', border: '1px solid rgba(247,200,65,0.2)' }}
+            >
+              <span className="text-2xl leading-none">🔐</span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#F7C841' }}>
+                  Enigma
+                </p>
+                <p className="text-base font-extrabold text-white leading-tight truncate">
+                  {isNewFormat ? enigmaTitle : pin.name}
+                </p>
+              </div>
             </div>
-          </div>
-          {imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt="Indizio" className="w-full rounded-2xl object-cover max-h-40" />
-          )}
-          {question && (
-            <p className="text-sm text-white/80 leading-relaxed">{question}</p>
-          )}
-          <div className="space-y-2">
-            <input
-              value={solution}
-              onChange={e => setSolution(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
-              placeholder="Inserisci la soluzione…"
-              className="w-full bg-white/08 text-white border border-white/20 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-violet-400/60 placeholder:text-white/30"
-              style={{ background: 'rgba(255,255,255,0.06)' }}
-            />
-            {errorMsg && (
-              <p className="text-xs text-red-400">{errorMsg}</p>
+
+            {/* ── New-format content ────────────────────────────── */}
+            {isNewFormat ? (
+              <>
+                {/* Enigma description — serif feel */}
+                {enigmaDesc && (
+                  <p
+                    className="text-base leading-relaxed text-white/85 text-center italic"
+                    style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+                  >
+                    {enigmaDesc}
+                  </p>
+                )}
+
+                {/* Frammenti section */}
+                {frammenti.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                      Frammenti enigma ({frammenti.filter(f => f.player_has).length}/{frammenti.length})
+                    </p>
+                    <div className="space-y-2">
+                      {frammenti.map(f => (
+                        <div
+                          key={f.id}
+                          className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                          style={f.player_has ? {
+                            background: 'rgba(58,157,188,0.12)',
+                            border: '1px solid rgba(58,157,188,0.35)',
+                          } : {
+                            background: 'rgba(255,255,255,0.04)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            opacity: 0.45,
+                            filter: 'blur(0.6px)',
+                          }}
+                        >
+                          <span className="text-base shrink-0">{f.player_has ? '☑' : '☐'}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-sm font-semibold leading-tight ${f.player_has ? 'text-white' : 'text-white/60'}`}>
+                              {f.player_has ? f.title : '— frammento mancante —'}
+                            </p>
+                            {!f.player_has && (
+                              <p className="text-[10px] text-white/35 mt-0.5">Trova la creatura per sbloccare</p>
+                            )}
+                          </div>
+                          {f.player_has && (
+                            <span className="text-xs shrink-0" style={{ color: '#3A9DBC' }}>✓</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Suggerimenti section */}
+                {suggerimenti.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                        Indizi trovati
+                      </p>
+                      <p className="text-[10px] font-bold" style={{ color: '#3A9DBC' }}>
+                        {suggerimentoHas}/{suggerimentoTotal}
+                      </p>
+                    </div>
+
+                    {/* Progress bar */}
+                    {suggerimentoTotal > 0 && (
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${(suggerimentoHas / suggerimentoTotal) * 100}%`,
+                            background: 'linear-gradient(90deg, #3A9DBC 0%, #5BBBD8 100%)',
+                            boxShadow: '0 0 8px rgba(58,157,188,0.6)',
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      {suggerimenti.map(s => (
+                        <div
+                          key={s.id}
+                          className="rounded-xl px-3 py-2.5"
+                          style={s.player_has ? {
+                            background: 'rgba(124,58,237,0.12)',
+                            border: '1px solid rgba(124,58,237,0.3)',
+                          } : {
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.07)',
+                          }}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-sm shrink-0 mt-0.5">{s.player_has ? '💡' : '🔒'}</span>
+                            {s.player_has ? (
+                              <div className="flex-1 min-w-0">
+                                {s.text && (
+                                  <p className="text-sm text-white/80 leading-snug">{s.text}</p>
+                                )}
+                                {s.image_url && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={s.image_url}
+                                    alt="Indizio"
+                                    className="w-full rounded-lg object-cover max-h-32 mt-2 cursor-zoom-in"
+                                    onClick={() => window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: s.image_url }))}
+                                  />
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-white/25 italic">Indizio ancora nascosto…</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* ── Old-format content (backward compat) ──────────── */
+              <>
+                {imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={imageUrl} alt="Indizio" className="w-full rounded-2xl object-cover max-h-40" />
+                )}
+                {question && (
+                  <p className="text-sm text-white/80 leading-relaxed">{question}</p>
+                )}
+              </>
             )}
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 py-3.5 rounded-xl font-bold text-sm text-white/60 transition-all active:scale-95"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
-            >
-              Più tardi
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || !solution.trim()}
-              className="flex-[2] py-3.5 rounded-xl font-extrabold text-sm text-white transition-all active:scale-95 disabled:opacity-50"
-              style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}
-            >
-              {submitting ? 'Verifica…' : '✓ Conferma'}
-            </button>
+
+            {/* Answer input */}
+            <div className="space-y-2">
+              <input
+                value={solution}
+                onChange={e => setSolution(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+                placeholder="Inserisci la soluzione…"
+                className="w-full text-white rounded-xl px-4 py-3.5 text-base font-semibold focus:outline-none placeholder:text-white/25 transition-all"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1.5px solid rgba(247,200,65,0.25)',
+                  boxShadow: solution ? '0 0 0 2px rgba(247,200,65,0.2)' : 'none',
+                  animation: shaking ? 'enigmaShake 0.55s ease-in-out' : 'none',
+                }}
+              />
+              {errorMsg && (
+                <p className="text-xs font-semibold text-red-400 text-center">{errorMsg}</p>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3.5 rounded-xl font-bold text-sm text-white/50 transition-all active:scale-95"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}
+              >
+                Più tardi
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || !solution.trim()}
+                className="flex-[2] py-3.5 rounded-xl font-extrabold text-sm transition-all active:scale-95 disabled:opacity-40"
+                style={{
+                  background: 'linear-gradient(135deg, #B8860B 0%, #F7C841 50%, #D4A017 100%)',
+                  color: '#080C1A',
+                  boxShadow: solution.trim() && !submitting
+                    ? '0 4px 20px rgba(247,200,65,0.5), 0 0 1px rgba(247,200,65,0.8)'
+                    : 'none',
+                  letterSpacing: '0.08em',
+                }}
+              >
+                {submitting ? 'Verifica…' : '🔓 RISOLVI ENIGMA'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes enigmaShake {
+          0%, 100% { transform: translateX(0); }
+          15%       { transform: translateX(-8px); }
+          30%       { transform: translateX(8px); }
+          45%       { transform: translateX(-6px); }
+          60%       { transform: translateX(6px); }
+          75%       { transform: translateX(-3px); }
+          90%       { transform: translateX(3px); }
+        }
+      `}</style>
     </div>
   )
 }
