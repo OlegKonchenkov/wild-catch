@@ -296,131 +296,41 @@ export function PinPayloadBoss({ allCreatures, allItems, value, onChange }: {
 
 // ── Enigma ────────────────────────────────────────────────────────────────────
 
-export function PinPayloadEnigma({ allItems, allCreatures, value, onChange }: {
-  allItems: { id: string; name: string; type: string }[]
-  allCreatures: { id: string; name: string; rarity: string }[]
+export function PinPayloadEnigma({ allEnigmi, value, onChange }: {
+  allEnigmi: { id: string; title: string; difficulty: string }[]
   value: string
   onChange: (v: string) => void
 }) {
-  const p            = parsePayload(value)
-  const question     = (p.question as string) ?? ''
-  const imageUrl     = (p.image_url as string) ?? ''
-  const solution     = (p.solution as string) ?? ''
-  const rewardType   = (p.reward_type as string) ?? 'exp'
-  const rewardPayload = (p.reward_payload as Record<string, unknown>) ?? {}
+  const p = parsePayload(value)
+  const enigmaId = (p.enigma_id as string) ?? ''
 
-  const [uploading, setUploading] = useState(false)
-  const [preview, setPreview]     = useState<string | null>(imageUrl || null)
-
-  function update(updates: Record<string, unknown>) {
-    onChange(encodePayload({ question, image_url: imageUrl, solution, reward_type: rewardType, reward_payload: rewardPayload, ...updates }))
-  }
-  function updateRewardPayload(rp: Record<string, unknown>) {
-    update({ reward_payload: rp })
-  }
-
-  async function handleImageFile(file: File) {
-    setUploading(true)
-    const fd = new FormData()
-    fd.append('file', file)
-    const res = await fetch('/api/admin/upload', { method: 'POST', body: fd })
-    if (res.ok) {
-      const json = await res.json()
-      const url = json.url ?? ''
-      setPreview(url)
-      update({ image_url: url })
-    }
-    setUploading(false)
-  }
+  const DIFF_LABEL: Record<string, string> = { facile: '🟢 Facile', medio: '🟡 Medio', difficile: '🔴 Difficile' }
+  const selected = allEnigmi.find(e => e.id === enigmaId)
 
   return (
-    <div className="space-y-3">
-      {/* Question */}
+    <div className="space-y-2">
       <div>
-        <label className={LABEL}>Testo enigma / domanda</label>
-        <textarea value={question} rows={3}
-          onChange={e => update({ question: e.target.value })}
-          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#3A9DBC]/60" />
-      </div>
-      {/* Optional image */}
-      <div className="space-y-1.5">
-        <label className={LABEL}>Immagine <span className="text-white/30">(opzionale)</span></label>
-        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif"
-          onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile(f) }}
-          className="w-full text-xs text-white/60 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white/70 hover:file:bg-white/15 cursor-pointer" />
-        {uploading && <p className="text-xs text-white/40">Caricamento…</p>}
-        <input value={imageUrl} placeholder="oppure incolla URL immagine…"
-          onChange={e => { setPreview(e.target.value || null); update({ image_url: e.target.value }) }}
-          className={INPUT + ' text-xs'} />
-        {preview && (
-          <div className="relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt="Anteprima" className="w-full rounded-lg object-cover max-h-28" />
-            <button type="button"
-              onClick={() => { setPreview(null); update({ image_url: '' }) }}
-              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white text-xs flex items-center justify-center hover:bg-red-500/80">
-              ×
-            </button>
-          </div>
-        )}
-      </div>
-      {/* Solution */}
-      <div>
-        <label className={LABEL}>Soluzione (testo libero — confronto case-insensitive)</label>
-        <input value={solution} placeholder="es. aquila, Venezia, 42…"
-          onChange={e => update({ solution: e.target.value })}
-          className={INPUT} />
-      </div>
-      {/* Reward type */}
-      <div>
-        <label className={LABEL}>Tipo ricompensa</label>
-        <select value={rewardType}
-          onChange={e => update({ reward_type: e.target.value, reward_payload: {} })}
-          className={SELECT}>
-          <option value="exp">⭐ EXP</option>
-          <option value="gold">💰 Oro</option>
-          <option value="oggetto">🎁 Oggetto</option>
-          <option value="creatura">🐾 Creatura</option>
+        <label className={LABEL}>Enigma</label>
+        <select
+          value={enigmaId}
+          onChange={e => onChange(encodePayload({ enigma_id: e.target.value }))}
+          className={SELECT}
+        >
+          <option value="">— Seleziona enigma —</option>
+          {allEnigmi.map(e => (
+            <option key={e.id} value={e.id}>
+              {e.title} ({DIFF_LABEL[e.difficulty] ?? e.difficulty})
+            </option>
+          ))}
         </select>
       </div>
-      {/* Reward payload */}
-      {(rewardType === 'exp' || rewardType === 'gold') && (
-        <div>
-          <label className={LABEL}>{rewardType === 'exp' ? 'EXP' : 'Oro'} da assegnare</label>
-          <input type="number" min={0} value={(rewardPayload.amount as number) ?? 0}
-            onChange={e => updateRewardPayload({ amount: +e.target.value })}
-            className={INPUT} />
-        </div>
+      {selected && (
+        <p className="text-xs text-white/40">
+          Difficoltà: <span className="text-[#3A9DBC]/80">{DIFF_LABEL[selected.difficulty] ?? selected.difficulty}</span>
+        </p>
       )}
-      {rewardType === 'oggetto' && (
-        <div className="space-y-2">
-          <div>
-            <label className={LABEL}>Oggetto</label>
-            <select value={(rewardPayload.item_id as string) ?? ''}
-              onChange={e => updateRewardPayload({ item_id: e.target.value, quantity: rewardPayload.quantity ?? 1 })}
-              className={SELECT}>
-              <option value="">— Seleziona oggetto —</option>
-              {allItems.map(it => <option key={it.id} value={it.id}>{it.name} ({it.type})</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={LABEL}>Quantità</label>
-            <input type="number" min={1} max={99} value={(rewardPayload.quantity as number) ?? 1}
-              onChange={e => updateRewardPayload({ item_id: rewardPayload.item_id, quantity: Math.max(1, +e.target.value) })}
-              className={INPUT} />
-          </div>
-        </div>
-      )}
-      {rewardType === 'creatura' && (
-        <div>
-          <label className={LABEL}>Creatura</label>
-          <select value={(rewardPayload.creature_id as string) ?? ''}
-            onChange={e => updateRewardPayload({ creature_id: e.target.value })}
-            className={SELECT}>
-            <option value="">— Seleziona creatura —</option>
-            {allCreatures.map(c => <option key={c.id} value={c.id}>{c.name} ({RARITY_LABEL[c.rarity] ?? c.rarity})</option>)}
-          </select>
-        </div>
+      {allEnigmi.length === 0 && (
+        <p className="text-xs text-white/30 italic">Nessun enigma disponibile per questa sessione. Creane uno in <strong>🧩 Enigmi</strong>.</p>
       )}
     </div>
   )
@@ -452,12 +362,13 @@ export function PinPayloadEvento({ value, onChange }: { value: string; onChange:
 
 // ── Reward type dispatcher ────────────────────────────────────────────────────
 
-export function PinPayloadFields({ type, value, onChange, allItems, allCreatures }: {
+export function PinPayloadFields({ type, value, onChange, allItems, allCreatures, allEnigmi }: {
   type: string
   value: string
   onChange: (v: string) => void
   allItems: { id: string; name: string; type: string }[]
   allCreatures: { id: string; name: string; rarity: string }[]
+  allEnigmi?: { id: string; title: string; difficulty: string }[]
 }) {
   if (type === 'oggetto')  return <PinPayloadOggetto  allItems={allItems}         value={value} onChange={onChange} />
   if (type === 'uovo')     return <PinPayloadUovo                                  value={value} onChange={onChange} />
@@ -465,6 +376,6 @@ export function PinPayloadFields({ type, value, onChange, allItems, allCreatures
   if (type === 'indizio')  return <PinPayloadIndizio                               value={value} onChange={onChange} />
   if (type === 'boss')     return <PinPayloadBoss     allCreatures={allCreatures} allItems={allItems} value={value} onChange={onChange} />
   if (type === 'evento')   return <PinPayloadEvento                                value={value} onChange={onChange} />
-  if (type === 'enigma')   return <PinPayloadEnigma   allItems={allItems} allCreatures={allCreatures} value={value} onChange={onChange} />
+  if (type === 'enigma')   return <PinPayloadEnigma   allEnigmi={allEnigmi ?? []}  value={value} onChange={onChange} />
   return null
 }

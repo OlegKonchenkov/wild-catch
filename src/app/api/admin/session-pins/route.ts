@@ -53,6 +53,7 @@ export async function POST(request: Request) {
       ...(reward_type != null ? { reward_type: reward_type ?? null } : {}),
       ...(reward_payload != null ? { reward_payload: reward_payload ?? null } : {}),
       ...(reward_radius_m != null ? { reward_radius_m: reward_radius_m ?? 50 } : {}),
+      ...(reward_type === 'enigma' && reward_payload?.enigma_id ? { enigma_id: reward_payload.enigma_id } : {}),
     })
     .select()
     .single()
