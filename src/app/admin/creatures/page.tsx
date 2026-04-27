@@ -32,6 +32,7 @@ interface Creature {
   attack_sound_duration_ms: number | null
   status_effect: string | null
   status_effect_chance: number
+  enigma_frammento_id: string | null
 }
 
 const RARITIES: Rarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
@@ -58,6 +59,7 @@ const EMPTY_FORM = {
   name: '', description: '', rarity: 'comune' as Rarity, element: 'armonia' as ElementType,
   hp: 50, atk: 10, def: 5, evolution_of: '', session_id: '', catch_difficulty: 1,
   enigma_title: '', enigma_description: '', enigma_image_url: '', enigma_video_url: '',
+  enigma_frammento_id: '',
   spawnable: true,
   attack_sound_url: '', attack_sound_duration_ms: '',
   status_effect: '' as string, status_effect_chance: 15,
@@ -87,11 +89,6 @@ export default function CreaturesPage() {
   const [artworkError, setArtworkError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [enigmaOpen, setEnigmaOpen] = useState(false)
-  const [enigmaImgUploading, setEnigmaImgUploading] = useState(false)
-  const [enigmaImgError, setEnigmaImgError] = useState<string | null>(null)
-  const enigmaFileRef = useRef<HTMLInputElement>(null)
-
   const [soundOpen, setSoundOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [soundUploading, setSoundUploading] = useState(false)
@@ -104,10 +101,27 @@ export default function CreaturesPage() {
   const [search, setSearch] = useState('')
   const [sessions, setSessions] = useState<{ id: string; name: string }[]>([])
   const [sessionFilter, setSessionFilter] = useState<string>('')
+  const [allFrammenti, setAllFrammenti] = useState<Array<{
+    id: string
+    title: string
+    enigma_title: string
+  }>>([])
+
 
   useEffect(() => {
     supabase.from('sessions').select('id, name').order('created_at', { ascending: false })
       .then(({ data }) => { if (data) setSessions(data) })
+    supabase
+      .from('enigma_frammenti')
+      .select('id, title, enigma:enigmi(title)')
+      .order('title', { ascending: true })
+      .then(({ data }) => {
+        if (data) setAllFrammenti(data.map((f: any) => ({
+          id: f.id,
+          title: f.title,
+          enigma_title: f.enigma?.title ?? '',
+        })))
+      })
   }, [supabase])
 
   const loadCreatures = useCallback(async () => {
@@ -126,7 +140,7 @@ export default function CreaturesPage() {
   function openNew() {
     setPanel('new'); setFormData({ ...EMPTY_FORM }); setFormError(null)
     setImageMode('preview'); setManualUrl(''); setAiPrompt(''); setArtworkError(null)
-    setEnigmaOpen(false); setSoundOpen(false); setSoundError(null); setStatusOpen(false)
+    setSoundOpen(false); setSoundError(null); setStatusOpen(false)
   }
 
   function openEdit(c: Creature) {
@@ -136,6 +150,7 @@ export default function CreaturesPage() {
       session_id: c.session_id ?? '', catch_difficulty: c.catch_difficulty ?? 1,
       enigma_title: c.enigma_title ?? '', enigma_description: c.enigma_description ?? '',
       enigma_image_url: c.enigma_image_url ?? '', enigma_video_url: c.enigma_video_url ?? '',
+      enigma_frammento_id: c.enigma_frammento_id ?? '',
       spawnable: (c as any).spawnable !== false,
       attack_sound_url: c.attack_sound_url ?? '', attack_sound_duration_ms: c.attack_sound_duration_ms ?? '',
       status_effect: c.status_effect ?? '', status_effect_chance: c.status_effect_chance != null ? Math.round(c.status_effect_chance * 100) : 15 } as any)
@@ -158,10 +173,7 @@ export default function CreaturesPage() {
       def: Number(formData.def), evolution_of: formData.evolution_of || null,
       session_id: (formData as any).session_id || null,
       catch_difficulty: Number((formData as any).catch_difficulty) || 1,
-      enigma_title: (formData as any).enigma_title || null,
-      enigma_description: (formData as any).enigma_description || null,
-      enigma_image_url: (formData as any).enigma_image_url || null,
-      enigma_video_url: (formData as any).enigma_video_url || null,
+      enigma_frammento_id: (formData as any).enigma_frammento_id || null,
       spawnable: (formData as any).spawnable !== false,
       attack_sound_url: (formData as any).attack_sound_url || null,
       attack_sound_duration_ms: (formData as any).attack_sound_duration_ms
@@ -230,19 +242,6 @@ export default function CreaturesPage() {
       else { setImageMode('preview'); await loadCreatures() }
     } catch { setArtworkError('Errore di rete') }
     finally { setArtworkLoading(false) }
-  }
-
-  async function handleEnigmaImageUpload(file: File) {
-    setEnigmaImgUploading(true); setEnigmaImgError(null)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd })
-      const d = await res.json()
-      if (!res.ok) { setEnigmaImgError(d.error ?? 'Errore upload'); return }
-      setFormData(f => ({ ...f, enigma_image_url: d.url } as any))
-    } catch { setEnigmaImgError('Errore di rete') }
-    finally { setEnigmaImgUploading(false) }
   }
 
   async function handleSoundUpload(file: File) {
@@ -694,64 +693,31 @@ export default function CreaturesPage() {
                       </button>
                     </div>
 
-                    {/* Enigma section */}
-                    <div className="border border-white/10 rounded-xl overflow-hidden">
-                      <button type="button"
-                        onClick={() => setEnigmaOpen(o => !o)}
-                        className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-white/5 transition-colors">
-                        <span className="text-xs font-semibold text-white/60 flex items-center gap-2">
-                          🧩 Enigma <span className="text-white/30 font-normal">(opzionale)</span>
-                        </span>
-                        <span className="text-white/30 text-xs">{enigmaOpen ? '▲' : '▼'}</span>
-                      </button>
-                      {enigmaOpen && (
-                        <div className="px-3 pb-3 space-y-2 border-t border-white/10 pt-3">
-                          <div>
-                            <label className="text-xs text-white/40 block mb-1">Titolo enigma</label>
-                            <input type="text" value={(formData as any).enigma_title}
-                              onChange={e => setFormData(f => ({ ...f, enigma_title: e.target.value } as any))}
-                              placeholder="Es. Il Segreto delle Acque..."
-                              className="w-full bg-white/5 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-white/40 block mb-1">Descrizione enigma</label>
-                            <textarea value={(formData as any).enigma_description} rows={3}
-                              onChange={e => setFormData(f => ({ ...f, enigma_description: e.target.value } as any))}
-                              placeholder="Testo del frammento di storia / indovinello..."
-                              className="w-full bg-white/5 text-white text-sm border border-white/10 rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-[#3A9DBC]/50" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-white/40 block mb-1">Immagine (URL o carica)</label>
-                            <div className="flex gap-2">
-                              <input type="text" value={(formData as any).enigma_image_url}
-                                onChange={e => { setFormData(f => ({ ...f, enigma_image_url: e.target.value } as any)); setEnigmaImgError(null) }}
-                                placeholder="https://..."
-                                className="flex-1 bg-white/5 text-white text-xs border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50 min-w-0" />
-                              <button type="button"
-                                onClick={() => enigmaFileRef.current?.click()}
-                                disabled={enigmaImgUploading}
-                                className="shrink-0 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors disabled:opacity-40">
-                                {enigmaImgUploading ? '⏳' : '📁'}
-                              </button>
-                            </div>
-                            <input ref={enigmaFileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                              className="hidden"
-                              onChange={e => { if (e.target.files?.[0]) handleEnigmaImageUpload(e.target.files[0]); e.target.value = '' }} />
-                            {enigmaImgError && <p className="text-xs text-red-400 mt-1">{enigmaImgError}</p>}
-                            {(formData as any).enigma_image_url && !enigmaImgUploading && (
-                              <img src={(formData as any).enigma_image_url} alt="preview"
-                                className="mt-2 w-full h-24 object-cover rounded-lg opacity-70" />
-                            )}
-                          </div>
-                          <div>
-                            <label className="text-xs text-white/40 block mb-1">Video (URL)</label>
-                            <input type="text" value={(formData as any).enigma_video_url}
-                              onChange={e => setFormData(f => ({ ...f, enigma_video_url: e.target.value } as any))}
-                              placeholder="https://youtube.com/... o link diretto"
-                              className="w-full bg-white/5 text-white text-xs border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-[#3A9DBC]/50" />
-                          </div>
-                        </div>
-                      )}
+                    {/* Frammento Enigma */}
+                    <div className="border border-white/10 rounded-lg overflow-hidden">
+                      <div className="px-3 py-2 bg-white/5 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-white/60">🧩 Frammento Enigma <span className="text-white/30 font-normal">(opzionale)</span></span>
+                      </div>
+                      <div className="px-3 py-3 space-y-2">
+                        <select
+                          value={(formData as any).enigma_frammento_id ?? ''}
+                          onChange={e => setFormData(f => ({ ...f, enigma_frammento_id: e.target.value || null } as any))}
+                          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm"
+                        >
+                          <option value="">— Nessun frammento —</option>
+                          {allFrammenti.map(f => (
+                            <option key={f.id} value={f.id}>
+                              {f.title}{f.enigma_title ? ` (${f.enigma_title})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {(formData as any).enigma_frammento_id && (() => {
+                          const sel = allFrammenti.find(f => f.id === (formData as any).enigma_frammento_id)
+                          return sel ? (
+                            <p className="text-xs text-white/40">Enigma: <span className="text-[#3A9DBC]/80">{sel.enigma_title}</span></p>
+                          ) : null
+                        })()}
+                      </div>
                     </div>
 
                     {/* Sound section */}
