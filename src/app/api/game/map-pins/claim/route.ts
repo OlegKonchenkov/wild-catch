@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient()
   const { data: pin } = await admin
     .from('session_map_pins')
-    .select('id, session_id, lat, lng, name, reward_type, reward_payload, reward_radius_m')
+    .select('id, session_id, lat, lng, name, reward_type, reward_payload, reward_radius_m, enigma_id')
     .eq('id', pinId)
     .eq('session_id', sessionId)
     .single()
@@ -58,7 +58,23 @@ export async function POST(request: Request) {
 
   // ── Enigma pins: verify solution before proceeding ───────────────────────
   if (pin.reward_type === 'enigma') {
-    const correctSolution = ((pin.reward_payload as any)?.solution ?? '') as string
+    let correctSolution: string
+    if ((pin as any).enigma_id) {
+      // New format: load solution from enigmi table
+      const { data: enigmaRow } = await admin
+        .from('enigmi')
+        .select('solution, reward_type, reward_payload')
+        .eq('id', (pin as any).enigma_id)
+        .single()
+      if (!enigmaRow) return NextResponse.json({ error: 'Enigma non trovato' }, { status: 404 })
+      correctSolution = enigmaRow.solution ?? ''
+      // Store enigma's own reward data for use in the dispense step below
+      ;(pin as any)._enigmaRewardType = enigmaRow.reward_type
+      ;(pin as any)._enigmaRewardPayload = enigmaRow.reward_payload ?? {}
+    } else {
+      // Old format: solution in reward_payload
+      correctSolution = ((pin.reward_payload as any)?.solution ?? '') as string
+    }
     if (!solution || solution.trim().toLowerCase() !== correctSolution.trim().toLowerCase()) {
       return NextResponse.json({ error: 'Soluzione errata, riprova!', wrongSolution: true }, { status: 422 })
     }
@@ -294,8 +310,9 @@ export async function POST(request: Request) {
 
     case 'enigma': {
       // Solution already verified above; now grant the nested reward
-      const rewardType    = payload.reward_type as string | undefined
-      const rewardPayload = (payload.reward_payload ?? {}) as any
+      // For new-format pins, use enigma's own reward; for old-format, use inline payload
+      const rewardType    = (pin as any)._enigmaRewardType ?? (payload.reward_type as string | undefined)
+      const rewardPayload = (pin as any)._enigmaRewardPayload ?? ((payload.reward_payload ?? {}) as any)
 
       if (rewardType === 'exp' || rewardType === 'gold') {
         const amount = (rewardPayload.amount ?? 0) as number

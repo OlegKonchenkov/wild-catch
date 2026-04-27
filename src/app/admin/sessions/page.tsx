@@ -144,6 +144,7 @@ export default function SessionsPage() {
   const [pinEditSaving, setPinEditSaving]     = useState(false)
   const [pinEditError, setPinEditError]       = useState<string | null>(null)
   const [allCreatures, setAllCreatures] = useState<{ id: string; name: string; rarity: string }[]>([])
+  const [allEnigmi, setAllEnigmi] = useState<{ id: string; title: string; difficulty: string }[]>([])
 
   // Create wizard
   const [step, setStep]           = useState<WizardStep>(1)
@@ -261,6 +262,13 @@ export default function SessionsPage() {
       supabase.from('creatures').select('id, name, rarity').order('name')
         .then(({ data }) => { if (data) setAllCreatures(data as { id: string; name: string; rarity: string }[]) })
     }
+    // Load enigmi for this session (filter by session_id)
+    supabase
+      .from('enigmi')
+      .select('id, title, difficulty')
+      .eq('session_id', editingId)
+      .order('title', { ascending: true })
+      .then(({ data }) => { if (data) setAllEnigmi(data as { id: string; title: string; difficulty: string }[]) })
   }
 
   async function savePinEdit() {
@@ -754,7 +762,7 @@ export default function SessionsPage() {
               <PinPayloadEvento value={pinEditPayload} onChange={setPinEditPayload} />
             )}
             {pinEditRewardType === 'enigma' && (
-              <PinPayloadEnigma allItems={allItems} allCreatures={allCreatures} value={pinEditPayload} onChange={setPinEditPayload} />
+              <PinPayloadEnigma allEnigmi={allEnigmi} value={pinEditPayload} onChange={setPinEditPayload} />
             )}
 
             {/* Radius */}

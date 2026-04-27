@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { ImageInput } from '@/components/admin/ImageInput'
 import { AdminInlineSpinner, AdminListSkeleton } from '@/components/admin/AdminLoading'
 import type { QRCodeType } from '@/lib/types'
 
@@ -150,7 +149,7 @@ type Fields = Record<string, string | number>
 function defaultFields(t: QRCodeType): Fields {
   switch (t) {
     case 'oggetto': return { item_id: '', quantity: 1 }
-    case 'indizio': return { chapter_order: 1, text: '', image_url: '' }
+    case 'indizio': return { suggerimento_id: '' }
     case 'uovo':    return { egg_rarity: 'comune', steps_required: 0 }
     case 'boss':    return {
       boss_c1: '', boss_lv1: 10,
@@ -163,13 +162,13 @@ function defaultFields(t: QRCodeType): Fields {
   }
 }
 
-function payloadToFields(type: QRCodeType, payload: any): Fields {
+function payloadToFields(type: QRCodeType, payload: any, qr?: any): Fields {
   const p = payload ?? {}
   switch (type) {
     case 'oggetto':
       return { item_id: String(p.item_id ?? ''), quantity: asNumber(p.quantity, 1) }
     case 'indizio':
-      return { chapter_order: asNumber(p.chapter_order, 1), text: String(p.text ?? ''), image_url: String(p.image_url ?? '') }
+      return { suggerimento_id: String(p.suggerimento_id ?? qr?.enigma_suggerimento_id ?? '') }
     case 'uovo':
       return { egg_rarity: String(p.egg_rarity ?? 'comune'), steps_required: asNumber(p.steps_required, 0) }
     case 'boss': {
@@ -198,7 +197,7 @@ function payloadToFields(type: QRCodeType, payload: any): Fields {
 function buildPayload(t: QRCodeType, f: Fields): any {
   switch (t) {
     case 'oggetto': return { item_id: f.item_id, quantity: Number(f.quantity) }
-    case 'indizio': return { chapter_order: Number(f.chapter_order), text: f.text, image_url: f.image_url || null }
+    case 'indizio': return { suggerimento_id: f.suggerimento_id || null }
     case 'uovo':    return { egg_rarity: f.egg_rarity, steps_required: Number(f.steps_required ?? 0) }
     case 'boss': {
       const creatures = [
@@ -225,7 +224,7 @@ function getEventTypeLabel(eventType: string): string {
   }
 }
 
-function getQrDescription(qr: any, items: any[], creatures: any[]): string {
+function getQrDescription(qr: any, items: any[], creatures: any[], suggerimenti?: Array<{ id: string; text: string; enigma_title: string }>): string {
   const payload = qr.payload ?? {}
   switch (qr.type as QRCodeType) {
     case 'oggetto': {
@@ -233,8 +232,10 @@ function getQrDescription(qr: any, items: any[], creatures: any[]): string {
       return `${item?.name ?? 'Oggetto'} ×${asNumber(payload.quantity, 1)}`
     }
     case 'indizio': {
-      const text = String(payload.text ?? '').trim()
-      return text ? `Cap. ${asNumber(payload.chapter_order, 1)}: ${text.slice(0, 50)}` : `Indizio capitolo ${asNumber(payload.chapter_order, 1)}`
+      const sugId = payload.suggerimento_id ?? qr.enigma_suggerimento_id
+      const s = suggerimenti?.find(sg => sg.id === sugId)
+      if (s) return `Suggerimento: ${s.text.slice(0, 50)} (${s.enigma_title})`
+      return 'Indizio (suggerimento non trovato)'
     }
     case 'uovo':
       return `Uovo ${String(payload.egg_rarity ?? 'comune')}${payload.steps_required > 0 ? ` · ${payload.steps_required} passi` : ' · immediato'}`
@@ -260,14 +261,14 @@ function getQrDescription(qr: any, items: any[], creatures: any[]): string {
   }
 }
 
-function getQrDetails(qr: any, items: any[], creatures: any[], sessions: any[]) {
+function getQrDetails(qr: any, items: any[], creatures: any[], sessions: any[], suggerimenti?: Array<{ id: string; text: string; enigma_title: string }>) {
   const payload = qr.payload ?? {}
   const sessionName = sessions.find(s => s.id === qr.session_id)?.name
   const details: { label: string; value: string }[] = [
     { label: 'Etichetta', value: qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || 'QR' },
     { label: 'Tipo', value: TYPE_INFO[qr.type as QRCodeType]?.label ?? qr.type },
     { label: 'Sessione', value: sessionName ? `🎯 ${sessionName}` : '🌐 Tutte le sessioni' },
-    { label: 'Descrizione', value: getQrDescription(qr, items, creatures) },
+    { label: 'Descrizione', value: getQrDescription(qr, items, creatures, suggerimenti) },
     {
       label: 'Utilizzi',
       value: qr.uses_remaining === null ? 'Illimitati' : qr.uses_remaining === 0 ? 'Esaurito' : `${qr.uses_remaining} rimanenti`,
@@ -395,6 +396,12 @@ export default function QRCodesPage() {
 
   const [creatures, setCreatures] = useState<any[]>([])
   const [items, setItems]         = useState<any[]>([])
+  const [allSuggerimenti, setAllSuggerimenti] = useState<Array<{
+    id: string
+    text: string
+    enigma_title: string
+  }>>([])
+
 
   const [type, setType]               = useState<QRCodeType>('oggetto')
   const [label, setLabel]             = useState('')
@@ -418,6 +425,17 @@ export default function QRCodesPage() {
       .then(() => setLoadingSessions(false), () => setLoadingSessions(false))
     fetch('/api/admin/creatures').then(r => r.json()).then(d => setCreatures(d.creatures ?? []))
     fetch('/api/admin/items').then(r => r.json()).then(d => setItems(d.items ?? []))
+    supabase
+      .from('enigma_suggerimenti')
+      .select('id, text, enigma:enigmi(title)')
+      .order('order_index', { ascending: true })
+      .then(({ data }) => {
+        if (data) setAllSuggerimenti((data as any[]).map(s => ({
+          id: s.id,
+          text: s.text,
+          enigma_title: (s.enigma as any)?.title ?? '',
+        })))
+      })
   }, [supabase])
 
   useEffect(() => {
@@ -468,7 +486,7 @@ export default function QRCodesPage() {
     setUsesRemaining(typeof qr.uses_remaining === 'number' ? qr.uses_remaining : null)
     setScopeSessionId(qr.session_id ?? '')
     setUniquePerUser(qr.unique_per_user ?? (qrType === 'boss'))
-    setFields(payloadToFields(qrType, qr.payload ?? {}))
+    setFields(payloadToFields(qrType, qr.payload ?? {}, qr))
     setManualCode(String(qr.manual_code ?? ''))
     setError('')
     setEditorOpen(true)
@@ -538,7 +556,7 @@ export default function QRCodesPage() {
 
   async function handleShare(qr: any) {
     const title = qr.label || TYPE_INFO[qr.type as QRCodeType]?.label || 'QR'
-    const text = getQrDescription(qr, items, creatures)
+    const text = getQrDescription(qr, items, creatures, allSuggerimenti)
     try {
       if (navigator.share) { await navigator.share({ title, text }) }
       else {
@@ -620,7 +638,7 @@ export default function QRCodesPage() {
           if (filterType && qr.type !== filterType) return false
           if (!search.trim()) return true
           const q = search.toLowerCase()
-          const description = getQrDescription(qr, items, creatures)
+          const description = getQrDescription(qr, items, creatures, allSuggerimenti)
           return (
             (qr.label ?? '').toLowerCase().includes(q) ||
             description.toLowerCase().includes(q) ||
@@ -628,7 +646,7 @@ export default function QRCodesPage() {
           )
         }).map(qr => {
           const typeInfo = TYPE_INFO[qr.type as QRCodeType]
-          const description = getQrDescription(qr, items, creatures)
+          const description = getQrDescription(qr, items, creatures, allSuggerimenti)
           const isBoss = qr.type === 'boss'
           const sname = sessionName(qr.session_id)
           return (
@@ -773,15 +791,33 @@ export default function QRCodesPage() {
 
                 {type === 'indizio' && (
                   <>
-                    <Field label="Capitolo di riferimento" hint="A quale missione/capitolo appartiene questo indizio">
-                      <input type="number" value={fields.chapter_order} min={1} onChange={e => setField('chapter_order', +e.target.value)} className={cls} />
+                    <Field label="Suggerimento enigma" hint="Seleziona il suggerimento che verrà svelato al giocatore">
+                      <select
+                        value={String(fields.suggerimento_id ?? '')}
+                        onChange={e => setField('suggerimento_id', e.target.value)}
+                        className={cls}
+                      >
+                        <option value="">— Seleziona suggerimento —</option>
+                        {allSuggerimenti.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.enigma_title ? `[${s.enigma_title}] ` : ''}{s.text.slice(0, 60)}
+                          </option>
+                        ))}
+                      </select>
                     </Field>
-                    <Field label="Testo dell'indizio">
-                      <textarea value={String(fields.text)} onChange={e => setField('text', e.target.value)}
-                        rows={3} className={cls + ' resize-none'} placeholder="es. Il segreto si nasconde tra le rovine al tramonto..." />
-                    </Field>
-                    <ImageInput label="Immagine (opzionale)" hint="Mostrata insieme al testo"
-                      value={String(fields.image_url)} onChange={v => setField('image_url', v)} optional />
+                    {fields.suggerimento_id && (() => {
+                      const sel = allSuggerimenti.find(s => s.id === fields.suggerimento_id)
+                      return sel ? (
+                        <div className="bg-white/5 rounded-lg p-3 text-xs text-white/60">
+                          <p className="font-semibold text-white/80 mb-1">Anteprima:</p>
+                          <p>{sel.text}</p>
+                          {sel.enigma_title && <p className="text-[#3A9DBC]/70 mt-1">Enigma: {sel.enigma_title}</p>}
+                        </div>
+                      ) : null
+                    })()}
+                    {allSuggerimenti.length === 0 && (
+                      <p className="text-xs text-white/30 italic">Nessun suggerimento disponibile. Creane uno in 🧩 Enigmi.</p>
+                    )}
                   </>
                 )}
 
@@ -937,7 +973,7 @@ export default function QRCodesPage() {
       {previewQr && (
         <QRModal
           qr={previewQr}
-          details={getQrDetails(previewQr, items, creatures, sessions)}
+          details={getQrDetails(previewQr, items, creatures, sessions, allSuggerimenti)}
           onClose={() => setPreviewQr(null)}
           onDownload={() => downloadQR(previewQr.id, previewQr.label)}
           onShare={() => handleShare(previewQr)}

@@ -56,6 +56,7 @@ export async function POST(request: Request) {
     label,
     unique_per_user: uniquePerUser ?? false,
     manual_code: code,
+    ...(type === 'indizio' && payload?.suggerimento_id ? { enigma_suggerimento_id: payload.suggerimento_id } : {}),
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -101,6 +102,13 @@ export async function PATCH(request: Request) {
     unique_per_user: uniquePerUser ?? false,
   }
   if (sessionId !== undefined) updatePayload.session_id = sessionId ?? null
+
+  // Update enigma_suggerimento_id for indizio type
+  if (type === 'indizio' && payload?.suggerimento_id) {
+    updatePayload.enigma_suggerimento_id = payload.suggerimento_id
+  } else if (type !== 'indizio') {
+    updatePayload.enigma_suggerimento_id = null
+  }
 
   // Update manual_code if provided
   if (manualCode !== undefined) {

@@ -30,7 +30,7 @@ export async function PATCH(
   const { id } = await params
   const body = await request.json()
   const { name, description, rarity, element, hp, atk, def: defVal, evolution_of, session_id, catch_difficulty,
-    enigma_title, enigma_description, enigma_image_url, enigma_video_url, spawnable,
+    enigma_title, enigma_description, enigma_image_url, enigma_video_url, enigma_frammento_id, spawnable,
     attack_sound_url, attack_sound_duration_ms,
     status_effect, status_effect_chance } = body
 
@@ -68,6 +68,7 @@ export async function PATCH(
   if (enigma_description !== undefined) updates.enigma_description = enigma_description || null
   if (enigma_image_url !== undefined) updates.enigma_image_url = enigma_image_url || null
   if (enigma_video_url !== undefined) updates.enigma_video_url = enigma_video_url || null
+  if (enigma_frammento_id !== undefined) updates.enigma_frammento_id = enigma_frammento_id ?? null
   if (spawnable !== undefined) updates.spawnable = Boolean(spawnable)
   if (attack_sound_url !== undefined) updates.attack_sound_url = attack_sound_url || null
   if (attack_sound_duration_ms !== undefined) updates.attack_sound_duration_ms = attack_sound_duration_ms ? Number(attack_sound_duration_ms) : null

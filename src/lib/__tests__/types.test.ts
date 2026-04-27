@@ -10,6 +10,7 @@ describe('types', () => {
       spawn_weight: 10, evolution_of: null,
       catch_difficulty: 1, session_id: null,
       enigma_title: null, enigma_description: null, enigma_image_url: null, enigma_video_url: null,
+      enigma_frammento_id: null,
     }
     expect(c.element).toBe('fiamma')
   })
