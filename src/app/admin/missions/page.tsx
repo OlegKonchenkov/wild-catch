@@ -17,11 +17,14 @@ interface Mission {
   reward_creature_id: string | null
   is_required: boolean
   session_id: string | null
+  unlock_level: number | null
+  unlock_after_mission_id: string | null
 }
 
 interface Creature  { id: string; name: string; rarity: string; element: string }
 interface Item      { id: string; name: string; type: string }
 interface QRCode    { id: string; label: string; type: string; manual_code?: string | null }
+interface SessionRow { id: string; name: string; status: string }
 
 /* ── Mission types ────────────────────────────── */
 const MISSION_TYPES = [
@@ -175,12 +178,14 @@ const EMPTY_FORM = {
   target_count: 1, reward_gold: 50, reward_exp: 100,
   reward_items: [] as Array<{ item_id: string; quantity: number }>,
   reward_creature_id: '' as string,
+  unlock_level: '' as number | '',
+  unlock_after_mission_id: '' as string,
   chapter_order: 1, is_required: false, scope_session_id: '',
 }
 
 /* ── Page ────────────────────────────────────── */
 export default function AdminMissions() {
-  const [sessions, setSessions]   = useState<any[]>([])
+  const [sessions, setSessions]   = useState<SessionRow[]>([])
   const [selectedId, setSelectedId] = useState<string>('')
   const [missions, setMissions]   = useState<Mission[]>([])
   const [loadingSessions, setLoadingSessions] = useState(true)
@@ -219,7 +224,8 @@ export default function AdminMissions() {
       .then(({ data }) => { if (data) setMissions(data as Mission[]) })
       .then(() => setLoadingMissions(false), () => setLoadingMissions(false))
   }
-  useEffect(() => { loadMissions(selectedId) }, [selectedId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+  useEffect(() => { loadMissions(selectedId) }, [selectedId])
 
   /* ── Load reference data for selects ── */
   useEffect(() => {
@@ -261,6 +267,18 @@ export default function AdminMissions() {
     return []
   }, [typeInfo.targetType, creatures, items, qrCodes])
 
+  const prerequisiteOptions = useMemo(() => {
+    const scopeSessionId = form.scope_session_id || null
+    const currentId = panel !== null && panel !== 'new' ? (panel as Mission).id : null
+    return missions
+      .filter(m => {
+        if (m.id === currentId) return false
+        if (scopeSessionId === null) return m.session_id === null
+        return m.session_id === scopeSessionId || m.session_id === null
+      })
+      .sort((a, b) => a.chapter_order - b.chapter_order)
+  }, [form.scope_session_id, missions, panel])
+
   /* ── Open panels ── */
   function openNew() {
     setForm({ ...EMPTY_FORM, chapter_order: missions.length + 1 })
@@ -273,6 +291,8 @@ export default function AdminMissions() {
       target_count: m.target_count, reward_gold: m.reward_gold, reward_exp: m.reward_exp,
       reward_items: m.reward_items ?? [],
       reward_creature_id: m.reward_creature_id ?? '',
+      unlock_level: m.unlock_level ?? '',
+      unlock_after_mission_id: m.unlock_after_mission_id ?? '',
       chapter_order: m.chapter_order, is_required: m.is_required,
       scope_session_id: m.session_id ?? '',
     })
@@ -284,21 +304,52 @@ export default function AdminMissions() {
   /* ── Save ── */
   async function handleSave() {
     if (!form.title.trim()) { setFormError('Titolo obbligatorio'); return }
+    const unlockLevel = form.unlock_level === '' ? null : Number(form.unlock_level)
+    if (unlockLevel !== null && (!Number.isFinite(unlockLevel) || unlockLevel < 1)) {
+      setFormError('Il livello di sblocco deve essere vuoto oppure maggiore o uguale a 1')
+      return
+    }
+    const unlockAfterMissionId = form.unlock_after_mission_id || null
+    if (panel !== null && panel !== 'new' && unlockAfterMissionId === (panel as Mission).id) {
+      setFormError('Una missione non può sbloccare sé stessa')
+      return
+    }
+    if (panel !== null && panel !== 'new' && unlockAfterMissionId) {
+      const prerequisite = missions.find(m => m.id === unlockAfterMissionId)
+      if (prerequisite?.unlock_after_mission_id === (panel as Mission).id) {
+        setFormError('Dipendenza circolare diretta tra missioni')
+        return
+      }
+    }
     setSaving(true); setFormError('')
     const isEdit = panel !== null && panel !== 'new'
 
-    const { scope_session_id, reward_items, reward_creature_id, ...formFields } = form as any
-    const sessionIdToSave = scope_session_id || null
-    const rewardItems = (reward_items ?? []).filter((ri: any) => ri.item_id)
-    const rewardCreatureId = reward_creature_id || null
+    const formFields = {
+      title: form.title,
+      description: form.description,
+      type: form.type,
+      target: form.target,
+      target_count: form.target_count,
+      reward_gold: form.reward_gold,
+      reward_exp: form.reward_exp,
+      chapter_order: form.chapter_order,
+      is_required: form.is_required,
+    }
+    const sessionIdToSave = form.scope_session_id || null
+    const rewardItems = form.reward_items.filter(ri => ri.item_id)
+    const rewardCreatureId = form.reward_creature_id || null
+    const unlockFields = {
+      unlock_level: unlockLevel,
+      unlock_after_mission_id: unlockAfterMissionId,
+    }
     if (isEdit) {
       const { error } = await supabase.from('missions')
-        .update({ ...formFields, session_id: sessionIdToSave, reward_items: rewardItems, reward_creature_id: rewardCreatureId })
+        .update({ ...formFields, ...unlockFields, session_id: sessionIdToSave, reward_items: rewardItems, reward_creature_id: rewardCreatureId })
         .eq('id', (panel as Mission).id)
       if (error) { setFormError(error.message); setSaving(false); return }
     } else {
       const { error } = await supabase.from('missions')
-        .insert({ ...formFields, session_id: sessionIdToSave, reward_items: rewardItems, reward_creature_id: rewardCreatureId })
+        .insert({ ...formFields, ...unlockFields, session_id: sessionIdToSave, reward_items: rewardItems, reward_creature_id: rewardCreatureId })
       if (error) { setFormError(error.message); setSaving(false); return }
     }
 
@@ -362,7 +413,7 @@ export default function AdminMissions() {
       <div className="bg-[#3A9DBC]/8 border border-[#3A9DBC]/20 rounded-xl px-4 py-3 mb-4">
         <p className="text-xs text-white/50 leading-relaxed">
           <span className="text-[#3A9DBC] font-semibold">ℹ Ordine lista:</span>{' '}
-          Il numero "Posizione nella lista" controlla solo l'ordine visivo in cui i giocatori vedono le missioni. Non sblocca né blocca nulla — tutte le missioni sono attive simultaneamente. Usa numeri bassi per le missioni più importanti (1 = prima in lista).
+          Il numero &quot;Posizione nella lista&quot; controlla l&apos;ordine visivo. Lo sblocco si configura nel pannello missione: senza requisiti è subito attiva, con requisiti resta visibile ma bloccata finché il giocatore raggiunge il livello richiesto o completa la missione prerequisito.
         </p>
       </div>
 
@@ -401,6 +452,12 @@ export default function AdminMissions() {
                     <span className="text-xs text-white/40">×{m.target_count}</span>
                     <span className="text-xs text-[#F7C841]/70">🪙 {m.reward_gold}</span>
                     <span className="text-xs text-white/40">✨ {m.reward_exp} EXP</span>
+                    {m.unlock_level && (
+                      <span className="text-xs text-[#C084FC]/70">🔒 Lv {m.unlock_level}</span>
+                    )}
+                    {m.unlock_after_mission_id && (
+                      <span className="text-xs text-[#C084FC]/70">🔒 Dopo missione</span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
@@ -488,12 +545,50 @@ export default function AdminMissions() {
                 </Field>
               </div>
 
+              <div className="bg-white/3 border border-white/10 rounded-xl p-3 space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-white/60">🔒 Sblocco missione</p>
+                  <p className="text-xs text-white/30 mt-0.5 leading-relaxed">
+                    Lascia entrambi vuoti per renderla subito attiva. Se imposti livello e missione prerequisito, basta una delle due condizioni.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Livello minimo">
+                    <input
+                      type="number"
+                      className={cls}
+                      value={form.unlock_level}
+                      min={1}
+                      placeholder="Subito"
+                      onChange={e => setForm(f => ({
+                        ...f,
+                        unlock_level: e.target.value === '' ? '' : Math.max(1, +e.target.value),
+                      }))}
+                    />
+                  </Field>
+                  <Field label="Dopo missione">
+                    <select
+                      className={cls}
+                      value={form.unlock_after_mission_id}
+                      onChange={e => setForm(f => ({ ...f, unlock_after_mission_id: e.target.value }))}
+                    >
+                      <option value="">Nessuna</option>
+                      {prerequisiteOptions.map(m => (
+                        <option key={m.id} value={m.id}>
+                          #{m.chapter_order} {m.title}{m.session_id ? '' : ' (globale)'}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </div>
+
               {/* Reward creature */}
               <div>
                 <label className="block text-xs font-semibold text-white/60 mb-1">🐾 Creatura in ricompensa <span className="font-normal text-white/30">(opzionale)</span></label>
                 <select
-                  value={(form as any).reward_creature_id ?? ''}
-                  onChange={e => setForm(f => ({ ...f, reward_creature_id: e.target.value } as any))}
+                  value={form.reward_creature_id}
+                  onChange={e => setForm(f => ({ ...f, reward_creature_id: e.target.value }))}
                   className={cls}
                 >
                   <option value="">— Nessuna creatura —</option>
@@ -506,13 +601,13 @@ export default function AdminMissions() {
               {/* Reward items */}
               <div className="bg-white/3 border border-white/10 rounded-xl p-3 space-y-2">
                 <p className="text-xs font-semibold text-white/60">🎒 Oggetti in ricompensa</p>
-                {(form as any).reward_items?.map((ri: { item_id: string; quantity: number }, i: number) => (
+                {form.reward_items.map((ri, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <select
                       value={ri.item_id}
                       onChange={e => setForm(f => {
-                        const arr = [...(f as any).reward_items]; arr[i] = { ...arr[i], item_id: e.target.value }
-                        return { ...f, reward_items: arr } as any
+                        const arr = [...f.reward_items]; arr[i] = { ...arr[i], item_id: e.target.value }
+                        return { ...f, reward_items: arr }
                       })}
                       className="flex-1 bg-[#0F1F2E] border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs"
                     >
@@ -521,18 +616,18 @@ export default function AdminMissions() {
                     </select>
                     <input type="number" min={1} value={ri.quantity}
                       onChange={e => setForm(f => {
-                        const arr = [...(f as any).reward_items]; arr[i] = { ...arr[i], quantity: Math.max(1, +e.target.value) }
-                        return { ...f, reward_items: arr } as any
+                        const arr = [...f.reward_items]; arr[i] = { ...arr[i], quantity: Math.max(1, +e.target.value) }
+                        return { ...f, reward_items: arr }
                       })}
                       className="w-14 bg-white/10 border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs text-center"
                     />
                     <button type="button"
-                      onClick={() => setForm(f => ({ ...f, reward_items: (f as any).reward_items.filter((_: any, j: number) => j !== i) } as any))}
+                      onClick={() => setForm(f => ({ ...f, reward_items: f.reward_items.filter((_, j) => j !== i) }))}
                       className="text-red-400/60 hover:text-red-400 text-sm px-1">×</button>
                   </div>
                 ))}
                 <button type="button"
-                  onClick={() => setForm(f => ({ ...f, reward_items: [...((f as any).reward_items ?? []), { item_id: '', quantity: 1 }] } as any))}
+                  onClick={() => setForm(f => ({ ...f, reward_items: [...f.reward_items, { item_id: '', quantity: 1 }] }))}
                   className="text-xs text-[#3A9DBC] font-semibold hover:text-[#5AB5D0]">
                   + Aggiungi oggetto
                 </button>
@@ -550,8 +645,8 @@ export default function AdminMissions() {
               <div>
                 <label className="block text-xs font-semibold text-white/60 mb-1">Disponibile in</label>
                 <p className="text-xs text-white/30 mb-1.5">Lascia vuoto per renderla visibile in tutte le sessioni</p>
-                <select className={cls} value={(form as any).scope_session_id}
-                  onChange={e => setForm(f => ({ ...f, scope_session_id: e.target.value } as any))}>
+                <select className={cls} value={form.scope_session_id}
+                  onChange={e => setForm(f => ({ ...f, scope_session_id: e.target.value, unlock_after_mission_id: '' }))}>
                   <option value="">🌐 Tutte le sessioni</option>
                   {sessions.map(s => <option key={s.id} value={s.id}>🎯 {s.name}</option>)}
                 </select>

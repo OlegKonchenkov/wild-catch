@@ -142,6 +142,8 @@ export interface Mission {
   reward_exp: number
   reward_item_id: string | null
   is_required: boolean
+  unlock_level: number | null
+  unlock_after_mission_id: string | null
 }
 
 export interface QRCode {
