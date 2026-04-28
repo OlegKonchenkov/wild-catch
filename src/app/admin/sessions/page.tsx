@@ -262,11 +262,11 @@ export default function SessionsPage() {
       supabase.from('creatures').select('id, name, rarity').order('name')
         .then(({ data }) => { if (data) setAllCreatures(data as { id: string; name: string; rarity: string }[]) })
     }
-    // Load enigmi for this session (filter by session_id)
+    // Load enigmi: session-specific + global (session_id IS NULL)
     supabase
       .from('enigmi')
       .select('id, title, difficulty')
-      .eq('session_id', editingId)
+      .or(`session_id.eq.${editingId},session_id.is.null`)
       .order('title', { ascending: true })
       .then(({ data }) => { if (data) setAllEnigmi(data as { id: string; title: string; difficulty: string }[]) })
   }
