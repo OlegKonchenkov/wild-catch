@@ -13,7 +13,7 @@ import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import type { Session } from '@/lib/types'
 import { RARITY_LABELS } from '@/lib/types'
 import type { MapPin } from '@/components/map/GameMap'
-import { startMapAmbience } from '@/lib/game/sounds/map-loop'
+import { startMapAmbience, duckMapAmbience, unduckMapAmbience } from '@/lib/game/sounds/map-loop'
 import { playEggHatch } from '@/lib/game/sounds/hatch'
 import { playEnigmaSolve } from '@/lib/game/sounds/enigma'
 
@@ -865,9 +865,13 @@ function EnigmaModal({
       })
       const d: any = await res.json()
       if (d.success || d.alreadyClaimed) {
+        duckMapAmbience(0.06, 300)
         playEnigmaSolve()
         setSolvedData(d as PinRewardData)
-        setTimeout(() => { if (mountedRef.current) onSuccess(d as PinRewardData) }, 2600)
+        setTimeout(() => {
+          if (mountedRef.current) onSuccess(d as PinRewardData)
+          unduckMapAmbience(1200)
+        }, 2600)
       } else if (d.wrongSolution) {
         setErrorMsg('Soluzione errata, riprova!')
         setShaking(true)
