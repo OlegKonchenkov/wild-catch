@@ -129,10 +129,13 @@ interface SuggerimentoForm {
   image_url: string
 }
 
+// Valore sentinel per "nessuna sessione" = enigma globale
+const GLOBAL_SESSION_ID = '__global__'
+
 interface EnigmaForm {
   title: string
   description: string
-  session_id: string
+  session_id: string  // GLOBAL_SESSION_ID → null in API
   difficulty: EnigmaDifficulty
   solution: string
   reward_type: RewardType
@@ -147,7 +150,7 @@ interface EnigmaForm {
 const EMPTY_FORM: EnigmaForm = {
   title: '',
   description: '',
-  session_id: '',
+  session_id: GLOBAL_SESSION_ID,
   difficulty: 'medio',
   solution: '',
   reward_type: 'none',
@@ -181,7 +184,7 @@ function enigmaToForm(e: Enigma): EnigmaForm {
   return {
     title: e.title,
     description: e.description ?? '',
-    session_id: e.session_id,
+    session_id: e.session_id ?? GLOBAL_SESSION_ID,
     difficulty: e.difficulty,
     solution: e.solution,
     reward_type,
@@ -256,14 +259,15 @@ export default function EnigmiPage() {
 
   async function loadEnigmi(sid: string) {
     setLoading(true)
-    const res = await fetch(`/api/admin/enigmi?sessionId=${sid}`)
+    const apiId = sid === GLOBAL_SESSION_ID ? 'global' : sid
+    const res = await fetch(`/api/admin/enigmi?sessionId=${apiId}`)
     const d = await res.json()
     setEnigmi(d.enigmi ?? [])
     setLoading(false)
   }
 
   function openNew() {
-    setForm({ ...EMPTY_FORM, session_id: sessionFilter })
+    setForm({ ...EMPTY_FORM, session_id: sessionFilter || GLOBAL_SESSION_ID })
     setError('')
     setFrammentoOpen(true)
     setSuggerimentoOpen(true)
@@ -302,7 +306,8 @@ export default function EnigmiPage() {
     }
 
     return {
-      session_id: form.session_id,
+      // GLOBAL_SESSION_ID → null = enigma globale (tutte le sessioni)
+      session_id: form.session_id === GLOBAL_SESSION_ID ? null : form.session_id || null,
       title: form.title.trim(),
       description: form.description.trim() || null,
       solution: form.solution.trim(),
@@ -326,7 +331,6 @@ export default function EnigmiPage() {
 
   async function handleSave() {
     if (!form.title.trim()) { setError('Titolo obbligatorio'); return }
-    if (!form.session_id) { setError('Sessione obbligatoria'); return }
     if (!form.solution.trim()) { setError('Soluzione obbligatoria'); return }
     for (const f of form.frammenti) {
       if (!f.title.trim()) { setError('Ogni frammento deve avere un titolo'); return }
@@ -413,7 +417,10 @@ export default function EnigmiPage() {
     })
   }
 
-  const sessionName = (sid: string) => sessions.find(s => s.id === sid)?.name ?? sid
+  const sessionName = (sid: string | null) => {
+    if (!sid) return '🌍 Globale'
+    return sessions.find(s => s.id === sid)?.name ?? sid
+  }
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
@@ -423,8 +430,7 @@ export default function EnigmiPage() {
         <h1 className="text-2xl font-bold">🧩 Enigmi</h1>
         <button
           onClick={openNew}
-          disabled={!sessionFilter}
-          className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-40"
+          className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-lg text-sm"
         >
           + Nuovo Enigma
         </button>
@@ -438,6 +444,7 @@ export default function EnigmiPage() {
           className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm w-full max-w-xs"
         >
           <option value="">📋 Seleziona una sessione...</option>
+          <option value={GLOBAL_SESSION_ID}>🌍 Globale (tutte le sessioni)</option>
           {sessions.map(s => (
             <option key={s.id} value={s.id}>
               🎮 {s.name}
@@ -478,7 +485,7 @@ export default function EnigmiPage() {
                     </span>
                   </div>
                   <p className="text-xs text-white/40 mt-0.5">
-                    🎮 {sessionName(enigma.session_id)}
+                    {enigma.session_id ? `🎮 ${sessionName(enigma.session_id)}` : '🌍 Globale'}
                   </p>
                   <div className="flex gap-3 mt-1">
                     <span className="text-xs text-white/30">🧩 {frCount} frammenti</span>
@@ -551,13 +558,16 @@ export default function EnigmiPage() {
                   />
                 </Field>
 
-                <Field label="Sessione *">
+                <Field
+                  label="Sessione"
+                  hint="Lascia 'Globale' per rendere l'enigma disponibile in tutte le sessioni"
+                >
                   <select
                     className={cls}
                     value={form.session_id}
                     onChange={e => setForm(f => ({ ...f, session_id: e.target.value }))}
                   >
-                    <option value="">— Seleziona sessione —</option>
+                    <option value={GLOBAL_SESSION_ID}>🌍 Globale (tutte le sessioni)</option>
                     {sessions.map(s => (
                       <option key={s.id} value={s.id}>
                         {s.name}

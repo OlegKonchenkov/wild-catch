@@ -116,7 +116,7 @@ export default function BestiaryPage() {
     let done = 0
     function finish() { if (++done === 3) setLoading(false) }
 
-    supabase.from('creatures').select('*').order('rarity').then(({ data }) => {
+    supabase.from('creatures').select('*, enigma_frammento:enigma_frammenti(id, enigma_id, title, description, image_url, video_url, order_index, enigma:enigmi(id, title))').order('rarity').then(({ data }) => {
       if (data) {
         const list = [...(data as unknown as Creature[])].sort(
           (a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
@@ -1156,64 +1156,91 @@ export default function BestiaryPage() {
                       )}
 
                       {/* Enigma button */}
-                      <button
-                        onClick={() => setShowEnigma(v => !v)}
-                        disabled={!creature.enigma_title && !creature.enigma_description}
-                        className={`w-full font-bold py-3 rounded-xl text-sm transition-all
-                          ${creature.enigma_title || creature.enigma_description
-                            ? 'bg-[#4A1D7A]/60 border border-[#7B4DB8]/50 text-[#C084FC] hover:bg-[#4A1D7A]/90'
-                            : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'}`}>
-                        🧩 Frammento Enigma
-                        {(creature.enigma_title || creature.enigma_description) && (
-                          <span className="ml-2 text-white/40 text-xs">{showEnigma ? '▲' : '▼'}</span>
-                        )}
-                      </button>
+                      {(() => {
+                        // Nuovo sistema FK: dati dal frammento collegato
+                        const fk = creature.enigma_frammento
+                        const hasEnigmaData = !!(
+                          creature.enigma_title || creature.enigma_description ||
+                          (fk && (fk.title || fk.description))
+                        )
+                        // Titolo frammento e enigma da mostrare
+                        const framTitle = fk?.title ?? creature.enigma_title
+                        const framDesc  = fk?.description ?? creature.enigma_description
+                        const framImg   = fk?.image_url ?? creature.enigma_image_url
+                        const framVideo = fk?.video_url ?? creature.enigma_video_url
+                        const enigmaTitle = (fk as any)?.enigma?.title ?? null
 
-                      {/* Enigma reveal */}
-                      <AnimatePresence>
-                        {showEnigma && (creature.enigma_title || creature.enigma_description) && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.25 }}
-                            className="overflow-hidden">
-                            <div className="bg-[#1A0D2E] border border-[#7B4DB8]/30 rounded-2xl p-4 space-y-3">
-                              {creature.enigma_title && (
-                                <h4 className="text-sm font-bold text-[#C084FC]">{creature.enigma_title}</h4>
+                        return (
+                          <>
+                            <button
+                              onClick={() => setShowEnigma(v => !v)}
+                              disabled={!hasEnigmaData}
+                              className={`w-full font-bold py-3 rounded-xl text-sm transition-all
+                                ${hasEnigmaData
+                                  ? 'bg-[#4A1D7A]/60 border border-[#7B4DB8]/50 text-[#C084FC] hover:bg-[#4A1D7A]/90'
+                                  : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'}`}>
+                              🧩 Frammento Enigma
+                              {hasEnigmaData && (
+                                <span className="ml-2 text-white/40 text-xs">{showEnigma ? '▲' : '▼'}</span>
                               )}
-                              {creature.enigma_description && (
-                                <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{creature.enigma_description}</p>
-                              )}
-                              {creature.enigma_image_url && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={creature.enigma_image_url} alt="Enigma"
-                                  className="w-full rounded-xl object-cover max-h-48 cursor-zoom-in"
-                                  onClick={() => window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: creature.enigma_image_url }))}
-                                  title="Tocca per ingrandire" />
-                              )}
-                              {creature.enigma_video_url && (() => {
-                                const embed = getVideoEmbed(creature.enigma_video_url)
-                                if (!embed) return null
-                                return (
-                                  <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                                    {embed.type === 'iframe' ? (
-                                      <iframe
-                                        src={embed.src}
-                                        className="absolute inset-0 w-full h-full"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                        allowFullScreen
-                                      />
-                                    ) : (
-                                      <video src={embed.src} controls className="absolute inset-0 w-full h-full" />
+                            </button>
+
+                            <AnimatePresence>
+                              {showEnigma && hasEnigmaData && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  transition={{ duration: 0.25 }}
+                                  className="overflow-hidden">
+                                  <div className="bg-[#1A0D2E] border border-[#7B4DB8]/30 rounded-2xl p-4 space-y-3">
+                                    {/* Badge riferimento enigma */}
+                                    {enigmaTitle && (
+                                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#7B4DB8]/20 border border-[#7B4DB8]/30">
+                                        <span className="text-sm">🔍</span>
+                                        <p className="text-xs text-[#C084FC]/80">
+                                          Aiuta a risolvere: <span className="font-bold text-[#C084FC]">{enigmaTitle}</span>
+                                        </p>
+                                      </div>
                                     )}
+                                    {framTitle && (
+                                      <h4 className="text-sm font-bold text-[#C084FC]">{framTitle}</h4>
+                                    )}
+                                    {framDesc && (
+                                      <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{framDesc}</p>
+                                    )}
+                                    {framImg && (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img src={framImg} alt="Frammento"
+                                        className="w-full rounded-xl object-cover max-h-48 cursor-zoom-in"
+                                        onClick={() => window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: framImg }))}
+                                        title="Tocca per ingrandire" />
+                                    )}
+                                    {framVideo && (() => {
+                                      const embed = getVideoEmbed(framVideo)
+                                      if (!embed) return null
+                                      return (
+                                        <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                                          {embed.type === 'iframe' ? (
+                                            <iframe
+                                              src={embed.src}
+                                              className="absolute inset-0 w-full h-full"
+                                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                              allowFullScreen
+                                            />
+                                          ) : (
+                                            <video src={embed.src} controls className="absolute inset-0 w-full h-full" />
+                                          )}
+                                        </div>
+                                      )
+                                    })()}
                                   </div>
-                                )
-                              })()}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </>
+                        )
+                      })()}
                     </>
                   ) : (
                     /* ── NOT CAUGHT: mystery view ── */

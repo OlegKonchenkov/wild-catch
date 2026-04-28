@@ -102,12 +102,37 @@ export async function POST(request: Request) {
     }
 
     case 'indizio': {
-      // Unlock mission chapter
-      result = {
-        ...result,
-        chapterOrder: payload.chapter_order,
-        text: payload.text,
-        imageUrl: payload.image_url,
+      if (qr.enigma_suggerimento_id) {
+        // Nuovo formato: suggerimento collegato al sistema enigmi via FK
+        const { data: sugg } = await supabase
+          .from('enigma_suggerimenti')
+          .select('id, text, image_url, enigma_id, enigma:enigmi(id, title)')
+          .eq('id', qr.enigma_suggerimento_id)
+          .single()
+
+        if (sugg) {
+          // Salva nella libreria personale del giocatore (idempotente)
+          await supabase.from('player_enigma_suggerimenti').upsert(
+            { user_id: user.id, session_id: sessionId, suggerimento_id: sugg.id },
+            { onConflict: 'user_id,session_id,suggerimento_id', ignoreDuplicates: true },
+          )
+          result = {
+            ...result,
+            suggerimentoId: sugg.id,
+            text: sugg.text,
+            imageUrl: sugg.image_url,
+            enigmaId: sugg.enigma_id,
+            enigmaTitle: (sugg.enigma as any)?.title ?? null,
+          }
+        }
+      } else {
+        // Vecchio formato inline (retrocompatibilità)
+        result = {
+          ...result,
+          chapterOrder: payload.chapter_order,
+          text: payload.text,
+          imageUrl: payload.image_url,
+        }
       }
       break
     }

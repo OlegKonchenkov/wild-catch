@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: '/game/bestiary', icon: '📖', label: 'DaimonDex'   },
   { href: '/game/duel',     icon: '⚔️', label: 'Duelli'   },
   { href: '/game/missions', icon: '🎯', label: 'Missioni'  },
+  { href: '/game/enigmi',   icon: '🧩', label: 'Enigmi'    },
   { href: '/game/shop',     icon: '🛒', label: 'Shop'      },
   { href: '/game/backpack', icon: '🎒', label: 'Zaino'     },
   { href: '/game/profile',  icon: '🏆', label: 'Classifica'},

@@ -38,6 +38,8 @@ export interface Creature {
   enigma_image_url: string | null
   enigma_video_url: string | null
   enigma_frammento_id: string | null
+  // Included when fetched with join (e.g. in bestiary)
+  enigma_frammento?: EnigmaFrammento | null
 }
 
 export interface EnigmaFrammento {
@@ -49,6 +51,8 @@ export interface EnigmaFrammento {
   video_url: string | null
   order_index: number
   created_at: string
+  // Included when fetched with join (e.g. in bestiary creature select)
+  enigma?: { id: string; title: string } | null
 }
 
 export interface EnigmaSuggerimento {
@@ -60,9 +64,17 @@ export interface EnigmaSuggerimento {
   created_at: string
 }
 
+export interface PlayerEnigmaSuggerimento {
+  id: string
+  user_id: string
+  session_id: string
+  suggerimento_id: string
+  obtained_at: string
+}
+
 export interface Enigma {
   id: string
-  session_id: string
+  session_id: string | null
   title: string
   description: string | null
   solution: string

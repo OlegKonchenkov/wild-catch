@@ -10,7 +10,8 @@ async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) 
   return { user }
 }
 
-// GET /api/admin/enigmi?sessionId=<uuid>
+// GET /api/admin/enigmi?sessionId=<uuid|global>
+// sessionId=global → restituisce enigmi globali (session_id IS NULL)
 export async function GET(request: Request) {
   const supabase = await createClient()
   const auth = await requireAdmin(supabase)
@@ -21,11 +22,18 @@ export async function GET(request: Request) {
   if (!sessionId) return NextResponse.json({ error: 'sessionId mancante' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { data, error } = await admin
+  let query = admin
     .from('enigmi')
     .select('*, frammenti:enigma_frammenti(*), suggerimenti:enigma_suggerimenti(*)')
-    .eq('session_id', sessionId)
     .order('created_at', { ascending: true })
+
+  if (sessionId === 'global') {
+    query = query.is('session_id', null)
+  } else {
+    query = query.eq('session_id', sessionId)
+  }
+
+  const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -47,10 +55,12 @@ export async function POST(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { session_id, title, solution, difficulty } = body
+  const { title, solution, difficulty } = body
+  // session_id opzionale: null/assente = enigma globale (tutte le sessioni)
+  const session_id: string | null = body.session_id || null
 
-  if (!session_id || !title || !solution || !difficulty) {
-    return NextResponse.json({ error: 'Parametri mancanti: session_id, title, solution, difficulty sono obbligatori' }, { status: 400 })
+  if (!title || !solution || !difficulty) {
+    return NextResponse.json({ error: 'Parametri mancanti: title, solution, difficulty sono obbligatori' }, { status: 400 })
   }
 
   const VALID_DIFFICULTIES = ['facile', 'medio', 'difficile']
