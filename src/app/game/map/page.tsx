@@ -15,6 +15,7 @@ import { RARITY_LABELS } from '@/lib/types'
 import type { MapPin } from '@/components/map/GameMap'
 import { startMapAmbience } from '@/lib/game/sounds/map-loop'
 import { playEggHatch } from '@/lib/game/sounds/hatch'
+import { playEnigmaSolve } from '@/lib/game/sounds/enigma'
 
 // Dynamic import — Leaflet is not SSR-safe
 const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false })
@@ -816,11 +817,14 @@ function EnigmaModal({
   onSuccess: (reward: PinRewardData) => void
   onClose: () => void
 }) {
-  const [visible, setVisible]     = useState(false)
-  const [solution, setSolution]   = useState('')
+  const [visible, setVisible]       = useState(false)
+  const [solution, setSolution]     = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [errorMsg, setErrorMsg]   = useState<string | null>(null)
-  const [shaking, setShaking]     = useState(false)
+  const [errorMsg, setErrorMsg]     = useState<string | null>(null)
+  const [shaking, setShaking]       = useState(false)
+  const [solvedData, setSolvedData] = useState<PinRewardData | null>(null)
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 60)
@@ -861,7 +865,9 @@ function EnigmaModal({
       })
       const d: any = await res.json()
       if (d.success || d.alreadyClaimed) {
-        onSuccess(d as PinRewardData)
+        playEnigmaSolve()
+        setSolvedData(d as PinRewardData)
+        setTimeout(() => { if (mountedRef.current) onSuccess(d as PinRewardData) }, 2600)
       } else if (d.wrongSolution) {
         setErrorMsg('Soluzione errata, riprova!')
         setShaking(true)
@@ -902,6 +908,96 @@ function EnigmaModal({
             background: 'radial-gradient(ellipse 70% 100% at 50% -10%, rgba(58,157,188,0.18) 0%, transparent 100%)',
           }}
         />
+
+        {/* ── Solved overlay ─────────────────────────────────── */}
+        <AnimatePresence>
+          {solvedData && (
+            <motion.div
+              key="solved"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.35 }}
+              className="absolute inset-0 z-30 flex flex-col items-center justify-center overflow-hidden rounded-t-3xl"
+              style={{ background: 'linear-gradient(180deg, #040710 0%, #080C1A 100%)' }}
+            >
+              {/* Pulsing golden radial glow */}
+              <motion.div
+                className="absolute inset-0 pointer-events-none"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 1, 0.6, 1, 0.7] }}
+                transition={{ duration: 2.2, times: [0, 0.2, 0.5, 0.75, 1] }}
+                style={{
+                  background: 'radial-gradient(ellipse 55% 35% at 50% 46%, rgba(247,200,65,0.28) 0%, transparent 70%)',
+                }}
+              />
+
+              {/* Particles */}
+              <div className="absolute" style={{ left: '50%', top: '44%' }}>
+                {Array.from({ length: 14 }).map((_, i) => {
+                  const angle = (i / 14) * 360
+                  const dist  = 65 + (i % 4) * 20
+                  const tx = Math.cos((angle * Math.PI) / 180) * dist
+                  const ty = Math.sin((angle * Math.PI) / 180) * dist
+                  const size = 5 + (i % 3) * 2
+                  const colors = ['#F7C841', '#FFF5C0', '#3A9DBC', '#A78BFA']
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                      animate={{ opacity: 0, x: tx, y: ty, scale: 0.2 }}
+                      transition={{ duration: 1.1, delay: 0.1 + i * 0.045, ease: 'easeOut' }}
+                      style={{
+                        position: 'absolute',
+                        width: size, height: size,
+                        borderRadius: i % 2 === 0 ? '50%' : '2px',
+                        background: colors[i % 4],
+                        left: -size / 2, top: -size / 2,
+                      }}
+                    />
+                  )
+                })}
+              </div>
+
+              {/* Lock icon */}
+              <motion.div
+                initial={{ scale: 0.25, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 16, delay: 0.08 }}
+                className="relative flex items-center justify-center rounded-full mb-5"
+                style={{
+                  width: 90, height: 90,
+                  background: 'radial-gradient(circle, rgba(247,200,65,0.22) 0%, rgba(247,200,65,0.04) 100%)',
+                  border: '2px solid rgba(247,200,65,0.55)',
+                  boxShadow: '0 0 38px rgba(247,200,65,0.45), 0 0 72px rgba(247,200,65,0.14)',
+                }}
+              >
+                <span className="text-5xl leading-none select-none">🔓</span>
+              </motion.div>
+
+              {/* "ENIGMA RISOLTO!" */}
+              <motion.p
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.22, duration: 0.42 }}
+                className="text-xl font-extrabold uppercase tracking-widest mb-1.5"
+                style={{ color: '#F7C841', textShadow: '0 0 18px rgba(247,200,65,0.65)' }}
+              >
+                Enigma Risolto!
+              </motion.p>
+
+              {/* Enigma title */}
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.40, duration: 0.40 }}
+                className="text-sm text-white/55 text-center px-10"
+              >
+                {enigmaTitle}
+              </motion.p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Drag handle */}
         <div className="flex justify-center pt-3 mb-2 relative">
