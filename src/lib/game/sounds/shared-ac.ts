@@ -12,10 +12,42 @@
  *   – getSoundStartTime() staggers rapid concurrent calls by a small gap so
  *     simultaneous sounds (e.g. level-up + mission complete) play in sequence
  *     rather than piling on top of each other.
+ *
+ * Ambience ducking:
+ *   – Call registerAmbienceDucking(duck, unduck) to register callbacks.
+ *     Every getSoundStartTime() call will automatically duck the ambience
+ *     and reschedule the unduck to fire after the FULL sound queue drains.
+ *     This means two back-to-back sounds both get heard clearly with a single
+ *     duck/unduck arc, not two separate ones.
+ *   – Call registerAmbienceDucking(null, null) to unregister (e.g. on unmount).
  */
 
 let _ac: AudioContext | null = null
 let _nextSoundAt = 0  // AudioContext time (seconds) when next queued sound may start
+
+// ── Ambience ducking ──────────────────────────────────────────────────────────
+type DuckFn   = (duckTo: number, rampMs: number) => void
+type UnduckFn = (rampMs: number) => void
+
+let _duckFn:   DuckFn   | null = null
+let _unduckFn: UnduckFn | null = null
+let _unduckTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Register (or unregister) duck/unduck callbacks.
+ * Typically called once on map-page mount/unmount.
+ */
+export function registerAmbienceDucking(
+  duck:   DuckFn   | null,
+  unduck: UnduckFn | null,
+): void {
+  _duckFn   = duck
+  _unduckFn = unduck
+  if (!duck && _unduckTimer) {
+    clearTimeout(_unduckTimer)
+    _unduckTimer = null
+  }
+}
 
 export function getSharedAC(): AudioContext | null {
   if (typeof window === 'undefined') return null
@@ -40,8 +72,12 @@ export function getSharedAC(): AudioContext | null {
  * Returns the AudioContext start time reserved for the next sound, staggering
  * rapid concurrent calls so they never overlap.
  *
+ * Also manages ambience ducking automatically:
+ *   – Ducks immediately on first call in a burst.
+ *   – Cancels any pending unduck and reschedules it to fire after the ENTIRE
+ *     queued burst has finished + a 600 ms tail buffer.
+ *
  * @param durationS  Estimated playback length of this sound in seconds.
- *                   The next caller will be pushed past (start + durationS + gap).
  */
 export function getSoundStartTime(durationS: number): number {
   const ac = getSharedAC()
@@ -50,5 +86,19 @@ export function getSoundStartTime(durationS: number): number {
   const GAP_S = 0.12  // 120 ms breathing room between stacked sounds
   const start = Math.max(now, _nextSoundAt)
   _nextSoundAt = start + durationS + GAP_S
+
+  // Duck ambience immediately (safe to call repeatedly — map-loop handles it)
+  if (_duckFn) _duckFn(0.09, 280)
+
+  // Reset the unduck timer to fire after the full queue clears
+  if (_unduckFn) {
+    if (_unduckTimer) clearTimeout(_unduckTimer)
+    const msUntilDone = (_nextSoundAt - now + 0.6) * 1000
+    _unduckTimer = setTimeout(() => {
+      _unduckTimer = null
+      if (_unduckFn) _unduckFn(1000)
+    }, msUntilDone)
+  }
+
   return start
 }

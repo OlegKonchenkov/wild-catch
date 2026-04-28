@@ -14,6 +14,7 @@ import type { Session } from '@/lib/types'
 import { RARITY_LABELS } from '@/lib/types'
 import type { MapPin } from '@/components/map/GameMap'
 import { startMapAmbience, duckMapAmbience, unduckMapAmbience } from '@/lib/game/sounds/map-loop'
+import { registerAmbienceDucking } from '@/lib/game/sounds/shared-ac'
 import { playEggHatch } from '@/lib/game/sounds/hatch'
 import { playEnigmaSolve } from '@/lib/game/sounds/enigma'
 
@@ -865,13 +866,9 @@ function EnigmaModal({
       })
       const d: any = await res.json()
       if (d.success || d.alreadyClaimed) {
-        duckMapAmbience(0.06, 300)
         playEnigmaSolve()
         setSolvedData(d as PinRewardData)
-        setTimeout(() => {
-          if (mountedRef.current) onSuccess(d as PinRewardData)
-          unduckMapAmbience(1200)
-        }, 2600)
+        setTimeout(() => { if (mountedRef.current) onSuccess(d as PinRewardData) }, 2600)
       } else if (d.wrongSolution) {
         setErrorMsg('Soluzione errata, riprova!')
         setShaking(true)
@@ -1355,10 +1352,14 @@ function MapPageInner() {
   useEffect(() => { declinedBossPinIdsRef.current = declinedBossPinIds }, [declinedBossPinIds])
   useEffect(() => { declinedEnigmaPinIdsRef.current = declinedEnigmaPinIds }, [declinedEnigmaPinIds])
 
-  // Background ambience loop — starts on mount, stops on unmount
+  // Background ambience loop + ducking registration — starts on mount, stops on unmount
   useEffect(() => {
+    registerAmbienceDucking(duckMapAmbience, unduckMapAmbience)
     const stop = startMapAmbience()
-    return () => stop()
+    return () => {
+      registerAmbienceDucking(null, null)
+      stop()
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
   const [pendingEncounter, setPendingEncounter] = useState<{
