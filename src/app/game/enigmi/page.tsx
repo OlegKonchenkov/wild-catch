@@ -181,25 +181,32 @@ function SuggerimentoCard({ suggerimento, index }: { suggerimento: EnigmaSuggeri
     )
   }
 
+  const isLong = suggerimento.text !== null && suggerimento.text.length > 60
+  const hasMore = isLong || !!suggerimento.image_url
+
   return (
     <div className="rounded-xl border border-[#3A9DBC]/40 overflow-hidden" style={{ background: 'rgba(58,157,188,0.1)' }}>
       <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center gap-3 px-3 py-2.5 text-left"
+        onClick={() => hasMore && setExpanded(v => !v)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${hasMore ? '' : 'cursor-default'}`}
       >
         <span className="text-xl">💡</span>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold text-[#38BDF8] truncate">{suggerimento.text}</p>
+          <p className={`text-xs font-bold text-[#38BDF8] ${hasMore ? 'truncate' : 'whitespace-pre-wrap break-words'}`}>
+            {suggerimento.text}
+          </p>
         </div>
-        <motion.span
-          animate={{ rotate: expanded ? 90 : 0 }}
-          transition={{ duration: 0.18 }}
-          className="text-[#38BDF8]/60 text-sm shrink-0"
-        >›</motion.span>
+        {hasMore && (
+          <motion.span
+            animate={{ rotate: expanded ? 90 : 0 }}
+            transition={{ duration: 0.18 }}
+            className="text-[#38BDF8]/60 text-sm shrink-0"
+          >›</motion.span>
+        )}
       </button>
 
       <AnimatePresence>
-        {expanded && suggerimento.image_url && (
+        {expanded && hasMore && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -208,14 +215,16 @@ function SuggerimentoCard({ suggerimento, index }: { suggerimento: EnigmaSuggeri
             className="overflow-hidden"
           >
             <div className="px-3 pb-3 border-t border-[#3A9DBC]/20 pt-2 space-y-2">
-              <p className="text-sm text-white/70 leading-relaxed">{suggerimento.text}</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={suggerimento.image_url}
-                alt="Suggerimento"
-                className="w-full rounded-xl object-cover max-h-48 cursor-zoom-in"
-                onClick={() => window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: suggerimento.image_url }))}
-              />
+              <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{suggerimento.text}</p>
+              {suggerimento.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={suggerimento.image_url}
+                  alt="Suggerimento"
+                  className="w-full rounded-xl object-cover max-h-48 cursor-zoom-in"
+                  onClick={() => window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: suggerimento.image_url }))}
+                />
+              )}
             </div>
           </motion.div>
         )}

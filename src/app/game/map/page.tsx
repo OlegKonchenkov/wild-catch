@@ -1,4 +1,5 @@
 'use client'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
@@ -701,6 +702,104 @@ function PinRewardModal({ reward, onDone }: { reward: PinRewardData; onDone: () 
 }
 
 // ── EnigmaModal ───────────────────────────────────────────────────────────────
+// Expandable frammento card used inside EnigmaModal
+function FrammentoEnigmaCard({ frammento }: {
+  frammento: { id: string; title: string | null; description: string | null; image_url: string | null; video_url: string | null; order_index: number; player_has: boolean }
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const hasContent = frammento.player_has && (frammento.description || frammento.image_url || frammento.video_url)
+
+  if (!frammento.player_has) {
+    return (
+      <div
+        className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', opacity: 0.45 }}
+      >
+        <span className="text-base shrink-0">☐</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold leading-tight text-white/60">— frammento mancante —</p>
+          <p className="text-[10px] text-white/35 mt-0.5">Trova la creatura per sbloccare</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{ background: 'rgba(74,29,122,0.18)', border: '1px solid rgba(124,58,237,0.35)' }}
+    >
+      <button
+        onClick={() => hasContent && setExpanded(v => !v)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${hasContent ? '' : 'cursor-default'}`}
+      >
+        <span className="text-base shrink-0">🧩</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-white leading-tight truncate">{frammento.title}</p>
+          {frammento.description && !expanded && (
+            <p className="text-[11px] text-white/50 truncate mt-0.5">{frammento.description}</p>
+          )}
+        </div>
+        {hasContent && (
+          <motion.span
+            animate={{ rotate: expanded ? 90 : 0 }}
+            transition={{ duration: 0.18 }}
+            className="text-[#C084FC]/70 text-sm shrink-0"
+          >›</motion.span>
+        )}
+      </button>
+
+      <AnimatePresence>
+        {expanded && hasContent && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            className="overflow-hidden"
+          >
+            <div
+              className="px-3 pb-3 pt-2 space-y-2"
+              style={{ borderTop: '1px solid rgba(124,58,237,0.2)' }}
+            >
+              {frammento.description && (
+                <p className="text-sm text-white/75 leading-relaxed whitespace-pre-wrap">{frammento.description}</p>
+              )}
+              {frammento.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={frammento.image_url}
+                  alt="Frammento"
+                  className="w-full rounded-xl object-cover max-h-40 cursor-zoom-in"
+                  onClick={() => window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: frammento.image_url }))}
+                />
+              )}
+              {frammento.video_url && (() => {
+                try {
+                  const u = new URL(frammento.video_url)
+                  let src = frammento.video_url
+                  if ((u.hostname === 'www.youtube.com' || u.hostname === 'youtube.com') && u.searchParams.get('v')) {
+                    src = `https://www.youtube.com/embed/${u.searchParams.get('v')}`
+                  } else if (u.hostname === 'youtu.be') {
+                    src = `https://www.youtube.com/embed/${u.pathname.slice(1)}`
+                  }
+                  return (
+                    <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                      <iframe src={src} className="absolute inset-0 w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen />
+                    </div>
+                  )
+                } catch { return null }
+              })()}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // Shown when the player taps or enters range of an enigma pin.
 // Supports both new-format pins (enigma_id → frammenti/suggerimenti) and
 // old-format pins (inline question/image_url in reward_payload).
@@ -734,7 +833,7 @@ function EnigmaModal({
   // New-format fields
   const enigmaTitle: string    = payload.title ?? pin.name
   const enigmaDesc: string | null = payload.description ?? null
-  type FrammentoPublic  = { id: string; title: string; order_index: number; player_has: boolean }
+  type FrammentoPublic  = { id: string; title: string | null; description: string | null; image_url: string | null; video_url: string | null; order_index: number; player_has: boolean }
   type SuggerimentoPublic = { id: string; text: string | null; image_url: string | null; order_index: number; player_has: boolean }
   const frammenti: FrammentoPublic[]      = payload.frammenti   ?? []
   const suggerimenti: SuggerimentoPublic[] = payload.suggerimenti ?? []
@@ -850,32 +949,7 @@ function EnigmaModal({
                     </p>
                     <div className="space-y-2">
                       {frammenti.map(f => (
-                        <div
-                          key={f.id}
-                          className="flex items-center gap-3 rounded-xl px-3 py-2.5"
-                          style={f.player_has ? {
-                            background: 'rgba(58,157,188,0.12)',
-                            border: '1px solid rgba(58,157,188,0.35)',
-                          } : {
-                            background: 'rgba(255,255,255,0.04)',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            opacity: 0.45,
-                            filter: 'blur(0.6px)',
-                          }}
-                        >
-                          <span className="text-base shrink-0">{f.player_has ? '☑' : '☐'}</span>
-                          <div className="min-w-0 flex-1">
-                            <p className={`text-sm font-semibold leading-tight ${f.player_has ? 'text-white' : 'text-white/60'}`}>
-                              {f.player_has ? f.title : '— frammento mancante —'}
-                            </p>
-                            {!f.player_has && (
-                              <p className="text-[10px] text-white/35 mt-0.5">Trova la creatura per sbloccare</p>
-                            )}
-                          </div>
-                          {f.player_has && (
-                            <span className="text-xs shrink-0" style={{ color: '#3A9DBC' }}>✓</span>
-                          )}
-                        </div>
+                        <FrammentoEnigmaCard key={f.id} frammento={f} />
                       ))}
                     </div>
                   </div>

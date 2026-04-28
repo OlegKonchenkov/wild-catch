@@ -59,7 +59,7 @@ export async function GET(request: Request) {
         // New format: load from enigmi table
         const { data: enigmaData } = await supabase
           .from('enigmi')
-          .select('title, description, frammenti:enigma_frammenti(id, title, order_index), suggerimenti:enigma_suggerimenti(id, text, image_url, order_index)')
+          .select('title, description, frammenti:enigma_frammenti(id, title, description, image_url, video_url, order_index), suggerimenti:enigma_suggerimenti(id, text, image_url, order_index)')
           .eq('id', p.enigma_id)
           .single()
 
@@ -89,41 +89,18 @@ export async function GET(request: Request) {
             }
           }
 
-          // Check which suggerimenti the player has via pin claims or QR scans
+          // Check which suggerimenti the player has via player_enigma_suggerimenti (migration 026)
           const suggerimentoIds = suggerimenti.map((s: any) => s.id).filter(Boolean)
           let playerSuggerimentoIds = new Set<string>()
           if (suggerimentoIds.length > 0) {
-            // Via pin claims
-            const { data: claimedPins } = await supabase
-              .from('pin_claims')
-              .select('pin_id')
+            const { data: collected } = await supabase
+              .from('player_enigma_suggerimenti')
+              .select('suggerimento_id')
               .eq('user_id', user.id)
-            const claimedPinIds = (claimedPins ?? []).map((r: any) => r.pin_id)
-            if (claimedPinIds.length > 0) {
-              const { data: pinsWithSugg } = await supabase
-                .from('session_map_pins')
-                .select('enigma_suggerimento_id')
-                .in('id', claimedPinIds)
-                .in('enigma_suggerimento_id', suggerimentoIds)
-              for (const pin of pinsWithSugg ?? []) {
-                if ((pin as any).enigma_suggerimento_id) playerSuggerimentoIds.add((pin as any).enigma_suggerimento_id)
-              }
-            }
-            // Via QR scans
-            const { data: scannedQRs } = await supabase
-              .from('qr_scan_log')
-              .select('qr_id')
-              .eq('user_id', user.id)
-            const scannedQRIds = (scannedQRs ?? []).map((r: any) => r.qr_id)
-            if (scannedQRIds.length > 0) {
-              const { data: qrsWithSugg } = await supabase
-                .from('qr_codes')
-                .select('enigma_suggerimento_id')
-                .in('id', scannedQRIds)
-                .in('enigma_suggerimento_id', suggerimentoIds)
-              for (const q of qrsWithSugg ?? []) {
-                if ((q as any).enigma_suggerimento_id) playerSuggerimentoIds.add((q as any).enigma_suggerimento_id)
-              }
+              .eq('session_id', sessionId)
+              .in('suggerimento_id', suggerimentoIds)
+            for (const row of collected ?? []) {
+              playerSuggerimentoIds.add((row as any).suggerimento_id)
             }
           }
 
@@ -131,12 +108,18 @@ export async function GET(request: Request) {
             enigma_id: p.enigma_id,
             title: enigmaData.title,
             description: enigmaData.description,
-            frammenti: frammenti.map((f: any) => ({
-              id: f.id,
-              title: f.title,
-              order_index: f.order_index,
-              player_has: playerFrammentoIds.has(f.id),
-            })),
+            frammenti: frammenti.map((f: any) => {
+              const has = playerFrammentoIds.has(f.id)
+              return {
+                id: f.id,
+                order_index: f.order_index,
+                player_has: has,
+                title:       has ? f.title       : null,
+                description: has ? f.description : null,
+                image_url:   has ? f.image_url   : null,
+                video_url:   has ? f.video_url   : null,
+              }
+            }),
             suggerimenti: suggerimenti.map((s: any) => ({
               id: s.id,
               text: playerSuggerimentoIds.has(s.id) ? s.text : null,
