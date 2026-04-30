@@ -28,6 +28,34 @@ const WALK_ENCOUNTER_DIST_M = 25  // trigger after accumulating ~25 m
 // authoritative update every 5 s. Cuts /api/game/position load by ~5×.
 const POSITION_POST_INTERVAL_MS = 5000
 
+// ── Map pins client cache ──────────────────────────────────────────────────
+// Stale-while-revalidate: on mount we paint pins from the cache instantly,
+// then refresh in background. Cache is keyed by sessionId; one entry per
+// browser. Invalidated locally on every successful pin claim so the next
+// page mount refetches authoritatively from the server.
+const MAP_PINS_CACHE_TTL_MS = 5 * 60 * 1000
+const mapPinsCacheKey = (sid: string) => `wc:map-pins:${sid}`
+
+type CachedPins = { pins: (MapPin & { claimed?: boolean })[]; ts: number }
+
+function readMapPinsCache(sid: string): CachedPins | null {
+  try {
+    const raw = localStorage.getItem(mapPinsCacheKey(sid))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as CachedPins
+    if (typeof parsed?.ts !== 'number' || !Array.isArray(parsed?.pins)) return null
+    return parsed
+  } catch { return null }
+}
+
+function writeMapPinsCache(sid: string, pins: (MapPin & { claimed?: boolean })[]): void {
+  try { localStorage.setItem(mapPinsCacheKey(sid), JSON.stringify({ pins, ts: Date.now() })) } catch {}
+}
+
+function invalidateMapPinsCache(sid: string): void {
+  try { localStorage.removeItem(mapPinsCacheKey(sid)) } catch {}
+}
+
 function GPSErrorBanner({ message }: { message: string }) {
   const [expanded, setExpanded] = useState(false)
   const isDenied = message.toLowerCase().includes('abilita') || message.toLowerCase().includes('denied')
@@ -1435,16 +1463,30 @@ function MapPageInner() {
             }
           })
       })
-      // Load map pins (includes claimed status per user)
-      fetch(`/api/game/map-pins?sessionId=${sid}`)
+      // Load map pins (includes claimed status per user) with stale-while-revalidate.
+      // Cache hit → paint immediately AND refresh in the background. Cache miss → fetch.
+      const applyPins = (pins: (MapPin & { claimed?: boolean })[]) => {
+        setMapPins(pins)
+        setClaimedPinIds(new Set(pins.filter(p => p.claimed).map(p => p.id)))
+      }
+      const fetchPinsFresh = () => fetch(`/api/game/map-pins?sessionId=${sid}`)
         .then(r => r.json())
         .then((d: { pins?: (MapPin & { claimed?: boolean })[] }) => {
           if (d.pins) {
-            setMapPins(d.pins)
-            setClaimedPinIds(new Set(d.pins.filter(p => p.claimed).map(p => p.id)))
+            applyPins(d.pins)
+            writeMapPinsCache(sid, d.pins)
           }
         })
         .catch(() => {})
+
+      const cached = readMapPinsCache(sid)
+      if (cached && Date.now() - cached.ts < MAP_PINS_CACHE_TTL_MS) {
+        applyPins(cached.pins)
+        // Background refresh keeps state authoritative within the TTL window
+        void fetchPinsFresh()
+      } else {
+        void fetchPinsFresh()
+      }
     }
 
     // ?restored=<sid> from auth callback OR history re-entry from home page
@@ -1657,12 +1699,16 @@ function MapPageInner() {
           .then((d: any) => {
             if (d.success) {
               setClaimedPinIds(prev => new Set([...prev, nearPin.id]))
+              invalidateMapPinsCache(sid)
               setPinReward(d as PinRewardData)
               if (d.completedMissions?.length > 0) {
                 setMissionQueue(prev => [...prev, ...d.completedMissions])
               }
             }
-            if (d.alreadyClaimed) setClaimedPinIds(prev => new Set([...prev, nearPin.id]))
+            if (d.alreadyClaimed) {
+              setClaimedPinIds(prev => new Set([...prev, nearPin.id]))
+              invalidateMapPinsCache(sid)
+            }
           })
           .catch(() => {})
           .finally(() => { claimingPinRef.current = false })
@@ -1992,6 +2038,8 @@ function MapPageInner() {
           playerPos={lastPosRef.current}
           onFight={(reward) => {
             setClaimedPinIds(prev => new Set([...prev, pendingBossPin.id]))
+            const sid = sessionIdRef.current
+            if (sid) invalidateMapPinsCache(sid)
             setPendingBossPin(null)
             if (reward.bossFightId) {
               window.location.href = `/game/boss/${reward.bossFightId}`
@@ -2012,6 +2060,8 @@ function MapPageInner() {
           playerPos={lastPosRef.current}
           onSuccess={(reward) => {
             setClaimedPinIds(prev => new Set([...prev, pendingEnigmaPin.id]))
+            const sid = sessionIdRef.current
+            if (sid) invalidateMapPinsCache(sid)
             setPendingEnigmaPin(null)
             setPinReward(reward as PinRewardData)
           }}
