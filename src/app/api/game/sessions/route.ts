@@ -80,5 +80,11 @@ export async function GET() {
       return (b.start_at ?? '').localeCompare(a.start_at ?? '')
     })
 
-  return NextResponse.json({ sessions })
+  // Per-user cache: stats (creatures caught, duel wins) update after gameplay events,
+  // but the home/profile pages where this is consumed aren't real-time. A 30 s private
+  // cache prevents rapid back-to-back fetches on navigation without user-visible
+  // staleness. `private` ensures no CDN/proxy caches the per-user response.
+  return NextResponse.json({ sessions }, {
+    headers: { 'Cache-Control': 'private, max-age=30, must-revalidate' },
+  })
 }
