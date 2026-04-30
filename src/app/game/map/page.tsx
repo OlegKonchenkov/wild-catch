@@ -24,6 +24,9 @@ const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false }
 const ENCOUNTER_COOLDOWN_MS = 30000  // 30s between encounters
 // Cumulative distance that, when exceeded, probabilistically triggers a walk-based encounter
 const WALK_ENCOUNTER_DIST_M = 25  // trigger after accumulating ~25 m
+// Minimum interval between server position POSTs — coalesces 1 Hz GPS callbacks into one
+// authoritative update every 5 s. Cuts /api/game/position load by ~5×.
+const POSITION_POST_INTERVAL_MS = 5000
 
 function GPSErrorBanner({ message }: { message: string }) {
   const [expanded, setExpanded] = useState(false)
@@ -1380,6 +1383,10 @@ function MapPageInner() {
   // Prevent concurrent triggerEncounter calls (mutex) and skip when popup is already open
   const triggeringEncounterRef = useRef(false)
   const encounterPopupRef = useRef(false)
+  // GPS POST throttling — coalesce frequent fixes into one authoritative POST per 5 s
+  const lastPositionPostAtRef = useRef(0)
+  const positionPostTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
@@ -1570,25 +1577,24 @@ function MapPageInner() {
     }
   }, [router])
 
-  const onGPSPosition = useCallback(async (pos: { lat: number; lng: number; accuracy: number }) => {
+  // Authoritative server POST: validates session/bounds, advances steps, hatches eggs,
+  // and may trigger an encounter. Throttled by onGPSPosition to one call per
+  // POSITION_POST_INTERVAL_MS to keep load light on free-tier Supabase.
+  const firePositionPost = useCallback(async () => {
+    const pos = pendingPositionRef.current
+    pendingPositionRef.current = null
+    if (!pos) return
     const sid = sessionIdRef.current
     if (!sid || sessionEndedRef.current) return
 
-    // Update accuracy display regardless of whether we send to server
-    setGpsAccuracy(Math.round(pos.accuracy))
-    lastPosRef.current = { lat: pos.lat, lng: pos.lng }
+    lastPositionPostAtRef.current = Date.now()
 
-    // Skip very inaccurate fixes for server calls (map marker still updates from useGPS).
-    // 300m is generous — on poor GPS we still want step counting to work.
-    if (pos.accuracy > 300) return
-
-    const now = Date.now()
     const res = await fetch('/api/game/position', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, sessionId: sid }),
     })
-    if (!res.ok) return  // network/auth error — keep current inBounds state
+    if (!res.ok) return
 
     const data = await res.json()
 
@@ -1603,33 +1609,26 @@ function MapPageInner() {
       inBoundsRef.current = data.inBounds
     }
 
-    // Update step counter from server's authoritative value
     if (typeof data.stepsWalked === 'number') {
       setStepsWalked(data.stepsWalked)
     }
 
-    // Enqueue all auto-hatched eggs — shown one at a time
     if (data.eggsHatched?.length > 0) {
       setHatchQueue(prev => [...prev, ...data.eggsHatched])
     }
 
-    // Queue walk mission completions for the modal
     if (data.completedMissions?.length > 0) {
       setMissionQueue(prev => [...prev, ...data.completedMissions])
     }
 
     if (starterFlowLockedRef.current) return
-
-    // Only perform pin claims and encounter triggers for active sessions
     if (data.sessionStatus && data.sessionStatus !== 'active') return
 
-    // ── Pin proximity check ────────────────────────────────────────────────
-    // Refs are used here so the callback always reads the latest values
+    // ── Pin proximity check (uses the throttled POST's pos) ─────────────────
     if (!claimingPinRef.current && !pinRewardRef.current && !pendingBossPinRef.current && !pendingEnigmaPinRef.current) {
       const nearPin = mapPinsRef.current.find(pin => {
         if (!pin.reward_type) return false
         if (claimedPinIdsRef.current.has(pin.id)) return false
-        // Boss/enigma pins that were declined skip auto-trigger (user can still tap manually)
         if (pin.reward_type === 'boss'   && declinedBossPinIdsRef.current.has(pin.id))   return false
         if (pin.reward_type === 'enigma' && declinedEnigmaPinIdsRef.current.has(pin.id)) return false
         const dLat = (pos.lat - pin.lat) * Math.PI / 180
@@ -1640,7 +1639,6 @@ function MapPageInner() {
         return dist <= (pin.reward_radius_m ?? 50)
       })
       if (nearPin) {
-        // Boss and enigma pins get confirm dialogs
         if (nearPin.reward_type === 'boss') {
           setPendingBossPin(nearPin)
           return
@@ -1671,26 +1669,55 @@ function MapPageInner() {
       }
     }
 
-    // Accumulate distance for walk-based encounter trigger
     if (typeof data.distanceMoved === 'number' && data.distanceMoved > 0 && data.distanceMoved < 500) {
       cumDistRef.current += data.distanceMoved
     }
 
-    const cooldownPassed = now - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS
+    const cooldownPassed = Date.now() - lastEncounterRef.current > ENCOUNTER_COOLDOWN_MS
 
-    // GPS-based trigger (single update moved ≥ 5 m, 30% chance)
     if (data.triggerEncounter && cooldownPassed) {
       const started = await triggerEncounter('gps')
-      if (started) { lastEncounterRef.current = now; cumDistRef.current = 0 }
+      if (started) { lastEncounterRef.current = Date.now(); cumDistRef.current = 0 }
       return
     }
 
-    // Walk-accumulation trigger: fired after WALK_ENCOUNTER_DIST_M metres since last attempt
     if (cumDistRef.current >= WALK_ENCOUNTER_DIST_M && cooldownPassed) {
       const started = await triggerEncounter('gps')
-      if (started) { lastEncounterRef.current = now; cumDistRef.current = 0 }
+      if (started) { lastEncounterRef.current = Date.now(); cumDistRef.current = 0 }
     }
   }, [triggerEncounter])
+
+  const onGPSPosition = useCallback((pos: { lat: number; lng: number; accuracy: number }) => {
+    const sid = sessionIdRef.current
+    if (!sid || sessionEndedRef.current) return
+
+    // Visual updates always happen at GPS rate — marker, accuracy, lastPos
+    setGpsAccuracy(Math.round(pos.accuracy))
+    lastPosRef.current = { lat: pos.lat, lng: pos.lng }
+
+    // Skip very inaccurate fixes (map marker already updated above)
+    if (pos.accuracy > 300) return
+
+    // Trailing throttle: keep latest pos, schedule one POST per interval
+    pendingPositionRef.current = pos
+    if (positionPostTimeoutRef.current) return  // already scheduled; latest pos will be used
+
+    const elapsed = Date.now() - lastPositionPostAtRef.current
+    const wait = Math.max(0, POSITION_POST_INTERVAL_MS - elapsed)
+
+    positionPostTimeoutRef.current = setTimeout(() => {
+      positionPostTimeoutRef.current = null
+      void firePositionPost()
+    }, wait)
+  }, [firePositionPost])
+
+  // Clean up any pending timer on unmount so we don't leak
+  useEffect(() => () => {
+    if (positionPostTimeoutRef.current) {
+      clearTimeout(positionPostTimeoutRef.current)
+      positionPostTimeoutRef.current = null
+    }
+  }, [])
 
   const { position, error: gpsError } = useGPS(onGPSPosition)
 
