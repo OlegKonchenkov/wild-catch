@@ -13,10 +13,10 @@ export async function POST(request: Request) {
 
   if (!sessionId) return NextResponse.json({ error: 'sessionId mancante' }, { status: 400 })
 
-  // Get player session
+  // Get player session (last_position included so we don't re-query for the bounds check)
   const { data: playerSession } = await supabase
     .from('player_sessions')
-    .select('id, level, selected_creature_id, squad_ids')
+    .select('id, level, selected_creature_id, squad_ids, last_position')
     .eq('user_id', user.id)
     .eq('session_id', sessionId)
     .single()
@@ -34,15 +34,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Sessione non attiva' }, { status: 403 })
   }
 
-  // Block if player is out of bounds (use last stored position)
+  // Block if player is out of bounds (use last stored position from the row above)
   if (session.area_bounds) {
-    const { data: posRow } = await supabase
-      .from('player_sessions')
-      .select('last_position')
-      .eq('id', playerSession.id)
-      .single()
     const { isWithinBounds, parsePoint } = await import('@/lib/game/anti-cheat')
-    const parsedPos = parsePoint(posRow?.last_position)
+    const parsedPos = parsePoint((playerSession as any).last_position)
     if (parsedPos) {
       const bounds = session.area_bounds as { north: number; south: number; east: number; west: number }
       const inBounds = isWithinBounds(parsedPos, bounds)
