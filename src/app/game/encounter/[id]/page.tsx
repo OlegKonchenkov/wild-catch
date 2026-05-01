@@ -330,7 +330,9 @@ export default function EncounterPage() {
   const [message, setMessage]   = useState('')
   const [isCritMessage, setIsCritMessage] = useState(false)
   const [loading, setLoading]   = useState(false)
-  const [pendingAction, setPendingAction] = useState<'fight' | 'catch' | 'heal' | null>(null)
+  const [pendingAction, setPendingAction] = useState<'fight' | 'catch' | 'heal' | 'switch' | null>(null)
+  // Slot index awaiting the user's "Cambia creatura" confirmation. null when no prompt is open.
+  const [pendingSwitchSlot, setPendingSwitchSlot] = useState<number | null>(null)
   const [result, setResult]     = useState<'caught' | 'fled' | 'evolved' | 'ko' | 'lost' | null>(null)
   const [caughtCreatureData, setCaughtCreatureData] = useState<any>(null)
   const [caughtExpGain, setCaughtExpGain]           = useState(0)
@@ -838,6 +840,220 @@ export default function EncounterPage() {
     finishPendingAction()
   }
 
+  // ── Handle creature switch (replaces this turn's attack) ───────────────────
+  // Player picks a different non-fainted squad slot; the wild gets a free
+  // attack on the incoming creature. Old creature's status is dropped (the
+  // server resets player_status); the new creature can pick up a fresh status
+  // from the wild's hit, just like in /fight.
+  async function handleSwitch(targetSlot: number) {
+    if (!state || loading || result) return
+    if (targetSlot === activeSlot) return
+    if (targetSlot < 0 || targetSlot >= squadCreatures.length) return
+    const targetCreature = squadCreatures[targetSlot]
+    if (!targetCreature) return
+    const targetHp = slotHps[targetSlot] ?? targetCreature.hp
+    if (targetHp <= 0) return  // can't switch to fainted
+
+    resetTimer()
+    setLoading(true)
+    setPendingAction('switch')
+    setShowItemsModal(false)
+
+    const outgoingName = playerCreature?.name ?? 'Creatura'
+    const incomingName = targetCreature.name
+    setMessage(`${outgoingName} torna indietro!`)
+    setIsCritMessage(false)
+
+    // Brief "leaving" animation on the outgoing creature
+    setPlayerFainting(true)
+    await new Promise(r => setTimeout(r, 320))
+
+    // Swap the active creature locally
+    setActiveSlot(targetSlot)
+    setPlayerCreature({
+      name: targetCreature.name,
+      maxHp: targetCreature.hp,
+      atk: targetCreature.atk,
+      element: targetCreature.element,
+      rarity: targetCreature.rarity,
+      imageUrl: targetCreature.image_url ?? '',
+      soundUrl: targetCreature.attack_sound_url,
+      soundDurationMs: targetCreature.attack_sound_duration_ms,
+    })
+    setPlayerHp(targetHp)
+    setPlayerStatus(null)
+    setPlayerStatusTurns(0)
+    setPlayerFainting(false)
+    setMessage(`Vai, ${incomingName}!`)
+    await new Promise(r => setTimeout(r, 400))
+
+    const res = await fetch('/api/game/encounter/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        encounterId: state.encounterId,
+        newActivePcId: targetCreature.pcId,
+        currentPlayerHp: targetHp,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setMessage(data.error ?? 'Errore'); finishPendingAction(); return }
+
+    let currentPlayerHp = targetHp
+    let currentWildHp = state.wildHp
+
+    const updateCurrentPlayerHp = (newHp: number) => {
+      currentPlayerHp = newHp
+      setPlayerHp(newHp)
+      if (squadCreatures.length > 0) {
+        setSlotHps(prev => {
+          const next = [...prev]
+          next[targetSlot] = newHp
+          return next
+        })
+      }
+    }
+    const updateCurrentWildHp = (newHp: number) => {
+      currentWildHp = newHp
+      setState(prev => prev ? {
+        ...prev,
+        wildHp: newHp,
+        catchMultiplier: getCatchHealthMultiplier(newHp, prev.wildHpMax),
+      } : null)
+    }
+
+    const handlePlayerKnockoutAfterSwitch = async () => {
+      playKnockout()
+      setPlayerFainting(true)
+      await new Promise(r => setTimeout(r, 1000))
+      setPlayerFainting(false)
+
+      // Find the next non-fainted slot, if any
+      const nextSlot = squadCreatures.findIndex((_c, i) => i !== targetSlot && (slotHps[i] ?? squadCreatures[i].hp) > 0)
+      if (nextSlot !== -1) {
+        const next = squadCreatures[nextSlot]
+        setActiveSlot(nextSlot)
+        setPlayerCreature({
+          name: next.name, maxHp: next.hp, atk: next.atk,
+          element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '',
+          soundUrl: next.attack_sound_url, soundDurationMs: next.attack_sound_duration_ms,
+        })
+        setPlayerHp(slotHps[nextSlot] ?? next.hp)
+        setPlayerStatus(null)
+        setPlayerStatusTurns(0)
+        clearPlayerStatusRef.current = true
+        fetch('/api/game/encounter/clear-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ encounterId: state.encounterId }),
+        }).catch(() => undefined)
+        setMessage(`${squadCreatures[targetSlot].name} è svenuta! Entra ${next.name}!`)
+        finishPendingAction()
+        return
+      }
+      playDefeat()
+      setResult('lost')
+      finishPendingAction()
+    }
+
+    // Wild's status tick events (sleep, poison etc) — same shape as fight
+    const wildStatusEvents = ((data.statusEvents ?? []) as any[]).filter(se => se.target === 'wild')
+    if (wildStatusEvents.length) {
+      await new Promise(r => setTimeout(r, 300))
+      for (const se of wildStatusEvents) {
+        const effect = se.type as StatusEffect
+        const meta = STATUS_EFFECT_META[effect]
+
+        if (se.cleared) setWildStatus(null)
+        else if (se.turnsLeft != null) setWildStatusTurns(se.turnsLeft)
+
+        if (effect === 'veleno' && se.poisonDamage > 0) {
+          const newHp = typeof se.newHp === 'number'
+            ? Math.max(0, se.newHp)
+            : Math.max(0, currentWildHp - se.poisonDamage)
+          updateCurrentWildHp(newHp)
+          showDamageFloat(se.poisonDamage, 'wild', { tone: 'poison' })
+          setWildAnim('damage')
+          setMessage(`☠️ Veleno - ${se.poisonDamage} danno a ${state.creature.name}!`)
+          await new Promise(r => setTimeout(r, 700))
+          setWildAnim('idle')
+          continue
+        }
+
+        if (effect === 'confusione' && se.selfHit && se.selfDamage > 0) {
+          const newHp = typeof se.newHp === 'number'
+            ? Math.max(0, se.newHp)
+            : Math.max(0, currentWildHp - se.selfDamage)
+          updateCurrentWildHp(newHp)
+          showDamageFloat(se.selfDamage, 'wild')
+          setWildAnim('damage')
+          setMessage(`💫 ${state.creature.name} si colpisce da sola per ${se.selfDamage}!`)
+          await new Promise(r => setTimeout(r, 700))
+          setWildAnim('idle')
+          continue
+        }
+
+        if (se.turnPassed || se.paralysisSkip === true) {
+          const label = `${state.creature.name} è ${meta?.label ?? effect} e ha saltato il turno!`
+          setMessage(`${meta?.emoji ?? ''} ${label}`)
+          await new Promise(r => setTimeout(r, 700))
+        }
+      }
+    }
+
+    if (currentWildHp !== data.wildHpRemaining) {
+      updateCurrentWildHp(data.wildHpRemaining)
+    }
+
+    // Switching counts as a turn
+    setState(prev => prev ? { ...prev, turns: prev.turns + 1 } : null)
+
+    // If the wild fainted from its own status during the tick, end the fight
+    if (data.fightResult === 'fled') {
+      playKnockout()
+      setWildAnim('flee'); setMessage(''); setResult('ko'); finishPendingAction(); return
+    }
+
+    // Wild's free attack on the incoming creature
+    if (data.playerTookDamage && data.wildDamage > 0) {
+      await new Promise(r => setTimeout(r, 300))
+      setAttackAnim({
+        key: Date.now() + 1,
+        element: state.creature?.element ?? 'armonia',
+        rarity: state.creature?.rarity ?? 'comune',
+        side: 'right',
+      })
+      await new Promise(r => setTimeout(r, 320))
+      setMessage(`${state.creature.name} colpisce ${incomingName}!`)
+      setIsCritMessage(false)
+
+      const newHp = typeof data.playerHpRemaining === 'number'
+        ? Math.max(0, data.playerHpRemaining)
+        : Math.max(0, currentPlayerHp - data.wildDamage)
+      updateCurrentPlayerHp(newHp)
+      showDamageFloat(data.wildDamage, 'player')
+      setPlayerAnim('damage')
+      await new Promise(r => setTimeout(r, 420))
+      setPlayerAnim('idle')
+
+      if (newHp <= 0) {
+        await handlePlayerKnockoutAfterSwitch()
+        return
+      }
+    }
+
+    if (data.statusAppliedToPlayer) {
+      const effect = data.statusAppliedToPlayer as StatusEffect
+      const meta = STATUS_EFFECT_META[effect]
+      setPlayerStatus(effect)
+      setPlayerStatusTurns(data.playerNewStatusTurns ?? 0)
+      setMessage(`${meta?.emoji ?? ''} ${incomingName} è afflitto da ${meta?.label ?? effect}!`)
+      await new Promise(r => setTimeout(r, 600))
+    }
+
+    finishPendingAction()
+  }
+
   async function handleCatch() {
     if (!state || loading) return
     resetTimer(); setLoading(true); setPendingAction('catch'); setShowItemsModal(false)
@@ -1302,20 +1518,19 @@ export default function EncounterPage() {
               const hpColor = hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444'
               const isActive = idx === activeSlot
               const isFainted = hp <= 0
-              return (
-                <div
-                  key={cr.pcId}
-                  className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-xl transition-all"
-                  style={{
-                    background: isActive
-                      ? 'rgba(255,255,255,0.1)'
-                      : isFainted ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
-                    border: isActive
-                      ? '1px solid rgba(255,255,255,0.22)'
-                      : '1px solid rgba(255,255,255,0.07)',
-                    opacity: isFainted ? 0.35 : 1,
-                  }}
-                >
+              // Switchable: not the active slot, not fainted, not mid-action, and turn budget left
+              const isSwitchable = !isActive && !isFainted && !loading && !result && state.turns < 5
+              const commonStyle = {
+                background: isActive
+                  ? 'rgba(255,255,255,0.1)'
+                  : isFainted ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
+                border: isActive
+                  ? '1px solid rgba(255,255,255,0.22)'
+                  : '1px solid rgba(255,255,255,0.07)',
+                opacity: isFainted ? 0.35 : 1,
+              }
+              const inner = (
+                <>
                   {/* Creature tiny icon */}
                   {cr.image_url ? (
                     <img
@@ -1339,13 +1554,36 @@ export default function EncounterPage() {
                       />
                     </div>
                   </div>
-                  {/* Active indicator */}
+                  {/* Active / fainted / switchable indicator */}
                   {isActive && !isFainted && (
                     <div className="w-1.5 h-1.5 rounded-full bg-white/60 shrink-0" />
                   )}
                   {isFainted && (
                     <span className="text-[9px] text-red-400/60 shrink-0 font-bold">✕</span>
                   )}
+                  {isSwitchable && (
+                    <span className="text-[10px] text-white/45 shrink-0 leading-none" aria-hidden>↻</span>
+                  )}
+                </>
+              )
+              return isSwitchable ? (
+                <button
+                  key={cr.pcId}
+                  type="button"
+                  onClick={() => setPendingSwitchSlot(idx)}
+                  className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-xl transition-all text-left active:scale-95"
+                  style={commonStyle}
+                  aria-label={`Cambia con ${cr.name}`}
+                >
+                  {inner}
+                </button>
+              ) : (
+                <div
+                  key={cr.pcId}
+                  className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-xl transition-all"
+                  style={commonStyle}
+                >
+                  {inner}
                 </div>
               )
             })}
@@ -1553,6 +1791,64 @@ export default function EncounterPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── SWITCH CONFIRM (centered popup) ── */}
+      <AnimatePresence>
+        {pendingSwitchSlot != null && squadCreatures[pendingSwitchSlot] && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[60] flex items-center justify-center px-6"
+            style={{ background: 'rgba(4,8,18,0.78)', backdropFilter: 'blur(8px)' }}
+            onClick={() => setPendingSwitchSlot(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="w-full max-w-xs rounded-3xl p-5"
+              style={{ background: '#0A1322', border: '1px solid rgba(255,255,255,0.1)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex flex-col items-center text-center gap-3">
+                {squadCreatures[pendingSwitchSlot].image_url && (
+                  <img
+                    src={squadCreatures[pendingSwitchSlot].image_url ?? ''}
+                    alt={squadCreatures[pendingSwitchSlot].name}
+                    className="w-16 h-16 object-contain"
+                  />
+                )}
+                <h3 className="text-white text-base font-extrabold leading-tight">
+                  Cambia con {squadCreatures[pendingSwitchSlot].name}?
+                </h3>
+                <p className="text-[12px] text-white/55 leading-relaxed">
+                  Il cambio sostituisce l'attacco di questo turno: la creatura selvatica colpirà la tua sostituta.
+                </p>
+                <div className="flex gap-2 w-full mt-1">
+                  <button
+                    onClick={() => setPendingSwitchSlot(null)}
+                    className="flex-1 py-3 rounded-2xl text-[12px] font-extrabold tracking-wide"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)' }}
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    onClick={() => {
+                      const slot = pendingSwitchSlot
+                      setPendingSwitchSlot(null)
+                      if (slot != null) void handleSwitch(slot)
+                    }}
+                    className="flex-1 py-3 rounded-2xl text-[12px] font-extrabold tracking-wide text-white"
+                    style={{ background: 'linear-gradient(145deg,#3A9DBC,#2a7a94)', boxShadow: '0 4px 18px rgba(58,157,188,0.4)' }}
+                  >
+                    Cambia
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
