@@ -8,6 +8,7 @@ import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import { getExpProgress } from '@/lib/game/leveling'
 import { ELEMENT_EMOJI } from '@/lib/types'
+import { playLevelUp } from '@/lib/game/sounds/events'
 
 const NAV_ITEMS = [
   { href: '/game/map',      icon: '🗺️', label: 'Mappa'     },
@@ -468,8 +469,8 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     function onLevelUp(e: Event) {
       const detail = (e as CustomEvent<LevelUpInfo>).detail
       if (detail?.newLevel) {
+        playLevelUp()
         setLevelUpInfo(detail)
-        // Auto-dismiss after 4s
         setTimeout(() => setLevelUpInfo(null), 4000)
       }
     }

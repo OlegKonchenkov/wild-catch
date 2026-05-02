@@ -22,7 +22,6 @@ import {
   playKnockout,
   playVictory,
   playDefeat,
-  playLevelUp,
 } from "@/lib/game/sounds/events";
 import { scaleCombatStats, STATUS_EFFECT_META } from "@/lib/game/combat";
 import type { StatusEffect } from "@/lib/game/combat";
@@ -2930,12 +2929,10 @@ export default function BossFightPage() {
             }
             if (isOver) {
               window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
-              if (data.levelUp) {
-                playLevelUp();
+              if (data.levelUp)
                 window.dispatchEvent(
                   new CustomEvent("wc:level-up", { detail: data.levelUp }),
                 );
-              }
               if (data.completedMissions?.length)
                 setBossMissions(data.completedMissions);
               if (data.won) playVictory();
@@ -2953,7 +2950,7 @@ export default function BossFightPage() {
             attackingRef.current = false;
             setAttacking(false);
           }, 1000);
-        } else if (!isOver && data.bossDamage > 0) {
+        } else if (data.bossDamage > 0) {
           // Phase 2: boss counter-attacks
           setBossAttacking(true);
           const counterBoss = nextBossLineup[bossActiveSlot];
@@ -3038,6 +3035,7 @@ export default function BossFightPage() {
                     setTimeout(() => setSwitchNotice(null), 2000);
                   }
                   if (isOver) {
+                    if (data.won) playVictory(); else playDefeat();
                     window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
                     if (data.levelUp)
                       window.dispatchEvent(
@@ -3083,6 +3081,7 @@ export default function BossFightPage() {
                   setTimeout(() => setSwitchNotice(null), 2000);
                 }
                 if (isOver) {
+                  if (data.won) playVictory(); else playDefeat();
                   window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
                   if (data.levelUp)
                     window.dispatchEvent(

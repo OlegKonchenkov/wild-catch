@@ -13,7 +13,7 @@ import { scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import { playBattleSound } from '@/lib/game/battle-sounds'
 import { startDuelLoop } from '@/lib/game/sounds/battle-loop'
-import { playKnockout, playVictory, playDefeat, playLevelUp } from '@/lib/game/sounds/events'
+import { playKnockout, playVictory, playDefeat } from '@/lib/game/sounds/events'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 
@@ -1127,7 +1127,7 @@ export default function DuelPage() {
         setTimeout(() => setAnimState('idle'), 400)
         setAttackAnim({ key: Date.now(), element: myActiveCrNow.element, rarity: myActiveCrNow.rarity, side: 'left', soundUrl: myActiveCrNow.attack_sound_url, soundDurationMs: myActiveCrNow.attack_sound_duration_ms })
       }
-      if (data.levelUp) { playLevelUp(); window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp })) }
+      if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
       if (data.duelOver) {
         // Immediately mark as won for the attacker — don't wait for postgres_changes
         playVictory()

@@ -17,6 +17,8 @@ import { startMapAmbience, duckMapAmbience, unduckMapAmbience } from '@/lib/game
 import { registerAmbienceDucking } from '@/lib/game/sounds/shared-ac'
 import { playEggHatch } from '@/lib/game/sounds/hatch'
 import { playEnigmaSolve } from '@/lib/game/sounds/enigma'
+import { playEncounterSound } from '@/lib/game/battle-sounds'
+import { playMissionComplete } from '@/lib/game/sounds/events'
 
 // Dynamic import — Leaflet is not SSR-safe
 const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false })
@@ -549,8 +551,10 @@ function PinRewardModal({ reward, onDone }: { reward: PinRewardData; onDone: () 
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 60)
+    // Enigma already plays playEnigmaSolve() before this modal mounts — skip here
+    if (type !== 'enigma') playMissionComplete()
     return () => clearTimeout(t)
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const rarityColor = RARITY_COLOR[reward.creature?.rarity ?? ''] ?? '#F7C841'
   const glow = ELEMENT_GLOW[reward.creature?.element ?? ''] ?? rarityColor
@@ -1605,6 +1609,7 @@ function MapPageInner() {
           shownAt: Date.now(),
         }))
         setPendingEncounter(data)
+        playEncounterSound()
         setShowEncounterPopup(true)
         encounterPopupRef.current = true
         return true

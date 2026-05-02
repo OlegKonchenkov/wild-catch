@@ -25,6 +25,17 @@
 let _ac: AudioContext | null = null
 let _nextSoundAt = 0  // AudioContext time (seconds) when next queued sound may start
 
+// ── AudioContext unlock (mobile autoplay policy) ──────────────────────────────
+// iOS/Android block AudioContext.resume() outside a user-gesture handler.
+// We register one-time capture listeners so the first tap/click resumes the AC.
+function _scheduleUnlock(ac: AudioContext): void {
+  if (ac.state === 'running') return
+  const unlock = () => { if (ac.state === 'suspended') ac.resume().catch(() => {}) }
+  for (const ev of ['click', 'touchend', 'keydown'] as const) {
+    document.addEventListener(ev, unlock, { once: true, capture: true })
+  }
+}
+
 // ── Ambience ducking ──────────────────────────────────────────────────────────
 type DuckFn   = (duckTo: number, rampMs: number) => void
 type UnduckFn = (rampMs: number) => void
@@ -54,7 +65,9 @@ export function getSharedAC(): AudioContext | null {
 
   if (!_ac || _ac.state === 'closed') {
     try {
-      _ac = new ((window as any).AudioContext || (window as any).webkitAudioContext)()
+      const fresh: AudioContext = new ((window as any).AudioContext || (window as any).webkitAudioContext)()
+      _ac = fresh
+      _scheduleUnlock(fresh)
     } catch {
       return null
     }
@@ -62,7 +75,9 @@ export function getSharedAC(): AudioContext | null {
 
   // Browser may suspend the context after user leaves the page then returns
   if (_ac && _ac.state === 'suspended') {
-    _ac.resume().catch(() => {})
+    const ac = _ac
+    ac.resume().catch(() => {})
+    _scheduleUnlock(ac)
   }
 
   return _ac

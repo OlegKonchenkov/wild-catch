@@ -6,7 +6,7 @@ import CreatureSprite from '@/components/creature/CreatureSprite'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
 import { startEncounterLoop } from '@/lib/game/sounds/battle-loop'
 import { playCatchAttempt, playCatchFail, playCatchSuccess } from '@/lib/game/sounds/catch'
-import { playKnockout, playFlee, playLevelUp, playDefeat } from '@/lib/game/sounds/events'
+import { playKnockout, playFlee, playDefeat } from '@/lib/game/sounds/events'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import { createClient } from '@/lib/supabase/client'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
@@ -835,7 +835,7 @@ export default function EncounterPage() {
       await new Promise(r => setTimeout(r, 600))
     }
 
-    if (data.levelUp) { playLevelUp(); window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp })) }
+    if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
     window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
     finishPendingAction()
   }
@@ -1097,7 +1097,7 @@ export default function EncounterPage() {
       setCaughtGoldGain(data.goldGain ?? 0)
       if (data.completedMissions?.length) setCompletedMissions(data.completedMissions)
       setResult(data.evolved ? 'evolved' : 'caught')
-      if (data.levelUp) { playLevelUp(); window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp })) }
+      if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
       window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       window.dispatchEvent(new CustomEvent('wc:refresh-bestiary'))
     } else if (data.fled) {
