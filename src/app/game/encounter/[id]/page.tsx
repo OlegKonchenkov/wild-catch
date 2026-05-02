@@ -6,7 +6,7 @@ import CreatureSprite from '@/components/creature/CreatureSprite'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
 import { startEncounterLoop } from '@/lib/game/sounds/battle-loop'
 import { playCatchAttempt, playCatchFail, playCatchSuccess } from '@/lib/game/sounds/catch'
-import { playKnockout, playFlee, playDefeat } from '@/lib/game/sounds/events'
+import { playKnockout, playFlee, playDefeat, playMissionComplete } from '@/lib/game/sounds/events'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import { createClient } from '@/lib/supabase/client'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
@@ -2086,7 +2086,7 @@ export default function EncounterPage() {
                   {/* Continua */}
                   <motion.button
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
-                    onClick={() => { if (completedMissions.length > 0) { setMissionRewardIdx(0) } else { router.push('/game/map') } }}
+                    onClick={() => { if (completedMissions.length > 0) { playMissionComplete(); setMissionRewardIdx(0) } else { router.push('/game/map') } }}
                     whileTap={{ scale: 0.97 }}
                     className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
                     style={{

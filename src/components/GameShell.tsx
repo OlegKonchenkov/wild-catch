@@ -9,6 +9,7 @@ import ImageLightbox from '@/components/ui/ImageLightbox'
 import { getExpProgress } from '@/lib/game/leveling'
 import { ELEMENT_EMOJI } from '@/lib/types'
 import { playLevelUp } from '@/lib/game/sounds/events'
+import { getSharedAC } from '@/lib/game/sounds/shared-ac'
 
 const NAV_ITEMS = [
   { href: '/game/map',      icon: '🗺️', label: 'Mappa'     },
@@ -476,6 +477,19 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     }
     window.addEventListener('wc:level-up', onLevelUp)
     return () => window.removeEventListener('wc:level-up', onLevelUp)
+  }, [])
+
+  useEffect(() => {
+    const warmup = () => {
+      const ac = getSharedAC()
+      if (ac && ac.state === 'suspended') ac.resume().catch(() => {})
+    }
+    document.addEventListener('touchstart', warmup, { once: true, passive: true })
+    document.addEventListener('click', warmup, { once: true })
+    return () => {
+      document.removeEventListener('touchstart', warmup)
+      document.removeEventListener('click', warmup)
+    }
   }, [])
 
   // Realtime: admin chiude sessione o aggiorna durata → aggiornamento immediato
