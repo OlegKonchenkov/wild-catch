@@ -283,7 +283,7 @@ export async function POST(request: Request, { params }: Params) {
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const body = await request.json().catch(() => ({}))
-  const { action, lineup, itemId } = body
+  const { action, lineup, itemId, targetPlayerCreatureId } = body
 
   const { data: rawFight } = await supabase
     .from('boss_fights')
@@ -677,6 +677,126 @@ export async function POST(request: Request, { params }: Params) {
       statusTickEvents,
       statusAppliedToPlayer,
       playerStatusTurnsLeft,
+    })
+  }
+
+  // ── Switch active creature ───────────────────────────────────────────────
+  // Replaces the player's attack for this turn. The boss still counter-attacks
+  // the incoming creature (same rule as encounter switch — switching costs a turn).
+  if (action === 'switch') {
+    if (fight.status !== 'active') {
+      return NextResponse.json({ error: 'Battaglia non attiva' }, { status: 409 })
+    }
+    if (!targetPlayerCreatureId) {
+      return NextResponse.json({ error: 'targetPlayerCreatureId richiesto' }, { status: 400 })
+    }
+
+    const swPlayerLineup: any[] = fight.player_lineup
+    const swBossLineup:   any[] = fight.boss_lineup
+    const swCurrentActive = swPlayerLineup.find((c: any) => c.is_active && !c.fainted)
+    const swTargetSlot = swPlayerLineup.findIndex((c: any) => c.player_creature_id === targetPlayerCreatureId)
+
+    if (swTargetSlot === -1) return NextResponse.json({ error: 'Creatura non valida' }, { status: 404 })
+    const swTarget = swPlayerLineup[swTargetSlot]
+    if (swTarget.is_active) return NextResponse.json({ error: 'Creatura già attiva' }, { status: 400 })
+    if (swTarget.fainted || swTarget.current_hp <= 0) return NextResponse.json({ error: 'Creatura svenuta' }, { status: 400 })
+
+    const swBossActive = swBossLineup[fight.boss_active_slot]
+    if (!swBossActive || swBossActive.fainted) return NextResponse.json({ error: 'Boss già sconfitto' }, { status: 400 })
+
+    // Deactivate current, activate target
+    if (swCurrentActive) swCurrentActive.is_active = false
+    swTarget.is_active = true
+    const newPlayerActiveSlot = swTargetSlot
+
+    // Boss status tick + counter-attack on the incoming creature
+    let skipBossAttack = false
+    const swBossStatusTick = resolveTurnStartStatus({
+      effect: swBossActive.active_status as StatusEffect | null,
+      turnsLeft: swBossActive.status_turns_left ?? 0,
+      currentHp: swBossActive.current_hp,
+      maxHp: swBossActive.max_hp,
+      atk: swBossActive.atk,
+      def: swBossActive.def ?? 0,
+    })
+    swBossActive.active_status = swBossStatusTick.nextEffect
+    swBossActive.status_turns_left = swBossStatusTick.nextTurnsLeft
+    swBossActive.current_hp = swBossStatusTick.currentHp
+    if (swBossStatusTick.fainted) swBossActive.fainted = true
+    if (swBossStatusTick.preventedAction || swBossStatusTick.fainted) skipBossAttack = true
+
+    let bossDamage = 0
+    let newPlayerHp = swTarget.current_hp
+    if (!skipBossAttack && swBossActive.current_hp > 0) {
+      const bossMult = getElementMultiplier(swBossActive.element as Element, swTarget.element as Element)
+      const { critMultiplier } = rollCrit()
+      bossDamage = calculateCombatDamage({
+        attackerAtk: swBossActive.atk,
+        defenderDef: swTarget.def ?? 0,
+        attackMultiplier: critMultiplier,
+        elementMultiplier: bossMult,
+        varianceMultiplier: 1,
+      })
+      newPlayerHp = Math.max(0, swTarget.current_hp - bossDamage)
+      swTarget.current_hp = newPlayerHp
+      if (newPlayerHp === 0) swTarget.fainted = true
+    }
+
+    // Status roll by boss on incoming creature
+    let statusAppliedToPlayer: StatusEffect | null = null
+    let playerStatusTurnsLeft = 0
+    if (bossDamage > 0 && newPlayerHp > 0) {
+      const triggered = rollStatusEffect(swBossActive.status_effect as StatusEffect | null, swBossActive.status_effect_chance ?? 0.15)
+      if (triggered) {
+        statusAppliedToPlayer = triggered
+        playerStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
+        swTarget.active_status = triggered
+        swTarget.status_turns_left = playerStatusTurnsLeft
+      }
+    }
+
+    // If incoming creature fainted from the counter-attack, auto-advance
+    let playerSwitchedTo: string | null = null
+    let finalPlayerActiveSlot = newPlayerActiveSlot
+    if (swTarget.fainted) {
+      swTarget.is_active = false
+      const nextIdx = swPlayerLineup.findIndex((c: any) => !c.fainted)
+      if (nextIdx !== -1) {
+        swPlayerLineup[nextIdx].is_active = true
+        finalPlayerActiveSlot = nextIdx
+        playerSwitchedTo = swPlayerLineup[nextIdx].name
+      }
+    }
+
+    const allPlayerFainted = swPlayerLineup.every((c: any) => c.fainted)
+    const newStatus = allPlayerFainted ? 'lost' : 'active'
+
+    await supabase.from('boss_fights').update({
+      player_lineup:      swPlayerLineup,
+      boss_lineup:        swBossLineup,
+      player_active_slot: finalPlayerActiveSlot,
+      status:             newStatus,
+      ...(newStatus !== 'active' ? { ended_at: new Date().toISOString() } : {}),
+    }).eq('id', id)
+
+    if (allPlayerFainted) {
+      createAdminClient().from('player_game_events').insert({
+        user_id: user.id, session_id: fight.session_id, type: 'boss_lost',
+        payload: { fight_id: id, boss_name: (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss' },
+      }).then(undefined, () => {})
+    }
+
+    return NextResponse.json({
+      switched: true,
+      bossDamage,
+      newPlayerHp,
+      playerLineup:  swPlayerLineup,
+      bossLineup:    swBossLineup,
+      playerSwitchedTo,
+      statusAppliedToPlayer,
+      playerStatusTurnsLeft,
+      status: newStatus,
+      lost: allPlayerFainted,
     })
   }
 

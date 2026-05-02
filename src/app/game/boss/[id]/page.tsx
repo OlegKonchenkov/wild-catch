@@ -732,6 +732,7 @@ function BattleScreen({
   selectedItemId,
   onSelectItem,
   onHeal,
+  onSwitch,
   switchNotice,
   fortuneNotice,
   critNotice,
@@ -761,6 +762,7 @@ function BattleScreen({
   selectedItemId: string | null;
   onSelectItem: (id: string | null) => void;
   onHeal: (itemId: string) => void;
+  onSwitch: (playerCreatureId: string) => void;
   switchNotice: string | null;
   fortuneNotice: {
     id: number;
@@ -788,6 +790,7 @@ function BattleScreen({
   onAttackAnimComplete: () => void;
 }) {
   const [showItemsModal, setShowItemsModal] = useState(false);
+  const [pendingSwitchCreatureId, setPendingSwitchCreatureId] = useState<string | null>(null);
   const [showBossIntro, setShowBossIntro] = useState(true);
   const [turnTimer, setTurnTimer] = useState(30);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1402,9 +1405,11 @@ function BattleScreen({
                   hpPct > 50 ? "#34D399" : hpPct > 25 ? "#FBBF24" : "#EF4444";
                 const isActive = slot.is_active;
                 const isFainted = slot.fainted;
+                const canSwitch = !attacking && !bossAttacking && !isActive && !isFainted;
                 return (
                   <div
                     key={slot.player_creature_id}
+                    onClick={() => canSwitch && setPendingSwitchCreatureId(slot.player_creature_id)}
                     className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-xl transition-all"
                     style={{
                       background: isActive
@@ -1414,8 +1419,11 @@ function BattleScreen({
                           : "rgba(255,255,255,0.04)",
                       border: isActive
                         ? "1px solid rgba(255,255,255,0.22)"
-                        : "1px solid rgba(255,255,255,0.07)",
+                        : canSwitch
+                          ? "1px solid rgba(255,255,255,0.22)"
+                          : "1px solid rgba(255,255,255,0.07)",
                       opacity: isFainted ? 0.35 : 1,
+                      cursor: canSwitch ? "pointer" : "default",
                     }}
                   >
                     {slot.image_url ? (
@@ -1451,6 +1459,7 @@ function BattleScreen({
                     {isActive && !isFainted && (
                       <div className="w-1.5 h-1.5 rounded-full bg-white/60 shrink-0" />
                     )}
+                    {canSwitch && <span className="text-[9px] text-white/50 shrink-0">↻</span>}
                     {isFainted && (
                       <span className="text-[9px] text-red-400/60 shrink-0 font-bold">
                         ✕
@@ -1829,6 +1838,62 @@ function BattleScreen({
             ))}
           </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* ── SWITCH CONFIRM MODAL ── */}
+      <AnimatePresence>
+        {pendingSwitchCreatureId && (() => {
+          const slot = playerLineup.find(c => c.player_creature_id === pendingSwitchCreatureId)
+          if (!slot) return null
+          return (
+            <motion.div
+              key="boss-switch-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 flex items-end justify-center pb-10"
+              style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+              onClick={() => setPendingSwitchCreatureId(null)}
+            >
+              <motion.div
+                initial={{ y: 40, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 40, opacity: 0 }}
+                className="bg-[#111827] rounded-3xl px-6 py-5 mx-4 w-full max-w-sm"
+                style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+                onClick={e => e.stopPropagation()}
+              >
+                <p className="text-white/60 text-sm text-center mb-3">Cambia creatura?</p>
+                {slot.image_url && (
+                  <img src={slot.image_url} alt={slot.name} className="w-16 h-16 object-contain mx-auto mb-2" />
+                )}
+                <p className="text-white font-bold text-center text-lg mb-1">{slot.name}</p>
+                <p className="text-white/40 text-xs text-center mb-4">Il Capo Palestra potrà contrattaccare</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPendingSwitchCreatureId(null)}
+                    className="flex-1 py-3 rounded-2xl text-white/50 text-sm font-semibold"
+                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    onClick={() => {
+                      const pcId = pendingSwitchCreatureId
+                      setPendingSwitchCreatureId(null)
+                      resetTimer()
+                      onSwitch(pcId)
+                    }}
+                    className="flex-1 py-3 rounded-2xl text-white font-bold text-sm"
+                    style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}
+                  >
+                    ↻ Cambia
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )
+        })()}
       </AnimatePresence>
     </div>
   );
@@ -3303,6 +3368,116 @@ export default function BossFightPage() {
     router.replace("/game/missions");
   }
 
+  async function handleSwitch(targetPlayerCreatureId: string) {
+    if (attackingRef.current) return;
+    attackingRef.current = true;
+    setAttacking(true);
+
+    const res = await fetch(`/api/game/boss/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "switch", targetPlayerCreatureId }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showActionError(res.status, data.error ?? "Errore cambio");
+      attackingRef.current = false;
+      setAttacking(false);
+      return;
+    }
+
+    const nextPlayerLineup = data.playerLineup as PlayerSlot[];
+    const nextBossLineup = data.bossLineup as BossSlot[];
+    const isOver = data.status === "won" || data.status === "lost";
+
+    if (data.bossDamage > 0) {
+      setBossAttacking(true);
+      const counterBoss = nextBossLineup[bossActiveSlot];
+      if (counterBoss) {
+        setAttackAnim({ key: Date.now(), element: counterBoss.element, rarity: "leggendario", side: "right" });
+      }
+      addLog(`↻ Cambio creatura! Il Capo Palestra contrattacca per ${data.bossDamage} danni!`);
+      setTimeout(() => {
+        setBossAttacking(false);
+        setPlayerLineup((prev) => prev.map((slot) =>
+          slot.is_active ? { ...slot, current_hp: data.newPlayerHp } : slot,
+        ));
+        setLastDamage({ amount: data.bossDamage, target: "me", id: Date.now() });
+        setAnimState("damage");
+
+        const swTarget = nextPlayerLineup.find((c) => c.player_creature_id === targetPlayerCreatureId);
+        const playerFainted = swTarget?.fainted === true;
+
+        if (playerFainted) {
+          setTimeout(() => {
+            setAnimState("idle");
+            setLastDamage(null);
+            playKnockout();
+            setPlayerFainting(true);
+            setTimeout(() => {
+              setPlayerFainting(false);
+              setPlayerLineup(nextPlayerLineup);
+              setBossLineup(nextBossLineup);
+              if (data.statusAppliedToPlayer) {
+                const effect = data.statusAppliedToPlayer as StatusEffect;
+                setTimeout(() => flashStatusNotice(effect, `Sei afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 600);
+              }
+              if (data.playerSwitchedTo) {
+                setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`);
+                setTimeout(() => setSwitchNotice(null), 2000);
+              }
+              if (isOver) {
+                window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
+                if (data.lost) playDefeat();
+                setTimeout(() => setFinalResult({ won: false, reward: null, levelUp: null }), 400);
+              }
+              attackingRef.current = false;
+              setAttacking(false);
+            }, 1000);
+          }, 900);
+        } else {
+          setTimeout(() => {
+            setPlayerLineup(nextPlayerLineup);
+            setBossLineup(nextBossLineup);
+            setAnimState("idle");
+            setLastDamage(null);
+            if (data.statusAppliedToPlayer) {
+              const effect = data.statusAppliedToPlayer as StatusEffect;
+              setTimeout(() => flashStatusNotice(effect, `Sei afflitto da ${STATUS_EFFECT_META[effect]?.label ?? effect}!`), 600);
+            }
+            if (data.playerSwitchedTo) {
+              setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`);
+              setTimeout(() => setSwitchNotice(null), 2000);
+            }
+            if (isOver) {
+              window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
+              if (data.lost) playDefeat();
+              setTimeout(() => setFinalResult({ won: false, reward: null, levelUp: null }), 400);
+            }
+            attackingRef.current = false;
+            setAttacking(false);
+          }, 900);
+        }
+      }, 1100);
+    } else {
+      addLog("↻ Hai cambiato creatura!");
+      setPlayerLineup(nextPlayerLineup);
+      setBossLineup(nextBossLineup);
+      if (data.playerSwitchedTo) {
+        setSwitchNotice(`${data.playerSwitchedTo} entra in campo!`);
+        setTimeout(() => setSwitchNotice(null), 2000);
+      }
+      if (isOver) {
+        window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
+        if (data.lost) playDefeat();
+        setTimeout(() => setFinalResult({ won: false, reward: null, levelUp: null }), 400);
+      }
+      attackingRef.current = false;
+      setAttacking(false);
+    }
+  }
+
   if (loading) {
     return (
       <GameBattleSkeleton
@@ -3435,6 +3610,7 @@ export default function BossFightPage() {
             selectedItemId={selectedItemId}
             onSelectItem={setSelectedItemId}
             onHeal={handleHeal}
+            onSwitch={handleSwitch}
             switchNotice={switchNotice}
             fortuneNotice={fortuneNotice}
             critNotice={critNotice}
