@@ -13,8 +13,8 @@ export async function POST(request: Request) {
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
   const userId = user.id
 
-  const { duelId, action, itemId } = await request.json()
-  // action: 'attack' | 'heal' | 'surrender' | 'cancel' | 'opponent_timeout'
+  const { duelId, action, itemId, targetLineupId } = await request.json()
+  // action: 'attack' | 'heal' | 'switch' | 'surrender' | 'cancel' | 'opponent_timeout'
 
   const { data: duel } = await supabase
     .from('duels')
@@ -115,6 +115,75 @@ export async function POST(request: Request) {
       { user_id: userId,     session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: oppUserId, winner_name: surrenderProfileMap[oppUserId!] ?? null, my_creatures: surrenderMine, opp_creatures: surrenderOpp } },
     ]).then(undefined, () => {})
     return NextResponse.json({ ended: true, winnerId: oppUserId })
+  }
+
+  // ── Switch active creature (replaces this turn's attack) ─────────────────
+  // Player swaps their active creature for a non-fainted teammate. Status on
+  // both creatures is preserved on their respective lineup rows. Turn flips
+  // to the opponent (no auto-attack — the opponent plays their own turn next).
+  if (action === 'switch') {
+    if (duel.current_turn !== myRole) {
+      return NextResponse.json({ error: 'Non è il tuo turno' }, { status: 409 })
+    }
+    if (!targetLineupId) {
+      return NextResponse.json({ error: 'targetLineupId richiesto' }, { status: 400 })
+    }
+
+    const { data: switchLineups } = await supabase
+      .from('duel_lineups')
+      .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_url, rarity))')
+      .eq('duel_id', duelId)
+      .order('slot', { ascending: true })
+
+    if (!switchLineups || switchLineups.length < 2) {
+      return NextResponse.json({ error: 'Lineup non trovato' }, { status: 500 })
+    }
+
+    const myCurrentActive = switchLineups.find((l: any) => l.user_id === userId && l.is_active)
+    const targetLineup    = switchLineups.find((l: any) => l.id === targetLineupId && l.user_id === userId)
+
+    if (!targetLineup) return NextResponse.json({ error: 'Creatura non valida' }, { status: 404 })
+    if (targetLineup.is_active) return NextResponse.json({ error: 'Creatura già attiva' }, { status: 400 })
+    if (targetLineup.fainted_at) return NextResponse.json({ error: 'Creatura svenuta' }, { status: 400 })
+    if ((targetLineup.current_hp ?? 0) <= 0) return NextResponse.json({ error: 'Creatura senza HP' }, { status: 400 })
+
+    const myField = isChallenger ? 'challenger_creature_id' : 'opponent_creature_id'
+    const nextTurnSwitch: 'challenger' | 'opponent' = isChallenger ? 'opponent' : 'challenger'
+
+    await Promise.all([
+      myCurrentActive
+        ? supabase.from('duel_lineups').update({ is_active: false }).eq('id', myCurrentActive.id)
+        : Promise.resolve(),
+      supabase.from('duel_lineups').update({ is_active: true }).eq('id', targetLineupId),
+      supabase.from('duels').update({
+        [myField]: targetLineup.player_creature_id,
+        current_turn: nextTurnSwitch,
+      }).eq('id', duelId),
+    ])
+
+    const switchedToInfo = {
+      userId,
+      slot: targetLineup.slot,
+      playerCreatureId: targetLineup.player_creature_id,
+      name: (targetLineup as any).player_creatures?.creatures?.name ?? 'Creatura',
+    }
+
+    const switchCh = supabase.channel(`duel:${duelId}`)
+    await new Promise<void>(resolve => switchCh.subscribe(() => resolve()))
+    await switchCh.send({
+      type: 'broadcast',
+      event: 'duel_action',
+      payload: {
+        actorId: userId,
+        action: 'switch',
+        switchedTo: switchedToInfo,
+        nextTurn: nextTurnSwitch,
+        duelOver: false,
+      },
+    })
+    await supabase.removeChannel(switchCh)
+
+    return NextResponse.json({ switched: true, switchedTo: switchedToInfo, nextTurn: nextTurnSwitch })
   }
 
   // ── Heal ───────────────────────────────────────────────────────────────────

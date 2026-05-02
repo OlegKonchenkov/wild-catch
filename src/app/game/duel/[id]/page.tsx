@@ -296,6 +296,7 @@ export default function DuelPage() {
   const [playerLevels, setPlayerLevels]     = useState<Record<string, number>>({})
   const [completedMissions, setCompletedMissions] = useState<CompletedMissionInfo[]>([])
   const [showMissionModal, setShowMissionModal] = useState(false)
+  const [pendingSwitchLineupId, setPendingSwitchLineupId] = useState<string | null>(null)
   const [showDuelIntro, setShowDuelIntro] = useState(false)
   const duelIntroFiredRef = useRef(false)
   const stopDuelLoopRef   = useRef<(() => void) | null>(null)
@@ -704,6 +705,26 @@ export default function DuelPage() {
             if (nextTurn) setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
             setLog(prev => [`💚 Cura +${healAmount} HP`, ...prev.slice(0, 3)])
           })
+          return
+        }
+
+        // ── Voluntary switch broadcast ─────────────────────────────────────────
+        if (broadcastAction === 'switch') {
+          const sw = switchedTo
+          if (sw) {
+            const updateActive = (prev: LineupEntry[]) => prev.map(l => ({
+              ...l,
+              is_active: l.player_creature_id === sw.playerCreatureId,
+            }))
+            if (iAttacked) setMyLineup(updateActive)
+            else setOppLineup(updateActive)
+            setSwitchNotice(`${sw.name} entra in battaglia!`)
+            setTimeout(() => setSwitchNotice(null), 2500)
+          }
+          if (nextTurn) setMyRole(role => { setIsMyTurn(nextTurn === role); return role })
+          const actorLabel = iAttacked ? 'Tu' : 'Avversario'
+          setLog(prev => [`↻ ${actorLabel} ha cambiato creatura`, ...prev.slice(0, 3)])
+          releaseAttackFeedback(250)
           return
         }
 
@@ -1162,6 +1183,23 @@ export default function DuelPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ duelId: id, action: 'surrender' }),
     })
+  }
+
+  async function handleSwitch(lineupId: string) {
+    if (attackingRef.current || !isMyTurn) return
+    if (timerRef.current) clearInterval(timerRef.current)
+    autoFightRef.current = true
+    attackingRef.current = true
+    setAttacking(true)
+
+    await fetch('/api/game/duel/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duelId: id, action: 'switch', targetLineupId: lineupId }),
+    })
+    // Turn flip + lineup update driven by realtime broadcast
+    attackingRef.current = false
+    setAttacking(false)
   }
 
   const myActive    = myLineup.find(l => l.is_active)
@@ -1669,12 +1707,16 @@ export default function DuelPage() {
               const hpColor = hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444'
               const isActive = entry.is_active
               const isFainted = !!entry.fainted_at
+              const canSwitch = isMyTurn && !isActive && !isFainted && !attacking
               return (
-                <div key={entry.id} className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-xl transition-all"
+                <div key={entry.id}
+                  onClick={() => canSwitch && setPendingSwitchLineupId(entry.id)}
+                  className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-xl transition-all"
                   style={{
                     background: isActive ? 'rgba(255,255,255,0.1)' : isFainted ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
-                    border: isActive ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.07)',
+                    border: isActive ? '1px solid rgba(255,255,255,0.22)' : canSwitch ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.07)',
                     opacity: isFainted ? 0.35 : 1,
+                    cursor: canSwitch ? 'pointer' : 'default',
                   }}>
                   {cr.image_url ? (
                     <img src={cr.image_url} alt={cr.name} className="w-6 h-6 object-contain shrink-0"
@@ -1689,6 +1731,7 @@ export default function DuelPage() {
                     </div>
                   </div>
                   {isActive && !isFainted && <div className="w-1.5 h-1.5 rounded-full bg-white/60 shrink-0" />}
+                  {canSwitch && <span className="text-[9px] text-white/50 shrink-0">↻</span>}
                   {isFainted && <span className="text-[9px] text-red-400/60 shrink-0 font-bold">✕</span>}
                 </div>
               )
@@ -1908,6 +1951,62 @@ export default function DuelPage() {
             ))}
           </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* ── SWITCH CONFIRM MODAL ── */}
+      <AnimatePresence>
+        {pendingSwitchLineupId && (() => {
+          const entry = myLineup.find(l => l.id === pendingSwitchLineupId)
+          const cr = entry?.player_creatures?.creatures
+          if (!entry || !cr) return null
+          return (
+            <motion.div
+              key="switch-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 flex items-end justify-center pb-10"
+              style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setPendingSwitchLineupId(null)}
+            >
+              <motion.div
+                initial={{ y: 40, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 40, opacity: 0 }}
+                className="bg-[#111827] rounded-3xl px-6 py-5 mx-4 w-full max-w-sm"
+                style={{ border: '1px solid rgba(255,255,255,0.12)' }}
+                onClick={e => e.stopPropagation()}
+              >
+                <p className="text-white/60 text-sm text-center mb-3">Cambia creatura?</p>
+                {cr.image_url && (
+                  <img src={cr.image_url} alt={cr.name} className="w-16 h-16 object-contain mx-auto mb-2" />
+                )}
+                <p className="text-white font-bold text-center text-lg mb-1">{cr.name}</p>
+                <p className="text-white/40 text-xs text-center mb-4">Passerai il turno all&apos;avversario</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPendingSwitchLineupId(null)}
+                    className="flex-1 py-3 rounded-2xl text-white/50 text-sm font-semibold"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    onClick={() => {
+                      const lid = pendingSwitchLineupId
+                      setPendingSwitchLineupId(null)
+                      void handleSwitch(lid)
+                    }}
+                    className="flex-1 py-3 rounded-2xl text-white font-bold text-sm"
+                    style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}
+                  >
+                    ↻ Cambia
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )
+        })()}
       </AnimatePresence>
     </div>
   )

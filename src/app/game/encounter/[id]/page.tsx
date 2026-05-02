@@ -864,9 +864,8 @@ export default function EncounterPage() {
     setMessage(`${outgoingName} torna indietro!`)
     setIsCritMessage(false)
 
-    // Brief "leaving" animation on the outgoing creature
-    setPlayerFainting(true)
-    await new Promise(r => setTimeout(r, 320))
+    // Brief pause so the "torna indietro" message is visible before swap
+    await new Promise(r => setTimeout(r, 300))
 
     // Swap the active creature locally
     setActiveSlot(targetSlot)
@@ -883,7 +882,6 @@ export default function EncounterPage() {
     setPlayerHp(targetHp)
     setPlayerStatus(null)
     setPlayerStatusTurns(0)
-    setPlayerFainting(false)
     setMessage(`Vai, ${incomingName}!`)
     await new Promise(r => setTimeout(r, 400))
 
