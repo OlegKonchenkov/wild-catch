@@ -139,12 +139,13 @@ async function updateWalkMissions(
   )
   if (!unlockedWalkMissions.length) return []
 
-  // Load existing player_missions entries
+  // Load existing player_missions entries — scoped to this session (migration 027)
   const missionIds = unlockedWalkMissions.map(m => m.id)
   const { data: playerMissions } = await supabase
     .from('player_missions')
     .select('id, mission_id, progress, completed_at')
     .eq('user_id', userId)
+    .eq('session_id', sessionId)
     .in('mission_id', missionIds)
 
   type PlayerMissionProgressRow = { id: string; mission_id: string; progress: number; completed_at: string | null }
@@ -164,6 +165,7 @@ async function updateWalkMissions(
       const justCompleted = newProgress >= mission.target_count
       const { error: insertErr } = await supabase.from('player_missions').insert({
         user_id: userId,
+        session_id: sessionId,
         mission_id: mission.id,
         progress: newProgress,
         ...(justCompleted ? { completed_at: new Date().toISOString() } : {}),

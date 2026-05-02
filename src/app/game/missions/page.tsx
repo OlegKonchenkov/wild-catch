@@ -413,6 +413,7 @@ export default function MissionsPage() {
             .from('player_missions')
             .select('mission_id, progress, completed_at')
             .eq('user_id', user.id)
+            .eq('session_id', sessionId)
             .in('mission_id', missionIds),
           supabase
             .from('player_sessions')

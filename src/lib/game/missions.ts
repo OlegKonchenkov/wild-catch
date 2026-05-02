@@ -76,12 +76,14 @@ export async function incrementMissionProgress({
   )
   if (!unlockedMatching.length) return []
 
-  // Load existing player_missions entries
+  // Load existing player_missions entries — scoped to this session so global
+  // missions can be replayed in a new session (migration 027).
   const missionIds = unlockedMatching.map(m => m.id)
   const { data: playerMissions } = await admin
     .from('player_missions')
     .select('id, mission_id, progress, completed_at')
     .eq('user_id', userId)
+    .eq('session_id', sessionId)
     .in('mission_id', missionIds)
 
   const pmMap: Record<string, PlayerMissionProgressRow> = Object.fromEntries(
@@ -92,7 +94,7 @@ export async function incrementMissionProgress({
 
   for (const mission of unlockedMatching) {
     const existing = pmMap[mission.id]
-    if (existing?.completed_at) continue  // already completed
+    if (existing?.completed_at) continue  // already completed in this session
 
     const newProgress = (existing?.progress ?? 0) + 1
     const justCompleted = newProgress >= mission.target_count
@@ -100,6 +102,7 @@ export async function incrementMissionProgress({
     if (!existing) {
       await admin.from('player_missions').insert({
         user_id: userId,
+        session_id: sessionId,
         mission_id: mission.id,
         progress: newProgress,
         ...(justCompleted ? { completed_at: new Date().toISOString() } : {}),
@@ -173,6 +176,8 @@ export async function loadMissionUnlockContext(
           .eq('user_id', userId)
           .in('mission_id', prerequisiteIds)
           .not('completed_at', 'is', null)
+          // Intentionally cross-session: completing a prerequisite in any session
+          // should unlock the next mission in a new session too.
       : Promise.resolve({ data: [] }),
     prerequisiteIds.length
       ? admin

@@ -45,12 +45,17 @@ export async function POST(request: Request) {
 
   // Track whether this is the first unique scan for this user.
   // Generic QR missions advance only on the first unique QR scan.
-  const { data: existingScan } = await supabase
+  // For global QRs (session_id IS NULL) dedup is per-session so they can be
+  // scanned again in a fresh session (migration 027).
+  let scanCheckQuery = supabase
     .from('qr_scan_log')
     .select('id')
     .eq('qr_id', qr.id)
     .eq('user_id', user.id)
-    .maybeSingle()
+  if (!qr.session_id) {
+    scanCheckQuery = scanCheckQuery.eq('session_id', sessionId)
+  }
+  const { data: existingScan } = await scanCheckQuery.maybeSingle()
 
   if (qr.unique_per_user && existingScan) {
     return NextResponse.json({ error: 'Hai già riscattato questo QR', alreadyScanned: true }, { status: 409 })
