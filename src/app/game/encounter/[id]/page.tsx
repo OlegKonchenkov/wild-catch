@@ -11,6 +11,8 @@ import AttackAnimation from '@/components/battle/AttackAnimation'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
 import { track } from '@/lib/analytics'
+import { haptics } from '@/lib/haptics'
+import { useWakeLock } from '@/hooks/useWakeLock'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
@@ -320,6 +322,10 @@ export default function EncounterPage() {
   const { id } = useParams<{ id: string }>()
   const router  = useRouter()
   const supabase = useMemo(() => createClient(), [])
+
+  // Keep the screen on during battle — losing focus mid-encounter is worse
+  // here than on the map (combat state in flight).
+  useWakeLock(true)
 
   const [state, setState]       = useState<EncounterState | null>(null)
   const [loadError, setLoadError] = useState(false)
@@ -1087,6 +1093,7 @@ export default function EncounterPage() {
       setMessage('')
       setWildAnim('catch')
       playCatchSuccess()
+      haptics.catchSuccess()
       setShowCatchSuccess(true)
       await new Promise(r => setTimeout(r, 1800))
       setShowCatchSuccess(false)
@@ -1123,6 +1130,7 @@ export default function EncounterPage() {
     } else if (data.fled) {
       setCatchPhase('idle')
       playFlee()
+      haptics.catchFail()
       setWildAnim('flee'); setMessage('La creatura è fuggita...'); setResult('fled')
       {
         const sid = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null

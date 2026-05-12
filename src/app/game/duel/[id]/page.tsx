@@ -3,6 +3,8 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
+import { useWakeLock } from '@/hooks/useWakeLock'
+import { haptics } from '@/lib/haptics'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import AttackAnimation from '@/components/battle/AttackAnimation'
@@ -270,6 +272,8 @@ function formatFortuneText(fortune: CombatFortuneInfo | null | undefined): strin
 export default function DuelPage() {
   const { id } = useParams<{ id: string }>()
   const router  = useRouter()
+
+  useWakeLock(true)
 
   const [loading, setLoading]               = useState(true)
   const [duel, setDuel]                     = useState<any>(null)

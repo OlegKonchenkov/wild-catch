@@ -3,6 +3,8 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentUser } from "@/lib/supabase/client-user";
+import { useWakeLock } from "@/hooks/useWakeLock";
+import { haptics } from "@/lib/haptics";
 import { motion, AnimatePresence } from "framer-motion";
 import CreatureSprite from "@/components/creature/CreatureSprite";
 import AttackAnimation from "@/components/battle/AttackAnimation";
@@ -2099,6 +2101,8 @@ export default function BossFightPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+
+  useWakeLock(true);
 
   const [fight, setFight] = useState<any>(null);
   const [loading, setLoading] = useState(true);

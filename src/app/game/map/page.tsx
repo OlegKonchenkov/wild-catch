@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
+import { useWakeLock } from '@/hooks/useWakeLock'
+import { haptics } from '@/lib/haptics'
 import { useGPS } from '@/hooks/useGPS'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import CreatureSprite from '@/components/creature/CreatureSprite'
@@ -1429,6 +1431,10 @@ function MapPageInner() {
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
 
+  // Keep the screen awake while the map is mounted — outdoor play would
+  // otherwise lose the GPS marker and any in-flight encounter modals.
+  useWakeLock(true)
+
   useEffect(() => {
     function init(sid: string) {
       starterCheckedRef.current = false
@@ -1620,6 +1626,7 @@ function MapPageInner() {
         }))
         setPendingEncounter(data)
         playEncounterSound()
+        haptics.encounter()
         setShowEncounterPopup(true)
         encounterPopupRef.current = true
         track('encounter_started', {
@@ -1678,6 +1685,7 @@ function MapPageInner() {
 
     if (data.eggsHatched?.length > 0) {
       setHatchQueue(prev => [...prev, ...data.eggsHatched])
+      haptics.hatch()
       for (const egg of data.eggsHatched as Array<{ rarity: string }>) {
         track('egg_hatched', { sessionId: sid, eggRarity: 'unknown', resultRarity: egg.rarity ?? 'unknown' })
       }
@@ -1685,6 +1693,7 @@ function MapPageInner() {
 
     if (data.completedMissions?.length > 0) {
       setMissionQueue(prev => [...prev, ...data.completedMissions])
+      haptics.missionDone()
       for (const m of data.completedMissions as Array<CompletedMissionInfo>) {
         track('mission_completed', {
           sessionId: sid,
