@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'rea
 import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 import { useGPS } from '@/hooks/useGPS'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import CreatureSprite from '@/components/creature/CreatureSprite'
@@ -1444,7 +1445,7 @@ function MapPageInner() {
       supabase.from('sessions').select('*').eq('id', sid).single()
         .then(({ data }) => { if (data) setSession(data as unknown as Session) })
       // Load esca status
-      supabase.auth.getUser().then(({ data: { user } }) => {
+      getCurrentUser(supabase).then(user => {
         if (!user) return
         supabase.from('player_sessions')
           .select('esca_active_until, selected_creature_id, steps_walked')

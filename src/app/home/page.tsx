@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import PrivacyPolicyModal from '@/components/legal/PrivacyPolicyModal'
@@ -125,7 +126,7 @@ function HomeLobby() {
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getCurrentUser(supabase).then(user => {
       if (!user) { router.replace('/'); return }
       setUser(user)
       loadData()

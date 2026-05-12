@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Rarity, Element } from '@/lib/types'
 import CreatureSprite from '@/components/creature/CreatureSprite'
@@ -26,7 +27,7 @@ function useHistory(supabase: ReturnType<typeof createClient>) {
   useEffect(() => {
     async function load() {
       const sessionId = localStorage.getItem('current_session_id')
-      const { data: { user } } = await supabase.auth.getUser()
+      const user = await getCurrentUser(supabase)
       if (!user || !sessionId) { setLoading(false); return }
 
       const [duelsRes, bossRes] = await Promise.all([
@@ -134,7 +135,7 @@ export default function DuelLobbyPage() {
 
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getCurrentUser(supabase).then(user => {
       if (!user || !sessionId) { setLoadingCreatures(false); return }
       setMyUserId(user.id)
       // Check for an active duel the user can rejoin

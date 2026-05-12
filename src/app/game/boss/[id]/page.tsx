@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getCurrentUser } from "@/lib/supabase/client-user";
 import { motion, AnimatePresence } from "framer-motion";
 import CreatureSprite from "@/components/creature/CreatureSprite";
 import AttackAnimation from "@/components/battle/AttackAnimation";
@@ -2521,11 +2522,9 @@ export default function BossFightPage() {
 
     async function load() {
       try {
-        const [fightRes, authRes] = await Promise.all([
+        const [fightRes, user] = await Promise.all([
           fetch(`/api/game/boss/${id}`),
-          sessionId
-            ? supabase.auth.getUser()
-            : Promise.resolve({ data: { user: null } }),
+          sessionId ? getCurrentUser(supabase) : Promise.resolve(null),
         ]);
         if (!fightRes.ok) {
           setError("Boss fight non trovato");
@@ -2550,7 +2549,6 @@ export default function BossFightPage() {
           addLog("Battaglia in corso...");
         }
 
-        const user = authRes.data.user;
         if (sessionId && user) {
           const [crRes, invRes, lvRes] = await Promise.all([
             supabase

@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 import type { Mission } from '@/lib/types'
 import { getMissionUnlockState, type MissionUnlockState } from '@/lib/game/mission-unlocks'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
@@ -397,15 +398,13 @@ export default function MissionsPage() {
     if (!sessionId) { setLoading(false); return }
 
     async function load() {
-      const [missRes, userRes] = await Promise.all([
+      const [missRes, user] = await Promise.all([
         supabase.from('missions').select('*').or(`session_id.eq.${sessionId},session_id.is.null`).order('chapter_order'),
-        supabase.auth.getUser(),
+        getCurrentUser(supabase),
       ])
 
       const missionList = (missRes.data ?? []) as Mission[]
       setMissions(missionList)
-
-      const user = userRes.data.user
       if (user && missionList.length > 0) {
         const missionIds = missionList.map(m => m.id)
         const [{ data: pm }, { data: ps }] = await Promise.all([

@@ -9,6 +9,7 @@ import { playCatchAttempt, playCatchFail, playCatchSuccess } from '@/lib/game/so
 import { playKnockout, playFlee, playDefeat, playMissionComplete } from '@/lib/game/sounds/events'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
@@ -425,7 +426,7 @@ export default function EncounterPage() {
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
     if (!sessionId) return
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getCurrentUser(supabase).then(user => {
       if (!user) return
       supabase.from('player_inventory')
         .select('id, quantity, items(id, name, type, effect_value)')

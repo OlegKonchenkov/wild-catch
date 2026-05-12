@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
@@ -133,7 +134,7 @@ export default function BestiaryPage() {
       finish()
     })
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getCurrentUser(supabase).then(user => {
       if (!user) { finish(); finish(); return }
       userIdRef.current = user.id
 
@@ -240,7 +241,7 @@ export default function BestiaryPage() {
     const data = await res.json()
     if (res.ok) {
       // Refresh collection
-      const user = (await supabase.auth.getUser()).data.user
+      const user = await getCurrentUser(supabase)
       if (user) {
         const { data: refreshed } = await supabase
           .from('player_creatures').select('*, creatures(*)')

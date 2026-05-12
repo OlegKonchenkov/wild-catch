@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 import type { ItemType } from '@/lib/types'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
@@ -362,7 +363,7 @@ export default function BackpackPage() {
     if (!sessionId) { setLoading(false); return }
     sessionRef.current = sessionId
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getCurrentUser(supabase).then(user => {
       if (!user) { setLoading(false); return }
       userIdRef.current = user.id
 

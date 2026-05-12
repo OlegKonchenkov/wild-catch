@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 
 interface LogOpts {
   sessionId: string
@@ -15,7 +16,7 @@ interface LogOpts {
 export function logSessionErrorClient(opts: LogOpts): void {
   try {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getCurrentUser(supabase).then(user => {
       supabase.from('session_errors').insert({
         session_id: opts.sessionId,
         user_id:    user?.id ?? null,

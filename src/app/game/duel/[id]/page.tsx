@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import AttackAnimation from '@/components/battle/AttackAnimation'
@@ -482,10 +483,10 @@ export default function DuelPage() {
         const sessionId = localStorage.getItem('current_session_id')
         const [
           { data: duelData },
-          { data: { user } },
+          user,
         ] = await Promise.all([
           supabase.from('duels').select('*').eq('id', id).single(),
-          supabase.auth.getUser(),
+          getCurrentUser(supabase),
         ])
 
         if (cancelled || !duelData) return
@@ -913,7 +914,7 @@ export default function DuelPage() {
             if (updated.winner_id === null) {
               setResult('cancelled')
             } else {
-              supabase.auth.getUser().then(({ data: { user } }) => {
+              getCurrentUser(supabase).then(user => {
                 const didWin = updated.winner_id === user?.id
                 setResult(didWin ? 'won' : 'lost')
                 if (didWin) playVictory(); else playDefeat()
@@ -937,7 +938,7 @@ export default function DuelPage() {
                 .order('slot', { ascending: true })
                 .then(({ data: freshLineups }) => {
                   if (!freshLineups) return
-                  supabase.auth.getUser().then(({ data: { user } }) => {
+                  getCurrentUser(supabase).then(user => {
                     if (!user) return
                     const mine = freshLineups.filter((l: LineupEntry) => l.user_id === user.id)
                     const opp  = freshLineups.filter((l: LineupEntry) => l.user_id !== user.id)

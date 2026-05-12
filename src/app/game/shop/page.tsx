@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 import type { Item, ItemType } from '@/lib/types'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
@@ -33,7 +34,7 @@ export default function ShopPage() {
     try {
       const [itemsRes, user] = await Promise.all([
         supabase.from('items').select('*').gt('shop_price', 0).order('type').order('shop_price'),
-        supabase.auth.getUser().then(r => r.data.user),
+        getCurrentUser(supabase),
       ])
       if (itemsRes.data) setItems(itemsRes.data as unknown as Item[])
       if (user && sessionId) {

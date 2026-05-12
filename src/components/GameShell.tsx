@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUser } from '@/lib/supabase/client-user'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import { getExpProgress } from '@/lib/game/leveling'
@@ -183,7 +184,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const initRef = useRef(false)
 
   function loadSessionData(sid: string) {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getCurrentUser(supabase).then(user => {
       if (!user) { setStatsLoading(false); return }
       setUserId(user.id)
       Promise.all([
