@@ -7,9 +7,31 @@ import { NextResponse } from 'next/server'
 // Once those env vars are set (free tier covers a small event app comfortably),
 // the configured budgets below take effect with no further code changes.
 
-const url   = process.env.UPSTASH_REDIS_REST_URL
-const token = process.env.UPSTASH_REDIS_REST_TOKEN
-const enabled = Boolean(url && token)
+// Strip whitespace plus optional surrounding single/double quotes — Upstash's
+// dashboard shows values formatted as `KEY="https://..."` (valid in .env files
+// but a footgun when pasted verbatim into Vercel's env-var UI, which treats
+// the entire string as the literal value).
+function cleanEnv(raw: string | undefined): string | undefined {
+  if (!raw) return undefined
+  const trimmed = raw.trim()
+  if (trimmed.length >= 2) {
+    const first = trimmed[0]
+    const last  = trimmed[trimmed.length - 1]
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      return trimmed.slice(1, -1).trim()
+    }
+  }
+  return trimmed
+}
+
+const url   = cleanEnv(process.env.UPSTASH_REDIS_REST_URL)
+const token = cleanEnv(process.env.UPSTASH_REDIS_REST_TOKEN)
+// Sanity-check the URL — a malformed env value should NOT crash production
+// builds. If parsing fails, fall back to "rate limiting disabled".
+let enabled = false
+if (url && token) {
+  try { new URL(url); enabled = true } catch { /* leave disabled */ }
+}
 
 const redis = enabled ? new Redis({ url: url!, token: token! }) : null
 
