@@ -1374,6 +1374,10 @@ function MapPageInner() {
   const [starters, setStarters] = useState<StarterCreature[]>([])
   const [starterPicked, setStarterPicked] = useState<StarterCreature | null>(null)
   const [starterCheckPending, setStarterCheckPending] = useState(true)
+  // 'pending' until player_sessions loads; then 'has' (skip starter API entirely)
+  // or 'missing' (run the starter API check). Gates the starter effect so it
+  // doesn't race the player_sessions fetch and waste a round-trip.
+  const [hasSelectedCreatureCheck, setHasSelectedCreatureCheck] = useState<'pending' | 'has' | 'missing'>('pending')
   const starterCheckedRef = useRef(false)
   const starterFlowLockedRef = useRef(true)
   const sessionEndedRef = useRef(false)
@@ -1432,6 +1436,7 @@ function MapPageInner() {
       localStorage.setItem('current_session_id', sid)
       setSession(null)
       setStarterCheckPending(true)
+      setHasSelectedCreatureCheck('pending')
       setShowStarterSelect(false)
       setStarters([])
       setStarterPicked(null)
@@ -1454,7 +1459,10 @@ function MapPageInner() {
             if (typeof data?.steps_walked === 'number') {
               setStepsWalked(data.steps_walked)
             }
-            // Load selected creature image
+            // Signal the starter effect: returning players (selected_creature_id
+            // already set) skip the /api/game/starters round-trip and unblock the
+            // skeleton immediately. Brand-new sessions still hit the API.
+            setHasSelectedCreatureCheck(data?.selected_creature_id ? 'has' : 'missing')
             if (data?.selected_creature_id) {
               supabase.from('player_creatures')
                 .select('creatures(image_url)')
@@ -1843,11 +1851,21 @@ function MapPageInner() {
     return () => clearInterval(t)
   }, [escaActiveUntil])
 
-  // Check if player needs to pick a starter (first time in session)
+  // Check if player needs to pick a starter (first time in session).
+  // Waits for player_sessions to resolve — returning players (hasSelectedCreatureCheck === 'has')
+  // skip the API call entirely, unblocking the skeleton ~1 round-trip earlier.
   useEffect(() => {
     if (!sessionId || !starterSessionStatus || starterCheckedRef.current) return
+    if (hasSelectedCreatureCheck === 'pending') return
 
     if (!['ready', 'active'].includes(starterSessionStatus)) {
+      starterCheckedRef.current = true
+      setStarterCheckPending(false)
+      setShowStarterSelect(false)
+      return
+    }
+
+    if (hasSelectedCreatureCheck === 'has') {
       starterCheckedRef.current = true
       setStarterCheckPending(false)
       setShowStarterSelect(false)
@@ -1866,7 +1884,7 @@ function MapPageInner() {
       })
       .catch(() => {})
       .finally(() => setStarterCheckPending(false))
-  }, [sessionId, starterSessionStatus])
+  }, [sessionId, starterSessionStatus, hasSelectedCreatureCheck])
 
   // Realtime broadcast: session_ended / session_restarted from admin
   useEffect(() => {
