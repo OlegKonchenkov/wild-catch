@@ -5,6 +5,7 @@ import { isWithinBounds, haversineDistance, parsePoint } from '@/lib/game/anti-c
 import { loadMissionUnlockContext } from '@/lib/game/missions'
 import { getMissionUnlockState } from '@/lib/game/mission-unlocks'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { evaluateStep, shouldRollEncounter } from '@/lib/game/step-counter'
 
 type SupabaseLike = ReturnType<typeof createAdminClient>
 
@@ -70,44 +71,23 @@ export async function POST(request: Request) {
 
   const distanceMoved = prevPos ? haversineDistance(prevPos, currentPos) : 0
 
-  // ── Step counting / encounter trigger filters ─────────────────────────────
-  // Goal: count only real walking, never GPS jitter. Industry-standard fitness
-  // filters reject fixes whose reported accuracy is comparable to or larger
-  // than the observed displacement — a "move" of 8 m with ±25 m accuracy is
-  // statistically noise, not a step.
-  const ACCURACY_MAX_FOR_STEPS = 50    // m — reject lower-quality fixes
-  const ACCURACY_MAX_FOR_BASELINE = 100 // m — corrupted baselines drift forever
-  const STEP_MIN_M  = 3                // jitter floor
-  const STEP_MAX_M  = 100              // hard upper bound for a single 5s interval
-  const STEP_SNR    = 0.8              // distance must exceed 0.8 × accuracy
-  const MAX_SPEED_MPS = 4              // ≈ 14.4 km/h — running upper bound
-
-  const acc = typeof accuracy === 'number' ? accuracy : Infinity
+  // All step-counting / SNR / velocity filtering lives in step-counter.ts —
+  // see src/lib/game/__tests__/step-counter.test.ts for the contract.
   const nowMs = Date.now()
   const lastPositionAtMs = playerSession.last_position_at
     ? new Date(playerSession.last_position_at).getTime()
     : null
-  // Implied speed since the previous persisted fix. If we have no timestamp
-  // (first fix or pre-migration row) the velocity gate is bypassed.
   const elapsedMs = lastPositionAtMs ? Math.max(1, nowMs - lastPositionAtMs) : null
-  const impliedSpeedMps = elapsedMs ? distanceMoved / (elapsedMs / 1000) : 0
-  const speedOk = !elapsedMs || impliedSpeedMps <= MAX_SPEED_MPS
 
-  const validStep =
-    session.status === 'active' &&
-    inBounds &&
-    acc <= ACCURACY_MAX_FOR_STEPS &&
-    distanceMoved >= STEP_MIN_M &&
-    distanceMoved <= STEP_MAX_M &&
-    distanceMoved > acc * STEP_SNR &&
-    speedOk
-
-  const stepsIncrement = validStep ? Math.round(distanceMoved) : 0
+  const step = evaluateStep({
+    distanceMoved,
+    accuracy: typeof accuracy === 'number' ? accuracy : Infinity,
+    elapsedMs,
+    sessionStatus: session.status,
+    inBounds,
+  })
+  const { validStep, stepsIncrement, shouldUpdateBaseline } = step
   const newStepsWalked = (playerSession.steps_walked ?? 0) + stepsIncrement
-
-  // Only refresh the baseline when accuracy is reasonable — otherwise a single
-  // bad fix would poison every subsequent distance computation.
-  const shouldUpdateBaseline = acc <= ACCURACY_MAX_FOR_BASELINE
 
   if (shouldUpdateBaseline) {
     await supabase
@@ -142,7 +122,7 @@ export async function POST(request: Request) {
 
   // Encounter trigger: piggy-backs on the same anti-noise filter as steps.
   // A "move" we wouldn't count as walking shouldn't spawn an encounter either.
-  const triggerEncounter = validStep && distanceMoved >= 5 && Math.random() < 0.30
+  const triggerEncounter = shouldRollEncounter(step, distanceMoved) && Math.random() < 0.30
 
   // Return validated distance only — the client uses this for its fallback
   // encounter accumulator (cumDistRef), which must not grow on rejected fixes.
