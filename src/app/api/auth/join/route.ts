@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
   // Auth check via user client (RLS)
@@ -9,6 +10,9 @@ export async function POST(request: Request) {
   if (authError || !user) {
     return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
   }
+
+  const rl = await rateLimit('auth_join', user.id)
+  if (!rl.success) return rateLimitResponse(rl.reset)
 
   const body = await request.json().catch(() => ({}))
   const { code } = body

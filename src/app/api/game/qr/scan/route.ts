@@ -4,11 +4,15 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
 import { scaleCombatStats } from '@/lib/game/combat'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+
+  const rl = await rateLimit('qr_scan', user.id)
+  if (!rl.success) return rateLimitResponse(rl.reset)
 
   const body = await request.json().catch(() => ({}))
   const { qrId, sessionId } = body

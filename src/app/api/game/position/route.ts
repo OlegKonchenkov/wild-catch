@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isWithinBounds, haversineDistance, parsePoint } from '@/lib/game/anti-cheat'
 import { loadMissionUnlockContext } from '@/lib/game/missions'
 import { getMissionUnlockState } from '@/lib/game/mission-unlocks'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 type SupabaseLike = ReturnType<typeof createAdminClient>
 
@@ -11,6 +12,9 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+
+  const rl = await rateLimit('position', user.id)
+  if (!rl.success) return rateLimitResponse(rl.reset)
 
   const body = await request.json().catch(() => ({}))
   const { lat, lng, accuracy, sessionId } = body
