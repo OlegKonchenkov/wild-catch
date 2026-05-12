@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
+// Generated Database types intentionally not applied here — see client.ts note.
 export async function createClient() {
   const cookieStore = await cookies()
   return createServerClient(

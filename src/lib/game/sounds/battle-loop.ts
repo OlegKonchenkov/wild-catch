@@ -11,6 +11,8 @@
  * Audio suspends when the PWA goes to background (visibilitychange).
  */
 
+import { newAudioContext } from './shared-ac'
+
 // ── Shared percussion ─────────────────────────────────────────────────────────
 
 function kick(ac: AudioContext, t: number, vol: number): void {
@@ -86,13 +88,10 @@ function startBattleLoop(
 ): () => void {
   if (typeof window === 'undefined') return () => {}
 
-  let ac: AudioContext | null = null
+  const ac = newAudioContext()
   let stopped = false
   const timers: ReturnType<typeof setTimeout>[] = []
 
-  try {
-    ac = new ((window as any).AudioContext || (window as any).webkitAudioContext)()
-  } catch { return () => {} }
   if (!ac) return () => {}
   const actx: AudioContext = ac
 
@@ -245,9 +244,7 @@ export function startEncounterLoop(vol = 0.12): () => void {
   let stopped = false
   const timers: ReturnType<typeof setTimeout>[] = []
 
-  try {
-    _ac = new ((window as any).AudioContext || (window as any).webkitAudioContext)()
-  } catch { return () => {} }
+  _ac = newAudioContext()
   if (!_ac) return () => {}
   const ac: AudioContext = _ac
 

@@ -25,6 +25,19 @@
 let _ac: AudioContext | null = null
 let _nextSoundAt = 0  // AudioContext time (seconds) when next queued sound may start
 
+// ── AudioContext constructor helper ───────────────────────────────────────────
+// Resolves the standard AudioContext on every browser, including the
+// webkit-prefixed legacy build still used by older iOS Safari.
+type ACCtor = new () => AudioContext
+
+export function newAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  const w = window as Window & { AudioContext?: ACCtor; webkitAudioContext?: ACCtor }
+  const Ctor = w.AudioContext ?? w.webkitAudioContext
+  if (!Ctor) return null
+  try { return new Ctor() } catch { return null }
+}
+
 // ── AudioContext unlock (mobile autoplay policy) ──────────────────────────────
 // iOS/Android block AudioContext.resume() outside a user-gesture handler.
 // We register one-time capture listeners so the first tap/click resumes the AC.
@@ -64,13 +77,10 @@ export function getSharedAC(): AudioContext | null {
   if (typeof window === 'undefined') return null
 
   if (!_ac || _ac.state === 'closed') {
-    try {
-      const fresh: AudioContext = new ((window as any).AudioContext || (window as any).webkitAudioContext)()
-      _ac = fresh
-      _scheduleUnlock(fresh)
-    } catch {
-      return null
-    }
+    const fresh = newAudioContext()
+    if (!fresh) return null
+    _ac = fresh
+    _scheduleUnlock(fresh)
   }
 
   // Browser may suspend the context after user leaves the page then returns

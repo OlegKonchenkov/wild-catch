@@ -14,6 +14,8 @@
  *   unduckMapAmbience(rampMs?)         – smoothly restore full volume
  */
 
+import { newAudioContext } from './shared-ac'
+
 // ── Melody data ────────────────────────────────────────────────────────────────
 // G major pentatonic: G4=392 A4=440 B4=493.88 D5=587.33 E5=659.25 G5=783.99
 const MELODY: [number, number][] = [
@@ -146,15 +148,10 @@ export function unduckMapAmbience(rampMs = 900): void {
 export function startMapAmbience(vol = 0.12): () => void {
   if (typeof window === 'undefined') return () => {}
 
-  let ac: AudioContext | null = null
+  const ac = newAudioContext()
   let stopped = false
   const timers: ReturnType<typeof setTimeout>[] = []
 
-  try {
-    ac = new ((window as any).AudioContext || (window as any).webkitAudioContext)()
-  } catch {
-    return () => {}
-  }
   if (!ac) return () => {}
   const actx: AudioContext = ac
 
