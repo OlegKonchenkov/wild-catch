@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
+import { identify, resetIdentity, track } from '@/lib/analytics'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import PrivacyPolicyModal from '@/components/legal/PrivacyPolicyModal'
@@ -129,6 +130,7 @@ function HomeLobby() {
     getCurrentUser(supabase).then(user => {
       if (!user) { router.replace('/'); return }
       setUser(user)
+      identify(user.id, { email: user.email })
       loadData()
     })
   }, [supabase, router])
@@ -189,6 +191,7 @@ function HomeLobby() {
     }
 
     localStorage.setItem('current_session_id', data.sessionId)
+    track('session_joined', { sessionId: data.sessionId })
     window.location.assign(`/game/map?restored=${data.sessionId}`)
   }
 
@@ -210,12 +213,14 @@ function HomeLobby() {
     setDeleting(true)
     localStorage.removeItem('current_session_id')
     await fetch('/api/profile', { method: 'DELETE' })
+    resetIdentity()
     await supabase.auth.signOut()
     router.replace('/')
   }
 
   async function handleSignOut() {
     localStorage.removeItem('current_session_id')
+    resetIdentity()
     await supabase.auth.signOut()
     router.replace('/')
   }

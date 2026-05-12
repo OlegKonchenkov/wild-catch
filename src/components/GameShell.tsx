@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
+import { track } from '@/lib/analytics'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import { getExpProgress } from '@/lib/game/leveling'
@@ -474,6 +475,8 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         playLevelUp()
         setLevelUpInfo(detail)
         setTimeout(() => setLevelUpInfo(null), 4000)
+        const sid = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null
+        if (sid) track('level_up', { sessionId: sid, newLevel: detail.newLevel })
       }
     }
     window.addEventListener('wc:level-up', onLevelUp)

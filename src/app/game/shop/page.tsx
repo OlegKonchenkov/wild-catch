@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
+import { track } from '@/lib/analytics'
 import type { Item, ItemType } from '@/lib/types'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
@@ -63,6 +64,7 @@ export default function ShopPage() {
       const data = await res.json()
       if (res.ok) {
         setGold(data.remainingGold)
+        track('shop_purchase', { sessionId, itemId: item.id, itemType: item.type, price: item.shop_price })
         showSuccess(`${TYPE_META[item.type].icon} ${item.name} acquistato!`)
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
         window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))

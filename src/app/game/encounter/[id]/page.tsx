@@ -10,6 +10,7 @@ import { playKnockout, playFlee, playDefeat, playMissionComplete } from '@/lib/g
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
+import { track } from '@/lib/analytics'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
@@ -1098,6 +1099,24 @@ export default function EncounterPage() {
       setCaughtGoldGain(data.goldGain ?? 0)
       if (data.completedMissions?.length) setCompletedMissions(data.completedMissions)
       setResult(data.evolved ? 'evolved' : 'caught')
+      {
+        const sid = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null
+        if (sid) {
+          track('creature_caught', {
+            sessionId: sid,
+            creatureId,
+            rarity: state.creature?.rarity ?? 'unknown',
+            element: state.creature?.element ?? 'unknown',
+            isNew: !!data.isNew,
+          })
+          track('encounter_resolved', {
+            sessionId: sid,
+            outcome: 'caught',
+            turns: state.turns ?? 0,
+            creatureRarity: state.creature?.rarity ?? 'unknown',
+          })
+        }
+      }
       if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
       window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       window.dispatchEvent(new CustomEvent('wc:refresh-bestiary'))
@@ -1105,6 +1124,17 @@ export default function EncounterPage() {
       setCatchPhase('idle')
       playFlee()
       setWildAnim('flee'); setMessage('La creatura è fuggita...'); setResult('fled')
+      {
+        const sid = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null
+        if (sid) {
+          track('encounter_resolved', {
+            sessionId: sid,
+            outcome: 'fled',
+            turns: state.turns ?? 0,
+            creatureRarity: state.creature?.rarity ?? 'unknown',
+          })
+        }
+      }
     } else {
       // ── Cattura fallita: aggiorna counter effetto di stato ────────────────
       if (data.wildStatus !== undefined) setWildStatus(data.wildStatus)

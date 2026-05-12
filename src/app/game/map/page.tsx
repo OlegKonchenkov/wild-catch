@@ -20,6 +20,7 @@ import { playEggHatch } from '@/lib/game/sounds/hatch'
 import { playEnigmaSolve } from '@/lib/game/sounds/enigma'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
 import { playMissionComplete } from '@/lib/game/sounds/events'
+import { track } from '@/lib/analytics'
 
 // Dynamic import — Leaflet is not SSR-safe
 const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false })
@@ -1621,6 +1622,12 @@ function MapPageInner() {
         playEncounterSound()
         setShowEncounterPopup(true)
         encounterPopupRef.current = true
+        track('encounter_started', {
+          sessionId: sid,
+          trigger,
+          creatureRarity: data.creature?.rarity ?? 'unknown',
+          creatureElement: data.creature?.element ?? 'unknown',
+        })
         return true
       } else if (data.encounterId) {
         // Stale active encounter — navigate only when no popup is showing
@@ -1671,10 +1678,22 @@ function MapPageInner() {
 
     if (data.eggsHatched?.length > 0) {
       setHatchQueue(prev => [...prev, ...data.eggsHatched])
+      for (const egg of data.eggsHatched as Array<{ rarity: string }>) {
+        track('egg_hatched', { sessionId: sid, eggRarity: 'unknown', resultRarity: egg.rarity ?? 'unknown' })
+      }
     }
 
     if (data.completedMissions?.length > 0) {
       setMissionQueue(prev => [...prev, ...data.completedMissions])
+      for (const m of data.completedMissions as Array<CompletedMissionInfo>) {
+        track('mission_completed', {
+          sessionId: sid,
+          missionId: 'unknown',
+          missionType: 'walk',
+          rewardGold: m.rewardGold ?? 0,
+          rewardExp: m.rewardExp ?? 0,
+        })
+      }
     }
 
     if (starterFlowLockedRef.current) return
