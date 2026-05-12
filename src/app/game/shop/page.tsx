@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
 import { track } from '@/lib/analytics'
+import { swr } from '@/lib/cache'
 import type { Item, ItemType } from '@/lib/types'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
@@ -33,11 +34,20 @@ export default function ShopPage() {
     const sessionId = localStorage.getItem('current_session_id')
     setLoading(true)
     try {
-      const [itemsRes, user] = await Promise.all([
-        supabase.from('items').select('*').gt('shop_price', 0).order('type').order('shop_price'),
+      // Items are read-only catalogue → SWR cache, paint cached instantly.
+      const itemsSWR = swr<Item[]>('shop:items:v1', 10 * 60 * 1000, async () => {
+        const { data } = await supabase
+          .from('items').select('*')
+          .gt('shop_price', 0).order('type').order('shop_price')
+        return (data ?? []) as unknown as Item[]
+      })
+      if (itemsSWR.cached) setItems(itemsSWR.cached)
+
+      const [items, user] = await Promise.all([
+        itemsSWR.fresh,
         getCurrentUser(supabase),
       ])
-      if (itemsRes.data) setItems(itemsRes.data as unknown as Item[])
+      setItems(items)
       if (user && sessionId) {
         const { data: ps } = await supabase
           .from('player_sessions').select('gold')

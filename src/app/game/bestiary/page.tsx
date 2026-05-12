@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
+import { swr } from '@/lib/cache'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
@@ -117,22 +118,31 @@ export default function BestiaryPage() {
     let done = 0
     function finish() { if (++done === 3) setLoading(false) }
 
-    supabase.from('creatures').select('*, enigma_frammento:enigma_frammenti(id, enigma_id, title, description, image_url, video_url, order_index, enigma:enigmi(id, title))').order('rarity').then(({ data }) => {
-      if (data) {
-        const list = [...(data as unknown as Creature[])].sort(
-          (a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
-        )
-        setCreatures(list)
-        // Build set of IDs that have an evolution (i.e. some creature points evolution_of → them)
-        const ids = new Set<string>(
-          list
-            .filter(c => (c as any).evolution_of)
-            .map(c => (c as any).evolution_of as string)
-        )
-        setEvolvableIds(ids)
-      }
-      finish()
+    // Bestiary is read-heavy and the underlying data rarely changes mid-session.
+    // SWR: paint cached creature catalogue instantly, then revalidate.
+    const applyCreatures = (data: Creature[] | null | undefined) => {
+      if (!data) return
+      const list = [...data].sort(
+        (a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
+      )
+      setCreatures(list)
+      const ids = new Set<string>(
+        list
+          .filter(c => (c as any).evolution_of)
+          .map(c => (c as any).evolution_of as string)
+      )
+      setEvolvableIds(ids)
+    }
+
+    const creaturesSWR = swr<Creature[]>('creatures:v1', 10 * 60 * 1000, async () => {
+      const { data } = await supabase
+        .from('creatures')
+        .select('*, enigma_frammento:enigma_frammenti(id, enigma_id, title, description, image_url, video_url, order_index, enigma:enigmi(id, title))')
+        .order('rarity')
+      return (data ?? []) as unknown as Creature[]
     })
+    if (creaturesSWR.cached) applyCreatures(creaturesSWR.cached)
+    creaturesSWR.fresh.then(applyCreatures).finally(finish)
 
     getCurrentUser(supabase).then(user => {
       if (!user) { finish(); finish(); return }

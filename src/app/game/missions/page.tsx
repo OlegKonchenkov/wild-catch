@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
+import { swr } from '@/lib/cache'
 import type { Mission } from '@/lib/types'
 import { getMissionUnlockState, type MissionUnlockState } from '@/lib/game/mission-unlocks'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
@@ -398,12 +399,19 @@ export default function MissionsPage() {
     if (!sessionId) { setLoading(false); return }
 
     async function load() {
-      const [missRes, user] = await Promise.all([
-        supabase.from('missions').select('*').or(`session_id.eq.${sessionId},session_id.is.null`).order('chapter_order'),
+      // Missions for this session are static for the event's lifetime → SWR cache.
+      const missionsSWR = swr<Mission[]>(`missions:${sessionId}:v1`, 10 * 60 * 1000, async () => {
+        const { data } = await supabase.from('missions')
+          .select('*').or(`session_id.eq.${sessionId},session_id.is.null`)
+          .order('chapter_order')
+        return (data ?? []) as Mission[]
+      })
+      if (missionsSWR.cached) setMissions(missionsSWR.cached)
+
+      const [missionList, user] = await Promise.all([
+        missionsSWR.fresh,
         getCurrentUser(supabase),
       ])
-
-      const missionList = (missRes.data ?? []) as Mission[]
       setMissions(missionList)
       if (user && missionList.length > 0) {
         const missionIds = missionList.map(m => m.id)
