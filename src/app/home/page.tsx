@@ -92,16 +92,15 @@ function HomeLobby() {
   const [settingMsg, setSettingMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function loadData() {
-    // Phase 1 — profile + restore + sessions all in parallel
-    const [profileRes, restoreRes, sessionsRes] = await Promise.all([
+    // Auth gating + active-session resolution are done server-side at the root
+    // route, so /home only needs profile + the session list here.
+    const [profileRes, sessionsRes] = await Promise.all([
       fetch('/api/profile'),
-      fetch('/api/auth/restore'),
       fetch('/api/game/sessions'),
     ])
 
-    const [profile, restore, sessData] = await Promise.all([
+    const [profile, sessData] = await Promise.all([
       profileRes.ok ? profileRes.json() : Promise.resolve({}),
-      restoreRes.json(),
       sessionsRes.ok ? sessionsRes.json() : Promise.resolve({ sessions: [] }),
     ])
 
@@ -111,17 +110,15 @@ function HomeLobby() {
     }
     if (profile.gdprAccepted) setGdpr(true)
 
-    const { sessionId } = restore as { sessionId: string | null }
-    if (sessionId) localStorage.setItem('current_session_id', sessionId)
-
     const loaded: SessionStats[] = sessData.sessions ?? []
     setSessions(loaded)
 
-    // Auto-select: prefer active, then the restored session, then the first one
+    // Auto-select: prefer active, then whatever the client last entered, then nothing
     if (loaded.length > 0) {
+      const knownSid = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null
       const active = loaded.find(s => s.status === 'active')
-      const restored = sessionId ? loaded.find(s => s.id === sessionId) : null
-      setSelectedId(active?.id ?? restored?.id ?? null)
+      const known  = knownSid ? loaded.find(s => s.id === knownSid) : null
+      setSelectedId(active?.id ?? known?.id ?? null)
     }
 
     setLoading(false)
@@ -247,7 +244,6 @@ function HomeLobby() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32,
       }}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap');
           @keyframes wc-spin { to { transform: rotate(360deg); } }
           @keyframes wc-pulse { 0%,100% { opacity: 0.4; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.05); } }
           @keyframes wc-ripple {
@@ -294,7 +290,7 @@ function HomeLobby() {
           <div className="wc-loader-ring" />
         </div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 20, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.06em', marginBottom: 8 }}>
+          <div style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 20, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.06em', marginBottom: 8 }}>
             Daimon
           </div>
           <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }} className="wc-dots">
@@ -308,15 +304,14 @@ function HomeLobby() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0A1520; font-family: 'DM Sans', sans-serif; min-height: 100svh; }
+        body { background: #0A1520; font-family: var(--font-dm-sans), sans-serif; min-height: 100svh; }
         .hr { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 0; }
         .input {
           width: 100%;
           background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.1);
           border-radius: 12px; padding: 12px 14px;
-          font-family: 'DM Sans', sans-serif; font-size: 16px; color: #fff; outline: none;
+          font-family: var(--font-dm-sans), sans-serif; font-size: 16px; color: #fff; outline: none;
           transition: border-color 0.2s;
         }
         .input::placeholder { color: rgba(255,255,255,0.2); font-size: 14px; }
@@ -328,7 +323,7 @@ function HomeLobby() {
         .input.code-style:focus { border-color: #F7C841; }
         .btn {
           display: flex; align-items: center; justify-content: center; gap: 8px;
-          font-family: 'DM Sans', sans-serif; font-weight: 700; letter-spacing: 0.04em;
+          font-family: var(--font-dm-sans), sans-serif; font-weight: 700; letter-spacing: 0.04em;
           border: none; border-radius: 12px; cursor: pointer; width: 100%;
           transition: opacity 0.2s, transform 0.15s;
           padding: 13px 16px; font-size: 14px;
@@ -376,7 +371,7 @@ function HomeLobby() {
           border-radius: 14px; padding: 13px 14px; margin-bottom: 8px;
           cursor: pointer; transition: border-color 0.18s, background 0.18s;
           display: flex; align-items: center; gap: 12;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-dm-sans), sans-serif;
         }
         .sess-card:hover { border-color: rgba(58,188,168,0.3); background: rgba(58,188,168,0.04); }
         .sess-card.selected { border-color: #3ABCA8; background: rgba(58,188,168,0.07); }
@@ -388,7 +383,7 @@ function HomeLobby() {
 
         {/* ── Top bar ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ fontFamily: "'Cinzel', serif", fontSize: 18, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.04em' }}>Daimon</span>
+          <span style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 18, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.04em' }}>Daimon</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
               onClick={() => { setShowSettings(v => !v); setSettingMsg(null); setEditingNickInline(false) }}

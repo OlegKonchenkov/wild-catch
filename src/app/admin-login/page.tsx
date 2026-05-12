@@ -43,9 +43,8 @@ function AdminLoginForm() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=DM+Sans:wght@300;400;500;700&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; overflow: hidden; font-family: 'DM Sans', sans-serif; }
+        html, body { height: 100%; overflow: hidden; font-family: var(--font-dm-sans), sans-serif; }
 
         .ar {
           position: fixed; inset: 0;
@@ -132,7 +131,7 @@ function AdminLoginForm() {
         }
 
         .ar-title {
-          font-family: 'Cinzel', serif;
+          font-family: var(--font-cinzel), serif;
           font-size: 20px; font-weight: 600;
           color: #fff; letter-spacing: 0.08em; margin-bottom: 4px;
         }
@@ -168,7 +167,7 @@ function AdminLoginForm() {
           width: 100%;
           display: flex; align-items: center; justify-content: center; gap: 10px;
           background: linear-gradient(135deg, #2D5BE3 0%, #1E3FA8 100%);
-          color: #fff; font-family: 'DM Sans', sans-serif;
+          color: #fff; font-family: var(--font-dm-sans), sans-serif;
           font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
           text-transform: uppercase;
           padding: 15px 20px; border-radius: 12px; border: none;
