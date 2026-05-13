@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { calculateCatchRate, getCatchHealthMultiplier, rollCatch, rollDice, selectCreatureForEncounter } from '@/lib/game/rng'
+import { describe, it, expect, vi } from 'vitest'
+import { calculateCatchRate, getCatchHealthMultiplier, rollCatch, rollDice, selectCreatureForEncounter, calculateFightDamage } from '@/lib/game/rng'
 import type { Rarity } from '@/lib/types'
 
 describe('rollCatch', () => {
@@ -89,5 +89,50 @@ describe('selectCreatureForEncounter', () => {
       const c = selectCreatureForEncounter(creatures, 5)
       expect(c?.id).toBe('a')
     }
+  })
+
+  it('returns null for an empty pool', () => {
+    expect(selectCreatureForEncounter([], 10)).toBeNull()
+  })
+
+  it('always returns the only creature in a single-entry pool', () => {
+    const creatures = [{ id: 'solo', spawn_weight: 1, rarity: 'epico' as Rarity, min_level: 1 }]
+    for (let i = 0; i < 20; i++) {
+      expect(selectCreatureForEncounter(creatures, 5)?.id).toBe('solo')
+    }
+  })
+
+  it('falls back to full pool when player level is below all min_levels', () => {
+    const creatures = [
+      { id: 'high1', spawn_weight: 50, rarity: 'raro' as Rarity, min_level: 30 },
+      { id: 'high2', spawn_weight: 50, rarity: 'epico' as Rarity, min_level: 40 },
+    ]
+    // Player level 1 < all min_levels → fallback to full pool → must return one of them
+    for (let i = 0; i < 20; i++) {
+      const c = selectCreatureForEncounter(creatures, 1)
+      expect(['high1', 'high2']).toContain(c?.id)
+    }
+  })
+})
+
+describe('calculateFightDamage', () => {
+  it('returns a positive integer for a positive atk', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    // rollDice() = 0.8 + 0.5 * 0.4 = 1.0 → Math.round(100 * 1.0) = 100
+    expect(calculateFightDamage(100)).toBe(100)
+    vi.restoreAllMocks()
+  })
+
+  it('result is within the 0.8–1.2× atk range across random rolls', () => {
+    vi.restoreAllMocks()
+    for (let i = 0; i < 50; i++) {
+      const d = calculateFightDamage(100)
+      expect(d).toBeGreaterThanOrEqual(80)
+      expect(d).toBeLessThanOrEqual(120)
+    }
+  })
+
+  it('returns 0 for atk = 0', () => {
+    expect(calculateFightDamage(0)).toBe(0)
   })
 })

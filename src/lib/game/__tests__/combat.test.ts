@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   calculateCombatDamage,
   calculatePoisonDamage,
@@ -7,14 +7,39 @@ import {
   rollConfusionSelfHit,
   rollCombatFortune,
   rollParalysisSkip,
+  rollStatusEffect,
   scaleCombatStats,
+  STATUS_EFFECT_META,
 } from '@/lib/game/combat'
+import type { StatusEffect } from '@/lib/game/combat'
 
 describe('combat helpers', () => {
   it('normalizes invalid levels to 1', () => {
     expect(normalizeCombatLevel(undefined)).toBe(1)
     expect(normalizeCombatLevel(0)).toBe(1)
     expect(normalizeCombatLevel(-4)).toBe(1)
+  })
+
+  it('scaleCombatStats: level 1 returns base stats unchanged', () => {
+    const base = { hp: 100, atk: 20, def: 10 }
+    const s = scaleCombatStats(base, 1)
+    expect(s).toMatchObject({ level: 1, hp: 100, atk: 20, def: 10 })
+  })
+
+  it('scaleCombatStats: stats increase monotonically from level 1 → 10 → 50', () => {
+    const base = { hp: 100, atk: 20, def: 10 }
+    const s10 = scaleCombatStats(base, 10)
+    const s50 = scaleCombatStats(base, 50)
+    expect(s10.hp).toBeGreaterThan(base.hp)
+    expect(s50.hp).toBeGreaterThan(s10.hp)
+    expect(s50.atk).toBeGreaterThan(s10.atk)
+  })
+
+  it('scaleCombatStats: level clamped at MAX_COMBAT_LEVEL (50)', () => {
+    const base = { hp: 100, atk: 20, def: 10 }
+    const s50 = scaleCombatStats(base, 50)
+    const s99 = scaleCombatStats(base, 99)
+    expect(s99).toMatchObject(s50)
   })
 
   it('scales hp, atk and def upward with level', () => {
@@ -150,5 +175,106 @@ describe('combat helpers', () => {
       cleared: false,
       turnsLeft: 2,
     })
+  })
+
+  it('resolves sonno: always prevents action and decrements turns', () => {
+    const result = resolveTurnStartStatus({
+      effect: 'sonno',
+      turnsLeft: 2,
+      currentHp: 60,
+      maxHp: 100,
+      atk: 20,
+      def: 10,
+    })
+
+    expect(result.preventedAction).toBe(true)
+    expect(result.nextEffect).toBe('sonno')
+    expect(result.nextTurnsLeft).toBe(1)
+    expect(result.currentHp).toBe(60)
+    expect(result.event).toMatchObject({ type: 'sonno', cleared: false, turnsLeft: 1 })
+  })
+
+  it('resolves sonno: clears when turns reach 0', () => {
+    const result = resolveTurnStartStatus({
+      effect: 'sonno',
+      turnsLeft: 1,
+      currentHp: 60,
+      maxHp: 100,
+      atk: 20,
+      def: 10,
+    })
+
+    expect(result.nextEffect).toBeNull()
+    expect(result.nextTurnsLeft).toBe(0)
+    expect(result.event).toMatchObject({ cleared: true })
+  })
+
+  it('no effect: returns pristine state', () => {
+    const result = resolveTurnStartStatus({
+      effect: null,
+      currentHp: 80,
+      maxHp: 100,
+      atk: 20,
+      def: 10,
+    })
+
+    expect(result).toMatchObject({
+      nextEffect: null,
+      nextTurnsLeft: 0,
+      currentHp: 80,
+      preventedAction: false,
+      fainted: false,
+      event: null,
+    })
+  })
+})
+
+describe('rollStatusEffect', () => {
+  it('returns the effect when random < chance (guaranteed proc)', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.01)
+    expect(rollStatusEffect('paralisi', 0.15)).toBe('paralisi')
+    vi.restoreAllMocks()
+  })
+
+  it('returns null when random >= chance (guaranteed miss)', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    expect(rollStatusEffect('paralisi', 0.15)).toBeNull()
+    vi.restoreAllMocks()
+  })
+
+  it('returns null when statusEffect is null', () => {
+    expect(rollStatusEffect(null, 0.99)).toBeNull()
+  })
+
+  it('returns null when statusEffect is undefined', () => {
+    expect(rollStatusEffect(undefined, 0.99)).toBeNull()
+  })
+
+  it('uses default chance 0.15 when chance is null', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.10)
+    expect(rollStatusEffect('veleno', null)).toBe('veleno')
+    vi.restoreAllMocks()
+  })
+})
+
+describe('STATUS_EFFECT_META', () => {
+  const effects: StatusEffect[] = ['paralisi', 'confusione', 'sonno', 'veleno']
+
+  it.each(effects)('%s has label, emoji, color, and glow', (effect) => {
+    const meta = STATUS_EFFECT_META[effect]
+    expect(meta).toBeDefined()
+    expect(typeof meta.label).toBe('string')
+    expect(meta.label.length).toBeGreaterThan(0)
+    expect(typeof meta.emoji).toBe('string')
+    expect(meta.emoji.length).toBeGreaterThan(0)
+    expect(meta.color).toMatch(/^#/)
+    expect(meta.glow).toMatch(/^rgba\(/)
+  })
+
+  it('sonno preventsAttack, others do not (except as action result)', () => {
+    expect(STATUS_EFFECT_META.sonno.preventsAttack).toBe(true)
+    expect(STATUS_EFFECT_META.paralisi.preventsAttack).toBe(false)
+    expect(STATUS_EFFECT_META.confusione.preventsAttack).toBe(false)
+    expect(STATUS_EFFECT_META.veleno.preventsAttack).toBe(false)
   })
 })
