@@ -15,6 +15,7 @@ import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import EggHatchModal from '@/components/game/EggHatchModal'
 import Coachmark, { type CoachmarkStep } from '@/components/game/Coachmark'
+import NextObjectiveWidget from '@/components/game/NextObjectiveWidget'
 import StarterSelect, { type StarterCreature } from '@/components/game/StarterSelect'
 import PinRewardModal, { type PinRewardData } from '@/components/game/PinRewardModal'
 import EnigmaModal from '@/components/game/EnigmaModal'
@@ -863,6 +864,12 @@ function MapPageInner() {
             🚫 Sei fuori dall'area di gioco
           </div>
         )}
+      </div>
+
+      {/* Top-left HUD — persistent "next objective" widget. Self-hides when
+          no unlocked, non-completed mission exists. */}
+      <div className="absolute top-2 left-2 z-[900]">
+        <NextObjectiveWidget sessionId={sessionId} />
       </div>
 
       {/* Top-right HUD column — step counter + GPS accuracy + esca */}

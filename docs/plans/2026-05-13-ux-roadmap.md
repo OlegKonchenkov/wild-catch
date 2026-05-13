@@ -33,19 +33,17 @@ Legenda priorità: ⭐ = nice-to-have · ⭐⭐⭐⭐⭐ = critical-for-pilot.
 
 ---
 
-## ⏳ Step 3 — Widget "Prossimo obiettivo" persistente sulla mappa
-**Status:** todo · **Effort:** ~1.5h · **Impatto:** ⭐⭐⭐⭐⭐
+## ✅ Step 3 — Widget "Prossimo obiettivo" persistente sulla mappa
+**Status:** done · **Effort:** ~1.5h · **Impatto:** ⭐⭐⭐⭐⭐
 
-Sempre visibile in cima alla mappa. Mostra la missione corrente
-(la prima non completata, sbloccata, ordinata per `chapter_order`) con
-icona + titolo breve + barra di progresso.
-
-- [ ] Selezione "missione corrente" lato server (`/api/game/missions/next?sessionId`)
-- [ ] Component `NextObjectiveWidget` (top-left della mappa)
-- [ ] Aggiornamento realtime via realtime channel su `player_missions`
-- [ ] Tap → apre `/game/missions` con la missione corrente in evidenza
-- [ ] Gestione "nessuna missione attiva" (nasconde widget)
-- [ ] Tests
+- [x] `GET /api/game/missions/next?sessionId=<uuid>` — restituisce la
+  prima missione sbloccata + non completata per `chapter_order`
+- [x] Componente `NextObjectiveWidget` (top-left della mappa) con icona
+  per tipo, titolo, progress bar + counter
+- [x] Aggiornamento realtime via Supabase channel su `player_missions`
+- [x] Tap → `router.push('/game/missions?focus=<id>')`
+- [x] Self-hide quando `objective: null` (tutte completate / nessuna config)
+- [x] 8 contract tests sull'endpoint (auth, validation, sort, lock, completion)
 
 ---
 
