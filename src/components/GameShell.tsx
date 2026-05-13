@@ -16,17 +16,17 @@ import { ELEMENT_EMOJI } from '@/lib/types'
 import { playLevelUp } from '@/lib/game/sounds/events'
 import { getSharedAC } from '@/lib/game/sounds/shared-ac'
 
-const NAV_ITEMS = [
-  { href: '/game/map',      icon: '🗺️', label: 'Mappa'     },
-  { href: '/game/bestiary', icon: '📖', label: 'DaimonDex'   },
-  { href: '/game/duel',     icon: '⚔️', label: 'Duelli'   },
-  { href: '/game/missions', icon: '🎯', label: 'Missioni'  },
-  { href: '/game/enigmi',   icon: '🧩', label: 'Enigmi'    },
-  { href: '/game/shop',     icon: '🛒', label: 'Shop'      },
-  { href: '/game/backpack', icon: '🎒', label: 'Zaino'     },
-  { href: '/game/profile',  icon: '🏆', label: 'Classifica'},
-  { href: '/game/guide',    icon: '❓', label: 'Guida'     },
-  { href: '/home',          icon: '🏠', label: 'Profilo'   },
+const NAV_ITEMS: Array<{ href: string; icon: string; label: string; coachmark?: string }> = [
+  { href: '/game/map',      icon: '🗺️', label: 'Mappa'                                   },
+  { href: '/game/bestiary', icon: '📖', label: 'DaimonDex'                              },
+  { href: '/game/duel',     icon: '⚔️', label: 'Duelli'                                  },
+  { href: '/game/missions', icon: '🎯', label: 'Missioni',   coachmark: 'nav-missioni' },
+  { href: '/game/enigmi',   icon: '🧩', label: 'Enigmi'                                  },
+  { href: '/game/shop',     icon: '🛒', label: 'Shop'                                    },
+  { href: '/game/backpack', icon: '🎒', label: 'Zaino',      coachmark: 'nav-zaino'    },
+  { href: '/game/profile',  icon: '🏆', label: 'Classifica'                              },
+  { href: '/game/guide',    icon: '❓', label: 'Guida',      coachmark: 'nav-guida'    },
+  { href: '/home',          icon: '🏠', label: 'Profilo'                                 },
 ]
 
 function xpProgress(exp: number, level: number): number {
@@ -732,11 +732,12 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
               </>
             )
           }
-          return NAV_ITEMS.map(({ href, icon, label }) => (
+          return NAV_ITEMS.map(({ href, icon, label, coachmark }) => (
             <Link
               key={href}
               href={href}
               data-active={pathname === href ? 'true' : 'false'}
+              data-coachmark={coachmark}
               className={`flex-shrink-0 flex flex-col items-center py-2 gap-0.5 text-xs transition-colors ${
                 pathname === href ? 'text-[#3A9DBC]' : 'text-white/50 hover:text-white/80'
               }`}

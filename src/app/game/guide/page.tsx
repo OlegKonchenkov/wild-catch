@@ -939,6 +939,11 @@ export default function GuidePage() {
     router.push('/game/onboarding?next=/game/guide')
   }
 
+  function replayCoachmarks() {
+    try { localStorage.removeItem('wc:coachmarks:map-seen') } catch {}
+    router.push('/game/map')
+  }
+
   function scrollToSection(id: string) {
     const container = containerRef.current
     const el = document.getElementById(id)
@@ -1065,18 +1070,31 @@ export default function GuidePage() {
                 </button>
               ))}
             </div>
-            <button
-              onClick={replayOnboarding}
-              disabled={replaying}
-              className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-60"
-              style={{
-                background: 'rgba(58,188,168,0.12)',
-                border: '1px solid rgba(58,188,168,0.35)',
-                color: '#3ABCA8',
-              }}
-            >
-              {replaying ? '...' : <>🎓 Rivedi il tutorial iniziale</>}
-            </button>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                onClick={replayOnboarding}
+                disabled={replaying}
+                className="flex items-center justify-center gap-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-60"
+                style={{
+                  background: 'rgba(58,188,168,0.12)',
+                  border: '1px solid rgba(58,188,168,0.35)',
+                  color: '#3ABCA8',
+                }}
+              >
+                {replaying ? '...' : <>🎓 Tutorial</>}
+              </button>
+              <button
+                onClick={replayCoachmarks}
+                className="flex items-center justify-center gap-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98]"
+                style={{
+                  background: 'rgba(247,200,65,0.12)',
+                  border: '1px solid rgba(247,200,65,0.35)',
+                  color: '#F7C841',
+                }}
+              >
+                💡 Suggerimenti UI
+              </button>
+            </div>
           </div>
         </motion.div>
       )}

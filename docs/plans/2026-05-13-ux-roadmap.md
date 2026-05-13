@@ -21,25 +21,15 @@ Legenda priorità: ⭐ = nice-to-have · ⭐⭐⭐⭐⭐ = critical-for-pilot.
 
 ---
 
-## ⏳ Step 2 — Coachmarks first-run sulla mappa
-**Status:** in progress · **Effort:** ~1.5h · **Impatto:** ⭐⭐⭐⭐⭐
+## ✅ Step 2 — Coachmarks first-run sulla mappa
+**Status:** done · **Effort:** ~1.5h · **Impatto:** ⭐⭐⭐⭐⭐
 
-Highlight cutout sulla UI principale al primo ingresso sulla mappa. Stile
-Duolingo / Pokémon Go: overlay scuro con buco di luce sul target +
-tooltip esplicativo + bottoni "Continua" / "Salta".
-
-- [ ] Componente `Coachmark` (overlay SVG mask + tooltip posizionato)
-- [ ] 5 step coachmark sulla mappa:
-  - Map area: "cammina per far apparire creature"
-  - Step counter (top-right): "metri percorsi per le missioni"
-  - Nav Missioni: "i tuoi obiettivi"
-  - Nav Zaino: "squadra, oggetti, uova"
-  - Nav Guida: "ogni meccanica spiegata"
-- [ ] `data-coachmark` attribute sui 5 target
-- [ ] Persistenza in `localStorage` (per device, non per sessione — sono hint UI, non game intro)
-- [ ] Guide page: bottone "Rivedi suggerimenti UI"
-- [ ] Tests del componente (target lookup, dismissal, navigation)
-- [ ] Commit
+- [x] Componente `Coachmark` (SVG mask + tooltip + pulsing outline)
+- [x] 5 step coachmark sulla mappa (map-area, step-counter, nav-missioni, nav-zaino, nav-guida)
+- [x] `data-coachmark` attributes su tutti i target
+- [x] Persistenza in `localStorage` per device
+- [x] Guide page: bottone "💡 Suggerimenti UI" (re-arma il flag)
+- [x] 7 contract tests (render, next/prev, skip, target lookup, fallback)
 
 ---
 

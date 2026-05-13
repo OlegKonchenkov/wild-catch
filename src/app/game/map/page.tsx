@@ -14,6 +14,7 @@ import useTweenedInteger from '@/hooks/useTweenedInteger'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import EggHatchModal from '@/components/game/EggHatchModal'
+import Coachmark, { type CoachmarkStep } from '@/components/game/Coachmark'
 import StarterSelect, { type StarterCreature } from '@/components/game/StarterSelect'
 import PinRewardModal, { type PinRewardData } from '@/components/game/PinRewardModal'
 import EnigmaModal from '@/components/game/EnigmaModal'
@@ -34,6 +35,19 @@ import { track } from '@/lib/analytics'
 
 // Dynamic import — Leaflet is not SSR-safe
 const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false })
+
+// First-run coachmarks shown on the map after a player completes the
+// onboarding carousel + starter pick. Persisted per-device in localStorage
+// (UI hints, not part of the game state — different devices = different
+// learning moments, and that's fine).
+const COACHMARK_STORAGE_KEY = 'wc:coachmarks:map-seen'
+const MAP_COACHMARK_STEPS: CoachmarkStep[] = [
+  { key: 'map-area', title: 'La tua mappa', body: 'Questo è il tuo territorio di caccia. Cammina con il cellulare per far apparire creature vicino a te.' },
+  { key: 'step-counter', title: 'Contapassi', body: 'I metri percorsi si accumulano qui. Molte missioni si completano camminando.', preferredSide: 'bottom' },
+  { key: 'nav-missioni', title: 'Missioni', body: 'I tuoi obiettivi attuali. Si sbloccano a cascata mentre giochi — guarda qui per sapere cosa fare.', preferredSide: 'top' },
+  { key: 'nav-zaino', title: 'Zaino', body: 'La tua squadra di creature, gli oggetti raccolti e le uova in incubazione.', preferredSide: 'top' },
+  { key: 'nav-guida', title: 'Guida', body: 'Ogni meccanica spiegata con esempi animati. E puoi rivedere questo tutorial da lì.', preferredSide: 'top' },
+]
 
 const ENCOUNTER_COOLDOWN_MS = 30000  // 30s between encounters
 // Cumulative distance that, when exceeded, probabilistically triggers a walk-based encounter
@@ -244,6 +258,20 @@ function MapPageInner() {
   // Tween the visible counter so any jump (server reconciliation, missed
   // GPS fix catch-up) animates instead of snapping. Pure presentation.
   const displayedSteps = useTweenedInteger(stepsWalked, 450)
+
+  // First-run coachmarks — fire after the map is fully usable (session +
+  // starter check both resolved) and only if not already seen on this device.
+  const [showCoachmarks, setShowCoachmarks] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!session || starterCheckPending) return
+    if (showStarterSelect) return // wait until starter picker closes
+    if (localStorage.getItem(COACHMARK_STORAGE_KEY) === '1') return
+    // Small delay so the GameMap finishes its first paint before we measure
+    // the bounding rects of nav items / step counter.
+    const t = setTimeout(() => setShowCoachmarks(true), 500)
+    return () => clearTimeout(t)
+  }, [session, starterCheckPending, showStarterSelect])
 
   useEffect(() => {
     function init(sid: string) {
@@ -793,7 +821,7 @@ function MapPageInner() {
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full" data-coachmark="map-area">
       <GameMap
         session={session}
         playerPosition={position ? { lat: position.lat, lng: position.lng } : null}
@@ -802,6 +830,17 @@ function MapPageInner() {
         pins={mapPins}
         onPinTap={handlePinTap}
       />
+
+      {/* First-run coachmarks — fires once per device after onboarding+starter */}
+      {showCoachmarks && (
+        <Coachmark
+          steps={MAP_COACHMARK_STEPS}
+          onClose={() => {
+            setShowCoachmarks(false)
+            try { localStorage.setItem(COACHMARK_STORAGE_KEY, '1') } catch {}
+          }}
+        />
+      )}
 
       {/* Session restarted overlay */}
       {sessionRestarted && (
@@ -828,7 +867,7 @@ function MapPageInner() {
 
       {/* Top-right HUD column — step counter + GPS accuracy + esca */}
       <div className="absolute top-2 right-2 z-[900] flex flex-col items-end gap-1.5">
-        <div className="bg-[#0F1F2E]/85 border border-white/10 backdrop-blur-sm rounded-xl px-3 py-2 flex items-center gap-2">
+        <div data-coachmark="step-counter" className="bg-[#0F1F2E]/85 border border-white/10 backdrop-blur-sm rounded-xl px-3 py-2 flex items-center gap-2">
           <span className="text-sm">👟</span>
           <div className="flex flex-col items-start leading-none">
             <span className="text-white font-bold text-sm leading-tight tabular-nums">{displayedSteps.toLocaleString('it-IT')} m</span>
