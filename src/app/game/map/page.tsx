@@ -267,11 +267,19 @@ function MapPageInner() {
       getCurrentUser(supabase).then(user => {
         if (!user) return
         supabase.from('player_sessions')
-          .select('esca_active_until, selected_creature_id, steps_walked')
+          .select('esca_active_until, selected_creature_id, steps_walked, onboarding_seen')
           .eq('user_id', user.id)
           .eq('session_id', sid)
           .single()
           .then(({ data }) => {
+            // ── First-session onboarding gate ────────────────────────────
+            // If the player hasn't seen / skipped the intro for this
+            // session, send them to the tutorial first. The onboarding page
+            // marks the flag and routes back here when done.
+            if (data && data.onboarding_seen === false) {
+              router.replace(`/game/onboarding?next=${encodeURIComponent(`/game/map?restored=${sid}`)}`)
+              return
+            }
             if (data?.esca_active_until) {
               const d = new Date(data.esca_active_until)
               if (d > new Date()) setEscaActiveUntil(d)

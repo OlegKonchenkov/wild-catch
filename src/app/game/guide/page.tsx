@@ -1,5 +1,6 @@
 'use client'
 import { useState, useMemo, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -915,10 +916,28 @@ const QUICK_LINKS = [
 
 export default function GuidePage() {
   const allSections = buildSections()
+  const router = useRouter()
   const [query, setQuery]           = useState('')
   const [showSearch, setShowSearch] = useState(false)
+  const [replaying, setReplaying]   = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  async function replayOnboarding() {
+    if (replaying) return
+    setReplaying(true)
+    const sessionId = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null
+    if (sessionId) {
+      try {
+        await fetch('/api/game/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, seen: false }),
+        })
+      } catch { /* best-effort; we still navigate */ }
+    }
+    router.push('/game/onboarding?next=/game/guide')
+  }
 
   function scrollToSection(id: string) {
     const container = containerRef.current
@@ -1046,6 +1065,18 @@ export default function GuidePage() {
                 </button>
               ))}
             </div>
+            <button
+              onClick={replayOnboarding}
+              disabled={replaying}
+              className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-60"
+              style={{
+                background: 'rgba(58,188,168,0.12)',
+                border: '1px solid rgba(58,188,168,0.35)',
+                color: '#3ABCA8',
+              }}
+            >
+              {replaying ? '...' : <>🎓 Rivedi il tutorial iniziale</>}
+            </button>
           </div>
         </motion.div>
       )}
