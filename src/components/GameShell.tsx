@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
 import { track } from '@/lib/analytics'
 import { haptics } from '@/lib/haptics'
+import LevelUpModal, { type LevelUpInfo } from '@/components/game/LevelUpModal'
+import NotifPopupComponent, { type NotifPopupData } from '@/components/game/NotifPopup'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import { getExpProgress } from '@/lib/game/leveling'
@@ -31,17 +33,9 @@ function xpProgress(exp: number, level: number): number {
   return getExpProgress(exp, level).percent
 }
 
-interface LevelUpInfo {
-  newLevel: number
-  goldReward: number
-}
-
-interface NotifPopup {
-  type: 'admin_notify' | 'item_redeemed'
-  title: string
-  message: string
-  icon?: string
-}
+// Types re-exported from the extracted modal/toast components below — kept
+// as local aliases so the rest of the file doesn't need to be touched.
+type NotifPopup = NotifPopupData
 
 const REWARD_TYPE_ICONS: Record<string, string> = {
   exp: '⭐', gold: '💰', oggetto: '📦', indizio: '🔍',
@@ -640,89 +634,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         })()}
       </nav>
 
-      {/* Level-up modal */}
-      <AnimatePresence>
-        {levelUpInfo && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center"
-            onClick={() => setLevelUpInfo(null)}
-          >
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
-
-            {/* Sparkle rings */}
-            <motion.div
-              className="absolute rounded-full border-2 border-[#F7C841]/20"
-              initial={{ width: 0, height: 0, opacity: 1 }}
-              animate={{ width: 500, height: 500, opacity: 0 }}
-              transition={{ duration: 1.2, ease: 'easeOut', delay: 0.1 }}
-            />
-            <motion.div
-              className="absolute rounded-full border border-[#F7C841]/30"
-              initial={{ width: 0, height: 0, opacity: 1 }}
-              animate={{ width: 380, height: 380, opacity: 0 }}
-              transition={{ duration: 1.0, ease: 'easeOut', delay: 0.2 }}
-            />
-
-            {/* Card */}
-            <motion.div
-              initial={{ scale: 0.4, y: 60, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              className="relative z-10 text-center px-10 py-8 rounded-3xl bg-[#0F1F2E]/90 border border-[#F7C841]/30"
-              style={{ boxShadow: '0 0 60px rgba(247,200,65,0.25), 0 20px 60px rgba(0,0,0,0.6)' }}
-            >
-              {/* Star */}
-              <motion.div
-                className="text-6xl mb-3"
-                animate={{ rotate: [0, -8, 8, -4, 4, 0], scale: [1, 1.15, 1] }}
-                transition={{ duration: 0.6, delay: 0.25 }}
-              >
-                ⭐
-              </motion.div>
-
-              <p className="text-[#F7C841]/80 text-xs font-bold tracking-[0.25em] uppercase mb-1">
-                Livello
-              </p>
-
-              <motion.p
-                className="font-black text-white leading-none"
-                style={{ fontSize: '5.5rem' }}
-                initial={{ scale: 0.5 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 18, delay: 0.15 }}
-              >
-                {levelUpInfo.newLevel}
-              </motion.p>
-
-              {levelUpInfo.goldReward > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.45 }}
-                  className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#D4A96A]/15 border border-[#D4A96A]/30"
-                >
-                  <span className="text-lg">💰</span>
-                  <span className="text-[#D4A96A] font-bold text-lg">+{levelUpInfo.goldReward}</span>
-                </motion.div>
-              )}
-
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.7 }}
-                className="mt-5 text-white/35 text-xs"
-              >
-                Tocca per continuare
-              </motion.p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <LevelUpModal info={levelUpInfo} onDismiss={() => setLevelUpInfo(null)} />
 
       {/* Notification history panel */}
       <AnimatePresence>
@@ -1214,31 +1126,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
 
-      {/* Admin/system notification popup */}
-      <AnimatePresence>
-        {notifPopup && (
-          <motion.div
-            initial={{ opacity: 0, y: -60 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -60 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="fixed top-4 left-4 right-4 z-[9990] pointer-events-auto"
-            onClick={() => setNotifPopup(null)}
-          >
-            <div className="bg-[#0F1F2E]/95 border border-[#3A9DBC]/40 rounded-2xl px-4 py-3 shadow-2xl backdrop-blur-sm flex items-start gap-3"
-              style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(58,157,188,0.2)' }}>
-              <span className="text-2xl shrink-0 mt-0.5">{notifPopup.icon ?? '📢'}</span>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-white text-sm leading-tight">{notifPopup.title}</p>
-                {notifPopup.message && (
-                  <p className="text-white/60 text-xs mt-0.5 leading-relaxed">{notifPopup.message}</p>
-                )}
-              </div>
-              <button className="text-white/30 hover:text-white text-lg leading-none shrink-0 mt-0.5">✕</button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <NotifPopupComponent popup={notifPopup} onDismiss={() => setNotifPopup(null)} />
     </div>
   )
 }
