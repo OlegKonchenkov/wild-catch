@@ -380,7 +380,12 @@ function OnboardingInner() {
 
   return (
     <main
-      className="fixed inset-0 flex flex-col text-white overflow-hidden"
+      // z-[9990] sits above the GameShell header (z-10) AND the bottom nav
+      // (which has no explicit z-index but paints in normal flow on top of
+      // bare `fixed` elements with z-auto). One under LevelUpModal (z-9999)
+      // and the notif popup (z-9990) so nothing critical gets covered if
+      // they happen to fire during onboarding.
+      className="fixed inset-0 z-[9990] flex flex-col text-white overflow-hidden"
       style={{ background: 'linear-gradient(160deg, #060C18 0%, #0A1628 60%, #0D0305 100%)' }}
     >
       {/* Decorative orbs */}
