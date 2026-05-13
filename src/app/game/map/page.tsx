@@ -8,6 +8,9 @@ import { getCurrentUser } from '@/lib/supabase/client-user'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { haptics } from '@/lib/haptics'
 import { useGPS } from '@/hooks/useGPS'
+import { evaluateStep } from '@/lib/game/step-counter'
+import { haversineDistance } from '@/lib/game/anti-cheat'
+import useTweenedInteger from '@/hooks/useTweenedInteger'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import EggHatchModal from '@/components/game/EggHatchModal'
@@ -187,6 +190,7 @@ function MapPageInner() {
   useEffect(() => { pendingEnigmaPinRef.current = pendingEnigmaPin }, [pendingEnigmaPin])
   useEffect(() => { declinedBossPinIdsRef.current = declinedBossPinIds }, [declinedBossPinIds])
   useEffect(() => { declinedEnigmaPinIdsRef.current = declinedEnigmaPinIds }, [declinedEnigmaPinIds])
+  useEffect(() => { sessionStatusRef.current = (session?.status as string) ?? 'active' }, [session?.status])
 
   // Background ambience loop + ducking registration — starts on mount, stops on unmount
   useEffect(() => {
@@ -220,6 +224,15 @@ function MapPageInner() {
   const lastPositionPostAtRef = useRef(0)
   const positionPostTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
+
+  // ── Optimistic local step counter ──────────────────────────────────────────
+  // Runs the same evaluateStep filter on every GPS fix (~1 Hz) so the visible
+  // counter ticks forward the moment a step is statistically credible, instead
+  // of waiting for the next 5 s server POST. The server response still
+  // overrides locally-credited steps — server is the authoritative source
+  // (anti-cheat) and any drift is corrected on every reconciliation.
+  const localBaselineRef = useRef<{ lat: number; lng: number; ts: number; accuracy: number } | null>(null)
+  const sessionStatusRef = useRef<string>('active')
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
@@ -228,10 +241,16 @@ function MapPageInner() {
   // otherwise lose the GPS marker and any in-flight encounter modals.
   useWakeLock(true)
 
+  // Tween the visible counter so any jump (server reconciliation, missed
+  // GPS fix catch-up) animates instead of snapping. Pure presentation.
+  const displayedSteps = useTweenedInteger(stepsWalked, 450)
+
   useEffect(() => {
     function init(sid: string) {
       starterCheckedRef.current = false
       starterFlowLockedRef.current = true
+      // Reset the optimistic step accumulator — different session, new baseline.
+      localBaselineRef.current = null
       setSessionId(sid)
       sessionIdRef.current = sid
       localStorage.setItem('current_session_id', sid)
@@ -473,7 +492,12 @@ function MapPageInner() {
     }
 
     if (typeof data.stepsWalked === 'number') {
+      // Server is the authoritative source — overwrite any locally-credited
+      // optimistic value. The fix the server just persisted becomes the new
+      // local baseline so the client's next predictions stay aligned with
+      // the server's accumulator.
       setStepsWalked(data.stepsWalked)
+      localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: Date.now(), accuracy: pos.accuracy }
     }
 
     if (data.eggsHatched?.length > 0) {
@@ -579,11 +603,42 @@ function MapPageInner() {
     // Skip very inaccurate fixes (map marker already updated above)
     if (pos.accuracy > 300) return
 
+    // ── Optimistic local step credit ───────────────────────────────────────
+    // Run the same evaluateStep filter the server uses, but every GPS fix
+    // (~1 Hz) instead of every 5 s. When the filter passes, increment the
+    // counter immediately so the UI feels responsive. The server response
+    // arriving later will overwrite this value — guaranteed correctness.
+    const baseline = localBaselineRef.current
+    const now = Date.now()
+    if (!baseline) {
+      // First fix in this session — establish baseline, no credit yet.
+      localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: now, accuracy: pos.accuracy }
+    } else {
+      const distanceMoved = haversineDistance(baseline, { lat: pos.lat, lng: pos.lng })
+      const result = evaluateStep({
+        distanceMoved,
+        accuracy: pos.accuracy,
+        elapsedMs: now - baseline.ts,
+        sessionStatus: sessionStatusRef.current,
+        inBounds: inBoundsRef.current,
+      })
+      if (result.stepsIncrement > 0) {
+        setStepsWalked(prev => prev + result.stepsIncrement)
+      }
+      // Refresh the local baseline under the same rule as the server: only
+      // when accuracy is reasonable (or we just credited a step). Keeping a
+      // stale baseline during very-coarse fixes prevents jitter from
+      // resetting the accumulator and stealing credible distance.
+      if (result.shouldUpdateBaseline) {
+        localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: now, accuracy: pos.accuracy }
+      }
+    }
+
     // Trailing throttle: keep latest pos, schedule one POST per interval
     pendingPositionRef.current = pos
     if (positionPostTimeoutRef.current) return  // already scheduled; latest pos will be used
 
-    const elapsed = Date.now() - lastPositionPostAtRef.current
+    const elapsed = now - lastPositionPostAtRef.current
     const wait = Math.max(0, POSITION_POST_INTERVAL_MS - elapsed)
 
     positionPostTimeoutRef.current = setTimeout(() => {
@@ -768,7 +823,7 @@ function MapPageInner() {
         <div className="bg-[#0F1F2E]/85 border border-white/10 backdrop-blur-sm rounded-xl px-3 py-2 flex items-center gap-2">
           <span className="text-sm">👟</span>
           <div className="flex flex-col items-start leading-none">
-            <span className="text-white font-bold text-sm leading-tight">{stepsWalked.toLocaleString('it-IT')} m</span>
+            <span className="text-white font-bold text-sm leading-tight tabular-nums">{displayedSteps.toLocaleString('it-IT')} m</span>
             <span className="text-white/30 text-[9px] uppercase tracking-wide mt-0.5">Passi sessione</span>
           </div>
         </div>
