@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/server'
 
 const mockGetUser = vi.fn()
 
-const EGG = { id: 'egg-1', egg_rarity: 'comune', steps_required: 0, steps_at_pickup: 0, hatched_at: null }
+const EGG = { id: 'egg-1', egg_rarity: 'comune', steps_required: 0, steps_at_pickup: 0, hatched_at: null as string | null }
 const CREATURE = { id: 'cr-1', name: 'Fiammare', rarity: 'comune', element: 'fiamma', image_url: null, sprite_url: null, hp: 60, atk: 20, def: 10, description: null, status_effect: null, status_effect_chance: null }
 
 function buildMock({
