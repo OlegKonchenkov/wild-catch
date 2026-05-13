@@ -17,16 +17,16 @@ import { playLevelUp } from '@/lib/game/sounds/events'
 import { getSharedAC } from '@/lib/game/sounds/shared-ac'
 
 const NAV_ITEMS: Array<{ href: string; icon: string; label: string; coachmark?: string }> = [
-  { href: '/game/map',      icon: '🗺️', label: 'Mappa'                                   },
-  { href: '/game/bestiary', icon: '📖', label: 'DaimonDex'                              },
-  { href: '/game/duel',     icon: '⚔️', label: 'Duelli'                                  },
-  { href: '/game/missions', icon: '🎯', label: 'Missioni',   coachmark: 'nav-missioni' },
-  { href: '/game/enigmi',   icon: '🧩', label: 'Enigmi'                                  },
-  { href: '/game/shop',     icon: '🛒', label: 'Shop'                                    },
-  { href: '/game/backpack', icon: '🎒', label: 'Zaino',      coachmark: 'nav-zaino'    },
-  { href: '/game/profile',  icon: '🏆', label: 'Classifica'                              },
-  { href: '/game/guide',    icon: '❓', label: 'Guida',      coachmark: 'nav-guida'    },
-  { href: '/home',          icon: '🏠', label: 'Profilo'                                 },
+  { href: '/game/map',      icon: '🗺️', label: 'Mappa'                                       },
+  { href: '/game/bestiary', icon: '📖', label: 'DaimonDex', coachmark: 'nav-bestiary'      },
+  { href: '/game/duel',     icon: '⚔️', label: 'Duelli',    coachmark: 'nav-duelli'        },
+  { href: '/game/missions', icon: '🎯', label: 'Missioni',  coachmark: 'nav-missioni'      },
+  { href: '/game/enigmi',   icon: '🧩', label: 'Enigmi',    coachmark: 'nav-enigmi'        },
+  { href: '/game/shop',     icon: '🛒', label: 'Shop',      coachmark: 'nav-shop'          },
+  { href: '/game/backpack', icon: '🎒', label: 'Zaino',     coachmark: 'nav-zaino'         },
+  { href: '/game/profile',  icon: '🏆', label: 'Classifica', coachmark: 'nav-classifica'   },
+  { href: '/game/guide',    icon: '❓', label: 'Guida',     coachmark: 'nav-guida'         },
+  { href: '/home',          icon: '🏠', label: 'Profilo'                                    },
 ]
 
 function xpProgress(exp: number, level: number): number {

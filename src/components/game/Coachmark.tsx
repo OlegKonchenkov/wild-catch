@@ -79,32 +79,58 @@ export default function Coachmark({
     }
   }, [])
 
-  // Re-measure on step change. ResizeObserver on the target ensures the hole
-  // tracks the element even if its layout is animating (e.g. counter widget
-  // shrinking when digits drop). Polling fallback covers cases where the
-  // target lives inside a not-yet-mounted route segment.
+  // Re-measure on step change. If the target is off-screen (e.g. a nav item
+  // hidden in the horizontally-scrolling bottom bar) we first smooth-scroll
+  // it into view, wait for the scroll to settle, then attach the spotlight
+  // and ResizeObserver. Polling fallback covers cases where the target lives
+  // inside a not-yet-mounted route segment.
   useLayoutEffect(() => {
     if (!step) return
     let pollId: number | null = null
     let observer: ResizeObserver | null = null
+    let settleTimer: number | null = null
+
+    function isOffscreen(r: DOMRect): boolean {
+      const margin = 24
+      return (
+        r.right  > window.innerWidth  - margin ||
+        r.bottom > window.innerHeight - margin ||
+        r.left   < margin ||
+        r.top    < margin
+      )
+    }
+
+    function attach(el: HTMLElement) {
+      const r = el.getBoundingClientRect()
+      setRect({ x: r.left, y: r.top, width: r.width, height: r.height })
+      if (typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(() => {
+          const nr = el.getBoundingClientRect()
+          setRect({ x: nr.left, y: nr.top, width: nr.width, height: nr.height })
+        })
+        observer.observe(el)
+      }
+    }
 
     function tryRead() {
-      const r = readTargetRect(step.key)
-      if (r) {
-        setRect(r)
-        if (pollId) { window.clearInterval(pollId); pollId = null }
+      const el = document.querySelector(`[data-coachmark="${step.key}"]`) as HTMLElement | null
+      if (!el) { setRect(null); return }
+      if (pollId) { window.clearInterval(pollId); pollId = null }
 
-        // Attach a ResizeObserver to keep the hole synced with layout changes.
-        const el = document.querySelector(`[data-coachmark="${step.key}"]`) as HTMLElement | null
-        if (el && typeof ResizeObserver !== 'undefined') {
-          observer = new ResizeObserver(() => {
-            const nr = el.getBoundingClientRect()
-            setRect({ x: nr.left, y: nr.top, width: nr.width, height: nr.height })
-          })
-          observer.observe(el)
-        }
-      } else {
+      const r = el.getBoundingClientRect()
+      if (isOffscreen(r)) {
+        // Hide the spotlight while the scroll plays so the user sees the
+        // nav slide instead of a half-occluded hole.
         setRect(null)
+        try {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+        } catch {
+          // Older browsers lacking smooth scroll — fall back to no-arg form.
+          el.scrollIntoView()
+        }
+        settleTimer = window.setTimeout(() => attach(el), 480)
+      } else {
+        attach(el)
       }
     }
 
@@ -112,7 +138,8 @@ export default function Coachmark({
     if (!rect) pollId = window.setInterval(tryRead, 250)
 
     return () => {
-      if (pollId) window.clearInterval(pollId)
+      if (pollId)      window.clearInterval(pollId)
+      if (settleTimer) window.clearTimeout(settleTimer)
       observer?.disconnect()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

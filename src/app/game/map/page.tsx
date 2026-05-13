@@ -41,13 +41,20 @@ const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false }
 // onboarding carousel + starter pick. Persisted per-device in localStorage
 // (UI hints, not part of the game state — different devices = different
 // learning moments, and that's fine).
-const COACHMARK_STORAGE_KEY = 'wc:coachmarks:map-seen'
+// Bump this version when you change the steps in a way that justifies
+// re-showing the walkthrough — older devices will be considered "unseen".
+const COACHMARK_STORAGE_KEY = 'wc:coachmarks:map-seen:v2'
 const MAP_COACHMARK_STEPS: CoachmarkStep[] = [
-  { key: 'map-area', title: 'La tua mappa', body: 'Questo è il tuo territorio di caccia. Cammina con il cellulare per far apparire creature vicino a te.' },
-  { key: 'step-counter', title: 'Contapassi', body: 'I metri percorsi si accumulano qui. Molte missioni si completano camminando.', preferredSide: 'bottom' },
-  { key: 'nav-missioni', title: 'Missioni', body: 'I tuoi obiettivi attuali. Si sbloccano a cascata mentre giochi — guarda qui per sapere cosa fare.', preferredSide: 'top' },
-  { key: 'nav-zaino', title: 'Zaino', body: 'La tua squadra di creature, gli oggetti raccolti e le uova in incubazione.', preferredSide: 'top' },
-  { key: 'nav-guida', title: 'Guida', body: 'Ogni meccanica spiegata con esempi animati. E puoi rivedere questo tutorial da lì.', preferredSide: 'top' },
+  { key: 'map-area',      title: 'La tua mappa', body: 'Questo è il tuo territorio di caccia. Cammina con il cellulare e le creature appariranno vicino a te.' },
+  { key: 'step-counter',  title: 'Contapassi',   body: 'I metri percorsi si accumulano qui. Molte missioni si completano camminando.', preferredSide: 'bottom' },
+  { key: 'nav-bestiary',  title: 'DaimonDex',    body: 'Tutte le creature che hai scoperto e catturato. Più completi la collezione, più sale la tua fama.', preferredSide: 'top' },
+  { key: 'nav-duelli',    title: 'Duelli',       body: 'Sfida altri giocatori della sessione 1v1 con la tua squadra.', preferredSide: 'top' },
+  { key: 'nav-missioni',  title: 'Missioni',     body: 'I tuoi obiettivi attuali — la stessa missione che vedi sempre in alto a sinistra sulla mappa.', preferredSide: 'top' },
+  { key: 'nav-enigmi',    title: 'Enigmi',       body: 'Indizi e rompicapi narrativi che si sbloccano scansionando QR code in giro.', preferredSide: 'top' },
+  { key: 'nav-shop',      title: 'Shop',         body: 'Spendi oro per reti, esche, pozioni e oggetti che ti aiutano in cattura e battaglia.', preferredSide: 'top' },
+  { key: 'nav-zaino',     title: 'Zaino',        body: 'La tua squadra di creature, gli oggetti raccolti e le uova in incubazione.', preferredSide: 'top' },
+  { key: 'nav-classifica', title: 'Classifica',  body: 'Il tuo posizionamento nella sessione corrente e le statistiche personali.', preferredSide: 'top' },
+  { key: 'nav-guida',     title: 'Guida',        body: 'Ogni meccanica spiegata con esempi animati. Da qui puoi rivedere anche questo tutorial.', preferredSide: 'top' },
 ]
 
 const ENCOUNTER_COOLDOWN_MS = 30000  // 30s between encounters

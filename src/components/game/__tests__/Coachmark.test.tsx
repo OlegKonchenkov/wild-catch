@@ -84,4 +84,46 @@ describe('<Coachmark>', () => {
     // The tooltip still renders, just without a spotlight cutout
     expect(screen.getByText('Title does-not-exist')).toBeTruthy()
   })
+
+  it('calls scrollIntoView on a target that lies outside the viewport (offscreen nav item)', () => {
+    const target = document.createElement('div')
+    target.setAttribute('data-coachmark', 'offscreen-target')
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(target, 'scrollIntoView', { value: scrollIntoView, configurable: true })
+    // Place the target far to the right — JSDOM defaults innerWidth to 1024.
+    Object.defineProperty(target, 'getBoundingClientRect', {
+      value: () => ({ x: 2000, y: 500, width: 60, height: 30, top: 500, left: 2000, bottom: 530, right: 2060 }),
+    })
+    document.body.appendChild(target)
+    try {
+      const onClose = vi.fn()
+      render(<Coachmark steps={[makeStep('offscreen-target')]} onClose={onClose} />)
+      expect(scrollIntoView).toHaveBeenCalledTimes(1)
+      // It should request smooth, nearest-block, center-inline scrolling.
+      expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({
+        behavior: 'smooth',
+        inline: 'center',
+      }))
+    } finally {
+      document.body.removeChild(target)
+    }
+  })
+
+  it('does NOT call scrollIntoView when the target is already on-screen', () => {
+    const target = document.createElement('div')
+    target.setAttribute('data-coachmark', 'onscreen-target')
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(target, 'scrollIntoView', { value: scrollIntoView, configurable: true })
+    Object.defineProperty(target, 'getBoundingClientRect', {
+      value: () => ({ x: 100, y: 200, width: 60, height: 30, top: 200, left: 100, bottom: 230, right: 160 }),
+    })
+    document.body.appendChild(target)
+    try {
+      const onClose = vi.fn()
+      render(<Coachmark steps={[makeStep('onscreen-target')]} onClose={onClose} />)
+      expect(scrollIntoView).not.toHaveBeenCalled()
+    } finally {
+      document.body.removeChild(target)
+    }
+  })
 })
