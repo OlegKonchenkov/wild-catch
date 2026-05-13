@@ -145,4 +145,49 @@ describe('POST /api/game/qr/scan boss payload', () => {
       ]),
     }))
   })
+
+  it('scopes the existing-fight lookup by session_id (regression: cross-session won fights must not be reused)', async () => {
+    // The boss_fights query should chain .eq('user_id', _).eq('qr_code_id', _)
+    // .eq('session_id', _).in('status', [...]).order(...). We record every
+    // (field, value) pair the route passes to .eq() and assert session_id is
+    // among them — otherwise a 'won' fight from a previous session would be
+    // served back, surfacing past victory + reward instead of letting the
+    // player fight.
+    const recordedEqCalls: Array<[string, unknown]> = []
+    const { client, adminClient } = buildBossScanMocks()
+    const adminFrom = adminClient.from
+    adminClient.from = vi.fn((table: string) => {
+      if (table === 'boss_fights') {
+        const chain = {
+          eq: vi.fn((field: string, value: unknown) => {
+            recordedEqCalls.push([field, value])
+            return chain
+          }),
+          in: vi.fn(() => ({ order: vi.fn(async () => ({ data: [] })) })),
+        }
+        return {
+          select: vi.fn(() => chain),
+          insert: vi.fn(() => ({
+            select: vi.fn(() => ({ single: vi.fn(async () => ({ data: { id: 'fight-new' }, error: null })) })),
+          })),
+        }
+      }
+      return adminFrom(table)
+    }) as typeof adminClient.from
+
+    vi.mocked(createClient).mockResolvedValue(client as any)
+    vi.mocked(createAdminClient).mockReturnValue(adminClient as any)
+
+    const res = await POST(new Request('http://localhost/api/game/qr/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'session-B', qrId: 'BOSS01' }),
+    }))
+
+    expect(res.status).toBe(200)
+    const eqFields = recordedEqCalls.map(([f]) => f)
+    expect(eqFields).toContain('session_id')
+    const sessionIdCall = recordedEqCalls.find(([f]) => f === 'session_id')
+    expect(sessionIdCall?.[1]).toBe('session-B')
+  })
 })

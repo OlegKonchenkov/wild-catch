@@ -93,12 +93,18 @@ async function grantBossFightRewards({
   let levelUp: { newLevel: number; goldReward: number } | null = null
   let rewardGranted = false
 
+  // Dedup reward per (user, QR, session). A global boss QR earns a reward
+  // once per session; scanning the same QR in a NEW session should let the
+  // player earn it again (each event has its own scoring). Without scoping
+  // by session, a user who beat the boss in session A would never receive
+  // the reward in session B.
   const { data: priorRewardedFight } = fight.qr_code_id
     ? await supabase
         .from('boss_fights')
         .select('id')
         .eq('user_id', userId)
         .eq('qr_code_id', fight.qr_code_id)
+        .eq('session_id', fight.session_id)
         .eq('reward_claimed', true)
         .neq('id', fightId)
         .limit(1)

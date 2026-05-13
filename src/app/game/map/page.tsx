@@ -1013,7 +1013,17 @@ function MapPageInner() {
             <button
               onClick={() => {
                 setShowEncounterPopup(false)
-                encounterPopupRef.current = false
+                // Keep encounterPopupRef.current = true through the navigation.
+                // The map doesn't unmount instantly; between this click and the
+                // actual unmount, a throttled position POST may still fire and
+                // its response (triggerEncounter=true) would otherwise spawn a
+                // second sound/vibration. Clearing pendingPosition + the
+                // pending timeout makes the guard belt-and-braces.
+                pendingPositionRef.current = null
+                if (positionPostTimeoutRef.current) {
+                  clearTimeout(positionPostTimeoutRef.current)
+                  positionPostTimeoutRef.current = null
+                }
                 sessionStorage.removeItem('wc:pending_popup')
                 router.push(`/game/encounter/${pendingEncounter.encounterId}`)
               }}

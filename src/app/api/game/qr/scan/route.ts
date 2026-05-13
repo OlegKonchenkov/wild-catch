@@ -232,13 +232,18 @@ export async function POST(request: Request) {
         break
       }
 
-      // Check if this player already has boss fights for this QR.
-      // Prefer an in-progress fight, otherwise reuse a won fight to avoid duplicate rewards.
+      // Check if this player already has boss fights for this QR **in the
+      // current session**. A global boss QR (session_id IS NULL) can be
+      // scanned across sessions, so a fight won in session A must NOT be
+      // re-served when the user scans the same QR in session B — that would
+      // surface the past victory screen + reward summary instead of letting
+      // them play. Each session must have its own fight.
       const { data: existingFights } = await admin
         .from('boss_fights')
         .select('id, status, created_at')
         .eq('user_id', user.id)
         .eq('qr_code_id', qr.id)
+        .eq('session_id', sessionId)
         .in('status', ['selecting', 'active', 'won'])
         .order('created_at', { ascending: false })
 
