@@ -42,85 +42,200 @@ const REWARD_TYPE_ICONS: Record<string, string> = {
   uovo: '🥚', creatura: '🎯', enigma: '🔐', evento: '⚡',
 }
 
-function rewardParts(p: any): string {
+// Notifications and game events are stored in Postgres as JSON blobs whose
+// shape varies by event type. We type them as Record<string, unknown> so
+// callers must narrow before reading, and keep a typed payload accessor
+// helper for the small set of fields we actually care about.
+type JsonPayload = Record<string, unknown>
+
+interface NotifReward {
+  gold?: number
+  exp?: number
+  bonus_items?: Array<{ name?: string; quantity: number }>
+}
+
+interface NotifPayload {
+  title?: string
+  message?: string
+  item_name?: string
+  link_url?: string
+  reward?: NotifReward
+}
+
+interface AdminNotificationRow {
+  id: string
+  type: string
+  payload: NotifPayload | null
+  read: boolean
+  created_at: string
+}
+
+// Game-event payloads vary by event type; the JSX in the events panel
+// reads many optional fields ad-hoc. We give them a "wide" optional shape
+// rather than per-type narrowing — wrong here trades type ergonomics for a
+// fragile codepath in production-critical UI we don't want to risk.
+interface GameEventPayload {
+  rarity?: string
+  element?: string
+  evolved?: boolean
+  gold?: number
+  exp?: number
+  gold_reward?: number
+  reward_gold?: number
+  reward_exp?: number
+  new_level?: number
+  creature_name?: string
+  opponent_name?: string
+  winner_name?: string
+  boss_name?: string
+  title?: string
+  mission_target?: string
+  item_name?: string
+  qr_type?: string
+  qr_label?: string
+  egg_rarity?: string
+  pin_name?: string
+  reward_type?: string
+  amount?: number
+  message?: string
+  // catch-specific
+  hp?: number
+  atk?: number
+  def?: number
+  via_pin?: boolean
+  via_egg?: boolean
+  via_qr?: boolean
+  starter?: boolean
+  evolved_from?: string
+  // mission-specific
+  target_count?: number
+  // duel-specific
+  my_creatures?: Array<Record<string, unknown>>
+  opp_creatures?: Array<Record<string, unknown>>
+  // image url for catch / pin previews
+  image_url?: string
+  // catch-all for unknown event types
+  [extra: string]: unknown
+}
+
+interface PlayerGameEventRow {
+  id: string
+  type: string
+  payload: GameEventPayload
+  created_at: string
+}
+
+function readNum(p: JsonPayload, key: string): number {
+  const v = p[key]
+  return typeof v === 'number' ? v : 0
+}
+
+function readStr(p: JsonPayload, key: string): string | null {
+  const v = p[key]
+  return typeof v === 'string' ? v : null
+}
+
+function readBool(p: JsonPayload, key: string): boolean {
+  return Boolean(p[key])
+}
+
+function rewardParts(p: JsonPayload): string {
   const parts: string[] = []
-  if (p.gold)         parts.push(`+${p.gold} 💰`)
-  if (p.exp)          parts.push(`+${p.exp} ⭐`)
-  if (p.gold_reward)  parts.push(`+${p.gold_reward} 💰`)
-  if (p.reward_gold)  parts.push(`+${p.reward_gold} 💰`)
-  if (p.reward_exp)   parts.push(`+${p.reward_exp} ⭐`)
+  if (readNum(p, 'gold'))         parts.push(`+${readNum(p, 'gold')} 💰`)
+  if (readNum(p, 'exp'))          parts.push(`+${readNum(p, 'exp')} ⭐`)
+  if (readNum(p, 'gold_reward'))  parts.push(`+${readNum(p, 'gold_reward')} 💰`)
+  if (readNum(p, 'reward_gold'))  parts.push(`+${readNum(p, 'reward_gold')} 💰`)
+  if (readNum(p, 'reward_exp'))   parts.push(`+${readNum(p, 'reward_exp')} ⭐`)
   return parts.join(' · ')
 }
 
-function formatGameEvent(ev: any): { icon: string; title: string; body: string } {
-  const p = ev.payload ?? {}
+function formatGameEvent(ev: PlayerGameEventRow): { icon: string; title: string; body: string } {
+  const p: JsonPayload = ev.payload ?? {}
   switch (ev.type) {
     case 'catch': {
-      const rarityInfo = p.rarity ? RARITY_DISPLAY[p.rarity as string] : null
+      const rarity = readStr(p, 'rarity')
+      const rarityInfo = rarity ? RARITY_DISPLAY[rarity] : null
+      const evolved = readBool(p, 'evolved')
+      const gold = readNum(p, 'gold')
       const bodyParts = [
         rarityInfo?.label,
-        p.element,
-        p.evolved ? '✨ Evoluta' : '',
-        p.gold ? `+${p.gold} 💰` : '',
+        readStr(p, 'element'),
+        evolved ? '✨ Evoluta' : '',
+        gold ? `+${gold} 💰` : '',
       ].filter(Boolean)
       return {
-        icon: p.evolved ? '✨' : '🎯',
-        title: `Catturato: ${p.creature_name ?? 'creatura'}`,
+        icon: evolved ? '✨' : '🎯',
+        title: `Catturato: ${readStr(p, 'creature_name') ?? 'creatura'}`,
         body: bodyParts.join(' · '),
       }
     }
-    case 'duel_won':
+    case 'duel_won': {
+      const opponent = readStr(p, 'opponent_name')
       return {
         icon: '🏆',
-        title: p.opponent_name ? `Vinto vs ${p.opponent_name}` : 'Duello vinto!',
+        title: opponent ? `Vinto vs ${opponent}` : 'Duello vinto!',
         body: rewardParts(p) || 'Vittoria in duello',
       }
-    case 'duel_lost':
-      return { icon: '💀', title: p.winner_name ? `Perso vs ${p.winner_name}` : 'Duello perso', body: '' }
-    case 'duel_cancelled':
-      return { icon: '🤝', title: p.opponent_name ? `Duello annullato vs ${p.opponent_name}` : 'Duello annullato', body: 'Nessun punto assegnato' }
-    case 'boss_won':
+    }
+    case 'duel_lost': {
+      const winner = readStr(p, 'winner_name')
+      return { icon: '💀', title: winner ? `Perso vs ${winner}` : 'Duello perso', body: '' }
+    }
+    case 'duel_cancelled': {
+      const opponent = readStr(p, 'opponent_name')
+      return { icon: '🤝', title: opponent ? `Duello annullato vs ${opponent}` : 'Duello annullato', body: 'Nessun punto assegnato' }
+    }
+    case 'boss_won': {
+      const boss = readStr(p, 'boss_name')
       return {
         icon: '👑',
-        title: p.boss_name ? `${p.boss_name} sconfitto!` : 'Boss sconfitto!',
+        title: boss ? `${boss} sconfitto!` : 'Boss sconfitto!',
         body: rewardParts(p),
       }
-    case 'boss_lost':
+    }
+    case 'boss_lost': {
+      const boss = readStr(p, 'boss_name')
       return {
         icon: '💀',
         title: 'Sconfitto dal boss',
-        body: p.boss_name ? `Boss: ${p.boss_name}` : '',
-      }
-    case 'mission_completed': {
-      const mRewards = rewardParts(p)
-      return {
-        icon: '✅',
-        title: p.title ? `Missione: ${p.title}` : 'Missione completata!',
-        body: mRewards || (p.mission_target ? p.mission_target : ''),
+        body: boss ? `Boss: ${boss}` : '',
       }
     }
-    case 'level_up':
+    case 'mission_completed': {
+      const mRewards = rewardParts(p)
+      const title = readStr(p, 'title')
+      return {
+        icon: '✅',
+        title: title ? `Missione: ${title}` : 'Missione completata!',
+        body: mRewards || readStr(p, 'mission_target') || '',
+      }
+    }
+    case 'level_up': {
+      const newLevel = readNum(p, 'new_level')
+      const goldReward = readNum(p, 'gold_reward')
       return {
         icon: '⭐',
-        title: `Livello ${p.new_level}!`,
-        body: p.gold_reward > 0 ? `+${p.gold_reward} 💰` : 'Nuovo livello raggiunto',
+        title: `Livello ${newLevel}!`,
+        body: goldReward > 0 ? `+${goldReward} 💰` : 'Nuovo livello raggiunto',
       }
+    }
     case 'qr_redeemed': {
       return {
         icon: '📱',
-        title: `QR: "${p.item_name}"`,
+        title: `QR: "${readStr(p, 'item_name') ?? ''}"`,
         body: rewardParts(p),
       }
     }
     case 'pin_claimed': {
-      const pinIcon = REWARD_TYPE_ICONS[p.reward_type as string] ?? '📍'
+      const pinIcon = REWARD_TYPE_ICONS[readStr(p, 'reward_type') ?? ''] ?? '📍'
+      const eggRarity = readStr(p, 'egg_rarity')
       const pinReward = rewardParts(p) ||
-        (p.creature_name ? p.creature_name : '') ||
-        (p.item_name ? p.item_name : '') ||
-        (p.egg_rarity ? `Uovo ${p.egg_rarity}` : '')
+        readStr(p, 'creature_name') ||
+        readStr(p, 'item_name') ||
+        (eggRarity ? `Uovo ${eggRarity}` : '')
       return {
         icon: pinIcon,
-        title: p.pin_name ? `Pin: ${p.pin_name}` : 'Pin riscattato!',
+        title: readStr(p, 'pin_name') ? `Pin: ${readStr(p, 'pin_name')}` : 'Pin riscattato!',
         body: pinReward,
       }
     }
@@ -169,10 +284,10 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null)
   const [showNotifPanel, setShowNotifPanel] = useState(false)
   const [notifTab, setNotifTab] = useState<'messaggi' | 'eventi'>('messaggi')
-  const [notifications, setNotifications] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<AdminNotificationRow[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const [gameEvents, setGameEvents] = useState<any[]>([])
+  const [gameEvents, setGameEvents] = useState<PlayerGameEventRow[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
   const [expandedNotifId, setExpandedNotifId] = useState<string | null>(null)
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
@@ -399,7 +514,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         table: 'player_notifications',
         filter: `user_id=eq.${userId}`,
       }, (payload) => {
-        const row = payload.new as any
+        const row = payload.new as AdminNotificationRow
         // Add to list
         setNotifications(prev => [row, ...prev])
         setUnreadCount(prev => prev + 1)
@@ -437,7 +552,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         table: 'player_game_events',
         filter: `user_id=eq.${userId}`,
       }, (payload) => {
-        setGameEvents(prev => [payload.new, ...prev])
+        setGameEvents(prev => [payload.new as PlayerGameEventRow, ...prev])
       })
       .subscribe()
 
@@ -803,7 +918,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                       <p className="text-sm">Nessun evento di gioco</p>
                     </div>
                   ) : (
-                    gameEvents.map((ev: any) => {
+                    gameEvents.map((ev) => {
                       const { icon, title, body } = formatGameEvent(ev)
                       const time     = new Date(ev.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
                       const fullDate = new Date(ev.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -822,9 +937,11 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                           </div>
                         ) : null
                       )
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       const DuelSquadColumn = ({ label, creatures, accentColor }: { label: string; creatures: any[]; accentColor: string }) => (
                         <div className="flex flex-col gap-1.5">
                           <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: accentColor + 'AA' }}>{label}</p>
+                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                           {creatures.map((cr: any, i: number) => {
                             const crRarity = cr.rarity ? RARITY_DISPLAY[cr.rarity as string] : null
                             const crElem   = cr.element ? (ELEMENT_EMOJI as Record<string, string>)[cr.element as string] : null
@@ -1041,11 +1158,11 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                           {p.title ?? p.mission_target ?? 'Missione completata!'}
                                         </p>
                                         {/* Objective detail */}
-                                        {(p.mission_target || p.target_count > 1) && (
+                                        {(p.mission_target || (p.target_count ?? 0) > 1) && (
                                           <div className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)' }}>
                                             <span className="text-sm">🎯</span>
                                             <p className="text-xs text-white/70">
-                                              {p.target_count > 1
+                                              {(p.target_count ?? 0) > 1
                                                 ? `${p.target_count}× ${p.mission_target ?? 'completamenti'}`
                                                 : (p.mission_target ?? 'completato')}
                                             </p>
@@ -1062,7 +1179,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                           <span className="font-black leading-none" style={{ fontSize: 48, color: '#F7C841', textShadow: '0 0 24px rgba(247,200,65,0.5)' }}>{p.new_level}</span>
                                           <span className="text-sm font-bold mb-1.5" style={{ color: 'rgba(247,200,65,0.7)' }}>Livello raggiunto!</span>
                                         </div>
-                                        {p.gold_reward > 0 && (
+                                        {(p.gold_reward ?? 0) > 0 && (
                                           <span className="inline-block text-sm font-bold px-3 py-1.5 rounded-xl" style={{ background: 'rgba(212,169,106,0.18)', color: '#D4A96A', border: '1px solid rgba(212,169,106,0.35)' }}>
                                             +{p.gold_reward} 💰 bonus livello
                                           </span>
