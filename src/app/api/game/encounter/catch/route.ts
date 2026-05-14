@@ -180,7 +180,17 @@ export async function POST(request: Request) {
   if (existing) {
     const newCount = existing.duplicates_count + 1
 
-    if (newCount >= 3 && !existing.evolved) {
+    // Auto-evolve when this catch brings the count to EXACTLY 3.
+    //
+    // Design rule (per game-design decision): "every 3 copies caught =
+    // +1 evolution". We don't gate on `existing.evolved` — a re-evolved
+    // creature is allowed. But we ONLY auto-fire on the threshold-
+    // crossing catch (newCount === 3, never >= 3) to avoid a chain
+    // reaction when count somehow stockpiles past 3 (e.g. via eggs,
+    // missions). Players who accumulate a surplus can evolve it through
+    // the manual /api/game/creature/evolve endpoint, one click = one
+    // evolution.
+    if (newCount === 3) {
       const { data: evolvedForm } = await supabase
         .from('creatures')
         .select('id')

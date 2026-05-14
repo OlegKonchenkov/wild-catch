@@ -113,4 +113,21 @@ describe('POST /api/game/creature/evolve', () => {
     expect(body.copiesConsumed).toBe(2)
     expect(body.newCreature.id).toBe('cr-2')
   })
+
+  it('200 — re-evolves even when evolved flag is already true (stockpile rule)', async () => {
+    // Design rule "every 3 copies = +1 evolution": the player can keep
+    // grinding more base creatures and call /evolve again. The `evolved`
+    // boolean is informational, not a gate.
+    vi.mocked(createClient).mockResolvedValue(buildSupabaseMock({
+      ...PC, duplicates_count: 3, evolved: true,
+    }) as any)
+    const res = await POST(new Request('http://x', {
+      method: 'POST',
+      body: JSON.stringify({ playerCreatureId: 'pc-1', sessionId: 'sess-1' }),
+    }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.evolved).toBe(true)
+    expect(body.copiesConsumed).toBe(2)
+  })
 })

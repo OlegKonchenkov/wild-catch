@@ -19,14 +19,11 @@ export async function POST(request: Request) {
     .single()
 
   if (!pc) return NextResponse.json({ error: 'Creatura non trovata' }, { status: 404 })
-  if ((pc as any).evolved) {
-    // Without this guard the player could stockpile 3+ copies of a base
-    // creature AFTER its first evolution and trigger /evolve again,
-    // farming infinite copies of the evolved form. encounter/catch
-    // already gates the auto-evolution path with `!existing.evolved`;
-    // this is the matching guard for the manual endpoint.
-    return NextResponse.json({ error: 'Creatura già evoluta' }, { status: 400 })
-  }
+  // Design choice: every 3 copies = +1 evolution. We deliberately do NOT
+  // gate on `evolved` so the player can keep evolving as they grind more
+  // copies. Each evolve consumes 2 copies, so a stockpile of 6 yields
+  // 2 evolved-form increments via two calls. The `evolved` boolean is
+  // kept true after the first evolution for UI display purposes only.
   if (pc.duplicates_count < 3) {
     return NextResponse.json({
       error: `Servono 3 copie (hai ${pc.duplicates_count})`,
