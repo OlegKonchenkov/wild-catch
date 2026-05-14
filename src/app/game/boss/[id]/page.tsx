@@ -951,7 +951,10 @@ export default function BossFightPage() {
             setAttackAnim({
               key: Date.now() + 1,
               element: counterBoss.element,
-              rarity: "leggendario",
+              // Use the actual boss creature rarity — hardcoding
+              // "leggendario" was wrong for sub-leggendary bosses
+              // (e.g. the tutorial boss is comune armonia).
+              rarity: (counterBoss as any).rarity ?? "comune",
               side: "right",
             });
           }
@@ -1390,7 +1393,7 @@ export default function BossFightPage() {
       setBossAttacking(true);
       const counterBoss = nextBossLineup[bossActiveSlot];
       if (counterBoss) {
-        setAttackAnim({ key: Date.now(), element: counterBoss.element, rarity: "leggendario", side: "right" });
+        setAttackAnim({ key: Date.now(), element: counterBoss.element, rarity: (counterBoss as any).rarity ?? "comune", side: "right" });
       }
       addLog(`↻ Cambio creatura! Il Capo Palestra contrattacca per ${data.bossDamage} danni!`);
       setTimeout(() => {

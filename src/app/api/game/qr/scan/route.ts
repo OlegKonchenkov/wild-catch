@@ -198,7 +198,7 @@ export async function POST(request: Request) {
       const creatureIds = bossCreatureEntries.map(e => e.creature_id)
       const { data: creaturesData } = await admin
         .from('creatures')
-        .select('id, name, element, hp, atk, def, image_url, sprite_url, status_effect, status_effect_chance')
+        .select('id, name, element, rarity, hp, atk, def, image_url, sprite_url, status_effect, status_effect_chance')
         .in('id', creatureIds)
 
       const crMap: Record<string, any> = Object.fromEntries(
@@ -217,6 +217,7 @@ export async function POST(request: Request) {
           creature_id: cr.id,
           name: cr.name,
           element: cr.element,
+          rarity: cr.rarity ?? 'comune',
           level: scaledStats.level,
           atk: scaledStats.atk,
           def: scaledStats.def,

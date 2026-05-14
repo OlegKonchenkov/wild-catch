@@ -7,6 +7,7 @@ import { useWakeLock } from '@/hooks/useWakeLock'
 import { haptics } from '@/lib/haptics'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import StatusAura from '@/components/battle/StatusAura'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import { GameBattleSkeleton } from '@/components/game/GameLoading'
@@ -150,6 +151,10 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
           rarity={rarity as Rarity}
           showAura
         />
+        {/* Ambient status loop matching the badge */}
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+          <StatusAura status={statusEffect ?? null} size={spriteSize} />
+        </div>
       </div>
 
       {/* ── Info section ── */}

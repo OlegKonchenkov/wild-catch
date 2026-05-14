@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import StatusAura from '@/components/battle/StatusAura'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
 import { startEncounterLoop } from '@/lib/game/sounds/battle-loop'
 import { playCatchAttempt, playCatchFail, playCatchSuccess } from '@/lib/game/sounds/catch'
@@ -216,6 +217,12 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
           rarity={rarity as Rarity}
           showAura
         />
+        {/* Ambient status overlay — visible loop matching the badge so
+            the player can tell "this creature is asleep/paralyzed/etc"
+            at a glance even when not reading the badge text. */}
+        <div className="absolute inset-0 pointer-events-none">
+          <StatusAura status={statusEffect ?? null} size={140} />
+        </div>
       </div>
 
       {/* ── Info section ── */}

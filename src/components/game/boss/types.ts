@@ -10,6 +10,10 @@ export interface BossSlot {
   creature_id: string
   name: string
   element: Element
+  /** Creature rarity. Used to pick the matching attack animation (anim
+   *  registry is keyed on element + rarity tier). Optional for
+   *  back-compat with legacy boss_fights rows that pre-date this field. */
+  rarity?: Rarity
   level?: number
   atk: number
   def?: number

@@ -62,7 +62,12 @@ export async function POST(request: Request) {
       .single()
 
     const inv = invItem as { quantity: number; items: { type: string; effect_value: number } } | null
-    if (inv && inv.quantity > 0 && (inv.items?.type === 'rete' || inv.items?.type === 'esca')) {
+    // Only "rete" items boost the catch attempt directly. "esca" is a
+    // PASSIVE spawn-rate booster activated separately via
+    // /api/game/item/use — accepting it here was a long-standing bug
+    // that turned every Esca's effect_value into a catch multiplier,
+    // letting players cheese leggendaries.
+    if (inv && inv.quantity > 0 && inv.items?.type === 'rete') {
       itemMult = Number(inv.items.effect_value ?? 1)
       await supabase
         .from('player_inventory')

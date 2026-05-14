@@ -1,6 +1,7 @@
 'use client'
 import { motion } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import StatusAura from '@/components/battle/StatusAura'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
@@ -83,6 +84,10 @@ export default function CreatureCard({
           rarity={rarity as Rarity}
           showAura
         />
+        {/* Ambient status loop matching the badge */}
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+          <StatusAura status={statusEffect ?? null} size={spriteSize} />
+        </div>
         {isBoss && (
           <div
             className="absolute top-1.5 left-1.5 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
