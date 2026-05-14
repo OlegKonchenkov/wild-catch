@@ -45,14 +45,22 @@ export const TUTORIAL_SUGGERIMENTO_ID = '7470a503-d41d-0500-0000-000000000701'
  *  Migration 033 seed. */
 export const TUTORIAL_BONUS_SUGGERIMENTO_ID = '7470a503-d41d-0500-0000-000000000702'
 
-/** Distance from the player's first GPS fix where the tutorial bonus pin
- *  is dropped (metres). 40m is ≈ 30–50 s of slow walking — far enough to
- *  feel like a real objective, close enough that even fragile GPS gets
- *  there within a tutorial session. */
-export const TUTORIAL_PIN_OFFSET_M = 40
-
 /** Distance below which the bonus pin auto-claims (metres). */
 export const TUTORIAL_PIN_CLAIM_RADIUS_M = 25
+
+/** Tutorial mission #7 — "Maestro Daimologo", final 50 m walk. The bonus
+ *  pin is now tied to this mission: it appears when M7 unlocks, placed
+ *  far enough that walking the M7 target (50 m) naturally takes the
+ *  player into the pin's claim radius. The two events fire together,
+ *  giving the otherwise-arbitrary "walk 50 m" objective a visual goal. */
+export const TUTORIAL_M7_MISSION_ID = '7470a311-d41d-0500-0000-000000000406'
+export const TUTORIAL_M7_TARGET_M = 50
+
+/** Distance from the player's GPS fix at the moment M7 unlocks where the
+ *  pin is dropped. = 50 m (mission target) + 25 m (claim radius) so the
+ *  player enters the claim zone exactly when they've walked 50 m in a
+ *  straight line toward the pin. */
+export const TUTORIAL_PIN_OFFSET_M = TUTORIAL_M7_TARGET_M + TUTORIAL_PIN_CLAIM_RADIUS_M
 
 /** Mapping: when a mission id completes, grant this frammento. */
 export const TUTORIAL_MISSION_FRAMMENTO_GRANTS: Record<string, string> = {

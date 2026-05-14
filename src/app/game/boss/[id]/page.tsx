@@ -73,6 +73,30 @@ export default function BossFightPage() {
       /* noop */
     }
   }, [fight]);
+
+  // Pre-fight mission rewards parked by the map page when the player
+  // scanned the boss QR. The QR-scan mission (e.g. M6 "Sfida il Capo")
+  // completes server-side at scan time, but showing its reward modal
+  // before the fight would flash on the screen during navigation AND
+  // would be narratively wrong (player hasn't won yet). We prepend
+  // these to the post-victory mission queue so the player sees them
+  // alongside the "you won" rewards.
+  const [pendingPreMissions, setPendingPreMissions] = useState<CompletedMissionInfo[]>([]);
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const raw = sessionStorage.getItem(`wc:pending-boss-rewards:${id}`);
+      if (raw) {
+        sessionStorage.removeItem(`wc:pending-boss-rewards:${id}`);
+        const parsed = JSON.parse(raw) as CompletedMissionInfo[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPendingPreMissions(parsed);
+        }
+      }
+    } catch {
+      /* noop */
+    }
+  }, [id]);
   const {
     toast: actionToast,
     showApiError: showActionError,
@@ -1477,13 +1501,20 @@ export default function BossFightPage() {
   }
 
   if (finalResult) {
+    // Combine pre-fight (QR-scan) mission rewards with post-victory ones
+    // so the player sees the boss-QR-scan frammento alongside any boss-win
+    // mission completion. Empty arrays drop out cleanly.
+    const allMissions = finalResult.won
+      ? [...pendingPreMissions, ...bossMissions]
+      : bossMissions
     return (
       <div className="h-full relative" style={{ background: BOSS_THEME.bg }}>
-        {showBossMissions && bossMissions.length > 0 && (
+        {showBossMissions && allMissions.length > 0 && (
           <MissionRewardModal
-            missions={bossMissions}
+            missions={allMissions}
             onDone={() => {
               setShowBossMissions(false);
+              setPendingPreMissions([]);
               router.replace("/game/missions");
             }}
           />
@@ -1493,12 +1524,12 @@ export default function BossFightPage() {
           reward={finalResult.reward}
           levelUp={finalResult.levelUp}
           ctaLabel={
-            finalResult.won && bossMissions.length > 0
+            finalResult.won && allMissions.length > 0
               ? "Vedi ricompense"
               : undefined
           }
           onExit={() => {
-            if (finalResult.won && bossMissions.length > 0) {
+            if (finalResult.won && allMissions.length > 0) {
               setShowBossMissions(true);
             } else {
               router.replace("/game/missions");

@@ -21,6 +21,7 @@ import {
   TUTORIAL_BONUS_SUGGERIMENTO_ID,
   TUTORIAL_PIN_OFFSET_M,
   TUTORIAL_PIN_CLAIM_RADIUS_M,
+  TUTORIAL_M7_MISSION_ID,
   TUTORIAL_MISSION_MOMENTS,
   isTutorialQrTarget,
   tutorialQrButtonLabel,
@@ -332,6 +333,11 @@ function MapPageInner() {
   const [tutorialQrBusy, setTutorialQrBusy] = useState(false)
   const [tutorialQrResult, setTutorialQrResult] = useState<string | null>(null)
   const [tutorialNextTarget, setTutorialNextTarget] = useState<string | null>(null)
+  // True iff the player's CURRENT next objective is M7 — the final 50 m
+  // walk ("Maestro Daimologo"). The tutorial bonus pin is tied to this:
+  // it appears only when M7 is active so walking 50 m toward the pin
+  // completes both at once. Resolves over a /api/game/missions/next fetch.
+  const [tutorialOnM7, setTutorialOnM7] = useState(false)
 
   // Resolve which tutorial QR (if any) the next-objective is asking for.
   // Re-fetches on every mission completion event so the button morphs from
@@ -339,6 +345,7 @@ function MapPageInner() {
   const refreshTutorialTarget = useCallback(async () => {
     if (!isTutorialSession || !sessionId) {
       setTutorialNextTarget(null)
+      setTutorialOnM7(false)
       return
     }
     try {
@@ -347,6 +354,7 @@ function MapPageInner() {
       const data = await res.json()
       const target = data?.objective?.target ?? null
       setTutorialNextTarget(isTutorialQrTarget(target) ? target : null)
+      setTutorialOnM7(data?.objective?.id === TUTORIAL_M7_MISSION_ID)
     } catch {
       // Best-effort: realtime will retrigger this on the next mission update.
     }
@@ -394,10 +402,15 @@ function MapPageInner() {
     return () => { cancelled = true }
   }, [isTutorialSession, supabase])
 
-  // Place the pin: needs (tutorial session, not claimed, a GPS fix). On the
-  // first eligible render we pick / persist the anchor and render the pin.
+  // Place the pin: needs (tutorial session, M7 unlocked, not claimed, GPS
+  // fix). The pin is tied to mission #7 — "Maestro Daimologo", a 50 m
+  // walk. We compute its position the FIRST time M7 becomes the active
+  // objective (anchor = player's GPS at that moment) and offset it by
+  // 50 m + 25 m claim radius so a straight-line walk to the pin
+  // completes both the mission and the claim simultaneously, giving the
+  // otherwise-arbitrary "walk 50 m" a concrete visual goal.
   useEffect(() => {
-    if (!isTutorialSession || tutorialBonusClaimed !== false) {
+    if (!isTutorialSession || tutorialBonusClaimed !== false || !tutorialOnM7) {
       setTutorialBonusPin(null)
       return
     }
@@ -409,10 +422,9 @@ function MapPageInner() {
       const user = await getCurrentUser(supabase)
       if (!user || cancelled) return
 
-      // Read or initialise the anchor (the "spawn point" of the pin —
-      // recomputed only if the user has never had one). The actual pin
-      // position is a fixed offset off this anchor, so the marker doesn't
-      // drift when the player walks around before reaching it.
+      // Anchor = player's GPS at the moment M7 first became active. We
+      // persist it so the pin doesn't drift if the player wanders before
+      // committing to the walk.
       const key = tutorialBonusAnchorKey(user.id)
       let anchor: { lat: number; lng: number } | null = null
       try {
@@ -436,8 +448,8 @@ function MapPageInner() {
         id: TUTORIAL_BONUS_PIN_ID,
         lat: pinPos.lat,
         lng: pinPos.lng,
-        name: '💡 Indizio del Maestro',
-        description: 'Cammina fino a qui per ricevere un indizio extra sull\'enigma.',
+        name: '💡 Punto di destinazione del Maestro',
+        description: 'Cammina fino a qui per completare il tirocinio — riceverai anche un indizio bonus sull\'enigma.',
         reward_type: 'enigma',
         reward_radius_m: TUTORIAL_PIN_CLAIM_RADIUS_M,
       })
@@ -451,7 +463,7 @@ function MapPageInner() {
       } catch { /* noop */ }
     })()
     return () => { cancelled = true }
-  }, [isTutorialSession, tutorialBonusClaimed, supabase])
+  }, [isTutorialSession, tutorialBonusClaimed, tutorialOnM7, supabase])
 
   // Proximity claim — fires from the GPS callback so it ticks even between
   // server POSTs. Wrapped in its own ref-guarded flow to avoid double posts.
@@ -517,8 +529,21 @@ function MapPageInner() {
         haptics.tap()
         if (data.bossFightId) {
           // Boss QR scanned — drop the player straight into the fight.
+          // The boss-QR mission completes SERVER-SIDE at scan time (it's
+          // type='qr', not 'boss_won'), so the server returned the mission
+          // completion + any frammento grant immediately. Showing the
+          // reward modal HERE would flash it for a split-second during the
+          // router.push to the boss page — and would also be narratively
+          // wrong (the player hasn't beaten the boss yet). Park the
+          // payload in sessionStorage and the boss page picks it up after
+          // the fight ends.
           if (data.completedMissions?.length > 0) {
-            setMissionQueue(prev => [...prev, ...data.completedMissions])
+            try {
+              sessionStorage.setItem(
+                `wc:pending-boss-rewards:${data.bossFightId}`,
+                JSON.stringify(data.completedMissions),
+              )
+            } catch { /* quota — fall back to losing the modal */ }
           }
           router.push(`/game/boss/${data.bossFightId}`)
           return
@@ -1219,9 +1244,9 @@ function MapPageInner() {
           <div className="flex items-start gap-2.5">
             <span className="text-2xl shrink-0 leading-none">💡</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold leading-snug">Il maestro ha nascosto un indizio nelle vicinanze</p>
+              <p className="text-sm font-bold leading-snug">Il maestro ha tracciato la rotta finale</p>
               <p className="text-[12px] text-white/80 leading-snug mt-0.5">
-                Esplora la mappa — un pin viola ti aspetta a pochi metri da qui.
+                Cammina verso il pin viola sulla mappa — completerà il tirocinio e ti darà un indizio bonus sull&apos;enigma.
               </p>
             </div>
             <button
