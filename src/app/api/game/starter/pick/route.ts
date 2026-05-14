@@ -52,12 +52,26 @@ export async function POST(request: Request) {
     duplicates_count: 1,
   }).select('id').single()
 
-  // Auto-assign starter as captain (squad slot 0)
+  // Atomically claim the starter slot. Without `.is('selected_creature_id',
+  // null)` two concurrent calls (different creature_ids → no UNIQUE
+  // collision on player_creatures) could both pass the count==0 check
+  // and both insert a creature. The guard ensures only the first
+  // request actually becomes the starter; the loser rolls back its
+  // creature insert below.
   if (pc?.id) {
-    await admin.from('player_sessions')
+    const { data: claimedRows } = await admin.from('player_sessions')
       .update({ squad_ids: [pc.id], selected_creature_id: pc.id })
       .eq('user_id', user.id)
       .eq('session_id', sessionId)
+      .is('selected_creature_id', null)
+      .select('id')
+
+    if (!claimedRows || claimedRows.length === 0) {
+      // Lost the race: another request became the starter. Roll back our
+      // creature insert so the player doesn't end up with two starters.
+      await admin.from('player_creatures').delete().eq('id', pc.id)
+      return NextResponse.json({ error: 'Starter già scelto', alreadyPicked: true }, { status: 409 })
+    }
   }
 
   // Save a game event for bell history
