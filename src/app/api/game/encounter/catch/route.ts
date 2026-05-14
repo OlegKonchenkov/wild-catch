@@ -166,6 +166,11 @@ export async function POST(request: Request) {
 
   let evolvedTriggered = false
   let newCreatureId = creature.id
+  // `isNew` = the player added a creature_id that wasn't yet in their
+  // session collection. Drives the bestiary "Nuovo!" reveal animation.
+  // Base catch path: true when !existing. Evolution path: true when the
+  // evolved form is added as a fresh row (see existingEvolved below).
+  let isNew = !existing
 
   if (existing) {
     const newCount = existing.duplicates_count + 1
@@ -206,6 +211,8 @@ export async function POST(request: Request) {
             session_id: encounter.session_id,
             duplicates_count: 1,
           }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
+          // First-time evolved form → bestiary should reveal it.
+          isNew = true
         }
 
         evolvedTriggered = true
@@ -295,6 +302,6 @@ export async function POST(request: Request) {
     },
   }).then(undefined, () => {})
 
-  return NextResponse.json({ caught: true, evolved: evolvedTriggered, newCreatureId, expGain, goldGain, scoreGain, levelUp, completedMissions })
+  return NextResponse.json({ caught: true, evolved: evolvedTriggered, isNew, newCreatureId, expGain, goldGain, scoreGain, levelUp, completedMissions })
 }
 

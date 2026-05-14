@@ -88,6 +88,17 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
     }
   }, [supabase, sessionId, fetchNext])
 
+  // Window-event fallback: realtime postgres_changes can be flaky (small
+  // delays, dropped events on backgrounded tabs, publication misconfig).
+  // Every gameplay route that progresses a mission also dispatches
+  // `wc:refresh-stats`, so listening here guarantees the widget refreshes
+  // immediately even if realtime missed the row update.
+  useEffect(() => {
+    function onRefresh() { void fetchNext() }
+    window.addEventListener('wc:refresh-stats', onRefresh)
+    return () => window.removeEventListener('wc:refresh-stats', onRefresh)
+  }, [fetchNext])
+
   if (!loaded || !objective) return null
 
   const meta = TYPE_META[objective.type] ?? { icon: '🎯', verb: 'Completa' }
