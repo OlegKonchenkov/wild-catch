@@ -16,7 +16,7 @@ import CreatureSprite from '@/components/creature/CreatureSprite'
 import EggHatchModal from '@/components/game/EggHatchModal'
 import Coachmark, { type CoachmarkStep } from '@/components/game/Coachmark'
 import NextObjectiveWidget from '@/components/game/NextObjectiveWidget'
-import { TUTORIAL_QR_CODE, TUTORIAL_SESSION_ID } from '@/lib/game/tutorial'
+import { TUTORIAL_SESSION_ID, isTutorialQrTarget, tutorialQrButtonLabel } from '@/lib/game/tutorial'
 import StarterSelect, { type StarterCreature } from '@/components/game/StarterSelect'
 import PinRewardModal, { type PinRewardData } from '@/components/game/PinRewardModal'
 import EnigmaModal from '@/components/game/EnigmaModal'
@@ -287,28 +287,77 @@ function MapPageInner() {
   // Tutorial mode: the always-on demo session has no physical QR codes in
   // the world, so we surface a "simulated scan" button on the map HUD.
   // Tapping it hits the normal /api/game/qr/scan endpoint with the seeded
-  // tutorial QR manual_code, so missions / rewards flow identically to a
-  // real scan.
+  // tutorial QR manual_code matching the **current mission target** — so a
+  // single button context-switches between "spawn an item" and "evoke the
+  // tutorial boss" depending on where the player is in the story arc.
+  // Missions, rewards, bestiary, and boss flow exactly like a real scan.
   const isTutorialSession = sessionId === TUTORIAL_SESSION_ID
   const [tutorialQrBusy, setTutorialQrBusy] = useState(false)
   const [tutorialQrResult, setTutorialQrResult] = useState<string | null>(null)
+  const [tutorialNextTarget, setTutorialNextTarget] = useState<string | null>(null)
+
+  // Resolve which tutorial QR (if any) the next-objective is asking for.
+  // Re-fetches on every mission completion event so the button morphs from
+  // "Simula scansione" → "Evoca il Capo" as the player progresses.
+  const refreshTutorialTarget = useCallback(async () => {
+    if (!isTutorialSession || !sessionId) {
+      setTutorialNextTarget(null)
+      return
+    }
+    try {
+      const res = await fetch(`/api/game/missions/next?sessionId=${sessionId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      const target = data?.objective?.target ?? null
+      setTutorialNextTarget(isTutorialQrTarget(target) ? target : null)
+    } catch {
+      // Best-effort: realtime will retrigger this on the next mission update.
+    }
+  }, [isTutorialSession, sessionId])
+
+  useEffect(() => { void refreshTutorialTarget() }, [refreshTutorialTarget])
+
+  // The mission-completion modal lifecycle ends with the queue draining;
+  // hook into wc:refresh-stats (already fired by the encounter/qr/boss
+  // success paths) so the simulated-button stays in sync without a
+  // dedicated channel here.
+  useEffect(() => {
+    if (!isTutorialSession) return
+    function onMissionTick() { void refreshTutorialTarget() }
+    window.addEventListener('wc:refresh-stats', onMissionTick)
+    return () => window.removeEventListener('wc:refresh-stats', onMissionTick)
+  }, [isTutorialSession, refreshTutorialTarget])
+
   async function simulateTutorialQr() {
-    if (tutorialQrBusy || !sessionId) return
+    if (tutorialQrBusy || !sessionId || !tutorialNextTarget) return
     setTutorialQrBusy(true)
     setTutorialQrResult(null)
     try {
       const res = await fetch('/api/game/qr/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, qrId: TUTORIAL_QR_CODE }),
+        body: JSON.stringify({ sessionId, qrId: tutorialNextTarget }),
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        setTutorialQrResult(`✓ ${data.itemName ?? 'Oggetto'} aggiunto allo zaino`)
+        if (data.bossFightId) {
+          // Boss QR scanned — drop the player straight into the fight.
+          if (data.completedMissions?.length > 0) {
+            setMissionQueue(prev => [...prev, ...data.completedMissions])
+          }
+          router.push(`/game/boss/${data.bossFightId}`)
+          return
+        }
+        if (data.itemName) {
+          setTutorialQrResult(`✓ ${data.itemName} aggiunto allo zaino`)
+        } else {
+          setTutorialQrResult('✓ Scansione riuscita')
+        }
         if (data.completedMissions?.length > 0) {
           setMissionQueue(prev => [...prev, ...data.completedMissions])
         }
         window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       } else if (data.alreadyScanned) {
         setTutorialQrResult('Hai già scansionato questo segno')
       } else {
@@ -907,38 +956,48 @@ function MapPageInner() {
 
       {/* Tutorial-only: simulated QR scan button. Real events spawn QR
           codes on physical objects; the always-on demo can't, so we surface
-          this button only when the player is inside the tutorial session. */}
-      {isTutorialSession && (
-        <div className="absolute z-[850] bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
-          {tutorialQrResult && (
-            <div
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold backdrop-blur-sm"
-              style={{
-                background: 'rgba(58,188,168,0.18)',
-                border: '1px solid rgba(58,188,168,0.35)',
-                color: '#3ABCA8',
-                maxWidth: 260,
-                textAlign: 'center',
-              }}
+          this button only when the current mission target is a tutorial QR
+          (item or boss). The button's label + colour scheme adapt: teal
+          spell for items, red skull-warning for the boss. */}
+      {isTutorialSession && tutorialNextTarget && (() => {
+        const isBoss = tutorialNextTarget === 'TUTBSS'
+        const gradient = isBoss
+          ? 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)'
+          : 'linear-gradient(135deg, #3ABCA8 0%, #2d8c7d 100%)'
+        const shadow = isBoss
+          ? '0 6px 18px rgba(232,93,47,0.4)'
+          : '0 6px 18px rgba(58,188,168,0.4)'
+        const border = isBoss
+          ? '1px solid rgba(232,93,47,0.6)'
+          : '1px solid rgba(58,188,168,0.6)'
+        return (
+          <div className="absolute z-[850] bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
+            {tutorialQrResult && (
+              <div
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold backdrop-blur-sm"
+                style={{
+                  background: isBoss ? 'rgba(232,93,47,0.18)' : 'rgba(58,188,168,0.18)',
+                  border: isBoss ? '1px solid rgba(232,93,47,0.35)' : '1px solid rgba(58,188,168,0.35)',
+                  color: isBoss ? '#E85D2F' : '#3ABCA8',
+                  maxWidth: 260,
+                  textAlign: 'center',
+                }}
+              >
+                {tutorialQrResult}
+              </div>
+            )}
+            <button
+              onClick={simulateTutorialQr}
+              disabled={tutorialQrBusy}
+              className="rounded-2xl px-4 py-2.5 text-sm font-bold text-white shadow-lg disabled:opacity-60"
+              style={{ background: gradient, boxShadow: shadow, border }}
             >
-              {tutorialQrResult}
-            </div>
-          )}
-          <button
-            onClick={simulateTutorialQr}
-            disabled={tutorialQrBusy}
-            className="rounded-2xl px-4 py-2.5 text-sm font-bold text-white shadow-lg disabled:opacity-60"
-            style={{
-              background: 'linear-gradient(135deg, #3ABCA8 0%, #2d8c7d 100%)',
-              boxShadow: '0 6px 18px rgba(58,188,168,0.4)',
-              border: '1px solid rgba(58,188,168,0.6)',
-            }}
-          >
-            {tutorialQrBusy ? '...' : '🪄 Simula scansione QR'}
-          </button>
-          <span className="text-[10px] text-white/40 font-mono">tutorial only</span>
-        </div>
-      )}
+              {tutorialQrBusy ? '...' : tutorialQrButtonLabel(tutorialNextTarget)}
+            </button>
+            <span className="text-[10px] text-white/40 font-mono">tutorial only</span>
+          </div>
+        )
+      })()}
 
       {/* First-run coachmarks — fires once per device after onboarding+starter */}
       {showCoachmarks && (

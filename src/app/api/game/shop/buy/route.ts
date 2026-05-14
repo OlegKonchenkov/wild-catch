@@ -33,14 +33,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errMsg }, { status: 403 })
   }
 
-  // Get item price
+  // Get item — must be either a global item (session_id IS NULL) or one
+  // belonging to the current session. Without this scoping a tutorial-only
+  // item could be bought from inside a paid event (since both share the
+  // user's gold pool).
   const { data: item } = await supabase
     .from('items')
-    .select('id, name, shop_price')
+    .select('id, name, shop_price, session_id')
     .eq('id', itemId)
     .single()
 
   if (!item) return NextResponse.json({ error: 'Oggetto non trovato' }, { status: 404 })
+  if (item.session_id != null && item.session_id !== sessionId) {
+    return NextResponse.json({ error: 'Oggetto non disponibile in questa sessione' }, { status: 403 })
+  }
 
   const totalCost = item.shop_price * quantity
 

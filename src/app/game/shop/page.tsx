@@ -35,10 +35,21 @@ export default function ShopPage() {
     setLoading(true)
     try {
       // Items are read-only catalogue → SWR cache, paint cached instantly.
-      const itemsSWR = swr<Item[]>('shop:items:v1', 10 * 60 * 1000, async () => {
+      // Items are scoped by session: global ones (session_id IS NULL) plus
+      // anything specific to the current session. Tutorial-only items don't
+      // leak into real-event shops, and event-specific catalogues stay
+      // isolated. The cache key includes the sessionId so different
+      // sessions get their own SWR entry.
+      const cacheKey = `shop:items:${sessionId ?? 'no-session'}:v2`
+      const itemsSWR = swr<Item[]>(cacheKey, 10 * 60 * 1000, async () => {
+        const filter = sessionId
+          ? `session_id.eq.${sessionId},session_id.is.null`
+          : 'session_id.is.null'
         const { data } = await supabase
           .from('items').select('*')
-          .gt('shop_price', 0).order('type').order('shop_price')
+          .gt('shop_price', 0)
+          .or(filter)
+          .order('type').order('shop_price')
         return (data ?? []) as unknown as Item[]
       })
       if (itemsSWR.cached) setItems(itemsSWR.cached)

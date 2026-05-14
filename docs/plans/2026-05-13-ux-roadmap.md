@@ -48,31 +48,50 @@ Legenda priorità: ⭐ = nice-to-have · ⭐⭐⭐⭐⭐ = critical-for-pilot.
 ---
 
 ## ✅ Step 4 — Tutorial sempre attivo (mini-storia "Apprendista Daimologo")
-**Status:** done · **Effort:** ~3h · **Impatto:** ⭐⭐⭐⭐⭐
+**Status:** done · **Effort:** ~5h totali (v1: 3h + v2: 2h) · **Impatto:** ⭐⭐⭐⭐⭐
 
 Sessione globale `kind='tutorial'` accessibile a chiunque senza codice invito.
-Mini-storia in 4 missioni che fa interagire con cammino, cattura, QR
-(simulato), zaino. Rifacibile con wipe completo della propria run.
+Mini-storia in **6 missioni** che fa interagire con cammino, cattura, QR
+(item simulato), shop, boss fight, finale. Rifacibile con wipe completo.
 
-- [x] Migration 030: `sessions.kind` + tutorial session UUID fisso +
-  4 missioni narrative + QR seed + item "Rete del Tirocinante"
+v1 (migration 030):
+- [x] `sessions.kind` + tutorial session UUID fisso + QR seed + item
 - [x] `src/lib/game/tutorial.ts` constants module
 - [x] `POST /api/game/tutorial` (start | reset) — idempotente; reset wipe
   atomico di 10 tabelle per-(user, session) + ricreazione fresh
-- [x] `/api/game/sessions` filtra fuori `kind='tutorial'` dalla lista
-  sessioni reali del giocatore
-- [x] `/home`: card "🎓 Prova il gioco — Tutorial gratuito" con CTA
-  primaria + link "Rifai da capo" dopo prima visita
-- [x] Bottone "🪄 Simula scansione QR" sulla mappa visibile **solo** in
-  `session.id === TUTORIAL_SESSION_ID`
-- [x] Fix bounds vuoti in `/api/game/encounter/start` (tutorial ha
-  `area_bounds = {}`)
-- [x] 6 contract test sul nuovo endpoint (auth, validation, start
-  idempotente, reset wipe completo, errore propagato)
+- [x] `/api/game/sessions` filtra fuori `kind='tutorial'`
+- [x] `/home`: card "🎓 Prova il gioco — Tutorial gratuito"
+- [x] Bottone "🪄 Simula scansione QR" tutorial-only sulla mappa
+- [x] Fix bounds vuoti in `/api/game/encounter/start`
+
+v2 (migration 031 — espansione completa):
+- [x] 4 missioni → 6: aggiunte "L'arte del commercio" (shop) e
+  "Sfida il Capo del Tirocinio" (boss QR), rinominata finale "Maestro Daimologo"
+- [x] Tutorial Esca (premio QR1) + Tutorial Rete (in shop a 100 oro)
+- [x] Tutorial boss QR `TUTBSS` con creatura comune lookup dinamico
+- [x] Shop page: filtra item per `session_id=eq.<currentSessionId>` o
+  `is.null` — tutorial item non leakano in eventi reali
+- [x] Shop buy route: 403 se l'item appartiene a una sessione diversa
+- [x] Bottone simulato sulla mappa è ora **context-aware**: legge il
+  next-objective e morpha da "🪄 Simula scansione QR" (teal) a
+  "💀 Evoca il Capo del Tirocinio" (rosso) quando il giocatore è alla
+  missione 5. Boss QR scan → navigate diretto a `/game/boss/[id]`.
+- [x] 9 contract test sul nuovo helpers module (`isTutorialQrTarget`,
+  `tutorialQrButtonLabel`, costanti)
+- [x] Totale: 313 test pass, 4 pre-esistenti balance failure invariati
 
 ---
 
-## ⏳ Step 5 — Primo incontro guidato
+## ✅ Step 5 — Primo incontro guidato (assorbito da Step 4)
+**Status:** dropped — coperto dal Tutorial v2 ("Il tuo primo Daimon" missione 2)
+
+~~Dropped as a standalone step:~~ il tutorial guida già il giocatore al
+primo combat naturalmente. Aggiungere un coachmark in-encounter è un
+nice-to-have ma non più critico.
+
+---
+
+## ⏳ Step 5b — Primo incontro guidato (legacy, dropped)
 **Status:** todo · **Effort:** ~2h · **Impatto:** ⭐⭐⭐⭐
 
 Garantire che la prima creatura selvatica sia **easy** (rarity comune,
