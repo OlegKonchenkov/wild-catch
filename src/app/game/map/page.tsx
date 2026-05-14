@@ -77,6 +77,12 @@ const TUTORIAL_BONUS_PIN_ID = 'tutorial-bonus-hint'
 const tutorialBonusAnchorKey = (uid: string) => `wc:tutorial-bonus-anchor:${uid}`
 const TUTORIAL_PIN_HINT_SEEN_KEY = 'wc:tutorial-pin-hint-seen'
 
+// sessionStorage key for the per-session optimistic steps_walked total.
+// Persists across map ↔ encounter ↔ duel ↔ boss navigations so the
+// counter doesn't snap backward when the player returns to the map
+// before the throttled position POST has flushed the latest credit.
+const STEPS_CACHE_KEY = (sid: string) => `wc:steps-walked:${sid}`
+
 const ENCOUNTER_COOLDOWN_MS = 30000  // 30s between encounters
 // Cumulative distance that, when exceeded, probabilistically triggers a walk-based encounter
 const WALK_ENCOUNTER_DIST_M = 25  // trigger after accumulating ~25 m
@@ -233,6 +239,18 @@ function MapPageInner() {
   useEffect(() => { declinedBossPinIdsRef.current = declinedBossPinIds }, [declinedBossPinIds])
   useEffect(() => { declinedEnigmaPinIdsRef.current = declinedEnigmaPinIds }, [declinedEnigmaPinIds])
   useEffect(() => { sessionStatusRef.current = (session?.status as string) ?? 'active' }, [session?.status])
+
+  // Persist the optimistic step total to sessionStorage so a remount of
+  // the map (encounter/duel/boss back-button) doesn't snap the counter
+  // backward to whatever the server last persisted. Init reads this and
+  // takes max(server, cached).
+  useEffect(() => {
+    const sid = sessionIdRef.current
+    if (!sid || stepsWalked <= 0) return
+    try {
+      sessionStorage.setItem(STEPS_CACHE_KEY(sid), String(stepsWalked))
+    } catch { /* quota */ }
+  }, [stepsWalked])
 
   // Background ambience loop + ducking registration — starts on mount, stops on unmount
   useEffect(() => {
@@ -583,7 +601,18 @@ function MapPageInner() {
               if (d > new Date()) setEscaActiveUntil(d)
             }
             if (typeof data?.steps_walked === 'number') {
-              setStepsWalked(data.steps_walked)
+              // Compare server's count to any locally-cached optimistic
+              // total from a previous mount. The server is authoritative
+              // for the bottom bound, but local credit may be ahead if a
+              // position POST didn't flush before the page navigated
+              // away (e.g. player tapped an encounter). Take the max so
+              // the visible counter is strictly non-decreasing.
+              let cached = 0
+              try {
+                const raw = sessionStorage.getItem(STEPS_CACHE_KEY(sid))
+                if (raw) cached = parseInt(raw, 10) || 0
+              } catch { /* noop */ }
+              setStepsWalked(Math.max(data.steps_walked, cached))
             }
             // Signal the starter effect: returning players (selected_creature_id
             // already set) skip the /api/game/starters round-trip and unblock the
@@ -1066,6 +1095,16 @@ function MapPageInner() {
   const [escaSecondsLeft, setEscaSecondsLeft] = useState(0)
   const starterSessionStatus = session?.status
 
+  // Stable pins array reference — important because GameMap's marker-render
+  // useEffect uses [mapReady, pins] as deps and tears every marker (and
+  // their open popups) on any change. Without useMemo a fresh array would
+  // be created on every parent re-render (escaSecondsLeft tick, GPS fix,
+  // tutorial state, etc.) and player-opened popups would flicker shut.
+  const renderedPins = useMemo(
+    () => tutorialBonusPin ? [...mapPins, tutorialBonusPin] : mapPins,
+    [mapPins, tutorialBonusPin],
+  )
+
   // Countdown tick — updates every second while esca is active
   useEffect(() => {
     if (!escaActiveUntil) { setEscaSecondsLeft(0); return }
@@ -1142,7 +1181,7 @@ function MapPageInner() {
         playerPosition={position ? { lat: position.lat, lng: position.lng } : null}
         sessionId={sessionId!}
         creatureImageUrl={creatureImageUrl}
-        pins={tutorialBonusPin ? [...mapPins, tutorialBonusPin] : mapPins}
+        pins={renderedPins}
         onPinTap={handlePinTap}
       />
 

@@ -352,7 +352,15 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
             style="width:100%;border-radius:8px;margin-top:6px;cursor:zoom-in;max-height:130px;object-fit:cover"
             title="Tocca per ingrandire" />`
         : ''
-      const popup = Leaflet.popup({ maxWidth: 230 }).setContent(`
+      // autoClose:false + closeOnClick:false → once a player opens a pin
+      // popup, it stays open until they explicitly close it. Default
+      // Leaflet behaviour dismisses popups on the next map interaction or
+      // marker re-render, which is annoying when reading the pin text.
+      const popup = Leaflet.popup({
+        maxWidth: 230,
+        autoClose: false,
+        closeOnClick: false,
+      }).setContent(`
         <div style="font-family:sans-serif;padding:2px 0">
           <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#0F1F2E">${pin.name || 'Punto di interesse'}</div>
           ${pin.description ? `<div style="font-size:12px;color:#4B5563;line-height:1.4">${pin.description}</div>` : ''}
