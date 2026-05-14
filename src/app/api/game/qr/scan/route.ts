@@ -70,9 +70,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Hai già riscattato questo QR', alreadyScanned: true }, { status: 409 })
   }
 
-  const isFirstUniqueScan = !existingScan
+  let isFirstUniqueScan = !existingScan
   if (isFirstUniqueScan) {
-    await supabase.from('qr_scan_log').insert({ qr_id: qr.id, user_id: user.id, session_id: sessionId })
+    // Race-safe insert: qr_scan_log has UNIQUE(qr_id, user_id, session_id)
+    // so a concurrent request can't double-pass the existingScan check.
+    // 23505 = duplicate key → another request beat us; treat as "already
+    // scanned" so we don't re-dispense the reward.
+    const { error: insertErr } = await supabase.from('qr_scan_log').insert({
+      qr_id: qr.id,
+      user_id: user.id,
+      session_id: sessionId,
+    })
+    if (insertErr) {
+      if ((insertErr as any).code === '23505') {
+        if (qr.unique_per_user) {
+          return NextResponse.json(
+            { error: 'Hai già riscattato questo QR', alreadyScanned: true },
+            { status: 409 },
+          )
+        }
+        // Non-unique QR: someone else (or we, racing ourselves) already
+        // logged the scan. Treat as repeat scan — don't grant missions
+        // a second time but allow the reward dispense to fall through if
+        // the QR allows multi-use.
+        isFirstUniqueScan = false
+      } else {
+        return NextResponse.json({ error: 'Errore log scansione' }, { status: 500 })
+      }
+    }
   }
 
   // Decrement uses

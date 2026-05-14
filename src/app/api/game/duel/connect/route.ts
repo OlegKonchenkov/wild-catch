@@ -86,18 +86,6 @@ export async function POST(request: Request) {
     if (!duel) return NextResponse.json({ error: 'Stanza non trovata o già iniziata' }, { status: 404 })
     if (duel.challenger_id === user.id) return NextResponse.json({ error: 'Sei già in questa stanza' }, { status: 409 })
 
-    // Insert opponent lineups
-    await supabase.from('duel_lineups').insert(
-      lineup.map(entry => ({
-        duel_id: duel.id,
-        user_id: user.id,
-        slot: entry.slot,
-        player_creature_id: entry.playerCreatureId,
-        current_hp: hpMap.get(entry.playerCreatureId) ?? 100,
-        is_active: entry.slot === 1,
-      }))
-    )
-
     // Determine who goes first: lower slot-1 ATK attacks first.
     // Must use admin client because the opponent can't read the challenger's player_creatures via RLS.
     const { createAdminClient } = await import('@/lib/supabase/admin')
@@ -110,6 +98,10 @@ export async function POST(request: Request) {
     const challengerSlot1Atk = (challengerPc as any)?.creatures?.atk ?? 0
     const firstTurn: 'challenger' | 'opponent' = challengerSlot1Atk <= opponentSlot1Atk ? 'challenger' : 'opponent'
 
+    // Atomically claim the opponent slot FIRST — if a concurrent joiner
+    // beat us we abort cleanly without inserting our lineup. The previous
+    // order (lineups → update) could leave orphan duel_lineups rows
+    // belonging to "us" in someone else's duel.
     const { data: updated } = await supabase
       .from('duels')
       .update({
@@ -125,6 +117,19 @@ export async function POST(request: Request) {
       .single()
 
     if (!updated) return NextResponse.json({ error: 'Stanza già occupata' }, { status: 409 })
+
+    // Now safe to insert the opponent lineup — the duel is exclusively ours.
+    await supabase.from('duel_lineups').insert(
+      lineup.map(entry => ({
+        duel_id: duel.id,
+        user_id: user.id,
+        slot: entry.slot,
+        player_creature_id: entry.playerCreatureId,
+        current_hp: hpMap.get(entry.playerCreatureId) ?? 100,
+        is_active: entry.slot === 1,
+      }))
+    )
+
     return NextResponse.json({ duelId: updated.id, role: 'opponent', roomCode: duel.room_code })
   }
 
