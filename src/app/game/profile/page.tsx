@@ -1,10 +1,12 @@
 'use client'
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { GameProfileSkeleton } from '@/components/game/GameLoading'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
+import { createClient } from '@/lib/supabase/client'
+import { TUTORIAL_SESSION_ID } from '@/lib/game/tutorial'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,7 +65,33 @@ function ProfileContent() {
   const [avatarUrl, setAvatarUrl]       = useState<string | null>(null)
   const [loading, setLoading]           = useState(true)
   const [loadingBoard, setLoadingBoard] = useState(false)
+  const [tutorialCompleted, setTutorialCompleted] = useState(false)
   const { toast, showError, dismiss }   = useGameToast()
+  const supabase = useMemo(() => createClient(), [])
+
+  // ── Tutorial completion badge ─────────────────────────────────────────────
+  // The enigma-solve mission (M8 / 407) is the last step in the tutorial
+  // chain. If the player has a completed_at row for it, they've finished
+  // the apprenticeship. We surface a small badge under their identity so
+  // they have a sense of progress beyond just an event-specific stats card.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      const { data } = await supabase
+        .from('player_missions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('session_id', TUTORIAL_SESSION_ID)
+        .eq('mission_id', '7470a311-d41d-0500-0000-000000000407')
+        .not('completed_at', 'is', null)
+        .maybeSingle()
+      if (cancelled) return
+      setTutorialCompleted(!!data)
+    })()
+    return () => { cancelled = true }
+  }, [supabase])
 
   const searchParams = useSearchParams()
   const sessionEnded = searchParams.get('ended') === '1'
@@ -181,15 +209,23 @@ function ProfileContent() {
             <p className="font-extrabold text-white text-base truncate">
               {loading ? '...' : nickname || 'Cacciatore'}
             </p>
-            {session && st && (
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs truncate text-white/40">{session.name}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0"
-                  style={{ background: st.color + '22', color: st.color, border: `1px solid ${st.color}44` }}>
-                  {st.label}
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {session && st && (
+                <>
+                  <span className="text-xs truncate text-white/40">{session.name}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0"
+                    style={{ background: st.color + '22', color: st.color, border: `1px solid ${st.color}44` }}>
+                    {st.label}
+                  </span>
+                </>
+              )}
+              {tutorialCompleted && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 bg-[#FBBF24]/15 text-[#FBBF24] border border-[#FBBF24]/40"
+                  title="Hai completato il tutorial Apprendista Daimologo">
+                  🎓 Maestro Daimologo
                 </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>

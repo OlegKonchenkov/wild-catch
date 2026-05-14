@@ -127,6 +127,36 @@ Implementazione:
 
 ---
 
+## ✅ Step 4c — Tutorial polish pilot-ready
+**Status:** done · **Effort:** ~3h · **Impatto:** ⭐⭐⭐⭐⭐
+
+Rifiniture finali per portare il tutorial da "completo" a "memorabile":
+
+- [x] Migration 035: tutorial Pozione del Tirocinante (cura, 20g, 50% HP)
+  in shop tutorial-scoped + boss QR ora prefersce creatura `armonia`
+  (elemento neutro, no svantaggio elementale per nessuna squadra)
+- [x] `TutorialMomentModal` componente: narrative beats dopo M2 (prima
+  cattura + frammento), M6 (boss sconfitto + frammento), M8 (Maestro
+  Daimologo — celebrazione finale con CTA "Vai alla home")
+- [x] Server `incrementMissionProgress` ora include `missionId` +
+  `tutorialFrammentoGranted` ({frammentoId, title}) in
+  `CompletedMission`, propagato al client
+- [x] `MissionRewardModal` mostra pannello "🧩 Frammento d'enigma sbloccato"
+  quando un grant è presente
+- [x] Pin bonus hint banner: la prima volta che il pin viola appare
+  sulla mappa tutorial, mostra "Il maestro ha nascosto un indizio
+  nelle vicinanze". Dismissed forever via localStorage
+- [x] `TutorialElementsModal` overlay sul boss fight: prima volta in
+  combat tutorial, modal con tabella elementi (forte/debole) + spiega
+  bottoni Attacca/Cura/Cambia. Dismissed via localStorage
+- [x] Profile badge "🎓 Maestro Daimologo" quando M8 (407) ha
+  completed_at IS NOT NULL — query Supabase RLS-friendly su mount
+- [x] Tutorial reset cancella tutti i flag localStorage rilevanti
+  (`wc:tutorial-moments-seen:v1`, `wc:tutorial-pin-hint-seen`,
+  `wc:tutorial-elements-seen`, `wc:tutorial-bonus-anchor:<uid>`)
+
+---
+
 ## 🐛 Bug fix di rilascio
 **Status:** done · **Effort:** ~1h
 

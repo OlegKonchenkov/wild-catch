@@ -28,10 +28,17 @@ interface InventoryRow { id: string; quantity: number }
 interface PlayerCreatureRow { id: string; duplicates_count: number }
 
 export interface CompletedMission {
+  /** Original mission id — lets the client key tutorial-moment modals
+   *  by mission UUID (see TUTORIAL_MISSION_MOMENTS in tutorial.ts). */
+  missionId?: string
   title: string
   rewardGold: number
   rewardExp: number
   levelUp?: { newLevel: number; goldReward: number } | null
+  /** Present when this mission completion granted a tutorial enigma
+   *  frammento. The client uses it to surface a "🧩 nuovo frammento"
+   *  toast alongside the mission reward. */
+  tutorialFrammentoGranted?: { frammentoId: string; title: string } | null
 }
 
 /**
@@ -129,9 +136,12 @@ export async function incrementMissionProgress({
       // tutorial missions complete. This is how the player learns that
       // catching creatures + scanning special targets contributes to enigma
       // progress, without needing a real frammento-bearing creature pool.
+      let tutorialFrammentoGranted:
+        | { frammentoId: string; title: string }
+        | null = null
       const frammentoId = TUTORIAL_MISSION_FRAMMENTO_GRANTS[mission.id]
       if (frammentoId) {
-        await admin
+        const { error: upsertErr } = await admin
           .from('player_enigma_frammenti')
           .upsert(
             {
@@ -141,6 +151,19 @@ export async function incrementMissionProgress({
             },
             { onConflict: 'user_id,session_id,frammento_id', ignoreDuplicates: true },
           )
+        if (!upsertErr) {
+          // Fetch the frammento title so the client can show it in the
+          // toast. Best-effort — if this lookup fails we still grant the
+          // frammento above, we just won't have a fancy title to display.
+          const { data: frammento } = await admin
+            .from('enigma_frammenti')
+            .select('title')
+            .eq('id', frammentoId)
+            .maybeSingle()
+          if (frammento?.title) {
+            tutorialFrammentoGranted = { frammentoId, title: frammento.title }
+          }
+        }
       }
 
       // Game events for bell history
@@ -166,10 +189,12 @@ export async function incrementMissionProgress({
         }).then(undefined, () => {})
       }
       completed.push({
+        missionId: mission.id,
         title: mission.title,
         rewardGold: mission.reward_gold,
         rewardExp: mission.reward_exp,
         levelUp,
+        tutorialFrammentoGranted,
       })
     }
   }

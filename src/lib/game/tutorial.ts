@@ -25,6 +25,7 @@ export function scopedSessionOrFilter(sessionId: string): string | null {
 export const TUTORIAL_ITEMS = {
   esca: '7470a17e-d41d-0500-0000-000000000110',
   rete: '7470a17e-d41d-0500-0000-000000000111',
+  pozione: '7470a17e-d41d-0500-0000-000000000112',
 } as const
 
 /** Tutorial enigma — "anima". Mirrors migration 032. */
@@ -57,6 +58,56 @@ export const TUTORIAL_PIN_CLAIM_RADIUS_M = 25
 export const TUTORIAL_MISSION_FRAMMENTO_GRANTS: Record<string, string> = {
   '7470a311-d41d-0500-0000-000000000402': TUTORIAL_FRAMMENTI.respiro,
   '7470a311-d41d-0500-0000-000000000405': TUTORIAL_FRAMMENTI.eco,
+}
+
+// ── Tutorial moments ─────────────────────────────────────────────────────────
+// Educational narrative beats fired AFTER the standard MissionRewardModal
+// drains. Each entry maps a completed mission id → a story moment shown
+// in the TutorialMomentModal. Only the missions worth a beat are mapped;
+// the others (walk-only milestones) flow straight to the next objective
+// without an extra modal so the UX doesn't drown in popups.
+export interface TutorialMoment {
+  /** Identifier used to dedupe (we only show each moment once per session). */
+  key: string
+  /** Emoji shown in the modal header. */
+  emoji: string
+  /** Modal title — short, character voice. */
+  title: string
+  /** Body — 2-4 short sentences in the maestro's voice. Supports newlines. */
+  body: string
+  /** Optional call-to-action button label + route. If omitted the modal
+   *  closes and the player resumes the map. */
+  cta?: { label: string; route: string }
+  /** When true, render a "celebration" variant (gold gradient, bigger). */
+  celebrate?: boolean
+}
+
+export const TUTORIAL_MISSION_MOMENTS: Record<string, TutorialMoment> = {
+  // M2 — first catch
+  '7470a311-d41d-0500-0000-000000000402': {
+    key: 'first-catch',
+    emoji: '🎉',
+    title: 'Il tuo primo compagno',
+    body: '"Eccellente, ragazzo!" Il maestro applaude. "Ora questo Daimon è tuo — lo trovi nello Zaino, in basso a destra.\n\nHai anche raccolto un frammento d\'enigma 🧩 — guarda nella sezione Enigmi (icona 🧩 nel menu) per scoprire cosa significa."',
+    cta: { label: 'Continua', route: '/game/map' },
+  },
+  // M6 — boss defeated (boss QR mission, frammento #2 grant)
+  '7470a311-d41d-0500-0000-000000000405': {
+    key: 'boss-defeated',
+    emoji: '⚔️',
+    title: 'Capo del Tirocinio sconfitto',
+    body: '"Non c\'erano molti dubbi sull\'esito." Il maestro sorride. "Hai dimostrato di saperti difendere — e hai ottenuto un secondo frammento dell\'enigma.\n\nUltimi due passi: una passeggiata finale, poi l\'enigma da risolvere."',
+    cta: { label: 'Avanti', route: '/game/map' },
+  },
+  // M8 — enigma solved → tutorial COMPLETE
+  '7470a311-d41d-0500-0000-000000000407': {
+    key: 'tutorial-complete',
+    emoji: '🎓',
+    title: 'Maestro Daimologo',
+    body: '"Hai imparato tutto quello che potevo insegnarti, ragazzo." Il vecchio annuisce, soddisfatto. "Cattura, mercato, sigilli, duelli, enigmi — niente più segreti.\n\nGli eventi reali ti attendono in giro per il territorio. Ognuno ha le sue creature, i suoi premi, le sue sfide.\n\nQuando trovi un evento, premi \'Unisciti\' nella home e inserisci il codice invito. Buona caccia."',
+    cta: { label: 'Vai alla home', route: '/home' },
+    celebrate: true,
+  },
 }
 
 /** Manual codes are what the simulated-scan button passes to /api/game/qr/scan. */

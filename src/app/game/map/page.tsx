@@ -21,11 +21,13 @@ import {
   TUTORIAL_BONUS_SUGGERIMENTO_ID,
   TUTORIAL_PIN_OFFSET_M,
   TUTORIAL_PIN_CLAIM_RADIUS_M,
+  TUTORIAL_MISSION_MOMENTS,
   isTutorialQrTarget,
   tutorialQrButtonLabel,
   tutorialPinBearingForUser,
   offsetGpsPoint,
 } from '@/lib/game/tutorial'
+import type { TutorialMoment } from '@/lib/game/tutorial'
 import StarterSelect, { type StarterCreature } from '@/components/game/StarterSelect'
 import PinRewardModal, { type PinRewardData } from '@/components/game/PinRewardModal'
 import EnigmaModal from '@/components/game/EnigmaModal'
@@ -33,6 +35,7 @@ import BossApproachModal from '@/components/game/BossApproachModal'
 import { GameMapSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
+import TutorialMomentModal, { hasSeenTutorialMoment } from '@/components/game/TutorialMomentModal'
 import type { Session } from '@/lib/types'
 import { RARITY_LABELS } from '@/lib/types'
 import type { MapPin } from '@/components/map/GameMap'
@@ -71,6 +74,7 @@ const MAP_COACHMARK_STEPS: CoachmarkStep[] = [
 // distinguish it from real DB-backed pins in the proximity-claim flow.
 const TUTORIAL_BONUS_PIN_ID = 'tutorial-bonus-hint'
 const tutorialBonusAnchorKey = (uid: string) => `wc:tutorial-bonus-anchor:${uid}`
+const TUTORIAL_PIN_HINT_SEEN_KEY = 'wc:tutorial-pin-hint-seen'
 
 const ENCOUNTER_COOLDOWN_MS = 30000  // 30s between encounters
 // Cumulative distance that, when exceeded, probabilistically triggers a walk-based encounter
@@ -343,6 +347,13 @@ function MapPageInner() {
   const [tutorialBonusClaimed, setTutorialBonusClaimed] = useState<boolean | null>(null) // null = unknown yet
   const tutorialBonusClaimingRef = useRef(false)
   const [tutorialBonusToast, setTutorialBonusToast] = useState<string | null>(null)
+  const [showPinHint, setShowPinHint] = useState(false)
+
+  // ── Tutorial moments queue ────────────────────────────────────────────────
+  // After MissionRewardModal drains, we may need to show one or more
+  // narrative beats ("first catch!", "boss defeated", "tutorial complete").
+  // The queue is built from the mission completions surfaced by the server.
+  const [tutorialMomentQueue, setTutorialMomentQueue] = useState<TutorialMoment[]>([])
 
   // Resolve claimed status from the DB once we know the user + tutorial scope
   useEffect(() => {
@@ -411,6 +422,14 @@ function MapPageInner() {
         reward_type: 'enigma',
         reward_radius_m: TUTORIAL_PIN_CLAIM_RADIUS_M,
       })
+      // First time we drop the pin on this device, surface a hint banner
+      // so the player knows to look at the map (the marker is small and
+      // easy to miss). Dismissed forever via localStorage flag.
+      try {
+        if (!localStorage.getItem(TUTORIAL_PIN_HINT_SEEN_KEY)) {
+          setShowPinHint(true)
+        }
+      } catch { /* noop */ }
     })()
     return () => { cancelled = true }
   }, [isTutorialSession, tutorialBonusClaimed, supabase])
@@ -1126,6 +1145,33 @@ function MapPageInner() {
         </div>
       )}
 
+      {/* Tutorial bonus pin — first-time discovery hint. The Leaflet
+          marker is small so without this many players never notice it.
+          Dismissed forever once tapped. */}
+      {showPinHint && tutorialBonusPin && (
+        <div className="absolute z-[855] top-20 left-1/2 -translate-x-1/2 max-w-[320px] w-[88%] px-4 py-3 rounded-2xl bg-[#7B4DB8]/95 text-white shadow-xl backdrop-blur-sm border border-[#C084FC]/40">
+          <div className="flex items-start gap-2.5">
+            <span className="text-2xl shrink-0 leading-none">💡</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold leading-snug">Il maestro ha nascosto un indizio nelle vicinanze</p>
+              <p className="text-[12px] text-white/80 leading-snug mt-0.5">
+                Esplora la mappa — un pin viola ti aspetta a pochi metri da qui.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setShowPinHint(false)
+                try { localStorage.setItem(TUTORIAL_PIN_HINT_SEEN_KEY, '1') } catch { /* noop */ }
+              }}
+              className="shrink-0 text-white/70 hover:text-white text-base leading-none px-1"
+              aria-label="Chiudi"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tutorial-only: simulated QR scan button. Real events spawn QR
           codes on physical objects; the always-on demo can't, so we surface
           this button only when the current mission target is a tutorial QR
@@ -1319,7 +1365,32 @@ function MapPageInner() {
       {missionQueue.length > 0 && (
         <MissionRewardModal
           missions={missionQueue}
-          onDone={() => setMissionQueue([])}
+          onDone={() => {
+            // When the standard rewards modal closes, collect any tutorial
+            // moments tied to the missions that just completed and queue
+            // them up. We dedupe via localStorage so revisiting an old
+            // completion doesn't replay the modal.
+            if (isTutorialSession) {
+              const moments: TutorialMoment[] = []
+              for (const m of missionQueue) {
+                if (!m.missionId) continue
+                const moment = TUTORIAL_MISSION_MOMENTS[m.missionId]
+                if (moment && !hasSeenTutorialMoment(moment.key)) {
+                  moments.push(moment)
+                }
+              }
+              if (moments.length > 0) setTutorialMomentQueue(prev => [...prev, ...moments])
+            }
+            setMissionQueue([])
+          }}
+        />
+      )}
+
+      {/* Tutorial narrative beats — fired after MissionRewardModal closes */}
+      {tutorialMomentQueue.length > 0 && (
+        <TutorialMomentModal
+          moment={tutorialMomentQueue[0]}
+          onClose={() => setTutorialMomentQueue(prev => prev.slice(1))}
         />
       )}
 

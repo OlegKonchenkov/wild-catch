@@ -17,6 +17,8 @@ import { GameToast } from "@/components/game/GameToast";
 import { useGameToast } from "@/components/game/useGameToast";
 import MissionRewardModal from "@/components/game/MissionRewardModal";
 import type { CompletedMissionInfo } from "@/components/game/MissionRewardModal";
+import TutorialElementsModal from "@/components/game/TutorialElementsModal";
+import { TUTORIAL_SESSION_ID } from "@/lib/game/tutorial";
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from "@/lib/types";
 import type { Element, Rarity } from "@/lib/types";
 import { playBossSound } from "@/lib/game/battle-sounds";
@@ -56,6 +58,20 @@ export default function BossFightPage() {
   const [fight, setFight] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); // load-time errors (full-page screen)
+  // Tutorial-only "elements lesson" modal — shown once per device the
+  // first time the player enters a boss fight in the tutorial session.
+  const [showElementsLesson, setShowElementsLesson] = useState(false);
+  useEffect(() => {
+    if (!fight) return;
+    if (fight.session_id !== TUTORIAL_SESSION_ID) return;
+    try {
+      if (!localStorage.getItem("wc:tutorial-elements-seen")) {
+        setShowElementsLesson(true);
+      }
+    } catch {
+      /* noop */
+    }
+  }, [fight]);
   const {
     toast: actionToast,
     showApiError: showActionError,
@@ -1572,6 +1588,15 @@ export default function BossFightPage() {
           />
         </div>
       )}
+
+      {/* Tutorial-only: one-time element/duel lesson overlay */}
+      <TutorialElementsModal
+        open={showElementsLesson}
+        onClose={() => {
+          setShowElementsLesson(false);
+          try { localStorage.setItem("wc:tutorial-elements-seen", "1"); } catch { /* noop */ }
+        }}
+      />
     </div>
   );
 }

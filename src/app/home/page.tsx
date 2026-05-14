@@ -263,8 +263,15 @@ function HomeLobby() {
       localStorage.setItem('wc:tutorial-visited', '1')
       // Reset also clears the client-side tutorial bonus-pin anchor so the
       // pin can re-spawn at a fresh GPS fix; on plain start we leave it.
-      if (reset && user?.id) {
-        try { localStorage.removeItem(`wc:tutorial-bonus-anchor:${user.id}`) } catch { /* noop */ }
+      // Same goes for the tutorial-moment dedup flags and the pin-hint
+      // banner — they should re-arm when the player replays.
+      if (reset) {
+        try {
+          if (user?.id) localStorage.removeItem(`wc:tutorial-bonus-anchor:${user.id}`)
+          localStorage.removeItem('wc:tutorial-pin-hint-seen')
+          localStorage.removeItem('wc:tutorial-moments-seen:v1')
+          localStorage.removeItem('wc:tutorial-elements-seen')
+        } catch { /* noop */ }
       }
       // Full-page navigation matches how handleJoin enters a session — the
       // map page reads the restored sessionId from the URL.

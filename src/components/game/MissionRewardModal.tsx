@@ -4,10 +4,16 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { playMissionComplete } from '@/lib/game/sounds/events'
 
 export interface CompletedMissionInfo {
+  /** Server mission UUID — used by the tutorial moment modal to key off
+   *  specific mission completions ("you finished M8 → big finale"). */
+  missionId?: string
   title: string
   rewardGold: number
   rewardExp: number
   levelUp?: { newLevel: number; goldReward: number } | null
+  /** Server-provided when a tutorial mission grants an enigma frammento;
+   *  surfaced as a side toast in addition to the standard gold/exp panel. */
+  tutorialFrammentoGranted?: { frammentoId: string; title: string } | null
 }
 
 interface MissionRewardModalProps {
@@ -108,6 +114,16 @@ export default function MissionRewardModal({ missions, onDone }: MissionRewardMo
               style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.30)' }}>
               <span className="text-sm text-white/50">Livello raggiunto</span>
               <span className="font-extrabold text-[#A855F7] text-base">Lv. {mission.levelUp.newLevel} ✦</span>
+            </div>
+          )}
+          {mission.tutorialFrammentoGranted && (
+            <div className="flex items-center gap-3 rounded-2xl px-5 py-3"
+              style={{ background: 'rgba(192,132,252,0.12)', border: '1px solid rgba(192,132,252,0.30)' }}>
+              <span className="text-2xl">🧩</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-white/50 uppercase tracking-wider">Frammento d&apos;enigma sbloccato</p>
+                <p className="font-bold text-[#C084FC] text-sm truncate">{mission.tutorialFrammentoGranted.title}</p>
+              </div>
             </div>
           )}
         </motion.div>
