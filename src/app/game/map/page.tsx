@@ -814,14 +814,33 @@ function MapPageInner() {
 
     lastPositionPostAtRef.current = Date.now()
 
-    const res = await fetch('/api/game/position', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, sessionId: sid }),
-    })
+    // Position posts can race the page lifecycle: this function is
+    // dispatched from a 5 s setTimeout, so it may fire AFTER the user
+    // tapped an encounter / boss / duel and the map is unmounting.
+    // The in-flight fetch then rejects with "Failed to fetch" — a real
+    // network/lifecycle error, but irrelevant: the next map mount will
+    // re-sync state from the server anyway. Catch and swallow rather
+    // than letting it bubble up as an unhandled rejection (Sentry noise).
+    let res: Response
+    try {
+      res = await fetch('/api/game/position', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, sessionId: sid }),
+      })
+    } catch {
+      // Offline, page unloading, or DNS blip — best-effort POST, skip.
+      return
+    }
     if (!res.ok) return
 
-    const data = await res.json()
+    let data: any
+    try {
+      data = await res.json()
+    } catch {
+      // Body parse failure (server returned non-JSON) — also a no-op.
+      return
+    }
 
     if (data.sessionEnded) {
       sessionEndedRef.current = true
