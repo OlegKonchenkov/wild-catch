@@ -104,10 +104,20 @@ export async function POST(request: Request) {
   const playerStatusTurns = clearPlayerStatus ? 0 : ((encounter as any).player_status_turns ?? 0)
 
   let wildHpRemaining = encounter.wild_creature_hp
-  let playerHpRemaining = Math.max(0, Math.min(
-    Number.isFinite(currentPlayerHp) ? Number(currentPlayerHp) : playerCr.hp,
-    playerCr.hp,
-  ))
+  // Authoritative source for the active creature's HP, in priority order:
+  //   1. encounter.player_hp (migration 037+) — never trust the client
+  //   2. Number(currentPlayerHp) clamped — legacy in-flight encounters
+  //   3. playerCr.hp (full) — first turn or missing data
+  const serverPlayerHp = (encounter as any).player_hp
+  let playerHpRemaining: number
+  if (typeof serverPlayerHp === 'number') {
+    playerHpRemaining = Math.max(0, Math.min(serverPlayerHp, playerCr.hp))
+  } else {
+    playerHpRemaining = Math.max(0, Math.min(
+      Number.isFinite(currentPlayerHp) ? Number(currentPlayerHp) : playerCr.hp,
+      playerCr.hp,
+    ))
+  }
   let playerTookDamage = false
   let playerDamage = 0
   let wildDamage = 0
@@ -234,6 +244,9 @@ export async function POST(request: Request) {
       wild_status_turns: fightResult === 'fled' ? 0 : newWildStatusTurns,
       player_status: fightResult === 'fled' ? null : newPlayerStatus,
       player_status_turns: fightResult === 'fled' ? 0 : newPlayerStatusTurns,
+      // Persist authoritative player HP — anti-cheat: the next fight call
+      // will read this and ignore whatever currentPlayerHp the client sends.
+      player_hp: playerHpRemaining,
     })
     .eq('id', encounterId)
 

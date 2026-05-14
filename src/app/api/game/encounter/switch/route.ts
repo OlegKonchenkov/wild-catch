@@ -158,6 +158,12 @@ export async function POST(request: Request) {
       // Player status resets — new creature comes in clean (then maybe gets statusAppliedToPlayer)
       player_status: fightResult === 'fled' ? null : newPlayerStatus,
       player_status_turns: fightResult === 'fled' ? 0 : newPlayerStatusTurns,
+      // The new active creature comes in with the HP the client said it
+      // had (clamped to maxHp above). We don't track per-slot HP yet so
+      // this is the best the server can do; the client tracks the
+      // outgoing creature's HP locally for future switch-back.
+      player_creature_id: newActivePcId,
+      player_hp: playerHpRemaining,
     })
     .eq('id', encounterId)
 

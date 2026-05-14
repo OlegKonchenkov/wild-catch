@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   // Validate encounter is active and belongs to user
   const { data: encounter } = await supabase
     .from('encounters')
-    .select('id, player_creature_id, session_id')
+    .select('id, player_creature_id, session_id, player_hp')
     .eq('id', encounterId)
     .eq('user_id', user.id)
     .eq('status', 'active')
@@ -56,13 +56,31 @@ export async function POST(request: Request) {
     .single()
 
   const maxHp: number = (pc as any)?.creatures?.hp ?? 100
-  const healAmount = Math.round(maxHp * (inv.items.effect_value / 100))
+  const rawHealAmount = Math.round(maxHp * (inv.items.effect_value / 100))
 
-  // Consume the item
+  // Update server-side HP authoritatively (migration 037+). The actual
+  // applied heal may be clamped to maxHp - currentHp so we don't waste
+  // overflow. For legacy encounters (player_hp IS NULL) the server
+  // hasn't been tracking HP, so we accept any reasonable heal value
+  // and let the client manage display state.
+  const serverHp = (encounter as any).player_hp as number | null
+  let appliedHeal = rawHealAmount
+  if (typeof serverHp === 'number') {
+    const newHp = Math.min(maxHp, Math.max(0, serverHp) + rawHealAmount)
+    appliedHeal = newHp - Math.max(0, serverHp)
+    await supabase
+      .from('encounters')
+      .update({ player_hp: newHp })
+      .eq('id', encounterId)
+  }
+
+  // Consume the item (only after the HP update succeeds — if the player
+  // is at full HP and serverHp tracking is active, appliedHeal may be 0
+  // but we still consume the item, matching long-standing behaviour).
   await supabase
     .from('player_inventory')
     .update({ quantity: inv.quantity - 1 })
     .eq('id', itemId)
 
-  return NextResponse.json({ healed: true, healAmount, maxHp })
+  return NextResponse.json({ healed: true, healAmount: rawHealAmount, appliedHeal, maxHp })
 }

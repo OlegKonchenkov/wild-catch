@@ -161,7 +161,22 @@ export async function POST(request: Request) {
     }
   }
 
-  // Create encounter — lock player_creature_id at start (anti-cheat)
+  // Create encounter — lock player_creature_id + initial player_hp at
+  // start (anti-cheat). The active creature's HP is now server-side so
+  // /fight and /heal can't be spoofed by sending inflated currentPlayerHp.
+  // primaryCreatureMaxHp is the active creature's base hp (combat doesn't
+  // use level scaling for wilds — see encounter/fight which reads
+  // playerCr.hp directly).
+  let primaryCreatureMaxHp: number | null = null
+  if (primaryCreatureId) {
+    const { data: pcRow } = await supabase
+      .from('player_creatures')
+      .select('creatures(hp)')
+      .eq('id', primaryCreatureId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    primaryCreatureMaxHp = (pcRow as any)?.creatures?.hp ?? null
+  }
   const { data: encounter, error: encError } = await supabase
     .from('encounters')
     .insert({
@@ -172,6 +187,7 @@ export async function POST(request: Request) {
       trigger,
       wild_creature_hp: creature.hp,
       player_creature_id: primaryCreatureId,
+      player_hp: primaryCreatureMaxHp,
     })
     .select()
     .single()

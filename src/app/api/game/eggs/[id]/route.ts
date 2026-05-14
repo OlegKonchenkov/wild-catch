@@ -92,7 +92,29 @@ export async function POST(
 
   const picked = pool[Math.floor(Math.random() * pool.length)]
 
-  // Add creature to player collection (or increment duplicates)
+  // ── Atomic egg-claim FIRST, then grant the creature ──────────────────────
+  // The previous order (grant first, mark hatched second) had a race: two
+  // concurrent hatch requests both passed the hatched_at IS NULL check at
+  // the top of this handler, then both inserted player_creatures rows,
+  // and only one of the hatched_at updates "won". Net effect: a single
+  // egg could yield 2+ creatures.
+  //
+  // Fix: try to atomically flip hatched_at NULL → now() guarded by
+  // `.is('hatched_at', null)`. If 0 rows match, another request beat us
+  // and we abort without granting anything.
+  const { data: claimedRows, error: claimError } = await supabase
+    .from('player_eggs')
+    .update({ hatched_at: new Date().toISOString(), hatched_creature_id: picked.id })
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .is('hatched_at', null)
+    .select('id')
+
+  if (claimError || !claimedRows || claimedRows.length === 0) {
+    return NextResponse.json({ error: 'Uovo già schiuso' }, { status: 409 })
+  }
+
+  // Now safe to grant the creature — egg is exclusively ours.
   const { data: existing } = await supabase
     .from('player_creatures')
     .select('id, duplicates_count')
@@ -114,12 +136,6 @@ export async function POST(
       duplicates_count: 1,
     }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
   }
-
-  // Mark egg as hatched
-  await supabase
-    .from('player_eggs')
-    .update({ hatched_at: new Date().toISOString(), hatched_creature_id: picked.id })
-    .eq('id', id)
 
   // Game event — egg hatch is treated as a catch
   const { createAdminClient } = await import('@/lib/supabase/admin')
