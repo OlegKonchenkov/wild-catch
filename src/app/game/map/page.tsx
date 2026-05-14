@@ -8,7 +8,7 @@ import { getCurrentUser } from '@/lib/supabase/client-user'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { haptics } from '@/lib/haptics'
 import { useGPS } from '@/hooks/useGPS'
-import { evaluateStep } from '@/lib/game/step-counter'
+import { evaluateStep, updatePendingDistance } from '@/lib/game/step-counter'
 import { haversineDistance } from '@/lib/game/anti-cheat'
 import useTweenedInteger from '@/hooks/useTweenedInteger'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
@@ -248,13 +248,27 @@ function MapPageInner() {
   const pendingPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
 
   // ── Optimistic local step counter ──────────────────────────────────────────
-  // Runs the same evaluateStep filter on every GPS fix (~1 Hz) so the visible
-  // counter ticks forward the moment a step is statistically credible, instead
-  // of waiting for the next 5 s server POST. The server response still
-  // overrides locally-credited steps — server is the authoritative source
-  // (anti-cheat) and any drift is corrected on every reconciliation.
+  // Two-layer model:
+  //   1. `stepsWalked` (state) is the server-authoritative committed count.
+  //      It's mutated locally only when evaluateStep passes (i.e. the same
+  //      strict anti-cheat filter the server uses) and reconciled on every
+  //      server POST response.
+  //   2. `pendingDistance` (state, metres) is the optimistic distance the
+  //      player has accumulated *since* the last credit — capped just below
+  //      the credit threshold so the visible counter ticks every second
+  //      while walking, but never overshoots a credit that's about to fire.
+  // Display = stepsWalked + round(pendingDistance), then tweened.
+  //
+  // Critical detail: the local baseline is NOT updated on every fix (as the
+  // server does between POSTs). It moves only on (a) a real credit firing,
+  // or (b) the server POST reconciliation overwriting it. Updating it on
+  // every fix would reset distance-from-baseline to ~1.4 m each second and
+  // the SNR filter would never reach its threshold — the counter stayed
+  // frozen until the 5 s server POST surfaced its own credit, which is
+  // exactly the "non si attiva, poi salta" UX we're fixing.
   const localBaselineRef = useRef<{ lat: number; lng: number; ts: number; accuracy: number } | null>(null)
   const sessionStatusRef = useRef<string>('active')
+  const [pendingDistance, setPendingDistance] = useState(0)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
@@ -265,7 +279,9 @@ function MapPageInner() {
 
   // Tween the visible counter so any jump (server reconciliation, missed
   // GPS fix catch-up) animates instead of snapping. Pure presentation.
-  const displayedSteps = useTweenedInteger(stepsWalked, 450)
+  // Displayed value = committed credit + currently-pending optimistic metres
+  // so the number ticks forward every GPS fix while walking.
+  const displayedSteps = useTweenedInteger(stepsWalked + Math.round(pendingDistance), 450)
 
   // First-run coachmarks — fire after the map is fully usable (session +
   // starter check both resolved) and only if not already seen on this device.
@@ -287,6 +303,7 @@ function MapPageInner() {
       starterFlowLockedRef.current = true
       // Reset the optimistic step accumulator — different session, new baseline.
       localBaselineRef.current = null
+      setPendingDistance(0)
       setSessionId(sid)
       sessionIdRef.current = sid
       localStorage.setItem('current_session_id', sid)
@@ -539,8 +556,12 @@ function MapPageInner() {
       // Server is the authoritative source — overwrite any locally-credited
       // optimistic value. The fix the server just persisted becomes the new
       // local baseline so the client's next predictions stay aligned with
-      // the server's accumulator.
+      // the server's accumulator. Pending bucket resets too: whatever the
+      // user accumulated since the previous credit is now either folded
+      // into the new server total (if the server credited) or it never
+      // reached the SNR threshold (no credit) — either way, start fresh.
       setStepsWalked(data.stepsWalked)
+      setPendingDistance(0)
       localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: Date.now(), accuracy: pos.accuracy }
     }
 
@@ -647,11 +668,7 @@ function MapPageInner() {
     // Skip very inaccurate fixes (map marker already updated above)
     if (pos.accuracy > 300) return
 
-    // ── Optimistic local step credit ───────────────────────────────────────
-    // Run the same evaluateStep filter the server uses, but every GPS fix
-    // (~1 Hz) instead of every 5 s. When the filter passes, increment the
-    // counter immediately so the UI feels responsive. The server response
-    // arriving later will overwrite this value — guaranteed correctness.
+    // ── Optimistic local step credit + smooth pending interpolation ───────
     const baseline = localBaselineRef.current
     const now = Date.now()
     if (!baseline) {
@@ -667,15 +684,25 @@ function MapPageInner() {
         inBounds: inBoundsRef.current,
       })
       if (result.stepsIncrement > 0) {
+        // A real credit fires — flush the pending bucket into the committed
+        // counter (the credit already encodes that distance) and reset the
+        // baseline so the next accumulation starts fresh.
         setStepsWalked(prev => prev + result.stepsIncrement)
-      }
-      // Refresh the local baseline under the same rule as the server: only
-      // when accuracy is reasonable (or we just credited a step). Keeping a
-      // stale baseline during very-coarse fixes prevents jitter from
-      // resetting the accumulator and stealing credible distance.
-      if (result.shouldUpdateBaseline) {
+        setPendingDistance(0)
         localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: now, accuracy: pos.accuracy }
+      } else if (sessionStatusRef.current === 'active' && inBoundsRef.current && pos.accuracy <= 50) {
+        // No credit this tick, but the fix is accurate enough that we
+        // believe the displacement. Grow the optimistic "pending" bucket
+        // (monotonic-max, capped just below the credit threshold) so the
+        // visible counter ticks forward every fix while walking.
+        setPendingDistance(prev => updatePendingDistance({
+          previousPending: prev,
+          distanceMoved,
+          accuracy: pos.accuracy,
+        }))
       }
+      // Deliberately NOT calling shouldUpdateBaseline here — see top-of-file
+      // comment. The baseline only moves on credit or on server reconciliation.
     }
 
     // Trailing throttle: keep latest pos, schedule one POST per interval

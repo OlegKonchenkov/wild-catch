@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { evaluateStep, shouldRollEncounter, STEP_FILTER } from '@/lib/game/step-counter'
+import { evaluateStep, shouldRollEncounter, STEP_FILTER, updatePendingDistance } from '@/lib/game/step-counter'
 
 /**
  * Contract tests for the GPS step filter. These nail down the anti-jitter
@@ -135,5 +135,67 @@ describe('shouldRollEncounter', () => {
     const valid = { validStep: true, stepsIncrement: 4, shouldUpdateBaseline: true }
     expect(shouldRollEncounter(valid, 4)).toBe(false)
     expect(shouldRollEncounter(valid, STEP_FILTER.ENCOUNTER_MIN_M)).toBe(true)
+  })
+})
+
+describe('updatePendingDistance', () => {
+  // Cap = accuracy * STEP_SNR (0.8) * 0.85.
+  // With accuracy = 15 m: snrThreshold = 12, cap = 10.2.
+  // With accuracy = 10 m: snrThreshold = 8,  cap = 6.8.
+
+  it('grows monotonically with distance when below the cap', () => {
+    let p = 0
+    p = updatePendingDistance({ previousPending: p, distanceMoved: 1.5, accuracy: 15 })
+    expect(p).toBe(1.5)
+    p = updatePendingDistance({ previousPending: p, distanceMoved: 3.2, accuracy: 15 })
+    expect(p).toBe(3.2)
+    p = updatePendingDistance({ previousPending: p, distanceMoved: 7.0, accuracy: 15 })
+    expect(p).toBe(7.0)
+  })
+
+  it('never decreases when distanceMoved shrinks (monotonic-max guards flicker)', () => {
+    let p = updatePendingDistance({ previousPending: 0, distanceMoved: 8, accuracy: 15 })
+    expect(p).toBe(8)
+    // A subsequent GPS fix reports a smaller distance (jitter or back-step):
+    // pending must hold its previous high so the visible counter doesn't tick backward.
+    p = updatePendingDistance({ previousPending: p, distanceMoved: 5, accuracy: 15 })
+    expect(p).toBe(8)
+    p = updatePendingDistance({ previousPending: p, distanceMoved: 2, accuracy: 15 })
+    expect(p).toBe(8)
+  })
+
+  it('caps just below the credit threshold so display does not cross it', () => {
+    // Cap at accuracy=15: 15 * 0.8 * 0.85 = 10.2.
+    const p1 = updatePendingDistance({ previousPending: 0, distanceMoved: 11, accuracy: 15 })
+    expect(p1).toBeCloseTo(10.2, 5)
+    const p2 = updatePendingDistance({ previousPending: 0, distanceMoved: 100, accuracy: 15 })
+    expect(p2).toBeCloseTo(10.2, 5)
+  })
+
+  it('cap scales with accuracy — worse fixes can show more pending before credit', () => {
+    // Better GPS (smaller accuracy) → tighter cap.
+    const tight = updatePendingDistance({ previousPending: 0, distanceMoved: 50, accuracy: 10 })
+    const loose = updatePendingDistance({ previousPending: 0, distanceMoved: 50, accuracy: 30 })
+    expect(tight).toBeLessThan(loose)
+    expect(tight).toBeCloseTo(10 * 0.8 * 0.85, 5) // 6.8
+    expect(loose).toBeCloseTo(30 * 0.8 * 0.85, 5) // 20.4
+  })
+
+  it('clamps negative or zero accuracy to a zero cap (no growth)', () => {
+    const p = updatePendingDistance({ previousPending: 0, distanceMoved: 5, accuracy: 0 })
+    expect(p).toBe(0)
+    const pNeg = updatePendingDistance({ previousPending: 0, distanceMoved: 5, accuracy: -5 })
+    expect(pNeg).toBe(0)
+  })
+
+  it('clamps a negative distanceMoved to zero growth', () => {
+    const p = updatePendingDistance({ previousPending: 4, distanceMoved: -2, accuracy: 15 })
+    // Negative distance is nonsense, but we hold the previous high either way.
+    expect(p).toBe(4)
+  })
+
+  it('preserves previousPending when nothing new accumulates', () => {
+    const p = updatePendingDistance({ previousPending: 7, distanceMoved: 0, accuracy: 15 })
+    expect(p).toBe(7)
   })
 })

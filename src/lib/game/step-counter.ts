@@ -73,3 +73,42 @@ export function evaluateStep(input: StepFilterInput): StepFilterResult {
 export function shouldRollEncounter(result: StepFilterResult, distanceMoved: number): boolean {
   return result.validStep && distanceMoved >= STEP_FILTER.ENCOUNTER_MIN_M
 }
+
+/**
+ * Fraction of the SNR threshold the optimistic "pending" display is allowed
+ * to climb to before plateauing. Set just under 1 so the visible counter
+ * never crosses the credit boundary — when the credit DOES fire, the new
+ * committed total absorbs the pending without snapping the display backward.
+ */
+const PENDING_CAP_FRACTION = 0.85
+
+/**
+ * Monotonic-max accumulator for the "pending distance" the player has
+ * covered since the last credit. Used by the map HUD to tick the step
+ * counter forward every GPS fix instead of only when a credit fires.
+ *
+ * - `distanceMoved` is the haversine distance from the last committed
+ *   baseline (the position where the previous credit fired or the server
+ *   last reconciled).
+ * - `accuracy` is the current fix's reported GPS accuracy in metres.
+ *
+ * Returns the new pending value, capped below the credit threshold. The
+ * monotonic-max behaviour (`max(previous, …)`) prevents sub-fix GPS noise
+ * from making the visible counter flicker downward — if the player walks
+ * to d=8 m and the next fix reports d=6 m (jitter), pending stays at 8 m.
+ *
+ * Edge cases:
+ * - accuracy = 0 or negative → cap is 0 → pending never grows. Safe.
+ * - distanceMoved < 0 → clamped via `Math.min(...)` not increasing pending.
+ */
+export function updatePendingDistance(input: {
+  previousPending: number
+  distanceMoved: number
+  accuracy: number
+}): number {
+  const { previousPending, distanceMoved, accuracy } = input
+  const snrThreshold = Math.max(0, accuracy * STEP_FILTER.STEP_SNR)
+  const cap = snrThreshold * PENDING_CAP_FRACTION
+  const candidate = Math.min(Math.max(0, distanceMoved), cap)
+  return Math.max(previousPending, candidate)
+}
