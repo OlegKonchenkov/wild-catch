@@ -57,6 +57,17 @@ function buildSupabaseMock() {
           eq: vi.fn(() => ({ single: vi.fn(async () => ({ data: { name: 'Rete base' } })) })),
         })),
       }
+      if (table === 'player_sessions') return {
+        // Anti-cheat last_position cross-check: the route now reads
+        // player_sessions.last_position to verify the claim coords aren't
+        // wildly different. Mock returns null → handler treats as "fresh
+        // session, no spoof opportunity" and skips the check.
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({ eq: vi.fn(() => ({
+            maybeSingle: vi.fn(async () => ({ data: null })),
+          })) })),
+        })),
+      }
       return {
         select: vi.fn(() => ({ eq: vi.fn(() => ({ single: vi.fn(async () => ({ data: null })) })) })),
         insert: vi.fn(async () => ({ error: null })),
@@ -140,5 +151,33 @@ describe('POST /api/game/map-pins/claim', () => {
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.alreadyClaimed).toBe(true)
+  })
+
+  it('422 with suspectGpsSpoof when claim coords are far from last_position', async () => {
+    // Player's server-stored last_position is on the OTHER side of the
+    // map (lng 13.5) but the request body claims to be exactly at the
+    // pin (13.0). Drift = ~39 km — way beyond the 200 m threshold.
+    const supabaseMock = buildSupabaseMock()
+    ;(supabaseMock.from as any).mockImplementation((table: string) => {
+      if (table === 'player_sessions') return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({ eq: vi.fn(() => ({
+            maybeSingle: vi.fn(async () => ({
+              // PostgREST POINT format "(lng,lat)"
+              data: { last_position: '(13.5,45.0)' },
+            })),
+          })) })),
+        })),
+      }
+      return buildSupabaseMock().from(table)
+    })
+    vi.mocked(createClient).mockResolvedValue(supabaseMock as any)
+    const res = await POST(new Request('http://x', {
+      method: 'POST',
+      body: JSON.stringify({ pinId: 'pin-1', sessionId: 'sess-1', lat: 45.0, lng: 13.0 }),
+    }))
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.suspectGpsSpoof).toBe(true)
   })
 })

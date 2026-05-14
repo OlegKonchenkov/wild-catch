@@ -56,6 +56,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Troppo lontano dal pin', distanceM: Math.round(dist) }, { status: 422 })
   }
 
+  // Anti-cheat: cross-check the claimed coords against the player's
+  // server-stored last_position. A malicious client could otherwise
+  // send arbitrary body lat/lng at the pin's exact location and farm
+  // every map pin without moving. /api/game/position throttles to one
+  // update every 5 s so legitimate drift between last_position and the
+  // body coords is bounded to ~30 m at normal walking speed; we allow
+  // 200 m as a forgiving threshold (covers small GPS jitter, dropped
+  // position posts, network hiccups).
+  const { parsePoint } = await import('@/lib/game/anti-cheat')
+  const { data: ps } = await supabase
+    .from('player_sessions')
+    .select('last_position')
+    .eq('user_id', user.id)
+    .eq('session_id', sessionId)
+    .maybeSingle()
+  const lastPos = parsePoint((ps as any)?.last_position)
+  if (lastPos) {
+    const drift = haversine(lat, lng, lastPos.lat, lastPos.lng)
+    if (drift > 200) {
+      return NextResponse.json({
+        error: 'Posizione GPS incoerente — riprova dopo aver aggiornato la mappa',
+        suspectGpsSpoof: true,
+        driftM: Math.round(drift),
+      }, { status: 422 })
+    }
+  }
+  // If last_position is NULL (player has never posted a fix), allow the
+  // claim — likely a fresh session, no spoof opportunity to defend.
+
   // ── Enigma pins: verify solution before proceeding ───────────────────────
   if (pin.reward_type === 'enigma') {
     let correctSolution: string
