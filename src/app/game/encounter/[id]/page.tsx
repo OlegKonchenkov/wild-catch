@@ -4,6 +4,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import StatusAura from '@/components/battle/StatusAura'
+import TutorialEncounterLesson from '@/components/game/TutorialEncounterLesson'
+import { TUTORIAL_SESSION_ID } from '@/lib/game/tutorial'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
 import { startEncounterLoop } from '@/lib/game/sounds/battle-loop'
 import { playCatchAttempt, playCatchFail, playCatchSuccess } from '@/lib/game/sounds/catch'
@@ -337,6 +339,20 @@ export default function EncounterPage() {
 
   const [state, setState]       = useState<EncounterState | null>(null)
   const [loadError, setLoadError] = useState(false)
+  // First-encounter tutorial lesson — shown once per device the first
+  // time the player meets a wild Daimon in the tutorial session.
+  // Explains HP/difficulty stars, action buttons, items, status effects.
+  const [showEncounterLesson, setShowEncounterLesson] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const sid = localStorage.getItem('current_session_id')
+    if (sid !== TUTORIAL_SESSION_ID) return
+    try {
+      if (!localStorage.getItem('wc:tutorial-encounter-lesson-seen')) {
+        setShowEncounterLesson(true)
+      }
+    } catch { /* noop */ }
+  }, [])
   const [wildAnim, setWildAnim]     = useState<'idle' | 'damage' | 'catch' | 'flee'>('idle')
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null>(null)
@@ -1440,6 +1456,15 @@ export default function EncounterPage() {
             onComplete={() => setAttackAnim(null)}
           />
         )}
+
+        {/* Tutorial-only first-encounter lesson */}
+        <TutorialEncounterLesson
+          open={showEncounterLesson}
+          onClose={() => {
+            setShowEncounterLesson(false)
+            try { localStorage.setItem('wc:tutorial-encounter-lesson-seen', '1') } catch { /* noop */ }
+          }}
+        />
 
         {/* VS / message — center */}
         <div className="absolute inset-x-0 z-10" style={{ top: '46%', transform: 'translateY(-50%)' }}>

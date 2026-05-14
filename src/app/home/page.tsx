@@ -271,6 +271,7 @@ function HomeLobby() {
           localStorage.removeItem('wc:tutorial-pin-hint-seen')
           localStorage.removeItem('wc:tutorial-moments-seen:v1')
           localStorage.removeItem('wc:tutorial-elements-seen')
+          localStorage.removeItem('wc:tutorial-encounter-lesson-seen')
           // Step counter optimistic cache — wipe so the new run starts at 0.
           sessionStorage.removeItem(`wc:steps-walked:${data.sessionId}`)
         } catch { /* noop */ }
