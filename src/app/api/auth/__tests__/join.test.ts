@@ -58,8 +58,22 @@ function createAdminMock(state: AdminMockState) {
           },
           update(payload: Record<string, unknown>) {
             state.inviteUpdatePayload = payload
+            // The handler now atomically claims the invite via:
+            //   .update(...).eq('id', …).is('used_by_user_id', null)
+            //                .eq('is_active', true).select('id')
+            // Return [{ id: 'invite-1' }] when the fixture's invite is
+            // still "claimable" (default), or pass through inviteUpdateError.
             return {
-              eq: async () => ({ error: state.inviteUpdateError ?? null }),
+              eq: () => ({
+                is: () => ({
+                  eq: () => ({
+                    select: async () => ({
+                      data: state.inviteUpdateError ? null : [{ id: 'invite-1' }],
+                      error: state.inviteUpdateError ?? null,
+                    }),
+                  }),
+                }),
+              }),
             }
           },
         }

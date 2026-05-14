@@ -73,8 +73,14 @@ export async function POST(request: Request) {
     })
   }
 
-  // Mark invite as used (set is_active false + record who used it)
-  const { error: updateError } = await admin
+  // Atomically claim the invite. Without the `.is('used_by_user_id',
+  // null)` + select check, two concurrent /api/auth/join calls with the
+  // same code could both pass the SELECT above and both fire the
+  // UPDATE — last writer wins on used_by_user_id, but BOTH users get
+  // through to the player_sessions insert below. Two players would
+  // end up "joined" via a one-time code. Atomic claim + 0-row check
+  // closes the window.
+  const { data: claimedRows, error: updateError } = await admin
     .from('session_invites')
     .update({
       used_by_user_id: user.id,
@@ -82,9 +88,16 @@ export async function POST(request: Request) {
       is_active: false,
     })
     .eq('id', invite.id)
+    .is('used_by_user_id', null)
+    .eq('is_active', true)
+    .select('id')
 
   if (updateError) {
     return NextResponse.json({ error: 'Errore di sistema aggiornando il codice' }, { status: 500 })
+  }
+  if (!claimedRows || claimedRows.length === 0) {
+    // Another request beat us to claim this invite.
+    return NextResponse.json({ error: 'Codice già utilizzato' }, { status: 409 })
   }
 
   // Create player session
