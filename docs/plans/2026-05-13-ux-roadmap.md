@@ -47,7 +47,32 @@ Legenda priorità: ⭐ = nice-to-have · ⭐⭐⭐⭐⭐ = critical-for-pilot.
 
 ---
 
-## ⏳ Step 4 — Primo incontro guidato
+## ✅ Step 4 — Tutorial sempre attivo (mini-storia "Apprendista Daimologo")
+**Status:** done · **Effort:** ~3h · **Impatto:** ⭐⭐⭐⭐⭐
+
+Sessione globale `kind='tutorial'` accessibile a chiunque senza codice invito.
+Mini-storia in 4 missioni che fa interagire con cammino, cattura, QR
+(simulato), zaino. Rifacibile con wipe completo della propria run.
+
+- [x] Migration 030: `sessions.kind` + tutorial session UUID fisso +
+  4 missioni narrative + QR seed + item "Rete del Tirocinante"
+- [x] `src/lib/game/tutorial.ts` constants module
+- [x] `POST /api/game/tutorial` (start | reset) — idempotente; reset wipe
+  atomico di 10 tabelle per-(user, session) + ricreazione fresh
+- [x] `/api/game/sessions` filtra fuori `kind='tutorial'` dalla lista
+  sessioni reali del giocatore
+- [x] `/home`: card "🎓 Prova il gioco — Tutorial gratuito" con CTA
+  primaria + link "Rifai da capo" dopo prima visita
+- [x] Bottone "🪄 Simula scansione QR" sulla mappa visibile **solo** in
+  `session.id === TUTORIAL_SESSION_ID`
+- [x] Fix bounds vuoti in `/api/game/encounter/start` (tutorial ha
+  `area_bounds = {}`)
+- [x] 6 contract test sul nuovo endpoint (auth, validation, start
+  idempotente, reset wipe completo, errore propagato)
+
+---
+
+## ⏳ Step 5 — Primo incontro guidato
 **Status:** todo · **Effort:** ~2h · **Impatto:** ⭐⭐⭐⭐
 
 Garantire che la prima creatura selvatica sia **easy** (rarity comune,
@@ -62,7 +87,7 @@ spiegando i bottoni Attacca/Rete/Fuga.
 
 ---
 
-## ⏳ Step 5 — Capitoli narrativi
+## ⏳ Step 6 — Capitoli narrativi
 **Status:** todo · **Effort:** ~4h · **Impatto:** ⭐⭐⭐⭐
 
 Raggruppare missioni in **capitoli** con incipit narrativo, reward
@@ -77,7 +102,7 @@ finale di lore, e progressione visibile.
 
 ---
 
-## ⏳ Step 6 — Lore unlock per la bestiaria
+## ⏳ Step 7 — Lore unlock per la bestiaria
 **Status:** todo · **Effort:** ~2h · **Impatto:** ⭐⭐⭐
 
 Ogni creatura ha una **frase narrativa** che si sblocca alla cattura,
@@ -91,7 +116,7 @@ visibile nella scheda creatura. Sblocchi totali → tracker "Diario:
 
 ---
 
-## ⏳ Step 7 — Zone tematiche sulla mappa
+## ⏳ Step 8 — Zone tematiche sulla mappa
 **Status:** todo · **Effort:** ~3h · **Impatto:** ⭐⭐⭐
 
 Overlay colorati sulla mappa per elemento dominante della zona —
@@ -105,7 +130,7 @@ così il giocatore sa dove andare per certe creature.
 
 ---
 
-## ⏳ Step 8 — Photo mode / share card a fine sessione
+## ⏳ Step 9 — Photo mode / share card a fine sessione
 **Status:** todo · **Effort:** ~2h · **Impatto:** ⭐⭐ (ma viral)
 
 A fine sessione, una "card riassuntiva" condivisibile via Web Share API

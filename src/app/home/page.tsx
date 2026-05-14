@@ -70,6 +70,17 @@ function HomeLobby() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [enteringSessionId, setEnteringSessionId] = useState<string | null>(null)
 
+  // Tutorial session
+  const [tutorialBusy, setTutorialBusy] = useState<'idle' | 'starting' | 'resetting'>('idle')
+  const [tutorialError, setTutorialError] = useState<string | null>(null)
+  // Local "has visited tutorial before" hint — purely for button labelling.
+  // Server-side state lives on player_sessions row; this is just UX cosmetic.
+  const [hasTutorialBefore, setHasTutorialBefore] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setHasTutorialBefore(localStorage.getItem('wc:tutorial-visited') === '1')
+  }, [])
+
   // Invite code form
   const [code, setCode]           = useState(searchParams.get('code') ?? '')
   const [gdpr, setGdpr]           = useState(false)
@@ -230,6 +241,33 @@ function HomeLobby() {
     setEnteringSessionId(sess.id)
     localStorage.setItem('current_session_id', sess.id)
     router.push(`/game/map?restored=${sess.id}`)
+  }
+
+  async function startTutorial(reset = false) {
+    if (tutorialBusy !== 'idle') return
+    setTutorialError(null)
+    setTutorialBusy(reset ? 'resetting' : 'starting')
+    try {
+      const res = await fetch('/api/game/tutorial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: reset ? 'reset' : 'start' }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.sessionId) {
+        setTutorialError(data.error ?? 'Errore avvio tutorial')
+        setTutorialBusy('idle')
+        return
+      }
+      localStorage.setItem('current_session_id', data.sessionId)
+      localStorage.setItem('wc:tutorial-visited', '1')
+      // Full-page navigation matches how handleJoin enters a session — the
+      // map page reads the restored sessionId from the URL.
+      window.location.assign(`/game/map?restored=${data.sessionId}`)
+    } catch {
+      setTutorialError('Errore di rete')
+      setTutorialBusy('idle')
+    }
   }
 
   const googleName  = user?.user_metadata?.full_name ?? user?.email ?? 'Giocatore'
@@ -657,6 +695,53 @@ function HomeLobby() {
               )}
             </>
           )}
+        </Section>
+
+        {/* ── Tutorial (always-on free demo) ── */}
+        <Section title="🎓 Prova il gioco">
+          <Card accent="#3ABCA8">
+            <div style={{ padding: '16px 18px' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+                Tutorial gratuito
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 14 }}>
+                {hasTutorialBefore
+                  ? 'Rientra o ricomincia da capo il mini-tutorial — niente codice invito, gioca da subito.'
+                  : 'Una mini-storia di 5-10 minuti per scoprire come si gioca. Niente codice invito, prova subito.'}
+              </div>
+              <button
+                className="btn btn-teal"
+                disabled={tutorialBusy !== 'idle'}
+                onClick={() => startTutorial(false)}
+              >
+                {tutorialBusy === 'starting'
+                  ? <><span className="spinner" /> Apertura...</>
+                  : hasTutorialBefore ? '▶ Rientra nel tutorial' : '🎮 Inizia il tutorial'}
+              </button>
+              {hasTutorialBefore && (
+                <button
+                  onClick={() => startTutorial(true)}
+                  disabled={tutorialBusy !== 'idle'}
+                  style={{
+                    marginTop: 10,
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'rgba(255,255,255,0.45)',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: 4,
+                  }}
+                >
+                  {tutorialBusy === 'resetting' ? 'Reset in corso...' : '↻ Rifai da capo (cancella progressi tutorial)'}
+                </button>
+              )}
+              {tutorialError && (
+                <div className="msg err" style={{ marginTop: 8 }}>⚠ {tutorialError}</div>
+              )}
+            </div>
+          </Card>
         </Section>
 
         {/* ── Join event ── */}

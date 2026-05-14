@@ -90,6 +90,8 @@ export interface Session {
   id: string
   name: string
   status: SessionStatus
+  /** 'event' = normal event/sagra · 'tutorial' = always-on free demo session. */
+  kind?: 'event' | 'tutorial'
   area_bounds: { north: number; south: number; east: number; west: number }
   duration_minutes: number
   start_at: string | null

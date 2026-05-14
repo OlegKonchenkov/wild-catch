@@ -16,6 +16,7 @@ import CreatureSprite from '@/components/creature/CreatureSprite'
 import EggHatchModal from '@/components/game/EggHatchModal'
 import Coachmark, { type CoachmarkStep } from '@/components/game/Coachmark'
 import NextObjectiveWidget from '@/components/game/NextObjectiveWidget'
+import { TUTORIAL_QR_CODE, TUTORIAL_SESSION_ID } from '@/lib/game/tutorial'
 import StarterSelect, { type StarterCreature } from '@/components/game/StarterSelect'
 import PinRewardModal, { type PinRewardData } from '@/components/game/PinRewardModal'
 import EnigmaModal from '@/components/game/EnigmaModal'
@@ -282,6 +283,44 @@ function MapPageInner() {
   // Displayed value = committed credit + currently-pending optimistic metres
   // so the number ticks forward every GPS fix while walking.
   const displayedSteps = useTweenedInteger(stepsWalked + Math.round(pendingDistance), 450)
+
+  // Tutorial mode: the always-on demo session has no physical QR codes in
+  // the world, so we surface a "simulated scan" button on the map HUD.
+  // Tapping it hits the normal /api/game/qr/scan endpoint with the seeded
+  // tutorial QR manual_code, so missions / rewards flow identically to a
+  // real scan.
+  const isTutorialSession = sessionId === TUTORIAL_SESSION_ID
+  const [tutorialQrBusy, setTutorialQrBusy] = useState(false)
+  const [tutorialQrResult, setTutorialQrResult] = useState<string | null>(null)
+  async function simulateTutorialQr() {
+    if (tutorialQrBusy || !sessionId) return
+    setTutorialQrBusy(true)
+    setTutorialQrResult(null)
+    try {
+      const res = await fetch('/api/game/qr/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, qrId: TUTORIAL_QR_CODE }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setTutorialQrResult(`✓ ${data.itemName ?? 'Oggetto'} aggiunto allo zaino`)
+        if (data.completedMissions?.length > 0) {
+          setMissionQueue(prev => [...prev, ...data.completedMissions])
+        }
+        window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
+      } else if (data.alreadyScanned) {
+        setTutorialQrResult('Hai già scansionato questo segno')
+      } else {
+        setTutorialQrResult(data.error ?? 'Errore scansione')
+      }
+    } catch {
+      setTutorialQrResult('Errore di rete')
+    } finally {
+      setTutorialQrBusy(false)
+      setTimeout(() => setTutorialQrResult(null), 4000)
+    }
+  }
 
   // First-run coachmarks — fire after the map is fully usable (session +
   // starter check both resolved) and only if not already seen on this device.
@@ -865,6 +904,41 @@ function MapPageInner() {
         pins={mapPins}
         onPinTap={handlePinTap}
       />
+
+      {/* Tutorial-only: simulated QR scan button. Real events spawn QR
+          codes on physical objects; the always-on demo can't, so we surface
+          this button only when the player is inside the tutorial session. */}
+      {isTutorialSession && (
+        <div className="absolute z-[850] bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
+          {tutorialQrResult && (
+            <div
+              className="rounded-lg px-3 py-1.5 text-xs font-semibold backdrop-blur-sm"
+              style={{
+                background: 'rgba(58,188,168,0.18)',
+                border: '1px solid rgba(58,188,168,0.35)',
+                color: '#3ABCA8',
+                maxWidth: 260,
+                textAlign: 'center',
+              }}
+            >
+              {tutorialQrResult}
+            </div>
+          )}
+          <button
+            onClick={simulateTutorialQr}
+            disabled={tutorialQrBusy}
+            className="rounded-2xl px-4 py-2.5 text-sm font-bold text-white shadow-lg disabled:opacity-60"
+            style={{
+              background: 'linear-gradient(135deg, #3ABCA8 0%, #2d8c7d 100%)',
+              boxShadow: '0 6px 18px rgba(58,188,168,0.4)',
+              border: '1px solid rgba(58,188,168,0.6)',
+            }}
+          >
+            {tutorialQrBusy ? '...' : '🪄 Simula scansione QR'}
+          </button>
+          <span className="text-[10px] text-white/40 font-mono">tutorial only</span>
+        </div>
+      )}
 
       {/* First-run coachmarks — fires once per device after onboarding+starter */}
       {showCoachmarks && (

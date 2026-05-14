@@ -39,12 +39,15 @@ export async function POST(request: Request) {
   }
 
   // Block if player is out of bounds (use last stored position from the row above)
-  if (session.area_bounds) {
+  // area_bounds may be {} for sessions with no geographic restriction
+  // (e.g. the always-on Tutorial session). Only enforce the check when the
+  // bounds object actually contains the cardinal limits.
+  const sessionBounds = session.area_bounds as { north?: number; south?: number; east?: number; west?: number } | null
+  if (sessionBounds && typeof sessionBounds.north === 'number') {
     const { isWithinBounds, parsePoint } = await import('@/lib/game/anti-cheat')
     const parsedPos = parsePoint((playerSession as any).last_position)
     if (parsedPos) {
-      const bounds = session.area_bounds as { north: number; south: number; east: number; west: number }
-      const inBounds = isWithinBounds(parsedPos, bounds)
+      const inBounds = isWithinBounds(parsedPos, sessionBounds as { north: number; south: number; east: number; west: number })
       if (!inBounds) return NextResponse.json({ error: 'Fuori dall\'area di gioco' }, { status: 403 })
     }
   }

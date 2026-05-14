@@ -8,17 +8,28 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
-  // 1. All sessions this user participated in
+  // 1. All sessions this user participated in (excluding the always-on
+  // Tutorial session — it has its own card on /home and shouldn't pollute
+  // the real-event history).
   const { data: playerSessions } = await supabase
     .from('player_sessions')
-    .select('session_id, exp, gold, level, sessions(id, name, status, start_at, end_at)')
+    .select('session_id, exp, gold, level, sessions(id, name, status, start_at, end_at, kind)')
     .eq('user_id', user.id)
 
   if (!playerSessions || playerSessions.length === 0) {
     return NextResponse.json({ sessions: [] })
   }
 
-  const sessionIds = playerSessions.map(ps => ps.session_id)
+  const realSessions = playerSessions.filter(ps => {
+    const sess = ps.sessions as unknown as { kind?: string } | null
+    return sess?.kind !== 'tutorial'
+  })
+
+  if (realSessions.length === 0) {
+    return NextResponse.json({ sessions: [] })
+  }
+
+  const sessionIds = realSessions.map(ps => ps.session_id)
   const adminClient = createAdminClient()
 
   // 2. Creature counts for all sessions in one query
@@ -57,7 +68,7 @@ export async function GET() {
   }
 
   // 4. Build response, active sessions first then by start_at desc
-  const sessions = playerSessions
+  const sessions = realSessions
     .map(ps => {
       const sess = ps.sessions as unknown as { id: string; name: string; status: string; start_at: string | null; end_at: string | null } | null
       return {
