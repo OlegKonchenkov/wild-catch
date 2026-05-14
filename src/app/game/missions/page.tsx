@@ -13,6 +13,8 @@ import { useGameToast } from '@/components/game/useGameToast'
 import dynamic from 'next/dynamic'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
+import { haptics } from '@/lib/haptics'
+import { playQrScan } from '@/lib/game/sounds/ui'
 
 const QrScanner = dynamic(() => import('@/components/QrScanner'), { ssr: false })
 
@@ -492,6 +494,8 @@ export default function MissionsPage() {
       }
       setScanResult(res.ok ? data : { error: data.error ?? 'Errore sconosciuto', success: false })
       if (res.ok && data.success) {
+        playQrScan()
+        haptics.tap()
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
         window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
         if (data.completedMissions?.length) {

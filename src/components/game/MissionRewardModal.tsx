@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { playMissionComplete } from '@/lib/game/sounds/events'
+import { playFrammento } from '@/lib/game/sounds/ui'
 
 export interface CompletedMissionInfo {
   /** Server mission UUID — used by the tutorial moment modal to key off
@@ -26,6 +27,17 @@ export default function MissionRewardModal({ missions, onDone }: MissionRewardMo
 
   // Play sound once when the modal first appears
   useEffect(() => { playMissionComplete() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When the current mission also granted a tutorial frammento, layer a
+  // soft puzzle-piece chime on top so the player learns "this is enigma
+  // progress" — distinct from the mission-complete fanfare.
+  useEffect(() => {
+    if (missions[idx]?.tutorialFrammentoGranted) {
+      // Slight delay so it sits AFTER the mission jingle starts.
+      const t = setTimeout(() => playFrammento(), 350)
+      return () => clearTimeout(t)
+    }
+  }, [idx, missions])
 
   if (!missions.length) return null
 

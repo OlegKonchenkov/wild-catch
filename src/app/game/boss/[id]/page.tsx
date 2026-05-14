@@ -28,6 +28,7 @@ import {
   playVictory,
   playDefeat,
 } from "@/lib/game/sounds/events";
+import { playHeal } from "@/lib/game/sounds/ui";
 import { scaleCombatStats, STATUS_EFFECT_META } from "@/lib/game/combat";
 import type { StatusEffect } from "@/lib/game/combat";
 import {
@@ -671,6 +672,7 @@ export default function BossFightPage() {
   async function handleAttack() {
     if (attackingRef.current) return;
     attackingRef.current = true;
+    haptics.tap();
     setAttacking(true);
     const actingPlayerNow = playerLineup.find(
       (c: PlayerSlot) => c.is_active && !c.fainted,
@@ -902,8 +904,8 @@ export default function BossFightPage() {
                 );
               if (data.completedMissions?.length)
                 setBossMissions(data.completedMissions);
-              if (data.won) playVictory();
-              else playDefeat();
+              if (data.won) { playVictory(); haptics.victory(); }
+              else { playDefeat(); haptics.defeat(); }
               setTimeout(
                 () =>
                   setFinalResult({
@@ -1002,7 +1004,7 @@ export default function BossFightPage() {
                     setTimeout(() => setSwitchNotice(null), 2000);
                   }
                   if (isOver) {
-                    if (data.won) playVictory(); else playDefeat();
+                    if (data.won) { playVictory(); haptics.victory(); } else { playDefeat(); haptics.defeat(); }
                     window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
                     if (data.levelUp)
                       window.dispatchEvent(
@@ -1048,7 +1050,7 @@ export default function BossFightPage() {
                   setTimeout(() => setSwitchNotice(null), 2000);
                 }
                 if (isOver) {
-                  if (data.won) playVictory(); else playDefeat();
+                  if (data.won) { playVictory(); haptics.victory(); } else { playDefeat(); haptics.defeat(); }
                   window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
                   if (data.levelUp)
                     window.dispatchEvent(
@@ -1123,6 +1125,8 @@ export default function BossFightPage() {
   async function handleHeal(itemId: string) {
     if (attackingRef.current) return;
     attackingRef.current = true;
+    haptics.tap();
+    playHeal();
     setAttacking(true);
 
     const res = await fetch(`/api/game/boss/${id}`, {
@@ -1273,8 +1277,8 @@ export default function BossFightPage() {
           setAnimState("idle");
           setLastDamage(null);
           if (isOver) {
-            if (data.won) playVictory();
-            else playDefeat();
+            if (data.won) { playVictory(); haptics.victory(); }
+            else { playDefeat(); haptics.defeat(); }
             setTimeout(
               () =>
                 setFinalResult({ won: data.won, reward: null, levelUp: null }),
@@ -1308,8 +1312,8 @@ export default function BossFightPage() {
         );
       }
       if (isOver) {
-        if (data.won) playVictory();
-        else playDefeat();
+        if (data.won) { playVictory(); haptics.victory(); }
+        else { playDefeat(); haptics.defeat(); }
         setTimeout(
           () =>
             setFinalResult({
@@ -1337,6 +1341,7 @@ export default function BossFightPage() {
   async function handleSwitch(targetPlayerCreatureId: string) {
     if (attackingRef.current) return;
     attackingRef.current = true;
+    haptics.tap();
     setAttacking(true);
 
     const res = await fetch(`/api/game/boss/${id}`, {
@@ -1395,7 +1400,7 @@ export default function BossFightPage() {
               }
               if (isOver) {
                 window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
-                if (data.lost) playDefeat();
+                if (data.lost) playDefeat(); haptics.defeat();
                 setTimeout(() => setFinalResult({ won: false, reward: null, levelUp: null }), 400);
               }
               attackingRef.current = false;
@@ -1418,7 +1423,7 @@ export default function BossFightPage() {
             }
             if (isOver) {
               window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
-              if (data.lost) playDefeat();
+              if (data.lost) playDefeat(); haptics.defeat();
               setTimeout(() => setFinalResult({ won: false, reward: null, levelUp: null }), 400);
             }
             attackingRef.current = false;
@@ -1436,7 +1441,7 @@ export default function BossFightPage() {
       }
       if (isOver) {
         window.dispatchEvent(new CustomEvent("wc:refresh-stats"));
-        if (data.lost) playDefeat();
+        if (data.lost) playDefeat(); haptics.defeat();
         setTimeout(() => setFinalResult({ won: false, reward: null, levelUp: null }), 400);
       }
       attackingRef.current = false;

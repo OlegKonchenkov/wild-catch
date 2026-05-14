@@ -45,6 +45,7 @@ import { playEggHatch } from '@/lib/game/sounds/hatch'
 import { playEnigmaSolve } from '@/lib/game/sounds/enigma'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
 import { playMissionComplete } from '@/lib/game/sounds/events'
+import { playQrScan, playPinClaim } from '@/lib/game/sounds/ui'
 import { track } from '@/lib/analytics'
 
 // Dynamic import — Leaflet is not SSR-safe
@@ -454,9 +455,10 @@ function MapPageInner() {
       const res = await fetch('/api/game/tutorial/claim-pin', { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
+        playPinClaim()
+        haptics.missionDone()
         setTutorialBonusClaimed(true)
         setTutorialBonusPin(null)
-        haptics.missionDone()
         setTutorialBonusToast(data.alreadyClaimed
           ? 'Indizio già raccolto'
           : '💡 Nuovo indizio nella sezione Enigmi!')
@@ -492,6 +494,9 @@ function MapPageInner() {
       })
       const data = await res.json()
       if (res.ok && data.success) {
+        // Aural + tactile confirmation — was silent before.
+        playQrScan()
+        haptics.tap()
         if (data.bossFightId) {
           // Boss QR scanned — drop the player straight into the fight.
           if (data.completedMissions?.length > 0) {
@@ -889,6 +894,9 @@ function MapPageInner() {
           .then(r => r.json())
           .then((d: any) => {
             if (d.success) {
+              // Aural + tactile feedback — pin claims used to be silent.
+              playPinClaim()
+              haptics.missionDone()
               setClaimedPinIds(prev => new Set([...prev, nearPin.id]))
               invalidateMapPinsCache(sid)
               setPinReward(d as PinRewardData)
@@ -1259,13 +1267,25 @@ function MapPageInner() {
 
       {/* Top-right HUD column — step counter + GPS accuracy + esca */}
       <div className="absolute top-2 right-2 z-[900] flex flex-col items-end gap-1.5">
-        <div data-coachmark="step-counter" className="bg-[#0F1F2E]/85 border border-white/10 backdrop-blur-sm rounded-xl px-3 py-2 flex items-center gap-2">
+        <motion.div
+          data-coachmark="step-counter"
+          className="bg-[#0F1F2E]/85 border border-white/10 backdrop-blur-sm rounded-xl px-3 py-2 flex items-center gap-2 relative overflow-hidden"
+          // Subtle glow pulse when a credit fires — keyed off stepsWalked
+          // (server-confirmed) so we don't fire on pending interpolation.
+          animate={{ boxShadow: stepsWalked > 0 ? [
+            '0 0 0 0 rgba(58,157,188,0)',
+            '0 0 0 6px rgba(58,157,188,0.18)',
+            '0 0 0 0 rgba(58,157,188,0)',
+          ] : '0 0 0 0 rgba(58,157,188,0)' }}
+          transition={{ duration: 0.7, ease: 'easeOut' }}
+          key={stepsWalked}
+        >
           <span className="text-sm">👟</span>
           <div className="flex flex-col items-start leading-none">
             <span className="text-white font-bold text-sm leading-tight tabular-nums">{displayedSteps.toLocaleString('it-IT')} m</span>
             <span className="text-white/30 text-[9px] uppercase tracking-wide mt-0.5">Passi sessione</span>
           </div>
-        </div>
+        </motion.div>
         {gpsAccuracy !== null && (
           <div className={`text-[10px] px-2 py-1 rounded-full backdrop-blur-sm border font-medium ${
             gpsAccuracy <= 20  ? 'bg-[#34D399]/15 border-[#34D399]/30 text-[#34D399]' :

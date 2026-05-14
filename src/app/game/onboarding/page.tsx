@@ -51,7 +51,13 @@ function SlideWelcome() {
           animate={{ scale: [1, 1.15, 1] }}
           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
         />
-        <span className="text-7xl relative z-10">🐉</span>
+        <motion.span
+          className="text-7xl relative z-10 inline-block"
+          animate={{ y: [0, -6, 0], rotate: [-2, 2, -2] }}
+          transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          🐉
+        </motion.span>
         <motion.span
           className="absolute text-3xl"
           style={{ top: 8, left: 16 }}

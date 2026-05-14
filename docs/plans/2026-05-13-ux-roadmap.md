@@ -157,6 +157,51 @@ Rifiniture finali per portare il tutorial da "completo" a "memorabile":
 
 ---
 
+## ✅ Step 4d — Polish sensoriale post-audit (game feel pass)
+**Status:** done · **Effort:** ~3h · **Impatto:** ⭐⭐⭐⭐
+
+Audit completo lato game design ha identificato 10 raccomandazioni
+prioritarie (juice + animazioni + haptic). Implementate tutte:
+
+### Audio (6 nuovi suoni Web Audio API)
+- [x] `playCoin` — shop purchase (ka-ching metallico + sparkle)
+- [x] `playQrScan` — QR success (square blip + chord confirm)
+- [x] `playPinClaim` — map pin claim (sparkle cascade + sub-bass)
+- [x] `playHeal` — item curativo in combat (warm chord shimmer)
+- [x] `playFrammento` — frammento granted (puzzle click + chime)
+- [x] `playUiTap` — coachmark/UI tap (subtle blip)
+
+### Wiring audio + haptics
+- [x] QR scan: `playQrScan` + `haptics.tap` su success (map + missions page)
+- [x] Shop buy: `playCoin` + `haptics.tap` su success
+- [x] Boss + duel finale: `haptics.victory`/`haptics.defeat` su tutti
+  i call site (8 in boss, 2 in duel)
+- [x] Boss combat buttons: `haptics.tap` su Attacca/Cura/Cambia
+- [x] Map pin claim: `playPinClaim` + `haptics.missionDone`
+- [x] Tutorial bonus pin: stessa coppia su claim
+- [x] Heal in encounter + boss: `playHeal` + `haptics.tap`
+- [x] Frammento granted: `playFrammento` con delay dentro MissionRewardModal
+
+### Animazioni
+- [x] `CountUp` componente riutilizzabile per number tween con easeOutCubic
+  applicato a oro nello shop header + GameShell header
+- [x] Bell icon: pulse + ring quando `unreadCount > 0`, keyframe wc-bell-pulse
+- [x] Step counter: glow box-shadow keyed su credit (stepsWalked change)
+- [x] Bestiary: reveal animation + badge "Nuovo!" la prima volta che
+  vedi una creatura appena catturata (state via localStorage)
+- [x] Onboarding slide 1: dragon emoji con bob + rotate continuo
+- [x] Boss `ResultScreen`: per la vittoria — 3 ring glow concentrici +
+  16 confetti starburst + trophy bounce con scala 1.3 e drop-shadow
+- [x] `FloatingDamage` componente library per refactor futuro
+  (encounter/boss/duel hanno già i propri damage numbers)
+
+### Già presenti — verificati
+- [x] Catch ball animation (net throw 0.58s in encounter)
+- [x] Map pin claim visual (claimed=grey via opacity 0.55)
+- [x] Next objective crossfade (AnimatePresence + key)
+
+---
+
 ## 🐛 Bug fix di rilascio
 **Status:** done · **Effort:** ~1h
 

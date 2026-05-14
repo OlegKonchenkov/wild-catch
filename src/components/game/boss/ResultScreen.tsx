@@ -2,6 +2,19 @@
 import { motion } from 'framer-motion'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 
+// Boss victory confetti — emitted from the trophy in a starburst pattern.
+const CONFETTI_PIECES = Array.from({ length: 16 }).map((_, i) => {
+  const angle = (i / 16) * Math.PI * 2
+  return {
+    id: i,
+    x: Math.cos(angle) * (110 + Math.random() * 50),
+    y: Math.sin(angle) * (110 + Math.random() * 50),
+    rotate: Math.random() * 720 - 360,
+    color: ['#FBBF24', '#3A9DBC', '#C084FC', '#34D399', '#E85D2F'][i % 5],
+    delay: Math.random() * 0.2,
+  }
+})
+
 interface BossReward {
   gold?: number
   exp?: number
@@ -31,23 +44,96 @@ export default function ResultScreen({
 }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 gap-6">
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-        className="text-7xl"
-      >
-        {won ? '🏆' : '💀'}
-      </motion.div>
+      <div className="relative flex items-center justify-center">
+        {/* Victory aura — expanding glow rings */}
+        {won && (
+          <>
+            <motion.div
+              className="absolute rounded-full pointer-events-none"
+              style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.35) 0%, transparent 70%)' }}
+              initial={{ width: 60, height: 60, opacity: 0 }}
+              animate={{ width: 280, height: 280, opacity: [0, 1, 0] }}
+              transition={{ duration: 1.4, delay: 0.1, ease: 'easeOut' }}
+            />
+            <motion.div
+              className="absolute rounded-full border-2 pointer-events-none"
+              style={{ borderColor: 'rgba(251,191,36,0.5)' }}
+              initial={{ width: 80, height: 80, opacity: 1 }}
+              animate={{ width: 240, height: 240, opacity: 0 }}
+              transition={{ duration: 1.2, delay: 0.25, ease: 'easeOut' }}
+            />
+            <motion.div
+              className="absolute rounded-full border pointer-events-none"
+              style={{ borderColor: 'rgba(251,191,36,0.3)' }}
+              initial={{ width: 80, height: 80, opacity: 1 }}
+              animate={{ width: 320, height: 320, opacity: 0 }}
+              transition={{ duration: 1.6, delay: 0.4, ease: 'easeOut' }}
+            />
 
-      <div className="text-center">
+            {/* Confetti starburst */}
+            {CONFETTI_PIECES.map(p => (
+              <motion.div
+                key={p.id}
+                className="absolute rounded-sm"
+                style={{
+                  width: 8, height: 12,
+                  background: p.color,
+                  boxShadow: `0 0 6px ${p.color}`,
+                }}
+                initial={{ x: 0, y: 0, rotate: 0, opacity: 0, scale: 0.4 }}
+                animate={{
+                  x: p.x,
+                  y: p.y,
+                  rotate: p.rotate,
+                  opacity: [0, 1, 1, 0],
+                  scale: [0.4, 1, 1, 0.6],
+                }}
+                transition={{
+                  duration: 1.6,
+                  delay: 0.2 + p.delay,
+                  ease: 'easeOut',
+                  times: [0, 0.15, 0.7, 1],
+                }}
+              />
+            ))}
+          </>
+        )}
+
+        <motion.div
+          initial={{ scale: 0, rotate: won ? -45 : 0 }}
+          animate={{
+            scale: won ? [0, 1.3, 1] : 1,
+            rotate: won ? [0, 0, 0] : 0,
+          }}
+          transition={{
+            type: 'spring',
+            stiffness: won ? 220 : 200,
+            damping: won ? 14 : 15,
+            duration: won ? 0.8 : undefined,
+            times: won ? [0, 0.6, 1] : undefined,
+          }}
+          className="text-7xl relative z-10"
+          style={{
+            filter: won ? 'drop-shadow(0 0 24px rgba(251,191,36,0.6))' : undefined,
+          }}
+        >
+          {won ? '🏆' : '💀'}
+        </motion.div>
+      </div>
+
+      <motion.div
+        className="text-center"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: won ? 0.5 : 0.2, duration: 0.4 }}
+      >
         <h2 className="text-2xl font-extrabold text-white mb-1">
           {won ? 'Vittoria!' : 'Sconfitta'}
         </h2>
         <p className="text-white/50 text-sm">
           {won ? 'Hai sconfitto il Capo Palestra!' : 'Il Capo Palestra è troppo forte...'}
         </p>
-      </div>
+      </motion.div>
 
       {won && reward && (
         <div

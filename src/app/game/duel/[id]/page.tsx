@@ -921,7 +921,8 @@ export default function DuelPage() {
               getCurrentUser(supabase).then(user => {
                 const didWin = updated.winner_id === user?.id
                 setResult(didWin ? 'won' : 'lost')
-                if (didWin) playVictory(); else playDefeat()
+                if (didWin) { playVictory(); haptics.victory() }
+                else { playDefeat(); haptics.defeat() }
               })
             }
             window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
@@ -1136,6 +1137,7 @@ export default function DuelPage() {
       if (data.duelOver) {
         // Immediately mark as won for the attacker — don't wait for postgres_changes
         playVictory()
+        haptics.victory()
         setResult('won')
         setIsMyTurn(false)
         window.dispatchEvent(new CustomEvent('wc:refresh-stats'))

@@ -9,6 +9,7 @@ import { track } from '@/lib/analytics'
 import { haptics } from '@/lib/haptics'
 import LevelUpModal, { type LevelUpInfo } from '@/components/game/LevelUpModal'
 import NotifPopupComponent, { type NotifPopupData } from '@/components/game/NotifPopup'
+import CountUp from '@/components/game/CountUp'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import { getExpProgress } from '@/lib/game/leveling'
@@ -667,7 +668,15 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-1 text-[#D4A96A]">
           {statsLoading
             ? <div className="w-12 h-4 rounded bg-white/10 animate-pulse" />
-            : <><span className="text-sm">💰</span><span className="text-sm font-bold">{gold ?? '—'}</span></>
+            : <>
+                <span className="text-sm">💰</span>
+                <CountUp
+                  value={gold ?? 0}
+                  durationMs={650}
+                  formatter={n => n.toLocaleString('it-IT')}
+                  className="text-sm font-bold tabular-nums"
+                />
+              </>
           }
         </div>
 
@@ -684,13 +693,39 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
             className="relative p-1 text-white/50 hover:text-white transition-colors"
             aria-label="Notifiche"
           >
-            <span className="text-xl">🔔</span>
+            {/* Pulse aura when unread events exist — draws the eye without
+                being aggressive. Disabled when count is 0 so it doesn't
+                animate forever. */}
+            {unreadCount > 0 && (
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-full pointer-events-none"
+                style={{
+                  background: 'radial-gradient(circle, rgba(239,68,68,0.55) 0%, transparent 65%)',
+                  animation: 'wc-bell-pulse 1.6s ease-in-out infinite',
+                }}
+              />
+            )}
+            <motion.span
+              animate={unreadCount > 0 ? { rotate: [0, -10, 10, -8, 8, 0] } : { rotate: 0 }}
+              transition={{ duration: 0.8, repeat: unreadCount > 0 ? Infinity : 0, repeatDelay: 2.4, ease: 'easeInOut' }}
+              className="text-xl relative inline-block"
+              style={{ transformOrigin: '50% 12%' }}
+            >
+              🔔
+            </motion.span>
             {unreadCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
+          <style jsx global>{`
+            @keyframes wc-bell-pulse {
+              0%, 100% { opacity: 0; transform: scale(0.6); }
+              50%      { opacity: 0.6; transform: scale(1.4); }
+            }
+          `}</style>
         </div>
       </header>
 

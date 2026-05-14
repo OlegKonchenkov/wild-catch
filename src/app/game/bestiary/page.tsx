@@ -67,6 +67,23 @@ export default function BestiaryPage() {
   const [showEnigma, setShowEnigma]         = useState(false)
   const [showStatusInfo, setShowStatusInfo] = useState(false)
   const [loading, setLoading]               = useState(true)
+  // Creature IDs that were caught for the first time but not yet revealed
+  // in the bestiary. Drives a one-time sparkle animation on the matching
+  // card the next time the page is opened. Cleared after rendering once.
+  const [newlyCaughtIds, setNewlyCaughtIds] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('wc:bestiary-new')
+      if (raw) {
+        const ids: string[] = JSON.parse(raw)
+        if (Array.isArray(ids) && ids.length > 0) {
+          setNewlyCaughtIds(new Set(ids))
+          // Clear immediately so a second visit doesn't replay the reveal.
+          localStorage.removeItem('wc:bestiary-new')
+        }
+      }
+    } catch { /* noop */ }
+  }, [])
   const [selectedPcId, setSelectedPcId]     = useState<string | null>(null)
   const [playerLevel, setPlayerLevel]       = useState(1)
   // Set of creature IDs that have an evolved form
@@ -681,13 +698,26 @@ export default function BestiaryPage() {
             const rarityColor = RARITY_COLORS[creature.rarity]
 
             const canEvolve = !!(pc && pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id))
+            const isNewReveal = newlyCaughtIds.has(creature.id)
 
             return (
               <motion.div
                 key={creature.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: i * 0.02 }}
+                initial={
+                  isNewReveal
+                    ? { opacity: 0, scale: 0.55, rotate: -8 }
+                    : { opacity: 0, scale: 0.9 }
+                }
+                animate={
+                  isNewReveal
+                    ? { opacity: 1, scale: [0.55, 1.14, 1], rotate: [0, 0, 0] }
+                    : { opacity: 1, scale: 1 }
+                }
+                transition={
+                  isNewReveal
+                    ? { delay: i * 0.02 + 0.15, duration: 0.7, times: [0, 0.6, 1], type: 'tween' }
+                    : { delay: i * 0.02 }
+                }
                 whileTap={{ scale: 0.93 }}
                 onClick={() => { setSelected({ creature, pc }); setShowEnigma(false); setShowStatusInfo(false) }}
                 className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all
@@ -703,8 +733,26 @@ export default function BestiaryPage() {
                   }`}
                 style={canEvolve ? {
                   boxShadow: '0 0 12px rgba(247,200,65,0.45), 0 0 4px rgba(247,200,65,0.3)',
+                } : isNewReveal ? {
+                  boxShadow: '0 0 24px rgba(58,188,168,0.55), 0 0 8px rgba(58,188,168,0.4)',
                 } : undefined}
               >
+                {/* "Nuovo!" badge — one-time reveal */}
+                {isNewReveal && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.4, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ delay: i * 0.02 + 0.55, type: 'spring', stiffness: 350, damping: 18 }}
+                    className="absolute top-1.5 right-1.5 z-10 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider"
+                    style={{
+                      background: 'linear-gradient(135deg, #3ABCA8, #34D399)',
+                      color: '#0F1F2E',
+                      boxShadow: '0 2px 6px rgba(58,188,168,0.55)',
+                    }}
+                  >
+                    Nuovo!
+                  </motion.div>
+                )}
                 {/* Rarity stripe */}
                 <div className="h-[3px]" style={{ background: canEvolve ? '#F7C841' : caught ? rarityColor : 'rgba(255,255,255,0.04)' }} />
 

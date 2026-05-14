@@ -11,6 +11,9 @@ import { GameListSkeleton } from '@/components/game/GameLoading'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
 import { isTutorialSession } from '@/lib/game/tutorial'
+import { haptics } from '@/lib/haptics'
+import { playCoin } from '@/lib/game/sounds/ui'
+import CountUp from '@/components/game/CountUp'
 
 const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; color: string }> = {
   rete:      { icon: '🎯', label: 'Rete',       hint: 'Aumenta la probabilità di cattura',       color: '#3A9DBC' },
@@ -89,6 +92,11 @@ export default function ShopPage() {
       })
       const data = await res.json()
       if (res.ok) {
+        // Aural + tactile confirmation of a successful purchase — the
+        // transaction used to be silent. The "ka-ching" + tap haptic
+        // make the spending tangible.
+        playCoin()
+        haptics.tap()
         setGold(data.remainingGold)
         track('shop_purchase', { sessionId, itemId: item.id, itemType: item.type, price: item.shop_price })
         showSuccess(`${TYPE_META[item.type].icon} ${item.name} acquistato!`)
@@ -124,7 +132,12 @@ export default function ShopPage() {
           <h1 className="text-lg font-extrabold tracking-tight">🛒 Negozio</h1>
           <div className="flex items-center gap-1.5 bg-[#D4A96A]/10 border border-[#D4A96A]/30 rounded-full px-3 py-1">
             <span className="text-base">💰</span>
-            <span className="text-[#D4A96A] font-extrabold text-sm">{gold.toLocaleString('it-IT')}</span>
+            <CountUp
+              value={gold}
+              durationMs={550}
+              formatter={n => n.toLocaleString('it-IT')}
+              className="text-[#D4A96A] font-extrabold text-sm tabular-nums"
+            />
             <span className="text-[#D4A96A]/50 text-xs">oro</span>
           </div>
         </div>

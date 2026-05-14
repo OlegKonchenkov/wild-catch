@@ -7,6 +7,7 @@ import { playEncounterSound } from '@/lib/game/battle-sounds'
 import { startEncounterLoop } from '@/lib/game/sounds/battle-loop'
 import { playCatchAttempt, playCatchFail, playCatchSuccess } from '@/lib/game/sounds/catch'
 import { playKnockout, playFlee, playDefeat, playMissionComplete } from '@/lib/game/sounds/events'
+import { playHeal } from '@/lib/game/sounds/ui'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
@@ -1098,6 +1099,18 @@ export default function EncounterPage() {
       await new Promise(r => setTimeout(r, 1800))
       setShowCatchSuccess(false)
       const creatureId = data.newCreatureId ?? state.creature.id
+      // Mark this creature as "new in bestiary" so the bestiary page can
+      // play a reveal animation the first time it's viewed. Only on truly
+      // new captures (server flags isNew=true); duplicates don't sparkle.
+      if (data.isNew && creatureId) {
+        try {
+          const key = 'wc:bestiary-new'
+          const existing: string[] = JSON.parse(localStorage.getItem(key) ?? '[]')
+          if (!existing.includes(creatureId)) {
+            localStorage.setItem(key, JSON.stringify([...existing, creatureId]))
+          }
+        } catch { /* quota */ }
+      }
       supabase.from('creatures')
         .select('name, hp, atk, def, element, rarity, image_url, description, status_effect, status_effect_chance')
         .eq('id', creatureId).single()
@@ -1219,6 +1232,8 @@ export default function EncounterPage() {
 
   async function handleHeal(itemId: string) {
     if (!state || loading) return
+    haptics.tap()
+    playHeal()
     resetTimer(); setLoading(true); setPendingAction('heal'); setShowItemsModal(false)
     const res = await fetch('/api/game/encounter/heal', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
