@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import {
   TUTORIAL_SESSION_ID,
   TUTORIAL_USER_SESSION_TABLES,
+  TUTORIAL_SUGGERIMENTO_ID,
 } from '@/lib/game/tutorial'
 
 /**
@@ -89,6 +90,21 @@ export async function POST(request: Request) {
       }, { status: 500 })
     }
   }
+
+  // Pre-grant the free enigma hint. In a real event a player would find a
+  // suggerimento on a map pin or by scanning a QR — the tutorial hands it
+  // to them up front so they learn the mechanic before having to hunt.
+  // Idempotent: UNIQUE(user_id, session_id, suggerimento_id) handles dupes.
+  await admin
+    .from('player_enigma_suggerimenti')
+    .upsert(
+      {
+        user_id: user.id,
+        session_id: TUTORIAL_SESSION_ID,
+        suggerimento_id: TUTORIAL_SUGGERIMENTO_ID,
+      },
+      { onConflict: 'user_id,session_id,suggerimento_id', ignoreDuplicates: true },
+    )
 
   return NextResponse.json({
     sessionId: TUTORIAL_SESSION_ID,

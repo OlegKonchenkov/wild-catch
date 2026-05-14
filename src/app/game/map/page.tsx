@@ -16,7 +16,16 @@ import CreatureSprite from '@/components/creature/CreatureSprite'
 import EggHatchModal from '@/components/game/EggHatchModal'
 import Coachmark, { type CoachmarkStep } from '@/components/game/Coachmark'
 import NextObjectiveWidget from '@/components/game/NextObjectiveWidget'
-import { TUTORIAL_SESSION_ID, isTutorialQrTarget, tutorialQrButtonLabel } from '@/lib/game/tutorial'
+import {
+  TUTORIAL_SESSION_ID,
+  TUTORIAL_BONUS_SUGGERIMENTO_ID,
+  TUTORIAL_PIN_OFFSET_M,
+  TUTORIAL_PIN_CLAIM_RADIUS_M,
+  isTutorialQrTarget,
+  tutorialQrButtonLabel,
+  tutorialPinBearingForUser,
+  offsetGpsPoint,
+} from '@/lib/game/tutorial'
 import StarterSelect, { type StarterCreature } from '@/components/game/StarterSelect'
 import PinRewardModal, { type PinRewardData } from '@/components/game/PinRewardModal'
 import EnigmaModal from '@/components/game/EnigmaModal'
@@ -57,6 +66,11 @@ const MAP_COACHMARK_STEPS: CoachmarkStep[] = [
   { key: 'nav-classifica', title: 'Classifica',  body: 'Il tuo posizionamento nella sessione corrente e le statistiche personali.', preferredSide: 'top' },
   { key: 'nav-guida',     title: 'Guida',        body: 'Ogni meccanica spiegata con esempi animati. Da qui puoi rivedere anche questo tutorial.', preferredSide: 'top' },
 ]
+
+// Synthetic pin id for the tutorial-only "indizio bonus" pin. Used to
+// distinguish it from real DB-backed pins in the proximity-claim flow.
+const TUTORIAL_BONUS_PIN_ID = 'tutorial-bonus-hint'
+const tutorialBonusAnchorKey = (uid: string) => `wc:tutorial-bonus-anchor:${uid}`
 
 const ENCOUNTER_COOLDOWN_MS = 30000  // 30s between encounters
 // Cumulative distance that, when exceeded, probabilistically triggers a walk-based encounter
@@ -317,6 +331,125 @@ function MapPageInner() {
 
   useEffect(() => { void refreshTutorialTarget() }, [refreshTutorialTarget])
 
+  // ── Tutorial bonus map pin ────────────────────────────────────────────────
+  // A single map pin dropped ~40 m from the player's first GPS fix, in a
+  // deterministic per-user direction. Walking within 25 m auto-claims it,
+  // granting an extra enigma suggerimento. Purely client-side overlay —
+  // no row in session_map_pins — so the existing pin RLS / fetch path is
+  // unaffected. localStorage stores the anchor so the pin stays put across
+  // reloads; the DB (player_enigma_suggerimenti) is authoritative for
+  // the "already claimed" check, so a tutorial reset cleanly re-arms it.
+  const [tutorialBonusPin, setTutorialBonusPin] = useState<MapPin | null>(null)
+  const [tutorialBonusClaimed, setTutorialBonusClaimed] = useState<boolean | null>(null) // null = unknown yet
+  const tutorialBonusClaimingRef = useRef(false)
+  const [tutorialBonusToast, setTutorialBonusToast] = useState<string | null>(null)
+
+  // Resolve claimed status from the DB once we know the user + tutorial scope
+  useEffect(() => {
+    if (!isTutorialSession) { setTutorialBonusClaimed(null); return }
+    let cancelled = false
+    void (async () => {
+      const user = await getCurrentUser(supabase)
+      if (!user || cancelled) return
+      const { data } = await supabase
+        .from('player_enigma_suggerimenti')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('session_id', TUTORIAL_SESSION_ID)
+        .eq('suggerimento_id', TUTORIAL_BONUS_SUGGERIMENTO_ID)
+        .maybeSingle()
+      if (cancelled) return
+      setTutorialBonusClaimed(!!data)
+    })()
+    return () => { cancelled = true }
+  }, [isTutorialSession, supabase])
+
+  // Place the pin: needs (tutorial session, not claimed, a GPS fix). On the
+  // first eligible render we pick / persist the anchor and render the pin.
+  useEffect(() => {
+    if (!isTutorialSession || tutorialBonusClaimed !== false) {
+      setTutorialBonusPin(null)
+      return
+    }
+    const pos = lastPosRef.current
+    if (!pos) return // wait for first GPS fix
+
+    let cancelled = false
+    void (async () => {
+      const user = await getCurrentUser(supabase)
+      if (!user || cancelled) return
+
+      // Read or initialise the anchor (the "spawn point" of the pin —
+      // recomputed only if the user has never had one). The actual pin
+      // position is a fixed offset off this anchor, so the marker doesn't
+      // drift when the player walks around before reaching it.
+      const key = tutorialBonusAnchorKey(user.id)
+      let anchor: { lat: number; lng: number } | null = null
+      try {
+        const raw = localStorage.getItem(key)
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (typeof parsed?.lat === 'number' && typeof parsed?.lng === 'number') {
+            anchor = { lat: parsed.lat, lng: parsed.lng }
+          }
+        }
+      } catch { /* fall through */ }
+      if (!anchor) {
+        anchor = { lat: pos.lat, lng: pos.lng }
+        try { localStorage.setItem(key, JSON.stringify(anchor)) } catch { /* quota */ }
+      }
+
+      const bearing = tutorialPinBearingForUser(user.id)
+      const pinPos = offsetGpsPoint(anchor, bearing, TUTORIAL_PIN_OFFSET_M)
+      if (cancelled) return
+      setTutorialBonusPin({
+        id: TUTORIAL_BONUS_PIN_ID,
+        lat: pinPos.lat,
+        lng: pinPos.lng,
+        name: '💡 Indizio del Maestro',
+        description: 'Cammina fino a qui per ricevere un indizio extra sull\'enigma.',
+        reward_type: 'enigma',
+        reward_radius_m: TUTORIAL_PIN_CLAIM_RADIUS_M,
+      })
+    })()
+    return () => { cancelled = true }
+  }, [isTutorialSession, tutorialBonusClaimed, supabase])
+
+  // Proximity claim — fires from the GPS callback so it ticks even between
+  // server POSTs. Wrapped in its own ref-guarded flow to avoid double posts.
+  const tryClaimTutorialBonus = useCallback(async (pos: { lat: number; lng: number }) => {
+    if (tutorialBonusClaimingRef.current) return
+    const pin = tutorialBonusPin
+    if (!pin) return
+    if (tutorialBonusClaimed) return
+    const R = 6371000
+    const dLat = (pos.lat - pin.lat) * Math.PI / 180
+    const dLon = (pos.lng - pin.lng) * Math.PI / 180
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(pin.lat * Math.PI / 180) * Math.cos(pos.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    if (dist > (pin.reward_radius_m ?? TUTORIAL_PIN_CLAIM_RADIUS_M)) return
+
+    tutorialBonusClaimingRef.current = true
+    try {
+      const res = await fetch('/api/game/tutorial/claim-pin', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setTutorialBonusClaimed(true)
+        setTutorialBonusPin(null)
+        haptics.missionDone()
+        setTutorialBonusToast(data.alreadyClaimed
+          ? 'Indizio già raccolto'
+          : '💡 Nuovo indizio nella sezione Enigmi!')
+        setTimeout(() => setTutorialBonusToast(null), 4500)
+      }
+    } catch {
+      /* network error — user can re-trigger by walking past the pin again */
+    } finally {
+      tutorialBonusClaimingRef.current = false
+    }
+  }, [tutorialBonusPin, tutorialBonusClaimed])
+
   // The mission-completion modal lifecycle ends with the queue draining;
   // hook into wc:refresh-stats (already fired by the encounter/qr/boss
   // success paths) so the simulated-button stays in sync without a
@@ -528,6 +661,14 @@ function MapPageInner() {
   const handlePinTap = useCallback((pin: MapPin) => {
     const sid = sessionIdRef.current
     if (!sid) return
+    // Tutorial bonus pin uses its own (proximity-only) claim flow and is
+    // not backed by a session_map_pins row — never route it through the
+    // real enigma/boss modal stack.
+    if (pin.id === TUTORIAL_BONUS_PIN_ID) {
+      const pos = lastPosRef.current
+      if (pos) void tryClaimTutorialBonus(pos)
+      return
+    }
     // Only act on boss/enigma pins that aren't yet claimed
     if (pin.reward_type !== 'boss' && pin.reward_type !== 'enigma') return
     if (claimedPinIdsRef.current.has(pin.id)) return
@@ -551,7 +692,7 @@ function MapPageInner() {
       setDeclinedEnigmaPinIds(prev => { const s = new Set(prev); s.delete(pin.id); return s })
       setPendingEnigmaPin(pin)
     }
-  }, [])
+  }, [tryClaimTutorialBonus])
 
   const triggerEncounter = useCallback(async (trigger: 'gps' | 'timer' = 'gps'): Promise<boolean> => {
     // Mutex: skip if another trigger is in-flight or popup already showing
@@ -641,16 +782,35 @@ function MapPageInner() {
     }
 
     if (typeof data.stepsWalked === 'number') {
-      // Server is the authoritative source — overwrite any locally-credited
-      // optimistic value. The fix the server just persisted becomes the new
-      // local baseline so the client's next predictions stay aligned with
-      // the server's accumulator. Pending bucket resets too: whatever the
-      // user accumulated since the previous credit is now either folded
-      // into the new server total (if the server credited) or it never
-      // reached the SNR threshold (no credit) — either way, start fresh.
-      setStepsWalked(data.stepsWalked)
-      setPendingDistance(0)
-      localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: Date.now(), accuracy: pos.accuracy }
+      // Server is authoritative. Two cases:
+      //
+      //  (a) Server credited new steps → data.stepsWalked > previous.
+      //      The credit already absorbed the distance the user walked, so
+      //      we zero the pending bucket and reset the local baseline to
+      //      the current fix. Display = new total + 0 — strictly higher
+      //      than before, no flicker.
+      //
+      //  (b) Server did NOT credit (jitter under SNR threshold) →
+      //      data.stepsWalked === previous. Previously we zeroed pending
+      //      here too, which made the visible counter drop by a few
+      //      metres every reconciliation cycle when the player was
+      //      walking slowly. Keep pending and the local baseline as they
+      //      were so the display only ticks forward.
+      setStepsWalked(prev => {
+        // Step total is monotonic non-decreasing. If the server is briefly
+        // behind a locally-credited optimistic tick (we credited 5m before
+        // the server saw the fix), keep the higher local value so the
+        // display doesn't snap backwards. The server will catch up next
+        // reconciliation.
+        const next = Math.max(prev, data.stepsWalked)
+        if (next > prev) {
+          setPendingDistance(0)
+          localBaselineRef.current = {
+            lat: pos.lat, lng: pos.lng, ts: Date.now(), accuracy: pos.accuracy,
+          }
+        }
+        return next
+      })
     }
 
     if (data.eggsHatched?.length > 0) {
@@ -756,6 +916,11 @@ function MapPageInner() {
     // Skip very inaccurate fixes (map marker already updated above)
     if (pos.accuracy > 300) return
 
+    // Tutorial bonus pin proximity — fires off the GPS tick so it claims
+    // even when no server POST is in flight. The function is a no-op when
+    // the pin isn't placed or has been claimed.
+    void tryClaimTutorialBonus({ lat: pos.lat, lng: pos.lng })
+
     // ── Optimistic local step credit + smooth pending interpolation ───────
     const baseline = localBaselineRef.current
     const now = Date.now()
@@ -804,7 +969,7 @@ function MapPageInner() {
       positionPostTimeoutRef.current = null
       void firePositionPost()
     }, wait)
-  }, [firePositionPost])
+  }, [firePositionPost, tryClaimTutorialBonus])
 
   // Clean up any pending timer on unmount so we don't leak
   useEffect(() => () => {
@@ -950,9 +1115,16 @@ function MapPageInner() {
         playerPosition={position ? { lat: position.lat, lng: position.lng } : null}
         sessionId={sessionId!}
         creatureImageUrl={creatureImageUrl}
-        pins={mapPins}
+        pins={tutorialBonusPin ? [...mapPins, tutorialBonusPin] : mapPins}
         onPinTap={handlePinTap}
       />
+
+      {/* Tutorial bonus pin — claim feedback toast */}
+      {tutorialBonusToast && (
+        <div className="absolute z-[860] top-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-[#3A9DBC]/95 text-white text-sm font-bold shadow-lg backdrop-blur-sm">
+          {tutorialBonusToast}
+        </div>
+      )}
 
       {/* Tutorial-only: simulated QR scan button. Real events spawn QR
           codes on physical objects; the always-on demo can't, so we surface

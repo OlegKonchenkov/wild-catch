@@ -41,6 +41,10 @@ function buildAdmin(opts: {
           }),
         })),
       })),
+      // The tutorial start path also pre-grants the free enigma hint via
+      // an upsert on player_enigma_suggerimenti. Stub it as a no-op so the
+      // mock chain doesn't blow up on unrelated tables either.
+      upsert: vi.fn(async () => ({ error: null })),
     }
   }
 

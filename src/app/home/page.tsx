@@ -261,6 +261,11 @@ function HomeLobby() {
       }
       localStorage.setItem('current_session_id', data.sessionId)
       localStorage.setItem('wc:tutorial-visited', '1')
+      // Reset also clears the client-side tutorial bonus-pin anchor so the
+      // pin can re-spawn at a fresh GPS fix; on plain start we leave it.
+      if (reset && user?.id) {
+        try { localStorage.removeItem(`wc:tutorial-bonus-anchor:${user.id}`) } catch { /* noop */ }
+      }
       // Full-page navigation matches how handleJoin enters a session — the
       // map page reads the restored sessionId from the URL.
       window.location.assign(`/game/map?restored=${data.sessionId}`)

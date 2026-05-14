@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getMissionUnlockState, type MissionUnlockFields } from '@/lib/game/mission-unlocks'
+import { isTutorialSession } from '@/lib/game/tutorial'
 
 /**
  * GET /api/game/missions/next?sessionId=<uuid>
@@ -30,13 +31,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'sessionId mancante' }, { status: 400 })
   }
 
-  // Pull missions (session-scoped + global), player progress, and player level in parallel.
+  // Pull missions, player progress, and player level in parallel. The
+  // mission scope depends on the session kind: real events pull both
+  // event-scoped and global missions; the tutorial session is isolated
+  // so its chain stays a clean scripted story without globals.
+  const missionsBase = supabase
+    .from('missions')
+    .select('id, title, type, target, target_count, reward_gold, reward_exp, unlock_level, unlock_after_mission_id, chapter_order')
+  const missionsScoped = isTutorialSession(sessionId)
+    ? missionsBase.eq('session_id', sessionId).order('chapter_order', { ascending: true })
+    : missionsBase
+        .or(`session_id.eq.${sessionId},session_id.is.null`)
+        .order('chapter_order', { ascending: true })
+
   const [missionsRes, pmRes, psRes] = await Promise.all([
-    supabase
-      .from('missions')
-      .select('id, title, type, target, target_count, reward_gold, reward_exp, unlock_level, unlock_after_mission_id, chapter_order')
-      .or(`session_id.eq.${sessionId},session_id.is.null`)
-      .order('chapter_order', { ascending: true }),
+    missionsScoped,
     supabase
       .from('player_missions')
       .select('mission_id, progress, completed_at')

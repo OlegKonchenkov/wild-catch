@@ -10,6 +10,7 @@ import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { GameListSkeleton } from '@/components/game/GameLoading'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
+import { isTutorialSession } from '@/lib/game/tutorial'
 
 const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; color: string }> = {
   rete:      { icon: '🎯', label: 'Rete',       hint: 'Aumenta la probabilità di cattura',       color: '#3A9DBC' },
@@ -40,16 +41,20 @@ export default function ShopPage() {
       // leak into real-event shops, and event-specific catalogues stay
       // isolated. The cache key includes the sessionId so different
       // sessions get their own SWR entry.
-      const cacheKey = `shop:items:${sessionId ?? 'no-session'}:v2`
+      // Tutorial gets its own catalogue: ONLY tutorial-scoped items, no
+      // globals. Real events get session-scoped + globals as before.
+      const isTut = !!sessionId && isTutorialSession(sessionId)
+      const cacheKey = `shop:items:${sessionId ?? 'no-session'}:${isTut ? 'tut-v3' : 'v2'}`
       const itemsSWR = swr<Item[]>(cacheKey, 10 * 60 * 1000, async () => {
-        const filter = sessionId
-          ? `session_id.eq.${sessionId},session_id.is.null`
-          : 'session_id.is.null'
-        const { data } = await supabase
-          .from('items').select('*')
-          .gt('shop_price', 0)
-          .or(filter)
-          .order('type').order('shop_price')
+        const base = supabase.from('items').select('*')
+          .gt('shop_price', 0).order('type').order('shop_price')
+        const { data } = await (
+          isTut
+            ? base.eq('session_id', sessionId!)
+            : sessionId
+              ? base.or(`session_id.eq.${sessionId},session_id.is.null`)
+              : base.is('session_id', null)
+        )
         return (data ?? []) as unknown as Item[]
       })
       if (itemsSWR.cached) setItems(itemsSWR.cached)

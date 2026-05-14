@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/supabase/client-user'
 import { swr } from '@/lib/cache'
 import type { Mission } from '@/lib/types'
 import { getMissionUnlockState, type MissionUnlockState } from '@/lib/game/mission-unlocks'
+import { isTutorialSession } from '@/lib/game/tutorial'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
@@ -400,10 +401,17 @@ export default function MissionsPage() {
 
     async function load() {
       // Missions for this session are static for the event's lifetime → SWR cache.
-      const missionsSWR = swr<Mission[]>(`missions:${sessionId}:v1`, 10 * 60 * 1000, async () => {
-        const { data } = await supabase.from('missions')
-          .select('*').or(`session_id.eq.${sessionId},session_id.is.null`)
-          .order('chapter_order')
+      // Real events pull both event-scoped and global missions; the tutorial
+      // session is isolated (no globals) so its chain stays a clean story.
+      // Bump the cache key version for tutorial so old caches with globals
+      // don't survive the scope change.
+      const isTut = isTutorialSession(sessionId)
+      const cacheKey = `missions:${sessionId}:${isTut ? 'tut-v2' : 'v1'}`
+      const missionsSWR = swr<Mission[]>(cacheKey, 10 * 60 * 1000, async () => {
+        const base = supabase.from('missions').select('*').order('chapter_order')
+        const { data } = await (isTut
+          ? base.eq('session_id', sessionId)
+          : base.or(`session_id.eq.${sessionId},session_id.is.null`))
         return (data ?? []) as Mission[]
       })
       if (missionsSWR.cached) setMissions(missionsSWR.cached)

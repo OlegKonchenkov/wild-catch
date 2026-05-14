@@ -54,6 +54,8 @@ export const LIMITS = {
   qr_scan:         makeLimiter(12, '60s'),
   shop_buy:        makeLimiter(4,  '10s'),
   auth_join:       makeLimiter(8,  '300s'),
+  enigma_solve:    makeLimiter(10, '60s'),
+  tutorial_claim_pin: makeLimiter(6, '60s'),
 } as const
 
 export type LimitKey = keyof typeof LIMITS

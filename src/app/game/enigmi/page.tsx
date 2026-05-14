@@ -41,6 +41,7 @@ interface EnigmaView {
   description: string | null
   difficulty: EnigmaDifficulty
   reward_type: string | null
+  solved: boolean
   frammenti: EnigmaFrammentoView[]
   suggerimenti: EnigmaSuggerimentoView[]
   frammenti_collected: number
@@ -233,7 +234,106 @@ function SuggerimentoCard({ suggerimento, index }: { suggerimento: EnigmaSuggeri
   )
 }
 
-function EnigmaCard({ enigma }: { enigma: EnigmaView }) {
+function SolvePanel({ enigma, onSolved }: { enigma: EnigmaView; onSolved: () => void }) {
+  const [answer, setAnswer] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [feedback, setFeedback] = useState<{ kind: 'ok' | 'ko' | 'info'; msg: string } | null>(null)
+
+  async function submit() {
+    if (!answer.trim() || submitting) return
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId) {
+      setFeedback({ kind: 'ko', msg: 'Sessione non trovata' })
+      return
+    }
+    setSubmitting(true)
+    setFeedback(null)
+    try {
+      const res = await fetch('/api/game/enigmi/solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enigmaId: enigma.id, sessionId, answer }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setFeedback({ kind: 'ko', msg: data.error ?? 'Errore' })
+      } else if (data.correct) {
+        if (data.alreadySolved) {
+          setFeedback({ kind: 'info', msg: 'Già risolto in precedenza.' })
+        } else {
+          const parts: string[] = []
+          if (data.reward?.gold) parts.push(`+${data.reward.gold} oro`)
+          if (data.reward?.exp)  parts.push(`+${data.reward.exp} EXP`)
+          setFeedback({
+            kind: 'ok',
+            msg: parts.length ? `Corretto! ${parts.join(' · ')}` : 'Corretto!',
+          })
+          window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+        }
+        onSolved()
+      } else {
+        setFeedback({ kind: 'ko', msg: 'Risposta errata — riprova.' })
+      }
+    } catch {
+      setFeedback({ kind: 'ko', msg: 'Errore di rete' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (enigma.solved) {
+    return (
+      <div className="rounded-xl border border-[#34D399]/40 bg-[#34D399]/10 px-3 py-2.5 flex items-center gap-2">
+        <span className="text-lg">✅</span>
+        <p className="text-sm font-bold text-[#34D399]">Enigma risolto</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
+      <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider">
+        🔓 La tua risposta
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={answer}
+          onChange={e => setAnswer(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') submit() }}
+          placeholder="Scrivi la soluzione…"
+          disabled={submitting}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          className="flex-1 min-w-0 rounded-lg bg-[#0A1520] border border-white/15 px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#3A9DBC]"
+        />
+        <button
+          onClick={submit}
+          disabled={submitting || !answer.trim()}
+          className="shrink-0 rounded-lg bg-[#3A9DBC] disabled:bg-white/10 px-3 py-2 text-sm font-bold text-white disabled:text-white/30 transition-colors"
+        >
+          {submitting ? '…' : 'Invia'}
+        </button>
+      </div>
+      {feedback && (
+        <p
+          className="text-xs font-semibold"
+          style={{
+            color: feedback.kind === 'ok'   ? '#34D399'
+                 : feedback.kind === 'info' ? '#38BDF8'
+                 : '#F87171',
+          }}
+        >
+          {feedback.msg}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function EnigmaCard({ enigma, onSolved }: { enigma: EnigmaView; onSolved: () => void }) {
   const [open, setOpen] = useState(false)
   const diffColor = DIFFICULTY_COLOR[enigma.difficulty]
   const hasActivity = enigma.frammenti_collected > 0 || enigma.suggerimenti_collected > 0
@@ -261,6 +361,11 @@ function EnigmaCard({ enigma }: { enigma: EnigmaView }) {
             >
               {DIFFICULTY_LABEL[enigma.difficulty]}
             </span>
+            {enigma.solved && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 bg-[#34D399]/20 text-[#34D399]">
+                ✅ Risolto
+              </span>
+            )}
             {isGlobal && (
               <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 bg-[#7B4DB8]/20 text-[#C084FC]">
                 🌍 Globale
@@ -351,6 +456,10 @@ function EnigmaCard({ enigma }: { enigma: EnigmaView }) {
                   Nessun frammento o suggerimento associato a questo enigma.
                 </p>
               )}
+
+              {/* Solve panel — always present so the player can guess even
+                  before all indizi are collected. */}
+              <SolvePanel enigma={enigma} onSolved={onSolved} />
             </div>
           </motion.div>
         )}
@@ -363,7 +472,7 @@ export default function EnigmiPage() {
   const [enigmi, setEnigmi] = useState<EnigmaView[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const reload = () => {
     const sessionId = localStorage.getItem('current_session_id')
     if (!sessionId) { setLoading(false); return }
 
@@ -372,6 +481,10 @@ export default function EnigmiPage() {
       .then(d => { setEnigmi(d.enigmi ?? []) })
       .catch(() => {})
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    reload()
   }, [])
 
   const collectedCount = enigmi.reduce(
@@ -409,7 +522,7 @@ export default function EnigmiPage() {
         ) : (
           <div className="space-y-3">
             {enigmi.map(enigma => (
-              <EnigmaCard key={enigma.id} enigma={enigma} />
+              <EnigmaCard key={enigma.id} enigma={enigma} onSolved={reload} />
             ))}
           </div>
         )}

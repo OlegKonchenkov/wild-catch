@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getMissionUnlockState, type MissionUnlockContext, type MissionUnlockFields } from '@/lib/game/mission-unlocks'
+import { TUTORIAL_MISSION_FRAMMENTO_GRANTS, isTutorialSession } from '@/lib/game/tutorial'
 
 interface MissionRow {
   id: string
@@ -54,12 +55,19 @@ export async function incrementMissionProgress({
   const admin = createAdminClient()
   const eventTargets = normalizeMissionTargets(target)
 
-  // Load matching missions for this session and type (include global missions with null session_id)
-  const { data: missions } = await admin
+  // Load matching missions for this session and type. Real events also
+  // pull "global" missions (session_id IS NULL); the tutorial session is
+  // intentionally isolated so its mission list stays a clean, scripted
+  // story without globals bleeding into it.
+  const missionQuery = admin
     .from('missions')
     .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_items, reward_creature_id, unlock_level, unlock_after_mission_id')
-    .or(`session_id.eq.${sessionId},session_id.is.null`)
     .eq('type', type)
+  const { data: missions } = await (
+    isTutorialSession(sessionId)
+      ? missionQuery.eq('session_id', sessionId)
+      : missionQuery.or(`session_id.eq.${sessionId},session_id.is.null`)
+  )
 
   if (!missions?.length) return []
 
@@ -116,6 +124,25 @@ export async function incrementMissionProgress({
 
     if (justCompleted) {
       const levelUp = await grantMissionReward(mission, userId, sessionId, admin)
+
+      // Tutorial-only: hand out a specific enigma frammento when certain
+      // tutorial missions complete. This is how the player learns that
+      // catching creatures + scanning special targets contributes to enigma
+      // progress, without needing a real frammento-bearing creature pool.
+      const frammentoId = TUTORIAL_MISSION_FRAMMENTO_GRANTS[mission.id]
+      if (frammentoId) {
+        await admin
+          .from('player_enigma_frammenti')
+          .upsert(
+            {
+              user_id: userId,
+              session_id: sessionId,
+              frammento_id: frammentoId,
+            },
+            { onConflict: 'user_id,session_id,frammento_id', ignoreDuplicates: true },
+          )
+      }
+
       // Game events for bell history
       admin.from('player_game_events').insert({
         user_id: userId,

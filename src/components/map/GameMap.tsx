@@ -140,26 +140,45 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
     import('leaflet').then(L => {
       if (mapRef.current || !mapContainerRef.current) return
 
-      const bounds = session.area_bounds
-      if (!bounds || bounds.north == null || isNaN(bounds.north)) return
+      // Bounded session: configured area (north/south/east/west). Unbounded
+      // (e.g. always-on tutorial with area_bounds = {}): play anywhere, no
+      // maxBounds constraint, no rectangle overlay. We still need an
+      // initial center — prefer the player GPS if we have one, otherwise
+      // fall back to a sane Italian default that any subsequent fix will
+      // immediately replace via setView.
+      const bounds = session.area_bounds as
+        | { north?: number; south?: number; east?: number; west?: number }
+        | null
+        | undefined
+      const isBounded =
+        !!bounds &&
+        typeof bounds.north === 'number' && !isNaN(bounds.north) &&
+        typeof bounds.south === 'number' && !isNaN(bounds.south) &&
+        typeof bounds.east  === 'number' && !isNaN(bounds.east)  &&
+        typeof bounds.west  === 'number' && !isNaN(bounds.west)
 
-      const center: [number, number] = [
-        (bounds.north + bounds.south) / 2,
-        (bounds.east + bounds.west) / 2,
-      ]
+      const initialPos = playerPositionRef.current
+      const center: [number, number] = isBounded
+        ? [(bounds!.north! + bounds!.south!) / 2, (bounds!.east! + bounds!.west!) / 2]
+        : initialPos
+          ? [initialPos.lat, initialPos.lng]
+          : [42.5, 12.5] // geographic center of Italy as last-resort fallback
 
       const Leaflet = L as unknown as typeof import('leaflet')
       LRef.current = Leaflet
 
-      const map = Leaflet.map(mapContainerRef.current!, {
+      const mapOpts: import('leaflet').MapOptions = {
         center,
-        zoom: 16,
+        zoom: isBounded ? 16 : 17,
         zoomControl: false,
-        maxBounds: Leaflet.latLngBounds(
-          [bounds.south - 0.005, bounds.west - 0.005],
-          [bounds.north + 0.005, bounds.east + 0.005]
-        ),
-      })
+      }
+      if (isBounded) {
+        mapOpts.maxBounds = Leaflet.latLngBounds(
+          [bounds!.south! - 0.005, bounds!.west! - 0.005],
+          [bounds!.north! + 0.005, bounds!.east! + 0.005],
+        )
+      }
+      const map = Leaflet.map(mapContainerRef.current!, mapOpts)
       mapRef.current = map
 
       // Immediately create marker if we already have a GPS position
@@ -183,10 +202,12 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
         maxZoom: 19,
       }).addTo(map)
 
-      Leaflet.rectangle(
-        [[bounds.south, bounds.west], [bounds.north, bounds.east]],
-        { color: '#3A9DBC', weight: 2, fillOpacity: 0.07 }
-      ).addTo(map)
+      if (isBounded) {
+        Leaflet.rectangle(
+          [[bounds!.south!, bounds!.west!], [bounds!.north!, bounds!.east!]],
+          { color: '#3A9DBC', weight: 2, fillOpacity: 0.07 }
+        ).addTo(map)
+      }
 
       map.on('dragstart', () => {
         followingRef.current = false

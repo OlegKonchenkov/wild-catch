@@ -91,6 +91,55 @@ nice-to-have ma non più critico.
 
 ---
 
+## ✅ Step 4b — Enigma del tutorial (v3)
+**Status:** done · **Effort:** ~2h · **Impatto:** ⭐⭐⭐⭐⭐
+
+Espande il tutorial v2 con una 7ª missione di tipo `enigma` che insegna
+la meccanica enigmi/frammenti/suggerimenti — l'unica feature non ancora
+toccata dal tirocinio.
+
+Design:
+- Enigma "L'Essenza del Daimon", soluzione `anima` (5 lettere, facile)
+- 2 frammenti narrativi concessi al completamento di M2 (prima cattura)
+  e M5 (boss QR) — il giocatore impara che catturare creature può
+  sbloccare indizi
+- 1 suggerimento gratuito pre-concesso allo start del tutorial — sostituisce
+  il pin/QR che troverebbe in un evento reale
+- Ricompensa: +200 oro + 50 EXP
+
+Implementazione:
+- [x] Migration 032: tabelle `player_enigmi` + `player_enigma_frammenti`
+  + seed enigma + 7ª missione
+- [x] Tutorial constants: `TUTORIAL_ENIGMA_ID`, `TUTORIAL_FRAMMENTI`,
+  `TUTORIAL_SUGGERIMENTO_ID`, `TUTORIAL_MISSION_FRAMMENTO_GRANTS`
+- [x] `/api/game/tutorial` start: upsert idempotente del suggerimento gratuito
+- [x] `incrementMissionProgress`: grant di frammento al completamento
+  delle missioni mappate
+- [x] `GET /api/game/enigmi`: UNION fra frammenti da creature catturate
+  e `player_enigma_frammenti` (grant diretti) + flag `solved`
+- [x] `POST /api/game/enigmi/solve` (nuovo): rate-limited, idempotente,
+  normalizzazione NFKC+lowercase+trim, ricompensa atomica, fires
+  `incrementMissionProgress({ type: 'enigma', target: enigmaId })`
+- [x] UI `/game/enigmi`: input + bottone Invia + feedback ok/ko, badge
+  "✅ Risolto" sulla card
+- [x] Wipe-on-reset: nuove tabelle aggiunte a `TUTORIAL_USER_SESSION_TABLES`
+- [x] 7 nuovi test (constants + mapping mission→frammento)
+
+---
+
+## 🐛 Bug fix di rilascio
+**Status:** done · **Effort:** ~1h
+
+- [x] Mappa non caricava sulla sessione tutorial: `area_bounds = {}` faceva
+  early-return in `GameMap`. Ora rileviamo sessioni "unbounded" e usiamo
+  GPS / centro Italia come fallback, senza `maxBounds` né rettangolo
+- [x] Contapassi che oscillava: il display ora è strettamente monotono.
+  Su reconciliation server senza credit, manteniamo `pendingDistance`;
+  su reconciliation con credit, `setStepsWalked(max(prev, server))`
+  per assorbire l'optimistic locale che batte temporaneamente il server
+
+---
+
 ## ⏳ Step 5b — Primo incontro guidato (legacy, dropped)
 **Status:** todo · **Effort:** ~2h · **Impatto:** ⭐⭐⭐⭐
 

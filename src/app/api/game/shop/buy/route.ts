@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import { logSessionError } from '@/lib/logSessionError'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { isTutorialSession } from '@/lib/game/tutorial'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -46,6 +47,12 @@ export async function POST(request: Request) {
   if (!item) return NextResponse.json({ error: 'Oggetto non trovato' }, { status: 404 })
   if (item.session_id != null && item.session_id !== sessionId) {
     return NextResponse.json({ error: 'Oggetto non disponibile in questa sessione' }, { status: 403 })
+  }
+  // Tutorial sessions are isolated: globals (session_id IS NULL) must NOT
+  // be purchasable inside the tutorial shop, even though they would be in
+  // a real event.
+  if (isTutorialSession(sessionId) && item.session_id == null) {
+    return NextResponse.json({ error: 'Oggetto non disponibile nel tutorial' }, { status: 403 })
   }
 
   const totalCost = item.shop_price * quantity

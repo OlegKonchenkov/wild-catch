@@ -5,6 +5,7 @@ import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { isTutorialSession } from '@/lib/game/tutorial'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -29,10 +30,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errMsg }, { status: 403 })
   }
 
-  // Get QR code - match by UUID or short manual_code (case-insensitive)
-  // Also matches global QRs (null session_id)
+  // Get QR code — by UUID or short manual_code (case-insensitive).
+  // Real events also match global QRs (session_id IS NULL); the tutorial
+  // session is isolated so its scans only resolve tutorial-seeded QRs.
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrId)
-  let qrQuery = supabase.from('qr_codes').select('*').or(`session_id.eq.${sessionId},session_id.is.null`)
+  let qrQuery = supabase.from('qr_codes').select('*')
+  qrQuery = isTutorialSession(sessionId)
+    ? qrQuery.eq('session_id', sessionId)
+    : qrQuery.or(`session_id.eq.${sessionId},session_id.is.null`)
   if (isUuid) {
     qrQuery = qrQuery.eq('id', qrId)
   } else {

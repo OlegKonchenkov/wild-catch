@@ -6,6 +6,7 @@ import { loadMissionUnlockContext } from '@/lib/game/missions'
 import { getMissionUnlockState } from '@/lib/game/mission-unlocks'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { evaluateStep, shouldRollEncounter } from '@/lib/game/step-counter'
+import { isTutorialSession } from '@/lib/game/tutorial'
 
 type SupabaseLike = ReturnType<typeof createAdminClient>
 
@@ -148,12 +149,14 @@ async function updateWalkMissions(
     unlock_after_mission_id: string | null
   }
 
-  // Load walk missions for this session (session-scoped OR global)
-  const { data: walkMissions } = await supabase
+  // Load walk missions. Real events include globals; tutorial is isolated.
+  const walkBase = supabase
     .from('missions')
     .select('id, title, target_count, reward_gold, reward_exp, reward_item_id, unlock_level, unlock_after_mission_id')
-    .or(`session_id.eq.${sessionId},session_id.is.null`)
     .eq('type', 'walk')
+  const { data: walkMissions } = await (isTutorialSession(sessionId)
+    ? walkBase.eq('session_id', sessionId)
+    : walkBase.or(`session_id.eq.${sessionId},session_id.is.null`))
 
   if (!walkMissions?.length) return []
 

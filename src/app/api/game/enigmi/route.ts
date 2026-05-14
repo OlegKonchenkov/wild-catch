@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isTutorialSession } from '@/lib/game/tutorial'
 
 // GET /api/game/enigmi?sessionId=<uuid>
 // Restituisce tutti gli enigmi (di sessione + globali) con i frammenti e suggerimenti raccolti dal giocatore.
@@ -16,27 +17,51 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient()
 
-  // Carica enigmi: quelli della sessione + quelli globali (session_id IS NULL)
-  const { data: enigmiData, error: enigmiError } = await admin
+  // Real events include the session's enigmi + global ones; the tutorial
+  // session is isolated so its enigma list stays clean (just the seeded
+  // "L'Essenza del Daimon").
+  const enigmiBase = admin
     .from('enigmi')
     .select('id, session_id, title, description, difficulty, reward_type, created_at, frammenti:enigma_frammenti(id, enigma_id, title, description, image_url, video_url, order_index), suggerimenti:enigma_suggerimenti(id, enigma_id, text, image_url, order_index)')
-    .or(`session_id.eq.${sessionId},session_id.is.null`)
     .order('created_at', { ascending: true })
+  const { data: enigmiData, error: enigmiError } = await (isTutorialSession(sessionId)
+    ? enigmiBase.eq('session_id', sessionId)
+    : enigmiBase.or(`session_id.eq.${sessionId},session_id.is.null`))
 
   if (enigmiError) return NextResponse.json({ error: enigmiError.message }, { status: 500 })
 
-  // Carica frammenti del giocatore: creature catturate con enigma_frammento_id
-  const { data: playerCreatures } = await admin
-    .from('player_creatures')
-    .select('creature_id, creatures!inner(enigma_frammento_id)')
+  // Carica frammenti del giocatore: due fonti unite
+  //   (a) creature catturate il cui enigma_frammento_id ≠ null (flusso base)
+  //   (b) grant diretti su player_enigma_frammenti (tutorial / future ricompense)
+  const [{ data: playerCreatures }, { data: directFrammenti }] = await Promise.all([
+    admin
+      .from('player_creatures')
+      .select('creature_id, creatures!inner(enigma_frammento_id)')
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId)
+      .not('creatures.enigma_frammento_id', 'is', null),
+    admin
+      .from('player_enigma_frammenti')
+      .select('frammento_id')
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId),
+  ])
+
+  const collectedFrammentoIds = new Set<string>([
+    ...((playerCreatures ?? []) as any[])
+      .map(pc => pc.creatures?.enigma_frammento_id)
+      .filter(Boolean),
+    ...((directFrammenti ?? []) as any[]).map(d => d.frammento_id),
+  ])
+
+  // Carica enigmi risolti per marcare lo status
+  const { data: solvedRows } = await admin
+    .from('player_enigmi')
+    .select('enigma_id')
     .eq('user_id', user.id)
     .eq('session_id', sessionId)
-    .not('creatures.enigma_frammento_id', 'is', null)
-
-  const collectedFrammentoIds = new Set<string>(
-    (playerCreatures ?? [])
-      .map((pc: any) => pc.creatures?.enigma_frammento_id)
-      .filter(Boolean),
+  const solvedEnigmaIds = new Set<string>(
+    ((solvedRows ?? []) as any[]).map(r => r.enigma_id),
   )
 
   // Carica suggerimenti del giocatore
@@ -92,6 +117,7 @@ export async function GET(request: Request) {
       description: enigma.description,
       difficulty: enigma.difficulty,
       reward_type: enigma.reward_type,
+      solved: solvedEnigmaIds.has(enigma.id),
       frammenti,
       suggerimenti,
       frammenti_collected: frammenti.filter((f: any) => f.collected).length,
