@@ -350,6 +350,14 @@ function MapPageInner() {
   // it appears only when M7 is active so walking 50 m toward the pin
   // completes both at once. Resolves over a /api/game/missions/next fetch.
   const [tutorialOnM7, setTutorialOnM7] = useState(false)
+  // Sticky "the bonus-pin storyline has been reached" flag. Goes true the
+  // first time we observe an objective with chapter_order >= 7 (i.e. M7
+  // active OR any later mission). Stays true forever in-session so the
+  // bonus pin remains creatable even if M7 auto-completes on the same
+  // /position POST as the boss defeat (anchor would otherwise never be
+  // created because tutorialOnM7 was never observably true). Reset on
+  // session change.
+  const [tutorialBonusUnlocked, setTutorialBonusUnlocked] = useState(false)
 
   // Resolve which tutorial QR (if any) the next-objective is asking for.
   // Re-fetches on every mission completion event so the button morphs from
@@ -367,6 +375,15 @@ function MapPageInner() {
       const target = data?.objective?.target ?? null
       setTutorialNextTarget(isTutorialQrTarget(target) ? target : null)
       setTutorialOnM7(data?.objective?.id === TUTORIAL_M7_MISSION_ID)
+      // Sticky-lock the bonus-pin gate the first time we see the
+      // storyline reach chapter 7 (M7) or beyond. We deliberately
+      // never unset — once unlocked, the pin remains creatable for
+      // the rest of the session even if the player completes M7
+      // before the map effect gets a chance to read tutorialOnM7=true.
+      const chapter = data?.objective?.chapter_order
+      if (typeof chapter === 'number' && chapter >= 7) {
+        setTutorialBonusUnlocked(true)
+      }
     } catch {
       // Best-effort: realtime will retrigger this on the next mission update.
     }
@@ -460,7 +477,15 @@ function MapPageInner() {
         }
       } catch { /* fall through */ }
       if (!anchor) {
-        if (!tutorialOnM7) return            // path (2) gate
+        // Path-2 gate: only create a new anchor once the storyline has
+        // reached chapter 7+ (M7 or later). Using `tutorialBonusUnlocked`
+        // — which becomes sticky-true the moment we observe an objective
+        // at chapter >= 7 — instead of `tutorialOnM7` (which is only
+        // true while M7 is the active objective). M7 can auto-complete
+        // on the same POST as the boss defeat, leaving M8 active before
+        // the map ever observes M7 as the next objective. That used to
+        // leave the player on the enigma mission with no pin.
+        if (!tutorialBonusUnlocked) return
         const pos = lastPosRef.current
         if (!pos) return                      // wait for first GPS fix
         anchor = { lat: pos.lat, lng: pos.lng }
@@ -489,7 +514,7 @@ function MapPageInner() {
       } catch { /* noop */ }
     })()
     return () => { cancelled = true }
-  }, [isTutorialSession, tutorialBonusClaimed, tutorialOnM7, hasGpsFix, supabase])
+  }, [isTutorialSession, tutorialBonusClaimed, tutorialBonusUnlocked, hasGpsFix, supabase])
 
   // Proximity claim — fires from the GPS callback so it ticks even between
   // server POSTs. Wrapped in its own ref-guarded flow to avoid double posts.
@@ -634,6 +659,9 @@ function MapPageInner() {
       // Reset the server-side step gauge so the first reconciliation in the
       // new session can correctly detect "did the server credit anything?".
       lastServerStepsRef.current = 0
+      // Reset the sticky bonus-pin unlock — refreshTutorialTarget will
+      // re-evaluate from the next /api/game/missions/next response.
+      setTutorialBonusUnlocked(false)
       setSessionId(sid)
       sessionIdRef.current = sid
       localStorage.setItem('current_session_id', sid)
