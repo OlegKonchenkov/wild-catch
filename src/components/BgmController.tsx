@@ -19,12 +19,15 @@ import { useEffect, useRef, useState } from 'react'
  * this component.
  */
 
-const STORAGE_KEY = 'wc:bgm-muted'
 const BGM_SRC = '/audio/bgm.mp3'
 const BASE_VOLUME = 0.35
 
 export default function BgmController() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  // Always start unmuted on every onboarding mount — feedback was that
+  // a persisted "off" preference made the music silently never come
+  // back. The toggle stays interactive for the duration of the session;
+  // we just don't carry the preference across visits.
   const [muted, setMuted] = useState(false)
   // `available` flips false on `error` event (404 or decode failure). We
   // start optimistic and let the asset's load failure hide the UI — that
@@ -34,13 +37,6 @@ export default function BgmController() {
   // .play() before that with a NotAllowedError; we silently swallow it
   // and try again from the gesture handler.
   const unlockedRef = useRef(false)
-
-  // Restore muted preference on mount.
-  useEffect(() => {
-    try {
-      setMuted(localStorage.getItem(STORAGE_KEY) === '1')
-    } catch { /* private mode etc. — default to unmuted */ }
-  }, [])
 
   // Audio element setup. We create the element imperatively (instead of
   // rendering <audio>) so its lifetime is decoupled from any conditional
@@ -116,11 +112,7 @@ export default function BgmController() {
   }, [muted, available])
 
   function toggle() {
-    setMuted(prev => {
-      const next = !prev
-      try { localStorage.setItem(STORAGE_KEY, next ? '1' : '0') } catch { /* noop */ }
-      return next
-    })
+    setMuted(prev => !prev)
   }
 
   if (!available) return null
