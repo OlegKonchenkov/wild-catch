@@ -918,6 +918,12 @@ function MapPageInner() {
           localBaselineRef.current = {
             lat: pos.lat, lng: pos.lng, ts: Date.now(), accuracy: pos.accuracy,
           }
+          // Server credited new steps → /api/game/position has already
+          // bumped player_missions.progress for any active walk mission.
+          // Kick the next-objective widget so its progress bar follows in
+          // real time instead of waiting on (flaky) Supabase realtime or
+          // the next mission-completion fallback.
+          window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
         }
         return next
       })

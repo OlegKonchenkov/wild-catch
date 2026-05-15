@@ -1457,15 +1457,6 @@ export default function EncounterPage() {
           />
         )}
 
-        {/* Tutorial-only first-encounter lesson */}
-        <TutorialEncounterLesson
-          open={showEncounterLesson}
-          onClose={() => {
-            setShowEncounterLesson(false)
-            try { localStorage.setItem('wc:tutorial-encounter-lesson-seen', '1') } catch { /* noop */ }
-          }}
-        />
-
         {/* VS / message — center */}
         <div className="absolute inset-x-0 z-10" style={{ top: '46%', transform: 'translateY(-50%)' }}>
           <div className="flex items-center justify-center px-4">
@@ -2444,6 +2435,18 @@ export default function EncounterPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Tutorial-only first-encounter lesson — rendered at the root of the
+          page (NOT inside the battlefield div) so its fixed-position overlay
+          is not trapped by the battlefield's z-10 stacking context, which
+          would otherwise let the action-bar siblings paint on top of it. */}
+      <TutorialEncounterLesson
+        open={showEncounterLesson}
+        onClose={() => {
+          setShowEncounterLesson(false)
+          try { localStorage.setItem('wc:tutorial-encounter-lesson-seen', '1') } catch { /* noop */ }
+        }}
+      />
     </div>
   )
 }
