@@ -1132,6 +1132,37 @@ function MapPageInner() {
       localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: now, accuracy: pos.accuracy }
     } else {
       const distanceMoved = haversineDistance(baseline, { lat: pos.lat, lng: pos.lng })
+
+      // ── GPS re-localization guard ─────────────────────────────────────
+      // If the new fix is SIGNIFICANTLY more accurate than the baseline,
+      // the device has just settled onto a better location estimate — the
+      // big positional shift between baseline and now reflects the GPS
+      // refining its guess, not the player actually walking that
+      // distance. Silently rebase to the new fix and skip the credit/
+      // pending update for this tick. Without this, going from indoor
+      // (acc≈100m, position off by ~30-50m) to outdoor (acc≈10m) would
+      // credit a phantom "step" of tens of metres while the player is
+      // standing still. The server path runs into the same case in
+      // theory but is throttled to one POST per ~5s so GPS has usually
+      // settled by then — here we run on every fix (1Hz) so we need
+      // the explicit guard. Conservative thresholds (baseline >30m, new
+      // ≤ 50% of baseline) keep normal accuracy wobble untouched.
+      if (baseline.accuracy > 30 && pos.accuracy * 2 < baseline.accuracy) {
+        localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: now, accuracy: pos.accuracy }
+        setPendingDistance(0)
+        // Trailing throttle handles the server POST below — let it fire
+        // normally so the server can independently confirm position.
+        pendingPositionRef.current = pos
+        if (positionPostTimeoutRef.current) return
+        const elapsed = now - lastPositionPostAtRef.current
+        const wait = Math.max(0, POSITION_POST_INTERVAL_MS - elapsed)
+        positionPostTimeoutRef.current = setTimeout(() => {
+          positionPostTimeoutRef.current = null
+          void firePositionPost()
+        }, wait)
+        return
+      }
+
       const result = evaluateStep({
         distanceMoved,
         accuracy: pos.accuracy,
