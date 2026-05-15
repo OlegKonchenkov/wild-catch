@@ -167,16 +167,25 @@ async function updateWalkMissions(
   )
   if (!unlockedWalkMissions.length) return []
 
-  // Load existing player_missions entries — scoped to this session (migration 027)
+  // Load existing player_missions entries — scoped to this session (migration 027).
+  // baseline_steps was added in migration 038; pre-existing rows read NULL
+  // and we treat that as 0 to keep the old absolute-step behaviour for any
+  // mission mid-progress at deploy time.
   const missionIds = unlockedWalkMissions.map(m => m.id)
   const { data: playerMissions } = await supabase
     .from('player_missions')
-    .select('id, mission_id, progress, completed_at')
+    .select('id, mission_id, progress, completed_at, baseline_steps')
     .eq('user_id', userId)
     .eq('session_id', sessionId)
     .in('mission_id', missionIds)
 
-  type PlayerMissionProgressRow = { id: string; mission_id: string; progress: number; completed_at: string | null }
+  type PlayerMissionProgressRow = {
+    id: string
+    mission_id: string
+    progress: number
+    completed_at: string | null
+    baseline_steps: number | null
+  }
   const pmMap: Record<string, PlayerMissionProgressRow> = Object.fromEntries(
     ((playerMissions ?? []) as PlayerMissionProgressRow[]).map(pm => [pm.mission_id, pm])
   )
@@ -187,24 +196,34 @@ async function updateWalkMissions(
     const existing = pmMap[mission.id]
     if (existing?.completed_at) continue // already done
 
-    const newProgress = Math.min(mission.target_count, stepsWalked)
-
     if (!existing) {
-      const justCompleted = newProgress >= mission.target_count
+      // First time we see this mission for this player → the player just
+      // unlocked it. Capture the current step counter as the baseline and
+      // start progress at 0, regardless of how many steps the player has
+      // already accumulated in this session. Without this a mission that
+      // unlocks mid-session (e.g. M7 in the tutorial, which becomes
+      // active only after the boss is defeated) would instantly complete
+      // because stepsWalked was already > target_count.
       const { error: insertErr } = await supabase.from('player_missions').insert({
         user_id: userId,
         session_id: sessionId,
         mission_id: mission.id,
-        progress: newProgress,
-        ...(justCompleted ? { completed_at: new Date().toISOString() } : {}),
+        progress: 0,
+        baseline_steps: stepsWalked,
       })
-      // If insert failed (23505 = race condition: another concurrent request beat us), skip
-      if (insertErr) continue
-      if (justCompleted) {
-        await grantMissionReward(mission, userId, sessionId)
-        justCompletedMissions.push({ title: mission.title, rewardGold: mission.reward_gold, rewardExp: mission.reward_exp })
-      }
-    } else if (newProgress > existing.progress) {
+      if (insertErr) continue // 23505 race: another concurrent request beat us
+      // No completion check on first insert: target_count > 0 by design,
+      // and progress starts at 0 so completion is impossible this tick.
+      continue
+    }
+
+    const baseline = existing.baseline_steps ?? 0
+    const newProgress = Math.min(
+      mission.target_count,
+      Math.max(0, stepsWalked - baseline),
+    )
+
+    if (newProgress > existing.progress) {
       const justCompleted = newProgress >= mission.target_count
       if (justCompleted) {
         // Atomically claim the completion — only succeeds if another request hasn't done it yet
