@@ -12,7 +12,6 @@ import NotifPopupComponent, { type NotifPopupData } from '@/components/game/Noti
 import CountUp from '@/components/game/CountUp'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
-import BgmController from '@/components/BgmController'
 import { getExpProgress } from '@/lib/game/leveling'
 import { ELEMENT_EMOJI } from '@/lib/types'
 import { playLevelUp } from '@/lib/game/sounds/events'
@@ -634,7 +633,6 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   return (
     <div ref={rootRef} className="flex flex-col bg-[#0F1F2E] text-white overflow-hidden" style={{ height: '100dvh' }}>
       <ImageLightbox />
-      <BgmController />
       {/* Session status banner */}
       {!sessionEnded && sessionStatus === 'ready' && (
         <div className="flex-none bg-[#F7C841]/15 border-b border-[#F7C841]/35 px-4 py-1.5 text-center">

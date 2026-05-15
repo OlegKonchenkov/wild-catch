@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence, type PanInfo } from 'framer-motion'
+import BgmController from '@/components/BgmController'
 
 type PermStatus = 'idle' | 'granted' | 'denied' | 'unavailable'
 
@@ -498,6 +499,11 @@ function OnboardingInner() {
       className="fixed inset-0 z-[9990] flex flex-col text-white overflow-hidden"
       style={{ background: 'linear-gradient(160deg, #060C18 0%, #0A1628 60%, #0D0305 100%)' }}
     >
+      {/* Background music — scoped to onboarding only. Unmounts on
+          navigation away, which stops playback (the BgmController's
+          cleanup pauses and clears the <audio> element). */}
+      <BgmController />
+
       {/* Decorative orbs */}
       <div
         className="absolute inset-0 pointer-events-none"
