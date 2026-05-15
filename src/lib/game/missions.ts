@@ -114,20 +114,30 @@ export async function incrementMissionProgress({
     const newProgress = (existing?.progress ?? 0) + 1
     const justCompleted = newProgress >= mission.target_count
 
+    let writeOk: boolean
     if (!existing) {
-      await admin.from('player_missions').insert({
+      const { error: insertErr } = await admin.from('player_missions').insert({
         user_id: userId,
         session_id: sessionId,
         mission_id: mission.id,
         progress: newProgress,
         ...(justCompleted ? { completed_at: new Date().toISOString() } : {}),
       })
+      // Race: another concurrent request already inserted this row. Skip so
+      // we don't grant the reward twice (the other request will).
+      if (insertErr?.code === '23505') continue
+      writeOk = !insertErr
     } else {
-      await admin.from('player_missions').update({
+      const { error: updateErr } = await admin.from('player_missions').update({
         progress: newProgress,
         ...(justCompleted ? { completed_at: new Date().toISOString() } : {}),
       }).eq('id', existing.id)
+      writeOk = !updateErr
     }
+
+    // DB write failed: don't grant reward, otherwise the next event sees the
+    // old progress, re-completes, and dispenses the reward again (phantom loop).
+    if (!writeOk) continue
 
     if (justCompleted) {
       const levelUp = await grantMissionReward(mission, userId, sessionId, admin)
