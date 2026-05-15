@@ -22,7 +22,34 @@ import { useEffect, useRef, useState } from 'react'
 const BGM_SRC = '/audio/bgm.mp3'
 const BASE_VOLUME = 0.35
 
+/**
+ * The intro audio source is resolved at mount time:
+ *   1. Try fetch the admin-uploaded override for slot='intro' (global +
+ *      optionally per-session if a session is active)
+ *   2. Fall back to the bundled default at /audio/bgm.mp3
+ *
+ * Onboarding may happen before any session is joined, so sessionId is
+ * optional — we still pick up a global intro override.
+ */
+async function resolveIntroSrc(): Promise<string> {
+  if (typeof window === 'undefined') return BGM_SRC
+  const sessionId = (() => {
+    try { return window.localStorage.getItem('current_session_id') } catch { return null }
+  })()
+  const qs = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ''
+  try {
+    const res = await fetch(`/api/game/audio-overrides${qs}`, { cache: 'no-store' })
+    if (!res.ok) return BGM_SRC
+    const data = (await res.json()) as { overrides?: Array<{ slot: string; file_url: string }> }
+    const intro = data.overrides?.find(o => o.slot === 'intro')
+    return intro?.file_url ?? BGM_SRC
+  } catch {
+    return BGM_SRC
+  }
+}
+
 export default function BgmController() {
+  const [src, setSrc] = useState<string>(BGM_SRC)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   // Always start unmuted on every onboarding mount — feedback was that
   // a persisted "off" preference made the music silently never come
@@ -42,8 +69,17 @@ export default function BgmController() {
   // rendering <audio>) so its lifetime is decoupled from any conditional
   // JSX and the same element survives muted/unmuted toggles without
   // restarting the loop.
+  // Resolve the intro src once on mount (admin override → default).
   useEffect(() => {
-    const audio = new Audio(BGM_SRC)
+    let cancelled = false
+    resolveIntroSrc().then(resolved => {
+      if (!cancelled) setSrc(resolved)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    const audio = new Audio(src)
     audio.loop = true
     audio.preload = 'auto'
     audio.volume = BASE_VOLUME
@@ -58,7 +94,7 @@ export default function BgmController() {
       audio.src = ''
       audioRef.current = null
     }
-  }, [])
+  }, [src])
 
   // First-gesture unlock. Modern browsers require a user gesture before
   // any .play() will succeed. We listen once for pointerdown/keydown and

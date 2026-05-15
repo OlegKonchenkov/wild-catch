@@ -15,6 +15,8 @@
  */
 
 import { newAudioContext } from './shared-ac'
+import { getAudioOverride } from '../audio-overrides'
+import { startSampleLoop } from './sample-loop'
 
 // ── Melody data ────────────────────────────────────────────────────────────────
 // G major pentatonic: G4=392 A4=440 B4=493.88 D5=587.33 E5=659.25 G5=783.99
@@ -147,6 +149,12 @@ export function unduckMapAmbience(rampMs = 900): void {
 // ── Main ambience start ────────────────────────────────────────────────────────
 export function startMapAmbience(vol = 0.12): () => void {
   if (typeof window === 'undefined') return () => {}
+
+  // Admin-uploaded override: bypass the synth path and play the file in loop.
+  // Ducking from `duckMapAmbience`/`unduckMapAmbience` is a no-op in this
+  // path (gates only the synth master). Acceptable for v1.
+  const override = getAudioOverride('map')
+  if (override) return startSampleLoop(override, { volume: Math.max(0.1, vol * 3) })
 
   const ac = newAudioContext()
   let stopped = false

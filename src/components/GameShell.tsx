@@ -16,6 +16,7 @@ import { getExpProgress } from '@/lib/game/leveling'
 import { ELEMENT_EMOJI } from '@/lib/types'
 import { playLevelUp } from '@/lib/game/sounds/events'
 import { getSharedAC } from '@/lib/game/sounds/shared-ac'
+import { hydrateAudioOverrides } from '@/lib/game/audio-overrides'
 
 const NAV_ITEMS: Array<{ href: string; icon: string; label: string; coachmark?: string }> = [
   { href: '/game/map',      icon: '🗺️', label: 'Mappa'                                       },
@@ -337,6 +338,10 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     if (sid) {
       initRef.current = true
       loadSessionData(sid)
+      // Populate the audio-override cache so the synth-vs-uploaded-mp3
+      // decision in startMapAmbience/startEncounterLoop/etc. is synchronous
+      // by the time the player navigates to a battle screen.
+      hydrateAudioOverrides(sid)
     }
 
     function onStorage(e: StorageEvent) {
@@ -344,6 +349,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         initRef.current = true
         setStatsLoading(true)
         loadSessionData(e.newValue)
+        hydrateAudioOverrides(e.newValue)
       }
     }
     window.addEventListener('storage', onStorage)
@@ -354,6 +360,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       if (sid2) {
         initRef.current = true
         loadSessionData(sid2)
+        hydrateAudioOverrides(sid2)
       } else {
         setStatsLoading(false)
       }

@@ -12,6 +12,19 @@
  */
 
 import { newAudioContext } from './shared-ac'
+import { getAudioOverride, type AudioSlot } from '../audio-overrides'
+import { startSampleLoop } from './sample-loop'
+
+/**
+ * Returns a stop function for the admin-uploaded override on this slot, or
+ * null if no override is configured. Volume is bumped vs synth defaults
+ * because mp3 mastering is typically louder than the modest synth mix.
+ */
+function tryStartOverride(slot: AudioSlot, vol: number): (() => void) | null {
+  const url = getAudioOverride(slot)
+  if (!url) return null
+  return startSampleLoop(url, { volume: Math.max(0.1, vol * 3) })
+}
 
 // ── Shared percussion ─────────────────────────────────────────────────────────
 
@@ -240,6 +253,9 @@ function openHat(ac: AudioContext, t: number, vol: number): void {
 export function startEncounterLoop(vol = 0.12): () => void {
   if (typeof window === 'undefined') return () => {}
 
+  const override = tryStartOverride('encounter', vol)
+  if (override) return override
+
   let _ac: AudioContext | null = null
   let stopped = false
   const timers: ReturnType<typeof setTimeout>[] = []
@@ -406,7 +422,7 @@ const BOSS_MELODY: [number, number][] = [
 
 // ── Exports ───────────────────────────────────────────────────────────────────
 export const startDuelLoop  = (vol = 0.12): (() => void) =>
-  startBattleLoop(DUEL_MELODY,  128, vol)
+  tryStartOverride('duel', vol) ?? startBattleLoop(DUEL_MELODY,  128, vol)
 
 export const startBossLoop  = (vol = 0.12): (() => void) =>
-  startBattleLoop(BOSS_MELODY,  108, vol)
+  tryStartOverride('boss', vol) ?? startBattleLoop(BOSS_MELODY,  108, vol)

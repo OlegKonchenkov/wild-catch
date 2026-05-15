@@ -17,6 +17,7 @@ const NAV = [
   { href: '/admin/players',       label: '👥 Giocatori'   },
   { href: '/admin/level-rewards', label: '⭐ Livelli'      },
   { href: '/admin/leaderboard',   label: '🏆 Classifica'  },
+  { href: '/admin/suoni',       label: '🎵 Suoni'       },
   { href: '/admin/guide',       label: '📘 Guida Admin' },
 ]
 
