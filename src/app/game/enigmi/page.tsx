@@ -432,6 +432,22 @@ function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: 
           >
             <div className="px-4 pb-4 space-y-4 border-t border-white/8 pt-3">
 
+              {/* Full enigma description — collapsed header truncates to
+                  2 lines so the card stays compact; reveal the full text
+                  here in a parchment-style quote so the player can
+                  actually read the riddle when they need to solve it. */}
+              {enigma.description && (
+                <div
+                  className="rounded-xl px-3 py-2.5"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                  <p className="text-[10px] font-bold tracking-widest uppercase text-white/35 mb-1">📜 Enigma</p>
+                  <p className="text-sm text-white/80 leading-relaxed whitespace-pre-wrap">
+                    {enigma.description}
+                  </p>
+                </div>
+              )}
+
               {/* Frammenti */}
               {enigma.frammenti_total > 0 && (
                 <div className="space-y-2">
