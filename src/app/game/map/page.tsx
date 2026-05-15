@@ -335,6 +335,20 @@ function MapPageInner() {
   // so the number ticks forward every GPS fix while walking.
   const displayedSteps = useTweenedInteger(stepsWalked + Math.round(pendingDistance), 450)
 
+  // Broadcast the optimistic local step delta so the NextObjectiveWidget
+  // (and any other walk-progress UI) can tick its bar forward at GPS rate
+  // rather than only on server-credit cadence. Without this the top-right
+  // step counter scrolls smoothly while the top-left mission bar jumps
+  // in chunks — a confusing mismatch flagged by playtesters.
+  // The widget filters this event by mission type ('walk' only) and
+  // resets when stepsWalked changes (server reconciliation).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(new CustomEvent('wc:optimistic-steps-delta', {
+      detail: { delta: Math.round(pendingDistance) },
+    }))
+  }, [pendingDistance])
+
   // Tutorial mode: the always-on demo session has no physical QR codes in
   // the world, so we surface a "simulated scan" button on the map HUD.
   // Tapping it hits the normal /api/game/qr/scan endpoint with the seeded

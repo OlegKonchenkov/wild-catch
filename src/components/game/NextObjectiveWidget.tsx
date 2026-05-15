@@ -39,6 +39,13 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
   const supabase = useMemo(() => createClient(), [])
   const [objective, setObjective] = useState<NextObjective | null>(null)
   const [loaded, setLoaded] = useState(false)
+  // Optimistic step delta broadcast by the map page on every GPS fix
+  // (see wc:optimistic-steps-delta in src/app/game/map/page.tsx). For
+  // walk missions we add this to the server-reported progress so the
+  // bar ticks smoothly between server credits, matching the top-right
+  // step counter's cadence. Reset to 0 whenever the underlying
+  // objective changes (different mission → different baseline).
+  const [optimisticDelta, setOptimisticDelta] = useState(0)
 
   const fetchNext = useCallback(async () => {
     if (!sessionId) return
@@ -99,13 +106,44 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
     return () => window.removeEventListener('wc:refresh-stats', onRefresh)
   }, [fetchNext])
 
+  // Optimistic step delta listener — keeps the walk progress bar moving
+  // between server credits at the same cadence as the top-right step
+  // counter. We trust whatever the page broadcasts; if it ever stops
+  // emitting (different page mounted, GPS off) the delta naturally stays
+  // at its last value, and the next server credit resets it to 0.
+  useEffect(() => {
+    function onDelta(e: Event) {
+      const detail = (e as CustomEvent<{ delta: number }>).detail
+      if (typeof detail?.delta === 'number') {
+        setOptimisticDelta(Math.max(0, detail.delta))
+      }
+    }
+    window.addEventListener('wc:optimistic-steps-delta', onDelta)
+    return () => window.removeEventListener('wc:optimistic-steps-delta', onDelta)
+  }, [])
+
+  // When the objective ROW changes (different mission unlocked), drop
+  // any stale optimistic delta — the new mission has its own baseline.
+  useEffect(() => {
+    setOptimisticDelta(0)
+  }, [objective?.id])
+
   if (!loaded || !objective) return null
 
   const meta = TYPE_META[objective.type] ?? { icon: '🎯', verb: 'Completa' }
   const target = objective.target_count
-  const progress = Math.min(target, objective.progress)
-  const pct = target > 0 ? Math.min(100, (progress / target) * 100) : 0
   const isWalk = objective.type === 'walk'
+  // Only walk missions track from the optimistic step counter. Other
+  // types (cattura, qr, duel) tick by discrete events that the server
+  // already reconciles immediately, so no smoothing is needed there.
+  const displayedProgress = isWalk
+    ? Math.min(target, objective.progress + optimisticDelta)
+    : Math.min(target, objective.progress)
+  const pct = target > 0 ? Math.min(100, (displayedProgress / target) * 100) : 0
+  // Variable kept for the JSX below — `progress` is shown alongside the
+  // bar (e.g. "12/50 m"). Use the displayed value so the number and bar
+  // stay in sync.
+  const progress = displayedProgress
 
   function onTap() {
     router.push(`/game/missions?focus=${encodeURIComponent(objective!.id)}`)
