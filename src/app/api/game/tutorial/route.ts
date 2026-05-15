@@ -44,9 +44,45 @@ export async function POST(request: Request) {
   const admin = createAdminClient()
 
   if (action === 'reset') {
-    // Order is not strictly important (FKs are user/session-scoped), but
-    // we do it sequentially with await so a single failure surfaces.
+    // duel_lineups doesn't have a `session_id` column — it's scoped via
+    // duel_id → duels.session_id. Handle it specially: find the user's
+    // duels in the tutorial session, then delete lineup rows by duel_id
+    // BEFORE deleting the duels themselves. Same applies to boss_fights
+    // (scoped by user_id + session_id directly, so it's in the list).
+    const SPECIAL_TABLES = new Set(['duel_lineups'])
+
+    // 1. Pre-wipe: collect duel ids for this user in the tutorial session
+    //    so we can clean their lineups before the duels rows go away.
+    const { data: userDuels } = await admin
+      .from('duels')
+      .select('id')
+      .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
+      .eq('session_id', TUTORIAL_SESSION_ID)
+    const duelIds = (userDuels ?? []).map((d: any) => d.id)
+    if (duelIds.length > 0) {
+      const { error: lineupErr } = await admin
+        .from('duel_lineups')
+        .delete()
+        .eq('user_id', user.id)
+        .in('duel_id', duelIds)
+      if (lineupErr) {
+        return NextResponse.json({
+          error: `Errore reset (duel_lineups)`,
+          detail: lineupErr.message,
+        }, { status: 500 })
+      }
+    }
+    // Then delete the duels themselves (challenger or opponent side).
+    await admin
+      .from('duels')
+      .delete()
+      .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
+      .eq('session_id', TUTORIAL_SESSION_ID)
+
+    // 2. Standard per-(user, session) wipe for all other tables that
+    //    have BOTH user_id AND session_id columns.
     for (const table of TUTORIAL_USER_SESSION_TABLES) {
+      if (SPECIAL_TABLES.has(table)) continue // already handled above
       const { error } = await admin
         .from(table)
         .delete()

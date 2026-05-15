@@ -27,7 +27,7 @@ export default function TutorialElementsModal({ open, onClose }: Props) {
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[1300] flex flex-col items-center justify-center px-5"
+          className="fixed inset-0 z-[9996] flex flex-col items-center justify-center px-5"
           style={{ background: 'rgba(2,4,12,0.92)', backdropFilter: 'blur(16px)' }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

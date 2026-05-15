@@ -59,7 +59,7 @@ export default function MissionRewardModal({ missions, onDone }: MissionRewardMo
     <AnimatePresence>
       <motion.div
         key={`mission-reward-${idx}`}
-        className="fixed inset-0 z-[1190] flex flex-col items-center justify-center px-6"
+        className="fixed inset-0 z-[9993] flex flex-col items-center justify-center px-6"
         style={{ background: 'rgba(2,4,12,0.94)', backdropFilter: 'blur(18px)' }}
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}

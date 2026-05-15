@@ -921,6 +921,12 @@ function MapPageInner() {
     if (data.completedMissions?.length > 0) {
       setMissionQueue(prev => [...prev, ...data.completedMissions])
       haptics.missionDone()
+      // Refresh next-objective widget + any other UI listening for stat
+      // changes. The walk-mission path (driven by /api/game/position) was
+      // the only completion route NOT firing this event, so the persistent
+      // next-objective HUD kept showing the just-completed mission until
+      // page reload.
+      window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       for (const m of data.completedMissions as Array<CompletedMissionInfo>) {
         track('mission_completed', {
           sessionId: sid,
@@ -975,6 +981,7 @@ function MapPageInner() {
               setPinReward(d as PinRewardData)
               if (d.completedMissions?.length > 0) {
                 setMissionQueue(prev => [...prev, ...d.completedMissions])
+                window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
               }
             }
             if (d.alreadyClaimed) {

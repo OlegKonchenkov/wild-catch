@@ -31,6 +31,7 @@ function buildAdmin(opts: {
   function chainDelete(table: string) {
     return {
       delete: vi.fn(() => ({
+        // .delete().eq('user_id', …).eq('session_id', …)
         eq: vi.fn(() => ({
           eq: vi.fn(async () => {
             deleteCalls.push({ table })
@@ -39,12 +40,34 @@ function buildAdmin(opts: {
             }
             return { error: null }
           }),
+          // duel_lineups uses .eq('user_id', …).in('duel_id', […])
+          in: vi.fn(async () => {
+            deleteCalls.push({ table })
+            if (opts.deleteShouldError?.table === table) {
+              return { error: { message: opts.deleteShouldError.message } }
+            }
+            return { error: null }
+          }),
+        })),
+        // duels uses .delete().or(…).eq('session_id', …)
+        or: vi.fn(() => ({
+          eq: vi.fn(async () => {
+            deleteCalls.push({ table })
+            return { error: null }
+          }),
         })),
       })),
       // The tutorial start path also pre-grants the free enigma hint via
       // an upsert on player_enigma_suggerimenti. Stub it as a no-op so the
       // mock chain doesn't blow up on unrelated tables either.
       upsert: vi.fn(async () => ({ error: null })),
+      // The reset's pre-wipe queries duels with .select(...).or(...).eq(...)
+      // to collect duel ids → empty array means no special handling needed.
+      select: vi.fn(() => ({
+        or: vi.fn(() => ({
+          eq: vi.fn(async () => ({ data: [] })),
+        })),
+      })),
     }
   }
 
@@ -148,14 +171,82 @@ describe('POST /api/game/tutorial', () => {
 
     const res = await POST(makeRequest({ action: 'reset' }))
     expect(res.status).toBe(200)
-    // All TUTORIAL_USER_SESSION_TABLES were wiped, plus player_sessions itself
+    // All TUTORIAL_USER_SESSION_TABLES were wiped, plus player_sessions and
+    // duels themselves. `duel_lineups` is special-cased: only deleted when
+    // the player has duel rows (verified separately below); here we mock 0
+    // duels, so duel_lineups won't appear in the call log.
     const wiped = adm.deleteCalls.map(c => c.table)
     for (const t of TUTORIAL_USER_SESSION_TABLES) {
+      if (t === 'duel_lineups') continue // see comment above
       expect(wiped).toContain(t)
     }
     expect(wiped).toContain('player_sessions')
+    expect(wiped).toContain('duels')
     // Then a fresh player_session was inserted
     expect(adm.insertCalls).toHaveLength(1)
+  })
+
+  it('reset: deletes duel_lineups (by duel_id) when player has tutorial duels', async () => {
+    // Override the duels SELECT to return a duel id so the special-cased
+    // duel_lineups pre-wipe path executes.
+    const adm = buildAdmin({ existingPlayerSession: null })
+    ;(adm.client.from as any).mockImplementation((table: string) => {
+      if (table === 'duels') {
+        return {
+          select: vi.fn(() => ({
+            or: vi.fn(() => ({
+              eq: vi.fn(async () => ({ data: [{ id: 'duel-1' }] })),
+            })),
+          })),
+          delete: vi.fn(() => ({
+            or: vi.fn(() => ({
+              eq: vi.fn(async () => {
+                adm.deleteCalls.push({ table: 'duels' })
+                return { error: null }
+              }),
+            })),
+          })),
+        }
+      }
+      if (table === 'duel_lineups') {
+        return {
+          delete: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              in: vi.fn(async () => {
+                adm.deleteCalls.push({ table: 'duel_lineups' })
+                return { error: null }
+              }),
+            })),
+          })),
+        }
+      }
+      // Fallback for all other tables — reuse the standard chain.
+      if (table === 'player_sessions') {
+        return {
+          select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: null })) })) })) })),
+          insert: vi.fn(async () => ({ error: null })),
+          delete: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(async () => {
+            adm.deleteCalls.push({ table: 'player_sessions' })
+            return { error: null }
+          }) })) })),
+        }
+      }
+      return {
+        delete: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(async () => {
+          adm.deleteCalls.push({ table })
+          return { error: null }
+        }) })) })),
+        upsert: vi.fn(async () => ({ error: null })),
+      }
+    })
+    vi.mocked(createClient).mockResolvedValue(buildSupabase() as any)
+    vi.mocked(createAdminClient).mockReturnValue(adm.client as any)
+
+    const res = await POST(makeRequest({ action: 'reset' }))
+    expect(res.status).toBe(200)
+    const wiped = adm.deleteCalls.map(c => c.table)
+    expect(wiped).toContain('duel_lineups')
+    expect(wiped).toContain('duels')
   })
 
   it('reset: surfaces a 500 with the failing table when a delete errors', async () => {

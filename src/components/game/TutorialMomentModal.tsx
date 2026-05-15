@@ -81,7 +81,7 @@ export default function TutorialMomentModal({ moment, onClose }: Props) {
     <AnimatePresence>
       <motion.div
         key={`tutorial-moment-${moment.key}`}
-        className="fixed inset-0 z-[1200] flex flex-col items-center justify-center px-6"
+        className="fixed inset-0 z-[9994] flex flex-col items-center justify-center px-6"
         style={{ background: 'rgba(2,4,12,0.96)', backdropFilter: 'blur(20px)' }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

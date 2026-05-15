@@ -30,14 +30,14 @@ function buildMock({
       if (table === 'pin_claims') return {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
-            in: vi.fn(async () => ({ data: claimedPinIds.map(pin_id => ({ pin_id })) })),
+            in: vi.fn(async () => ({ data: claimedPinIds.map((pin_id: string) => ({ pin_id })) })),
           })),
         })),
       }
       if (table === 'boss_fights') return {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({ eq: vi.fn(() => ({
-            in: vi.fn(async () => ({ data: wonBossPinIds.map(pin_id => ({ pin_id })) })),
+            in: vi.fn(async () => ({ data: wonBossPinIds.map((pin_id: string) => ({ pin_id })) })),
           })) })),
         })),
       }

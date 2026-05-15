@@ -132,7 +132,7 @@ export default function TutorialEncounterLesson({ open, onClose }: Props) {
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[1250] flex flex-col items-center justify-center px-5"
+          className="fixed inset-0 z-[9995] flex flex-col items-center justify-center px-5"
           style={{ background: 'rgba(2,4,12,0.94)', backdropFilter: 'blur(16px)' }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
