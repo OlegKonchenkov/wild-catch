@@ -422,21 +422,32 @@ function MapPageInner() {
   // completes both the mission and the claim simultaneously, giving the
   // otherwise-arbitrary "walk 50 m" a concrete visual goal.
   useEffect(() => {
-    if (!isTutorialSession || tutorialBonusClaimed !== false || !tutorialOnM7) {
+    // Visibility gate — the pin only ever depends on (tutorial session,
+    // not yet claimed). It does NOT depend on M7 still being active: the
+    // walk-50m mission can complete in a direction OTHER than the pin
+    // (player wanders, pacing back and forth, etc.), and the bonus
+    // suggerimento is rewarded by REACHING THE PIN — independent of the
+    // mission state. Earlier we also gated on `tutorialOnM7`, which made
+    // the pin vanish the moment M7 completed even if the bonus was
+    // unclaimed; user feedback flagged this as confusing.
+    if (!isTutorialSession || tutorialBonusClaimed !== false) {
       setTutorialBonusPin(null)
       return
     }
-    const pos = lastPosRef.current
-    if (!pos) return // wait for first GPS fix
 
     let cancelled = false
     void (async () => {
       const user = await getCurrentUser(supabase)
       if (!user || cancelled) return
 
-      // Anchor = player's GPS at the moment M7 first became active. We
-      // persist it so the pin doesn't drift if the player wanders before
-      // committing to the walk.
+      // Two creation paths:
+      //  (1) An anchor already exists in localStorage → re-use it, even
+      //      if M7 has since completed. This makes the pin persist across
+      //      mission completion until claimed.
+      //  (2) No anchor yet → only create one when M7 is the active
+      //      objective AND we have a GPS fix. Without M7 being active we
+      //      don't want the pin to materialize out of nowhere; the
+      //      "Maestro Daimologo" beat introduces it.
       const key = tutorialBonusAnchorKey(user.id)
       let anchor: { lat: number; lng: number } | null = null
       try {
@@ -449,6 +460,9 @@ function MapPageInner() {
         }
       } catch { /* fall through */ }
       if (!anchor) {
+        if (!tutorialOnM7) return            // path (2) gate
+        const pos = lastPosRef.current
+        if (!pos) return                      // wait for first GPS fix
         anchor = { lat: pos.lat, lng: pos.lng }
         try { localStorage.setItem(key, JSON.stringify(anchor)) } catch { /* quota */ }
       }
