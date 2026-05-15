@@ -36,54 +36,83 @@ function PermissionInstructions({ type }: { type: 'gps' | 'camera' }) {
 }
 
 // ── Slide content ───────────────────────────────────────────────────────────
+// Three elemental satellites orbiting the dragon. Each orbits at a different
+// radius/speed/phase so the cluster never aligns into a static-looking ring.
+function OrbitingElement({ emoji, radius, duration, delay, phase }: {
+  emoji: string; radius: number; duration: number; delay: number; phase: number
+}) {
+  return (
+    <motion.div
+      className="absolute top-1/2 left-1/2 pointer-events-none"
+      style={{ marginTop: -16, marginLeft: -16 }}
+      animate={{ rotate: [phase, phase + 360] }}
+      transition={{ duration, delay, repeat: Infinity, ease: 'linear' }}
+    >
+      <motion.span
+        className="block text-3xl"
+        style={{ transform: `translate(${radius}px, 0)` }}
+        animate={{ scale: [1, 1.15, 1], filter: ['drop-shadow(0 0 4px rgba(58,188,168,0.3))', 'drop-shadow(0 0 10px rgba(58,188,168,0.6))', 'drop-shadow(0 0 4px rgba(58,188,168,0.3))'] }}
+        transition={{ duration: 2.2, delay, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        {emoji}
+      </motion.span>
+    </motion.div>
+  )
+}
+
 function SlideWelcome() {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+    <motion.div
+      className="flex-1 flex flex-col items-center justify-center px-6 text-center"
+      initial="hidden"
+      animate="show"
+      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.15, delayChildren: 0.1 } } }}
+    >
       <motion.div
-        className="relative w-44 h-44 mb-6 flex items-center justify-center"
-        initial={{ scale: 0.6, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        className="relative w-48 h-48 mb-6 flex items-center justify-center"
+        variants={{ hidden: { scale: 0.6, opacity: 0 }, show: { scale: 1, opacity: 1 } }}
         transition={{ type: 'spring', stiffness: 120, damping: 14 }}
       >
+        {/* Outer breathing aura — wider + more contrast for "awakening" feel */}
+        <motion.div
+          className="absolute -inset-6 rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(58,188,168,0.32) 0%, rgba(58,188,168,0.05) 45%, transparent 70%)' }}
+          animate={{ scale: [1, 1.25, 1], opacity: [0.7, 1, 0.7] }}
+          transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        {/* Inner accent halo */}
         <motion.div
           className="absolute inset-0 rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(58,188,168,0.25) 0%, transparent 70%)' }}
-          animate={{ scale: [1, 1.15, 1] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ background: 'radial-gradient(circle, rgba(247,200,65,0.18) 0%, transparent 60%)' }}
+          animate={{ scale: [1.05, 0.95, 1.05], opacity: [0.5, 0.85, 0.5] }}
+          transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.span
           className="text-7xl relative z-10 inline-block"
-          animate={{ y: [0, -6, 0], rotate: [-2, 2, -2] }}
+          animate={{ y: [0, -6, 0], rotate: [-3, 3, -3] }}
           transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
         >
           🐉
         </motion.span>
-        <motion.span
-          className="absolute text-3xl"
-          style={{ top: 8, left: 16 }}
-          animate={{ y: [0, -8, 0], opacity: [0.6, 1, 0.6] }}
-          transition={{ duration: 2.4, repeat: Infinity }}
-        >🌊</motion.span>
-        <motion.span
-          className="absolute text-3xl"
-          style={{ top: 12, right: 12 }}
-          animate={{ y: [0, -6, 0], opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 2.8, repeat: Infinity, delay: 0.4 }}
-        >🔥</motion.span>
-        <motion.span
-          className="absolute text-3xl"
-          style={{ bottom: 12, left: 18 }}
-          animate={{ y: [0, -6, 0], opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2.6, repeat: Infinity, delay: 0.8 }}
-        >🌿</motion.span>
+        <OrbitingElement emoji="🌊" radius={78} duration={7}  delay={0}   phase={0}   />
+        <OrbitingElement emoji="🔥" radius={70} duration={8.5} delay={0.3} phase={120} />
+        <OrbitingElement emoji="🌿" radius={82} duration={9.5} delay={0.6} phase={240} />
       </motion.div>
-      <h1 className="text-3xl font-black tracking-tight mb-2 text-white">Le creature si sono risvegliate</h1>
-      <p className="text-white/55 leading-relaxed max-w-xs">
+      <motion.h1
+        className="text-3xl font-black tracking-tight mb-2 text-white"
+        variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
+      >
+        Le creature si sono risvegliate
+      </motion.h1>
+      <motion.p
+        className="text-white/55 leading-relaxed max-w-xs"
+        variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
+      >
         I <strong className="text-[#3ABCA8]">Daimon</strong> — antiche creature mitologiche
         del nostro territorio — sono tornate fra noi.
         Solo chi <strong className="text-white/80">cammina</strong> può scoprirli.
-      </p>
-    </div>
+      </motion.p>
+    </motion.div>
   )
 }
 
@@ -132,12 +161,31 @@ function SlideQRCodes() {
         transition={{ type: 'spring' }}
       >
         <span className="text-7xl">📱</span>
+        {/* Scanner line — slower, more dramatic */}
         <motion.div
           className="absolute inset-x-0 h-1 bg-[#F7C841]/60"
           animate={{ y: [0, 120, 0] }}
           transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }}
           style={{ boxShadow: '0 0 12px #F7C841' }}
         />
+        {/* L-shaped corner brackets that pulse — sells the "viewfinder" idea */}
+        {[
+          { top: 6,    left: 6,    rot: 0   },
+          { top: 6,    right: 6,   rot: 90  },
+          { bottom: 6, right: 6,   rot: 180 },
+          { bottom: 6, left: 6,    rot: 270 },
+        ].map((c, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-4 h-4 pointer-events-none"
+            style={{ ...c, transform: `rotate(${c.rot}deg)` }}
+            animate={{ opacity: [0.4, 1, 0.4], scale: [0.95, 1.05, 0.95] }}
+            transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
+          >
+            <div style={{ position: 'absolute', top: 0, left: 0, width: 14, height: 2, background: '#F7C841', boxShadow: '0 0 6px #F7C841' }} />
+            <div style={{ position: 'absolute', top: 0, left: 0, width: 2, height: 14, background: '#F7C841', boxShadow: '0 0 6px #F7C841' }} />
+          </motion.div>
+        ))}
       </motion.div>
       <h2 className="text-2xl font-black text-white mb-2">Cerca i QR code</h2>
       <p className="text-white/55 leading-relaxed max-w-xs mb-4">
@@ -247,25 +295,81 @@ function SlidePermissions({
   )
 }
 
+// One-shot confetti burst for the "Sei pronto" celebration. 18 particles
+// shoot up in a fan-out, each with random hue from the brand palette.
+const CONFETTI_COLORS = ['#3ABCA8', '#F7C841', '#E85D2F', '#34D399', '#7B4DB8']
+function ConfettiBurst() {
+  const pieces = Array.from({ length: 18 }, (_, i) => {
+    const angle = -90 + (i - 8.5) * 8       // fan: -90 ± 70°
+    const distance = 90 + Math.random() * 70
+    const rad = (angle * Math.PI) / 180
+    const dx = Math.cos(rad) * distance
+    const dy = Math.sin(rad) * distance
+    return {
+      i,
+      dx, dy,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      rot: Math.random() * 720 - 360,
+      delay: Math.random() * 0.15,
+    }
+  })
+  return (
+    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+      {pieces.map(p => (
+        <motion.span
+          key={p.i}
+          className="absolute block"
+          style={{ width: 6, height: 10, borderRadius: 1, background: p.color }}
+          initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
+          animate={{ x: p.dx, y: p.dy + 60, opacity: 0, rotate: p.rot }}
+          transition={{ duration: 1.4, delay: p.delay, ease: [0.2, 0.7, 0.3, 1] }}
+        />
+      ))}
+    </div>
+  )
+}
+
 function SlideReady() {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+    <motion.div
+      className="flex-1 flex flex-col items-center justify-center px-6 text-center relative"
+      initial="hidden"
+      animate="show"
+      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.14, delayChildren: 0.1 } } }}
+    >
+      <ConfettiBurst />
       <motion.div
-        className="text-7xl mb-6"
-        initial={{ scale: 0.5, rotate: -20 }}
-        animate={{ scale: 1, rotate: 0 }}
+        className="text-7xl mb-6 relative"
+        variants={{ hidden: { scale: 0.5, rotate: -20, opacity: 0 }, show: { scale: 1, rotate: 0, opacity: 1 } }}
         transition={{ type: 'spring', stiffness: 200, damping: 14 }}
       >
-        🌿
+        <motion.div
+          className="absolute -inset-4 rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(58,188,168,0.3) 0%, transparent 65%)' }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <span className="relative">🌿</span>
       </motion.div>
-      <h2 className="text-3xl font-black text-white mb-3">Sei pronto.</h2>
-      <p className="text-white/55 leading-relaxed max-w-xs mb-2">
+      <motion.h2
+        className="text-3xl font-black text-white mb-3"
+        variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
+      >
+        Sei pronto.
+      </motion.h2>
+      <motion.p
+        className="text-white/55 leading-relaxed max-w-xs mb-2"
+        variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
+      >
         Inizia a camminare — la mappa farà il resto.
-      </p>
-      <p className="text-white/30 text-xs max-w-xs">
+      </motion.p>
+      <motion.p
+        className="text-white/30 text-xs max-w-xs"
+        variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
+      >
         Puoi rivedere questo tutorial in qualunque momento dalla pagina <strong className="text-white/55">Guida</strong>.
-      </p>
-    </div>
+      </motion.p>
+    </motion.div>
   )
 }
 
@@ -401,6 +505,41 @@ function OnboardingInner() {
           background: 'radial-gradient(ellipse at 20% 10%, rgba(58,188,168,0.10) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(232,93,47,0.08) 0%, transparent 50%)',
         }}
       />
+
+      {/* Ambient floating particles — deterministic offsets so SSR/CSR
+          render the same DOM and React doesn't tear on hydration. The
+          loop period and starting y are derived from i to avoid Math.random
+          on first render. */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {Array.from({ length: 10 }).map((_, i) => {
+          const left = (i * 37) % 100               // pseudo-spread across width
+          const startY = 60 + ((i * 53) % 40)        // 60-100% (bottom area)
+          const duration = 8 + (i % 4) * 2           // 8-14 s
+          const delay = (i * 0.7) % 5
+          const size = 4 + (i % 3) * 2               // 4 / 6 / 8 px
+          const color = i % 3 === 0 ? '#3ABCA8' : i % 3 === 1 ? '#F7C841' : '#E85D2F'
+          return (
+            <motion.span
+              key={i}
+              className="absolute rounded-full"
+              style={{
+                left: `${left}%`,
+                top: `${startY}%`,
+                width: size, height: size,
+                background: color,
+                boxShadow: `0 0 ${size * 2}px ${color}`,
+                opacity: 0.35,
+              }}
+              animate={{
+                y: ['0%', '-180%'],
+                opacity: [0, 0.5, 0],
+                x: [0, (i % 2 === 0 ? 1 : -1) * 24, 0],
+              }}
+              transition={{ duration, delay, repeat: Infinity, ease: 'linear' }}
+            />
+          )
+        })}
+      </div>
 
       {/* Header: progress dots + skip */}
       <div className="relative z-10 flex items-center justify-between px-5 pt-6 pb-3">

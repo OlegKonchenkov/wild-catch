@@ -261,28 +261,22 @@ function HomeLobby() {
       }
       localStorage.setItem('current_session_id', data.sessionId)
       localStorage.setItem('wc:tutorial-visited', '1')
-      // Tutorial entry (both "start" and "reset") re-arms every UI walkthrough
-      // flag so the demo is always a complete, end-to-end first-time
-      // experience — even if the user previously played a real event and
-      // dismissed the coachmarks there. The 5-slide onboarding carousel
-      // gates on `player_sessions.onboarding_seen` (server-side, fires on
-      // fresh start). The coachmark / moment / lesson / hint banners are
-      // all client-localStorage gated; without clearing them here a
-      // repeat-tutorial run would silently skip them.
-      try {
-        if (user?.id) localStorage.removeItem(`wc:tutorial-bonus-anchor:${user.id}`)
-        localStorage.removeItem('wc:tutorial-pin-hint-seen')
-        localStorage.removeItem('wc:tutorial-moments-seen:v1')
-        localStorage.removeItem('wc:tutorial-elements-seen')
-        localStorage.removeItem('wc:tutorial-encounter-lesson-seen')
-        // The on-map UI tour (10-step Coachmark covering mappa + nav bar)
-        // — single most-important onboarding beat after the 5 slides.
-        localStorage.removeItem('wc:coachmarks:map-seen:v2')
-        if (reset) {
-          // Step counter optimistic cache — wipe so the new run starts at 0.
+      // Only RESET re-arms the walkthrough flags. Re-entering an already-
+      // started tutorial keeps the user's "I've already seen this" state —
+      // user feedback: repeated coachmark / moment popups on every tutorial
+      // entry felt nag-y. First-time entry never had the flags set anyway,
+      // so coachmarks fire naturally; only "Rifai da capo" wipes them.
+      if (reset) {
+        try {
+          if (user?.id) localStorage.removeItem(`wc:tutorial-bonus-anchor:${user.id}`)
+          localStorage.removeItem('wc:tutorial-pin-hint-seen')
+          localStorage.removeItem('wc:tutorial-moments-seen:v1')
+          localStorage.removeItem('wc:tutorial-elements-seen')
+          localStorage.removeItem('wc:tutorial-encounter-lesson-seen')
+          localStorage.removeItem('wc:coachmarks:map-seen:v2')
           sessionStorage.removeItem(`wc:steps-walked:${data.sessionId}`)
-        }
-      } catch { /* noop */ }
+        } catch { /* noop */ }
+      }
       // Full-page navigation matches how handleJoin enters a session — the
       // map page reads the restored sessionId from the URL.
       window.location.assign(`/game/map?restored=${data.sessionId}`)

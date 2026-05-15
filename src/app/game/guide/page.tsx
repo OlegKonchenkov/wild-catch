@@ -940,7 +940,9 @@ export default function GuidePage() {
   }
 
   function replayCoachmarks() {
-    try { localStorage.removeItem('wc:coachmarks:map-seen') } catch {}
+    // Key version must match COACHMARK_STORAGE_KEY in src/app/game/map/page.tsx
+    // (currently :v2). Bumping the suffix there requires updating it here.
+    try { localStorage.removeItem('wc:coachmarks:map-seen:v2') } catch {}
     router.push('/game/map')
   }
 
