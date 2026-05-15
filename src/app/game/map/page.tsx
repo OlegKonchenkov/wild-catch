@@ -578,12 +578,25 @@ function MapPageInner() {
     if (typeof window === 'undefined') return
     if (!session || starterCheckPending) return
     if (showStarterSelect) return // wait until starter picker closes
+    // ALSO wait for the starter-hatch celebration card to drain. Tapping
+    // "Inizia l'avventura!" flips showStarterSelect=false immediately
+    // but pushes a starter entry into hatchQueue for the reveal card.
+    // Without this guard the 1/10 "La tua mappa" coachmark would
+    // overlap the still-mounted starter celebration (visible in
+    // user-reported screenshot). `starterPicked` itself stays truthy
+    // for the whole map session so we DON'T gate on it — only on the
+    // queue actively containing the starter entry.
+    if (hatchQueue.some(e => e.isStarter)) return
     if (localStorage.getItem(COACHMARK_STORAGE_KEY) === '1') return
-    // Small delay so the GameMap finishes its first paint before we measure
-    // the bounding rects of nav items / step counter.
-    const t = setTimeout(() => setShowCoachmarks(true), 500)
+    // Small delay so (a) the GameMap finishes its first paint before we
+    // measure the bounding rects of nav items / step counter, and
+    // (b) any closing modal (StarterSelect picker, EggHatchModal starter
+    // celebration) finishes its framer-motion exit before the coachmark
+    // overlay paints on top. 700 ms is long enough for the modal exits
+    // (~300 ms) without feeling laggy.
+    const t = setTimeout(() => setShowCoachmarks(true), 700)
     return () => clearTimeout(t)
-  }, [session, starterCheckPending, showStarterSelect])
+  }, [session, starterCheckPending, showStarterSelect, hatchQueue])
 
   useEffect(() => {
     function init(sid: string) {
