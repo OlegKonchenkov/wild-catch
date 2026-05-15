@@ -37,6 +37,7 @@ import { GameMapSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import TutorialMomentModal, { hasSeenTutorialMoment } from '@/components/game/TutorialMomentModal'
+import TutorialPinClaimModal from '@/components/game/TutorialPinClaimModal'
 import type { Session } from '@/lib/types'
 import { RARITY_LABELS } from '@/lib/types'
 import type { MapPin } from '@/components/map/GameMap'
@@ -402,7 +403,11 @@ function MapPageInner() {
   const [tutorialBonusPin, setTutorialBonusPin] = useState<MapPin | null>(null)
   const [tutorialBonusClaimed, setTutorialBonusClaimed] = useState<boolean | null>(null) // null = unknown yet
   const tutorialBonusClaimingRef = useRef(false)
-  const [tutorialBonusToast, setTutorialBonusToast] = useState<string | null>(null)
+  // When the player walks onto the bonus pin we surface a full reward
+  // modal (TutorialPinClaimModal). `null` = no modal; non-null = open.
+  // The boolean tells the modal whether to phrase itself as "you just got
+  // it" or "you already had it" — the API distinguishes via alreadyClaimed.
+  const [tutorialBonusReward, setTutorialBonusReward] = useState<{ alreadyClaimed: boolean } | null>(null)
   const [showPinHint, setShowPinHint] = useState(false)
 
   // ── Tutorial moments queue ────────────────────────────────────────────────
@@ -540,10 +545,7 @@ function MapPageInner() {
         haptics.missionDone()
         setTutorialBonusClaimed(true)
         setTutorialBonusPin(null)
-        setTutorialBonusToast(data.alreadyClaimed
-          ? 'Indizio già raccolto'
-          : '💡 Nuovo indizio nella sezione Enigmi!')
-        setTimeout(() => setTutorialBonusToast(null), 4500)
+        setTutorialBonusReward({ alreadyClaimed: !!data.alreadyClaimed })
       }
     } catch {
       /* network error — user can re-trigger by walking past the pin again */
@@ -1363,11 +1365,12 @@ function MapPageInner() {
         onPinTap={handlePinTap}
       />
 
-      {/* Tutorial bonus pin — claim feedback toast */}
-      {tutorialBonusToast && (
-        <div className="absolute z-[860] top-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-[#3A9DBC]/95 text-white text-sm font-bold shadow-lg backdrop-blur-sm">
-          {tutorialBonusToast}
-        </div>
+      {/* Tutorial bonus pin — full-screen reward modal */}
+      {tutorialBonusReward && (
+        <TutorialPinClaimModal
+          alreadyClaimed={tutorialBonusReward.alreadyClaimed}
+          onClose={() => setTutorialBonusReward(null)}
+        />
       )}
 
       {/* Tutorial bonus pin — first-time discovery hint. The Leaflet

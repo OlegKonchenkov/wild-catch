@@ -25,6 +25,7 @@ const TYPE_META: Record<string, { icon: string; label: string; hint: string; col
   qr:       { icon: '📷', label: 'Scansione', hint: 'Scansiona il QR richiesto oppure QR diversi, se la missione non ne specifica uno',   color: '#34D399' },
   walk:     { icon: '🚶', label: 'Cammino',  hint: 'Percorri la distanza indicata (m)', color: '#C084FC' },
   collect:  { icon: '🎒', label: 'Raccolta', hint: 'Raccogli gli oggetti indicati',     color: '#F97316' },
+  enigma:   { icon: '🧩', label: 'Enigma',   hint: 'Risolvi l’enigma indicato dalla sezione Enigmi (icona \u{1F9E9} nel menu)', color: '#A855F7' },
 }
 
 function typeMeta(type: string) {
@@ -292,14 +293,26 @@ function MissionDetailModal({
             <span className="text-xl mt-0.5">{meta.icon}</span>
             <div>
               <p className="text-white/80 text-sm">{meta.hint}</p>
-              {mission.target && (
+              {/* For enigma missions `mission.target` is the enigma's UUID,
+                  which is unfriendly to the player — the hint already
+                  routes them to the Enigmi section. Walk's target is the
+                  raw empty string by convention. Skip the obiettivo line
+                  in both cases. */}
+              {mission.target && mission.type !== 'enigma' && mission.type !== 'walk' && (
                 <p className="text-xs text-white/45 mt-0.5">
                   Obiettivo: <span className="text-white/70 font-semibold">{mission.target}</span>
                 </p>
               )}
-              <p className="text-xs text-white/45 mt-0.5">
-                Quantità: <span className="text-white/70 font-semibold">{mission.target_count}×</span>
-              </p>
+              {/* Enigma is binary (risolto / non risolto) — quantity is
+                  always 1× and adds no info. Walk's target_count is the
+                  distance in metres, already implied by the type icon. */}
+              {mission.type !== 'enigma' && (
+                <p className="text-xs text-white/45 mt-0.5">
+                  {mission.type === 'walk' ? 'Distanza' : 'Quantità'}: <span className="text-white/70 font-semibold">
+                    {mission.target_count}{mission.type === 'walk' ? ' m' : '×'}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
         </div>

@@ -75,6 +75,18 @@ export default function TutorialMomentModal({ moment, onClose }: Props) {
     finalize()
   }
 
+  const onCelebrateExplore = () => {
+    // Tutorial finale: the player chose to keep exploring on the map.
+    // We still mark the moment as seen so re-entering doesn't re-fire it,
+    // and route to the map regardless of where we were called from (the
+    // enigma page can also trigger this same modal).
+    if (closing) return
+    setClosing(true)
+    markSeen(moment.key)
+    onClose()
+    router.push('/game/map')
+  }
+
   const celebrate = !!moment.celebrate
 
   return (
@@ -142,33 +154,62 @@ export default function TutorialMomentModal({ moment, onClose }: Props) {
           {moment.body}
         </motion.p>
 
-        {/* CTA */}
+        {/* CTA — celebrate variant offers an explicit two-way choice
+            (keep exploring vs. go home) so the player understands the
+            tutorial is complete but they CAN keep playing. Non-celebrate
+            moments stay a single primary CTA. */}
         <motion.div
-          className="w-full max-w-sm flex flex-col gap-2"
+          className="w-full max-w-sm flex flex-col gap-2.5"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
         >
-          <motion.button
-            onClick={onCta}
-            whileTap={{ scale: 0.97 }}
-            className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
-            style={{
-              background: celebrate
-                ? 'linear-gradient(135deg,#FBBF24,#F59E0B,#E85D2F)'
-                : 'linear-gradient(135deg,#3A9DBC,#2d7a99)',
-              boxShadow: celebrate
-                ? '0 6px 32px rgba(251,191,36,0.45)'
-                : '0 4px 20px rgba(58,157,188,0.35)',
-            }}
-          >
-            {moment.cta?.label ?? 'Continua'}
-          </motion.button>
-          {moment.cta && (
-            <button
-              onClick={finalize}
-              className="text-white/40 text-xs font-semibold hover:text-white/70 transition-colors py-2"
-            >
-              Resta sulla mappa
-            </button>
+          {celebrate ? (
+            <>
+              <motion.button
+                onClick={onCelebrateExplore}
+                whileTap={{ scale: 0.97 }}
+                className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
+                style={{
+                  background: 'linear-gradient(135deg,#FBBF24,#F59E0B,#E85D2F)',
+                  boxShadow: '0 6px 32px rgba(251,191,36,0.45)',
+                }}
+              >
+                🗺️  Continua ad esplorare
+              </motion.button>
+              <motion.button
+                onClick={onCta}
+                whileTap={{ scale: 0.97 }}
+                className="w-full py-3 rounded-2xl font-bold text-base"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'rgba(255,255,255,0.85)',
+                }}
+              >
+                🏠  {moment.cta?.label ?? 'Torna alla home'}
+              </motion.button>
+            </>
+          ) : (
+            <>
+              <motion.button
+                onClick={onCta}
+                whileTap={{ scale: 0.97 }}
+                className="w-full py-4 rounded-2xl font-extrabold text-white text-base"
+                style={{
+                  background: 'linear-gradient(135deg,#3A9DBC,#2d7a99)',
+                  boxShadow: '0 4px 20px rgba(58,157,188,0.35)',
+                }}
+              >
+                {moment.cta?.label ?? 'Continua'}
+              </motion.button>
+              {moment.cta && (
+                <button
+                  onClick={finalize}
+                  className="text-white/40 text-xs font-semibold hover:text-white/70 transition-colors py-2"
+                >
+                  Resta sulla mappa
+                </button>
+              )}
+            </>
           )}
         </motion.div>
       </motion.div>

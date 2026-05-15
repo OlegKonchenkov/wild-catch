@@ -2,6 +2,14 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { EnigmaDifficulty } from '@/lib/types'
+import EnigmaSolvedModal from '@/components/game/EnigmaSolvedModal'
+import MissionRewardModal, { type CompletedMissionInfo } from '@/components/game/MissionRewardModal'
+import TutorialMomentModal from '@/components/game/TutorialMomentModal'
+import {
+  TUTORIAL_MISSION_MOMENTS,
+  TUTORIAL_SESSION_ID,
+} from '@/lib/game/tutorial'
+import type { TutorialMoment } from '@/lib/game/tutorial'
 
 const DIFFICULTY_COLOR: Record<EnigmaDifficulty, string> = {
   facile: '#34D399',
@@ -234,10 +242,21 @@ function SuggerimentoCard({ suggerimento, index }: { suggerimento: EnigmaSuggeri
   )
 }
 
-function SolvePanel({ enigma, onSolved }: { enigma: EnigmaView; onSolved: () => void }) {
+export interface SolveSuccess {
+  enigmaTitle: string
+  solution: string
+  reward?: { gold?: number; exp?: number }
+  completedMissions: CompletedMissionInfo[]
+  fresh: boolean                      // false when the API reports alreadySolved
+}
+
+function SolvePanel({ enigma, onCorrect }: {
+  enigma: EnigmaView
+  onCorrect: (s: SolveSuccess) => void
+}) {
   const [answer, setAnswer] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [feedback, setFeedback] = useState<{ kind: 'ok' | 'ko' | 'info'; msg: string } | null>(null)
+  const [feedback, setFeedback] = useState<{ kind: 'ko'; msg: string } | null>(null)
 
   async function submit() {
     if (!answer.trim() || submitting) return
@@ -258,19 +277,22 @@ function SolvePanel({ enigma, onSolved }: { enigma: EnigmaView; onSolved: () => 
       if (!res.ok) {
         setFeedback({ kind: 'ko', msg: data.error ?? 'Errore' })
       } else if (data.correct) {
-        if (data.alreadySolved) {
-          setFeedback({ kind: 'info', msg: 'Già risolto in precedenza.' })
-        } else {
-          const parts: string[] = []
-          if (data.reward?.gold) parts.push(`+${data.reward.gold} oro`)
-          if (data.reward?.exp)  parts.push(`+${data.reward.exp} EXP`)
-          setFeedback({
-            kind: 'ok',
-            msg: parts.length ? `Corretto! ${parts.join(' · ')}` : 'Corretto!',
-          })
+        // Surface the rich success to the parent so it can render a full
+        // celebration modal + chain on into mission rewards + tutorial
+        // closing moments. We pass the player's own answer back as the
+        // displayed solution — the server deliberately never reveals it
+        // for wrong attempts, but here it MUST be correct so echoing the
+        // input is safe.
+        if (data.correct && !data.alreadySolved) {
           window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
         }
-        onSolved()
+        onCorrect({
+          enigmaTitle: enigma.title,
+          solution: answer.trim(),
+          reward: data.reward,
+          completedMissions: Array.isArray(data.completedMissions) ? data.completedMissions : [],
+          fresh: !data.alreadySolved,
+        })
       } else {
         setFeedback({ kind: 'ko', msg: 'Risposta errata — riprova.' })
       }
@@ -318,14 +340,7 @@ function SolvePanel({ enigma, onSolved }: { enigma: EnigmaView; onSolved: () => 
         </button>
       </div>
       {feedback && (
-        <p
-          className="text-xs font-semibold"
-          style={{
-            color: feedback.kind === 'ok'   ? '#34D399'
-                 : feedback.kind === 'info' ? '#38BDF8'
-                 : '#F87171',
-          }}
-        >
+        <p className="text-xs font-semibold" style={{ color: '#F87171' }}>
           {feedback.msg}
         </p>
       )}
@@ -333,7 +348,7 @@ function SolvePanel({ enigma, onSolved }: { enigma: EnigmaView; onSolved: () => 
   )
 }
 
-function EnigmaCard({ enigma, onSolved }: { enigma: EnigmaView; onSolved: () => void }) {
+function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: SolveSuccess) => void }) {
   const [open, setOpen] = useState(false)
   const diffColor = DIFFICULTY_COLOR[enigma.difficulty]
   const hasActivity = enigma.frammenti_collected > 0 || enigma.suggerimenti_collected > 0
@@ -459,7 +474,7 @@ function EnigmaCard({ enigma, onSolved }: { enigma: EnigmaView; onSolved: () => 
 
               {/* Solve panel — always present so the player can guess even
                   before all indizi are collected. */}
-              <SolvePanel enigma={enigma} onSolved={onSolved} />
+              <SolvePanel enigma={enigma} onCorrect={onCorrect} />
             </div>
           </motion.div>
         )}
@@ -471,6 +486,16 @@ function EnigmaCard({ enigma, onSolved }: { enigma: EnigmaView; onSolved: () => 
 export default function EnigmiPage() {
   const [enigmi, setEnigmi] = useState<EnigmaView[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Three-stage celebration chain when a player solves an enigma:
+  //   1. EnigmaSolvedModal     — the enigma's own confetti + answer reveal
+  //   2. MissionRewardModal    — any mission rows the solve completed
+  //   3. TutorialMomentModal   — only for the tutorial closing M8 mission
+  // Each stage hands off via state transitions so only one modal is on
+  // screen at a time. Mid-chain navigation away just drops the rest.
+  const [solveCelebration, setSolveCelebration] = useState<SolveSuccess | null>(null)
+  const [pendingMissionRewards, setPendingMissionRewards] = useState<CompletedMissionInfo[]>([])
+  const [pendingTutorialMoment, setPendingTutorialMoment] = useState<TutorialMoment | null>(null)
 
   const reload = () => {
     const sessionId = localStorage.getItem('current_session_id')
@@ -486,6 +511,37 @@ export default function EnigmiPage() {
   useEffect(() => {
     reload()
   }, [])
+
+  function handleSolveCorrect(s: SolveSuccess) {
+    setSolveCelebration(s)
+    reload()
+  }
+
+  function closeSolveCelebration() {
+    const missions = solveCelebration?.completedMissions ?? []
+    setSolveCelebration(null)
+    if (missions.length > 0) setPendingMissionRewards(missions)
+  }
+
+  function closeMissionRewards() {
+    const sessionId = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null
+    const isTutorial = sessionId === TUTORIAL_SESSION_ID
+    if (isTutorial) {
+      // If any of the just-completed missions has a tutorial moment defined
+      // (M8 → tutorial-complete), surface it as the final stage. We don't
+      // dedup against the moments-seen flag here: solving the tutorial
+      // enigma is THE finale and should always show, even on replays.
+      for (const m of pendingMissionRewards) {
+        if (!m.missionId) continue
+        const moment = TUTORIAL_MISSION_MOMENTS[m.missionId]
+        if (moment) {
+          setPendingTutorialMoment(moment)
+          break
+        }
+      }
+    }
+    setPendingMissionRewards([])
+  }
 
   const collectedCount = enigmi.reduce(
     (acc, e) => acc + e.frammenti_collected + e.suggerimenti_collected,
@@ -522,11 +578,34 @@ export default function EnigmiPage() {
         ) : (
           <div className="space-y-3">
             {enigmi.map(enigma => (
-              <EnigmaCard key={enigma.id} enigma={enigma} onSolved={reload} />
+              <EnigmaCard key={enigma.id} enigma={enigma} onCorrect={handleSolveCorrect} />
             ))}
           </div>
         )}
       </div>
+
+      {/* Solve celebration chain — order matters: only one renders at a time */}
+      {solveCelebration && (
+        <EnigmaSolvedModal
+          enigmaTitle={solveCelebration.enigmaTitle}
+          solution={solveCelebration.solution}
+          reward={solveCelebration.reward}
+          fresh={solveCelebration.fresh}
+          onClose={closeSolveCelebration}
+        />
+      )}
+      {!solveCelebration && pendingMissionRewards.length > 0 && (
+        <MissionRewardModal
+          missions={pendingMissionRewards}
+          onDone={closeMissionRewards}
+        />
+      )}
+      {!solveCelebration && pendingMissionRewards.length === 0 && pendingTutorialMoment && (
+        <TutorialMomentModal
+          moment={pendingTutorialMoment}
+          onClose={() => setPendingTutorialMoment(null)}
+        />
+      )}
     </div>
   )
 }
