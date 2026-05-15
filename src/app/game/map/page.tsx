@@ -276,6 +276,18 @@ function MapPageInner() {
   const lastEncounterRef = useRef(0)
   const sessionIdRef = useRef<string | null>(null)
   const lastPosRef = useRef<{ lat: number; lng: number } | null>(null)
+  // State mirror of "have we received at least one GPS fix yet?" — used to
+  // retrigger effects that need a position (e.g. the tutorial bonus pin
+  // placement) which would otherwise read the ref once during their first
+  // run and silently bail when the fix hadn't arrived in time.
+  const [hasGpsFix, setHasGpsFix] = useState(false)
+  // Last `stepsWalked` value confirmed by the SERVER, regardless of any
+  // local optimistic credit. Optimistic ticks can pull the local total
+  // ahead of the server, so comparing the new server total against the
+  // React state would miss real credits — we'd then fail to ping the
+  // next-objective widget. This ref is the authoritative "did the server
+  // actually credit something new?" gauge.
+  const lastServerStepsRef = useRef(0)
   // Tracks metres walked since the last encounter attempt — resets after each attempt
   const cumDistRef = useRef(0)
   // Prevent concurrent triggerEncounter calls (mutex) and skip when popup is already open
@@ -463,7 +475,7 @@ function MapPageInner() {
       } catch { /* noop */ }
     })()
     return () => { cancelled = true }
-  }, [isTutorialSession, tutorialBonusClaimed, tutorialOnM7, supabase])
+  }, [isTutorialSession, tutorialBonusClaimed, tutorialOnM7, hasGpsFix, supabase])
 
   // Proximity claim — fires from the GPS callback so it ticks even between
   // server POSTs. Wrapped in its own ref-guarded flow to avoid double posts.
@@ -605,6 +617,9 @@ function MapPageInner() {
       // Reset the optimistic step accumulator — different session, new baseline.
       localBaselineRef.current = null
       setPendingDistance(0)
+      // Reset the server-side step gauge so the first reconciliation in the
+      // new session can correctly detect "did the server credit anything?".
+      lastServerStepsRef.current = 0
       setSessionId(sid)
       sessionIdRef.current = sid
       localStorage.setItem('current_session_id', sid)
@@ -651,6 +666,10 @@ function MapPageInner() {
                 if (raw) cached = parseInt(raw, 10) || 0
               } catch { /* noop */ }
               setStepsWalked(Math.max(data.steps_walked, cached))
+              // Seed the server-side gauge so the next /position reconciliation
+              // doesn't spuriously look like "server credited" on the first
+              // POST after restore.
+              lastServerStepsRef.current = data.steps_walked
             }
             // Signal the starter effect: returning players (selected_creature_id
             // already set) skip the /api/game/starters round-trip and unblock the
@@ -906,6 +925,19 @@ function MapPageInner() {
       //      metres every reconciliation cycle when the player was
       //      walking slowly. Keep pending and the local baseline as they
       //      were so the display only ticks forward.
+      // Did the SERVER credit new steps on this reconciliation? Compare
+      // against `lastServerStepsRef` (the last server-confirmed total)
+      // NOT against the React state — optimistic local credits can pull
+      // the state ahead, so `data.stepsWalked > stepsWalked` would miss
+      // real credits whenever the server is catching up to us.
+      // /api/game/position has already bumped player_missions.progress
+      // for any active walk mission on every server credit, so we kick
+      // the next-objective widget here. Without this, the persistent
+      // mission HUD only updates on (flaky) Supabase realtime or when a
+      // mission outright completes.
+      const serverCreditedNewSteps = data.stepsWalked > lastServerStepsRef.current
+      lastServerStepsRef.current = data.stepsWalked
+
       setStepsWalked(prev => {
         // Step total is monotonic non-decreasing. If the server is briefly
         // behind a locally-credited optimistic tick (we credited 5m before
@@ -918,15 +950,13 @@ function MapPageInner() {
           localBaselineRef.current = {
             lat: pos.lat, lng: pos.lng, ts: Date.now(), accuracy: pos.accuracy,
           }
-          // Server credited new steps → /api/game/position has already
-          // bumped player_missions.progress for any active walk mission.
-          // Kick the next-objective widget so its progress bar follows in
-          // real time instead of waiting on (flaky) Supabase realtime or
-          // the next mission-completion fallback.
-          window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
         }
         return next
       })
+
+      if (serverCreditedNewSteps) {
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+      }
     }
 
     if (data.eggsHatched?.length > 0) {
@@ -1038,6 +1068,11 @@ function MapPageInner() {
     // Visual updates always happen at GPS rate — marker, accuracy, lastPos
     setGpsAccuracy(Math.round(pos.accuracy))
     lastPosRef.current = { lat: pos.lat, lng: pos.lng }
+    // Promote "we have a fix" to state on the FIRST fix so effects gated
+    // on a position (tutorial bonus pin) re-run as soon as GPS resolves.
+    // setState bails out when value is unchanged, so calling unconditionally
+    // is safe — avoids needing `hasGpsFix` in this callback's deps.
+    setHasGpsFix(true)
 
     // Skip very inaccurate fixes (map marker already updated above)
     if (pos.accuracy > 300) return
