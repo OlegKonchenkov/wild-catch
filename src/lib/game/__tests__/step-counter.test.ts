@@ -15,10 +15,12 @@ import {
  * Each case represents a real-world scenario we want the filter to handle.
  *
  * Tuning revision May 2026:
- *   - ACCURACY_MAX_FOR_STEPS: 50 → 30
- *   - STEP_SNR:               0.8 → 1.0
- *   - MIN_SPEED_MPS:          NEW  (≥ 0.3 required)
- * Tests below reflect the tightened gates.
+ *   - MIN_SPEED_MPS: NEW (≥ 0.3 required) — kept.
+ *   - SNR 0.8→1.0 and accuracy 50→30 were reverted after a field test
+ *     showed real walking no longer credited in proportion to movement.
+ *   - EMA smoothing + stationary detection helpers still exist (and are
+ *     tested) but are NOT wired into the live pipeline.
+ * Tests below reflect the proven (reverted) gates: SNR 0.8, acc 50.
  */
 
 const baseInput = {
@@ -47,24 +49,23 @@ describe('evaluateStep', () => {
   })
 
   describe('SNR (signal-to-noise) filter', () => {
-    it('rejects a "move" equal to accuracy (stationary GPS jitter)', () => {
-      // With SNR=1.0 we require dist STRICTLY > acc. Equal is rejected.
-      const r = evaluateStep({ ...baseInput, distanceMoved: 10, accuracy: 10 })
+    it('rejects a "move" smaller than 0.8 × accuracy (stationary GPS jitter)', () => {
+      // User standing still, GPS 30 m accuracy, drifts 10 m. 10 < 24 → reject.
+      const r = evaluateStep({ ...baseInput, distanceMoved: 10, accuracy: 30 })
       expect(r.validStep).toBe(false)
       expect(r.stepsIncrement).toBe(0)
     })
 
     it('accepts a move just above the SNR threshold', () => {
-      // 11 > 1.0 × 10 → valid.
-      const r = evaluateStep({ ...baseInput, distanceMoved: 11, accuracy: 10 })
+      // 0.8 × 10 = 8. Distance 9 > 8 → valid.
+      const r = evaluateStep({ ...baseInput, distanceMoved: 9, accuracy: 10 })
       expect(r.validStep).toBe(true)
     })
   })
 
   describe('accuracy ceiling', () => {
-    it('rejects fixes with accuracy worse than 30 m for step credit', () => {
-      // Even with a large distance, acc=40 fails the ceiling.
-      const r = evaluateStep({ ...baseInput, distanceMoved: 60, accuracy: 40 })
+    it('rejects fixes with accuracy worse than 50 m for step credit', () => {
+      const r = evaluateStep({ ...baseInput, distanceMoved: 60, accuracy: 60 })
       expect(r.validStep).toBe(false)
     })
 
@@ -149,8 +150,8 @@ describe('evaluateStep', () => {
     })
 
     it('exposes the configured constants for downstream callers', () => {
-      expect(STEP_FILTER.ACCURACY_MAX_FOR_STEPS).toBe(30)
-      expect(STEP_FILTER.STEP_SNR).toBe(1.0)
+      expect(STEP_FILTER.ACCURACY_MAX_FOR_STEPS).toBe(50)
+      expect(STEP_FILTER.STEP_SNR).toBe(0.8)
       expect(STEP_FILTER.MAX_SPEED_MPS).toBe(4)
       expect(STEP_FILTER.MIN_SPEED_MPS).toBe(0.3)
     })
@@ -171,9 +172,9 @@ describe('shouldRollEncounter', () => {
 })
 
 describe('updatePendingDistance', () => {
-  // Cap = accuracy * STEP_SNR (1.0) * 0.85.
-  // With accuracy = 15 m: snrThreshold = 15, cap = 12.75.
-  // With accuracy = 10 m: snrThreshold = 10, cap = 8.5.
+  // Cap = accuracy * STEP_SNR (0.8) * 0.85.
+  // With accuracy = 15 m: snrThreshold = 12, cap = 10.2.
+  // With accuracy = 10 m: snrThreshold = 8,  cap = 6.8.
 
   it('grows monotonically with distance when below the cap', () => {
     let p = 0
@@ -197,11 +198,11 @@ describe('updatePendingDistance', () => {
   })
 
   it('caps just below the credit threshold so display does not cross it', () => {
-    // Cap at accuracy=15: 15 * 1.0 * 0.85 = 12.75.
+    // Cap at accuracy=15: 15 * 0.8 * 0.85 = 10.2.
     const p1 = updatePendingDistance({ previousPending: 0, distanceMoved: 13, accuracy: 15 })
-    expect(p1).toBeCloseTo(12.75, 5)
+    expect(p1).toBeCloseTo(10.2, 5)
     const p2 = updatePendingDistance({ previousPending: 0, distanceMoved: 100, accuracy: 15 })
-    expect(p2).toBeCloseTo(12.75, 5)
+    expect(p2).toBeCloseTo(10.2, 5)
   })
 
   it('cap scales with accuracy — worse fixes can show more pending before credit', () => {
@@ -209,8 +210,8 @@ describe('updatePendingDistance', () => {
     const tight = updatePendingDistance({ previousPending: 0, distanceMoved: 50, accuracy: 10 })
     const loose = updatePendingDistance({ previousPending: 0, distanceMoved: 50, accuracy: 30 })
     expect(tight).toBeLessThan(loose)
-    expect(tight).toBeCloseTo(10 * 1.0 * 0.85, 5) // 8.5
-    expect(loose).toBeCloseTo(30 * 1.0 * 0.85, 5) // 25.5
+    expect(tight).toBeCloseTo(10 * 0.8 * 0.85, 5) // 6.8
+    expect(loose).toBeCloseTo(30 * 0.8 * 0.85, 5) // 20.4
   })
 
   it('clamps negative or zero accuracy to a zero cap (no growth)', () => {

@@ -11,11 +11,7 @@ import { useGPS } from '@/hooks/useGPS'
 import {
   evaluateStep,
   updatePendingDistance,
-  smoothPosition,
-  isStationary,
-  pushRecentFix,
   STEP_FILTER,
-  type SmoothedPosition,
 } from '@/lib/game/step-counter'
 import { haversineDistance } from '@/lib/game/anti-cheat'
 import useTweenedInteger from '@/hooks/useTweenedInteger'
@@ -327,19 +323,6 @@ function MapPageInner() {
   // frozen until the 5 s server POST surfaced its own credit, which is
   // exactly the "non si attiva, poi salta" UX we're fixing.
   const localBaselineRef = useRef<{ lat: number; lng: number; ts: number; accuracy: number } | null>(null)
-  // EMA-smoothed position used as the "current location" we measure
-  // distance from. Smoothing damps zigzag overcount when GPS noise makes
-  // consecutive raw fixes scatter around the true path. See smoothPosition
-  // in step-counter.ts for the alpha curve. We persist this in a ref so it
-  // survives across renders without retriggering effects.
-  const smoothedPosRef = useRef<SmoothedPosition | null>(null)
-  // Sliding window of the last few RAW fixes (newest last). Used by
-  // isStationary to detect "device is sitting still" and silently reset
-  // the baseline so accumulated drift can't slowly cross the credit
-  // threshold. 4 samples ≈ 4 seconds at 1 Hz — long enough to be sure,
-  // short enough to react when you start walking again.
-  const recentFixesRef = useRef<Array<{ lat: number; lng: number; accuracy: number }>>([])
-  const STATIONARY_WINDOW = 4
   const sessionStatusRef = useRef<string>('active')
   const [pendingDistance, setPendingDistance] = useState(0)
   const router = useRouter()
@@ -361,14 +344,22 @@ function MapPageInner() {
   // rather than only on server-credit cadence. Without this the top-right
   // step counter scrolls smoothly while the top-left mission bar jumps
   // in chunks — a confusing mismatch flagged by playtesters.
-  // The widget filters this event by mission type ('walk' only) and
-  // resets when stepsWalked changes (server reconciliation).
+  //
+  // The delta is the FULL "client total minus server-confirmed total":
+  // pendingDistance accounts for movement since the last credit, AND any
+  // locally-committed metres that the server hasn't credited yet (e.g.
+  // the re-localization guard commits pending into stepsWalked without
+  // waiting for server confirmation). Subtracting `lastServerStepsRef`
+  // — the last value the server confirmed — gives us exactly the "ahead
+  // of server" amount, which is what the widget should add on top of
+  // the server's player_missions.progress to mirror what the counter shows.
   useEffect(() => {
     if (typeof window === 'undefined') return
+    const localAheadOfServer = Math.max(0, stepsWalked - lastServerStepsRef.current)
     window.dispatchEvent(new CustomEvent('wc:optimistic-steps-delta', {
-      detail: { delta: Math.round(pendingDistance) },
+      detail: { delta: Math.round(pendingDistance) + localAheadOfServer },
     }))
-  }, [pendingDistance])
+  }, [pendingDistance, stepsWalked])
 
   // Tutorial mode: the always-on demo session has no physical QR codes in
   // the world, so we surface a "simulated scan" button on the map HUD.
@@ -692,8 +683,6 @@ function MapPageInner() {
       starterFlowLockedRef.current = true
       // Reset the optimistic step accumulator — different session, new baseline.
       localBaselineRef.current = null
-      smoothedPosRef.current = null
-      recentFixesRef.current = []
       setPendingDistance(0)
       // Reset the server-side step gauge so the first reconciliation in the
       // new session can correctly detect "did the server credit anything?".
@@ -1163,46 +1152,47 @@ function MapPageInner() {
     // the pin isn't placed or has been claimed.
     void tryClaimTutorialBonus({ lat: pos.lat, lng: pos.lng })
 
-    // ── Position smoothing + stationary tracking ──────────────────────────
-    // Slide the recent-fix window for stationary detection, then EMA-blend
-    // the raw fix into a smoothed position used for ALL distance math
-    // below. Smoothing damps zigzag overcount (consecutive raw fixes
-    // scatter around the true line of motion) and absorbs single bad
-    // fixes without discarding them outright.
-    recentFixesRef.current = pushRecentFix(
-      recentFixesRef.current,
-      { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy },
-      STATIONARY_WINDOW,
-    )
-    smoothedPosRef.current = smoothPosition(smoothedPosRef.current, pos)
-    const smoothed = smoothedPosRef.current
-
     // ── Optimistic local step credit + smooth pending interpolation ───────
+    // Walking-detection field test (May 2026): an earlier revision used
+    // EMA smoothing on positions + sliding-window stationary detection.
+    // Both made walking FEEL worse: smoothed lat/lng lags behind the raw
+    // fix so the measured distance ran 5-15 % short of the real walk,
+    // and stationary detection mis-fired on slow walkers (3 consecutive
+    // fixes inside the GPS noise circle is normal at 1 m/s, not "stopped").
+    // Worst symptom was a visible-counter regression: stationary reset
+    // pendingDistance to 0 WITHOUT crediting it, so the on-screen total
+    // ticked backward (58 → 60 → 63 → 58 → …). Reverted to the simpler
+    // raw-position pipeline that field testers reported as "good before".
+    // The single guard kept is GPS re-localization (accuracy snapping
+    // tighter mid-walk) — but it now COMMITS the pending bucket into
+    // stepsWalked before rebasing, so the visible total stays monotonic.
     const baseline = localBaselineRef.current
     const now = Date.now()
     if (!baseline) {
       // First fix in this session — establish baseline, no credit yet.
-      localBaselineRef.current = { lat: smoothed.lat, lng: smoothed.lng, ts: now, accuracy: pos.accuracy }
+      localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: now, accuracy: pos.accuracy }
     } else {
+      const distanceMoved = haversineDistance(baseline, { lat: pos.lat, lng: pos.lng })
+
       // ── GPS re-localization guard ─────────────────────────────────────
       // If the new fix is SIGNIFICANTLY more accurate than the baseline,
-      // the device has just settled onto a better location estimate — the
-      // big positional shift between baseline and now reflects the GPS
-      // refining its guess, not the player actually walking that
-      // distance. Silently rebase to the new fix and skip the credit/
-      // pending update for this tick. Without this, going from indoor
-      // (acc≈100m, position off by ~30-50m) to outdoor (acc≈10m) would
-      // credit a phantom "step" of tens of metres while the player is
-      // standing still. The server path runs into the same case in
-      // theory but is throttled to one POST per ~5s so GPS has usually
-      // settled by then — here we run on every fix (1Hz) so we need
-      // the explicit guard. Conservative thresholds (baseline >30m, new
-      // ≤ 50% of baseline) keep normal accuracy wobble untouched.
+      // the device has just settled onto a better location estimate. Rebase
+      // to the new fix; do NOT credit the (possibly enormous) baseline →
+      // current displacement as a step — the user likely didn't walk it.
+      // But the pending bucket reflects motion the user DID accumulate
+      // before re-localization; commit it into stepsWalked so the visible
+      // total can't tick backward. Conservative thresholds (baseline acc
+      // >30, new acc ≤ 50 % of baseline) keep normal wobble untouched.
       if (baseline.accuracy > 30 && pos.accuracy * 2 < baseline.accuracy) {
-        localBaselineRef.current = { lat: smoothed.lat, lng: smoothed.lng, ts: now, accuracy: pos.accuracy }
+        // Capture pending in a local before the state update so the
+        // commit + reset happen against the same value.
+        const committable = Math.round(pendingDistance)
+        if (committable > 0) {
+          setStepsWalked(prev => prev + committable)
+          window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+        }
         setPendingDistance(0)
-        // Trailing throttle handles the server POST below — let it fire
-        // normally so the server can independently confirm position.
+        localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: now, accuracy: pos.accuracy }
         pendingPositionRef.current = pos
         if (positionPostTimeoutRef.current) return
         const elapsed = now - lastPositionPostAtRef.current
@@ -1213,31 +1203,6 @@ function MapPageInner() {
         }, wait)
         return
       }
-
-      // ── Stationary detection ──────────────────────────────────────────
-      // If the last few RAW fixes are all clustered inside the GPS noise
-      // circle, the device is sitting still. Quietly rebase to the
-      // current smoothed position so accumulated drift can't sneak past
-      // the SNR check and credit phantom steps after a long idle period.
-      // We still POST to the server so it can reconcile independently.
-      if (isStationary(recentFixesRef.current)) {
-        localBaselineRef.current = { lat: smoothed.lat, lng: smoothed.lng, ts: now, accuracy: pos.accuracy }
-        setPendingDistance(0)
-        pendingPositionRef.current = pos
-        if (positionPostTimeoutRef.current) return
-        const elapsed = now - lastPositionPostAtRef.current
-        const wait = Math.max(0, POSITION_POST_INTERVAL_MS - elapsed)
-        positionPostTimeoutRef.current = setTimeout(() => {
-          positionPostTimeoutRef.current = null
-          void firePositionPost()
-        }, wait)
-        return
-      }
-
-      const distanceMoved = haversineDistance(
-        { lat: baseline.lat, lng: baseline.lng },
-        { lat: smoothed.lat, lng: smoothed.lng },
-      )
 
       const result = evaluateStep({
         distanceMoved,
@@ -1252,7 +1217,7 @@ function MapPageInner() {
         // baseline so the next accumulation starts fresh.
         setStepsWalked(prev => prev + result.stepsIncrement)
         setPendingDistance(0)
-        localBaselineRef.current = { lat: smoothed.lat, lng: smoothed.lng, ts: now, accuracy: pos.accuracy }
+        localBaselineRef.current = { lat: pos.lat, lng: pos.lng, ts: now, accuracy: pos.accuracy }
       } else if (sessionStatusRef.current === 'active' && inBoundsRef.current && pos.accuracy <= STEP_FILTER.ACCURACY_MAX_FOR_STEPS) {
         // No credit this tick, but the fix is accurate enough that we
         // believe the displacement. Grow the optimistic "pending" bucket

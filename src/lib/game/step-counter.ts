@@ -6,24 +6,29 @@
 // or larger than the observed displacement — a "move" of 8 m with ±25 m
 // accuracy is statistically noise, not a step.
 //
-// Tuning rationale (revised May 2026 after a step-counting audit):
-// - ACCURACY_MAX_FOR_STEPS lowered 50 → 30 m. The 50 m bar credited
-//   borderline fixes in dense buildings / under canopies where multi-
-//   path errors can be 30-40 m. 30 m matches Strava/Garmin's outdoor
-//   "usable" threshold.
-// - STEP_SNR raised 0.8 → 1.0. The standard SNR rule of thumb in GPS
-//   fitness apps is "credit ONLY when displacement ≥ accuracy" — i.e.
-//   you've genuinely moved further than the noise circle. 0.8 was too
-//   generous: at acc=30 it credited anything ≥ 24 m, swallowing real
-//   GPS drift.
-// - MIN_SPEED_MPS added (new). When you stand still, GPS may slowly
-//   drift to fool the SNR check across enough fixes. A minimum implied
-//   speed of 0.3 m/s (~1 km/h, less than a strolling pace) catches
-//   "I'm sitting on a bench" drift that would otherwise sneak through.
+// Tuning history:
+//   May 2026 (audit): tightened SNR 0.8→1.0, accuracy 50→30, added
+//     EMA smoothing + stationary detection. Field test showed REAL
+//     walking was no longer crediting in proportion to movement
+//     (smoothed positions lagged, stationary fired during slow walks)
+//     and the optimistic display flickered backward when stationary
+//     reset pending without committing it. Reverted SNR + accuracy
+//     to the proven values; kept MIN_SPEED_MPS as a light floor.
+//     Smoothing and stationary helpers stay exported (in case we
+//     find a use later) but are not wired into the live pipeline.
+//
+// Current rationale:
+//   - 50 m accuracy ceiling tolerates indoor/urban-canyon GPS that
+//     real players experience while still walking.
+//   - 0.8 × accuracy SNR catches stationary jitter (real drift inside
+//     the noise circle never quite crosses it) without rejecting
+//     normal walks (5 m moves at 6 m accuracy = 5 > 4.8 → credit).
+//   - 0.3 m/s min speed filters "I'm sitting still and GPS drifted
+//     8 m over 30 s" without catching even the slowest walkers.
 
 export const STEP_FILTER = {
   /** Reject fixes coarser than this for step credit (m). */
-  ACCURACY_MAX_FOR_STEPS: 30,
+  ACCURACY_MAX_FOR_STEPS: 50,
   /** Don't refresh the saved baseline when accuracy is worse than this (m). */
   ACCURACY_MAX_FOR_BASELINE: 100,
   /** Minimum credible displacement to consider as movement (m). */
@@ -31,7 +36,7 @@ export const STEP_FILTER = {
   /** Hard upper bound on a single interval to reject GPS spikes (m). */
   STEP_MAX_M: 100,
   /** Distance must exceed (SNR × accuracy) to count as a step. */
-  STEP_SNR: 1.0,
+  STEP_SNR: 0.8,
   /** Implied velocity must be ≥ this in m/s — under 0.3 m/s is stationary drift, not walking. */
   MIN_SPEED_MPS: 0.3,
   /** Implied velocity must be ≤ this in m/s (≈14.4 km/h running upper bound). */

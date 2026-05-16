@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
@@ -46,6 +46,12 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
   // step counter's cadence. Reset to 0 whenever the underlying
   // objective changes (different mission → different baseline).
   const [optimisticDelta, setOptimisticDelta] = useState(0)
+  // Monotonic-max guard: the displayed progress for a given objective must
+  // never visually tick backward, even if a server refetch briefly reports
+  // a lower number than the optimistic local view (server credits lag the
+  // client). Keyed by objective id so a NEW mission legitimately starts
+  // from its own (lower) baseline.
+  const progressFloorRef = useRef<{ id: string | null; value: number }>({ id: null, value: 0 })
 
   const fetchNext = useCallback(async () => {
     if (!sessionId) return
@@ -136,9 +142,19 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
   // Only walk missions track from the optimistic step counter. Other
   // types (cattura, qr, duel) tick by discrete events that the server
   // already reconciles immediately, so no smoothing is needed there.
-  const displayedProgress = isWalk
+  const rawProgress = isWalk
     ? Math.min(target, objective.progress + optimisticDelta)
     : Math.min(target, objective.progress)
+  // Apply the monotonic-max floor. Reset the floor when the objective id
+  // changes (a different mission has a legitimately lower starting point).
+  const floor = progressFloorRef.current
+  if (floor.id !== objective.id) {
+    floor.id = objective.id
+    floor.value = rawProgress
+  } else if (rawProgress > floor.value) {
+    floor.value = rawProgress
+  }
+  const displayedProgress = Math.max(rawProgress, floor.value)
   const pct = target > 0 ? Math.min(100, (displayedProgress / target) * 100) : 0
   // Variable kept for the JSX below — `progress` is shown alongside the
   // bar (e.g. "12/50 m"). Use the displayed value so the number and bar
