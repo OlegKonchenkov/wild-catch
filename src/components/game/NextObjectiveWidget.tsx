@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
+import useTweenedInteger from '@/hooks/useTweenedInteger'
 
 export interface NextObjective {
   id: string
@@ -134,32 +135,43 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
     setOptimisticDelta(0)
   }, [objective?.id])
 
-  if (!loaded || !objective) return null
-
-  const meta = TYPE_META[objective.type] ?? { icon: '🎯', verb: 'Completa' }
-  const target = objective.target_count
-  const isWalk = objective.type === 'walk'
+  // ── Progress computation (runs every render, BEFORE the early-return
+  //    guard, so the tween hook below keeps a stable call order) ────────
+  const target = objective?.target_count ?? 0
+  const isWalk = objective?.type === 'walk'
   // Only walk missions track from the optimistic step counter. Other
   // types (cattura, qr, duel) tick by discrete events that the server
   // already reconciles immediately, so no smoothing is needed there.
-  const rawProgress = isWalk
-    ? Math.min(target, objective.progress + optimisticDelta)
-    : Math.min(target, objective.progress)
-  // Apply the monotonic-max floor. Reset the floor when the objective id
-  // changes (a different mission has a legitimately lower starting point).
+  const rawProgress = !objective
+    ? 0
+    : isWalk
+      ? Math.min(target, objective.progress + optimisticDelta)
+      : Math.min(target, objective.progress)
+  // Monotonic-max floor — reset when the objective id changes (a
+  // different mission legitimately starts from a lower point).
   const floor = progressFloorRef.current
-  if (floor.id !== objective.id) {
-    floor.id = objective.id
+  const objId = objective?.id ?? null
+  if (floor.id !== objId) {
+    floor.id = objId
     floor.value = rawProgress
   } else if (rawProgress > floor.value) {
     floor.value = rawProgress
   }
-  const displayedProgress = Math.max(rawProgress, floor.value)
-  const pct = target > 0 ? Math.min(100, (displayedProgress / target) * 100) : 0
+  const flooredProgress = Math.max(rawProgress, floor.value)
+  // Tween at the SAME 450 ms as the top-right step counter
+  // (useTweenedInteger in map/page.tsx) so a +N jump animates at the
+  // same rate in both places — the player perceives the two counters
+  // moving together instead of one snapping while the other glides.
+  const tweenedProgress = useTweenedInteger(flooredProgress, 450)
+
+  if (!loaded || !objective) return null
+
+  const meta = TYPE_META[objective.type] ?? { icon: '🎯', verb: 'Completa' }
+  const pct = target > 0 ? Math.min(100, (tweenedProgress / target) * 100) : 0
   // Variable kept for the JSX below — `progress` is shown alongside the
-  // bar (e.g. "12/50 m"). Use the displayed value so the number and bar
-  // stay in sync.
-  const progress = displayedProgress
+  // bar (e.g. "12/50 m"). Use the tweened value so the number and bar
+  // stay in sync with each other and with the main step counter.
+  const progress = tweenedProgress
 
   function onTap() {
     router.push(`/game/missions?focus=${encodeURIComponent(objective!.id)}`)

@@ -323,6 +323,18 @@ function MapPageInner() {
   // frozen until the 5 s server POST surfaced its own credit, which is
   // exactly the "non si attiva, poi salta" UX we're fixing.
   const localBaselineRef = useRef<{ lat: number; lng: number; ts: number; accuracy: number } | null>(null)
+  // GPS warm-up gate. A cold GPS start reports a very inaccurate first
+  // fix (accuracy 60-150 m, position off by tens of metres) and then
+  // "walks" the reported position toward the truth as it acquires more
+  // satellites. If we set the step baseline on that first bad fix, the
+  // settling drift gets measured and credited as phantom steps — the
+  // classic "I read the tutorial without moving and it says 20 m"
+  // complaint. So we refuse to arm the counter (set the baseline / count
+  // anything) until the FIRST fix accurate enough that residual drift is
+  // within the SNR filter's tolerance. Real fitness apps do the same
+  // ("Acquiring GPS…" before a run can start). Reset per session.
+  const gpsWarmedUpRef = useRef(false)
+  const GPS_WARMUP_ACCURACY_M = 25
   const sessionStatusRef = useRef<string>('active')
   const [pendingDistance, setPendingDistance] = useState(0)
   const router = useRouter()
@@ -683,6 +695,7 @@ function MapPageInner() {
       starterFlowLockedRef.current = true
       // Reset the optimistic step accumulator — different session, new baseline.
       localBaselineRef.current = null
+      gpsWarmedUpRef.current = false
       setPendingDistance(0)
       // Reset the server-side step gauge so the first reconciliation in the
       // new session can correctly detect "did the server credit anything?".
@@ -1146,6 +1159,20 @@ function MapPageInner() {
 
     // Skip very inaccurate fixes (map marker already updated above)
     if (pos.accuracy > 300) return
+
+    // ── GPS warm-up gate ──────────────────────────────────────────────
+    // Until we get one fix accurate enough to trust, do nothing that
+    // depends on position precision: no step baseline, no counting, no
+    // proximity pin claims (a 50 m-off fix could falsely land inside a
+    // pin radius). The map marker + accuracy badge were already updated
+    // above so the player still sees "GPS ±Nm" shrinking — that IS the
+    // "acquiring" feedback. Once a good fix arrives the gate opens for
+    // the rest of the session and the baseline is established below from
+    // this same trustworthy fix.
+    if (!gpsWarmedUpRef.current) {
+      if (pos.accuracy > GPS_WARMUP_ACCURACY_M) return
+      gpsWarmedUpRef.current = true
+    }
 
     // Tutorial bonus pin proximity — fires off the GPS tick so it claims
     // even when no server POST is in flight. The function is a no-op when
