@@ -88,13 +88,24 @@ function SlideWelcome() {
           animate={{ scale: [1.05, 0.95, 1.05], opacity: [0.5, 0.85, 0.5] }}
           transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
         />
-        <motion.span
-          className="text-7xl relative z-10 inline-block"
-          animate={{ y: [0, -6, 0], rotate: [-3, 3, -3] }}
-          transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          🐉
-        </motion.span>
+        {/* The real Daimon guardian — same art as the launcher icon /
+            boot splash so the identity is seamless from install → splash
+            → onboarding. Square navy tile edge feathered with a radial
+            mask so it dissolves into the slide's dark gradient + the
+            ambient particles instead of reading as a pasted box. */}
+        <motion.img
+          src="/icons/icon-512.png"
+          alt="Daimon"
+          className="relative z-10"
+          style={{
+            width: 156, height: 156, objectFit: 'contain',
+            WebkitMaskImage: 'radial-gradient(circle at 50% 50%, #000 60%, transparent 78%)',
+            maskImage: 'radial-gradient(circle at 50% 50%, #000 60%, transparent 78%)',
+            filter: 'drop-shadow(0 6px 22px rgba(0,0,0,0.45))',
+          }}
+          animate={{ y: [0, -7, 0] }}
+          transition={{ duration: 3.6, repeat: Infinity, ease: 'easeInOut' }}
+        />
         <OrbitingElement emoji="🌊" radius={78} duration={7}  delay={0}   phase={0}   />
         <OrbitingElement emoji="🔥" radius={70} duration={8.5} delay={0.3} phase={120} />
         <OrbitingElement emoji="🌿" radius={82} duration={9.5} delay={0.6} phase={240} />
