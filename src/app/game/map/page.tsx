@@ -264,7 +264,10 @@ function MapPageInner() {
       if (!fix || !sid || sessionEndedRef.current) return
       try {
         const blob = new Blob(
-          [JSON.stringify({ lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, sessionId: sid })],
+          [JSON.stringify({
+            lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, sessionId: sid,
+            clientSteps: displayedStepsRef.current,
+          })],
           { type: 'application/json' },
         )
         navigator.sendBeacon('/api/game/position', blob)
@@ -308,6 +311,11 @@ function MapPageInner() {
   // so the server can reconcile the last few unsent metres before the
   // user navigates away / reloads.
   const lastFixRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
+  // Mirror of the displayed optimistic total for non-reactive readers
+  // (the position POST body + the page-exit beacon). The server adopts
+  // this as the authoritative step count so map/backpack/missions/eggs
+  // all agree — see clientSteps handling in /api/game/position.
+  const displayedStepsRef = useRef(0)
   // State mirror of "have we received at least one GPS fix yet?" — used to
   // retrigger effects that need a position (e.g. the tutorial bonus pin
   // placement) which would otherwise read the ref once during their first
@@ -384,6 +392,7 @@ function MapPageInner() {
   useEffect(() => {
     const sid = sessionIdRef.current
     const displayedTotal = stepsWalked + Math.round(pendingDistance)
+    displayedStepsRef.current = displayedTotal
     if (!sid || displayedTotal <= 0) return
     try {
       sessionStorage.setItem(STEPS_CACHE_KEY(sid), String(displayedTotal))
@@ -1020,7 +1029,10 @@ function MapPageInner() {
       res = await fetch('/api/game/position', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, sessionId: sid }),
+        body: JSON.stringify({
+          lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, sessionId: sid,
+          clientSteps: displayedStepsRef.current,
+        }),
       })
     } catch {
       // Offline, page unloading, or DNS blip — best-effort POST, skip.

@@ -5,7 +5,7 @@ import { isWithinBounds, haversineDistance, parsePoint } from '@/lib/game/anti-c
 import { loadMissionUnlockContext } from '@/lib/game/missions'
 import { getMissionUnlockState } from '@/lib/game/mission-unlocks'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { evaluateStep, shouldRollEncounter } from '@/lib/game/step-counter'
+import { evaluateStep, shouldRollEncounter, STEP_FILTER } from '@/lib/game/step-counter'
 import { isTutorialSession } from '@/lib/game/tutorial'
 
 type SupabaseLike = ReturnType<typeof createAdminClient>
@@ -20,6 +20,18 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}))
   const { lat, lng, accuracy, sessionId } = body
+  // The client's authoritative optimistic total (committed steps + the
+  // pending bucket). The client counter is the one the player actually
+  // sees on the map; without adopting it here the server lags behind by
+  // everything that accumulated between throttled POSTs + any local
+  // re-localization commits, so the backpack/eggs/missions show a lower
+  // number than the map and walk-gated rewards (egg hatch, walk mission)
+  // fire late or not at all. Anti-cheat is explicitly out of scope for
+  // this game; we still sanity-clamp below so a bug can't write garbage.
+  const clientSteps =
+    typeof body.clientSteps === 'number' && Number.isFinite(body.clientSteps)
+      ? Math.max(0, Math.floor(body.clientSteps))
+      : null
 
   if (typeof lat !== 'number' || typeof lng !== 'number' || !sessionId) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
@@ -88,7 +100,34 @@ export async function POST(request: Request) {
     inBounds,
   })
   const { validStep, stepsIncrement, shouldUpdateBaseline } = step
-  const newStepsWalked = (playerSession.steps_walked ?? 0) + stepsIncrement
+  const prevSteps = playerSession.steps_walked ?? 0
+  const serverComputed = prevSteps + stepsIncrement
+
+  // ── Adopt the client's optimistic total ───────────────────────────────
+  // The client is the source of truth for the visible counter. We take
+  // max(serverComputed, clientSteps) so the persisted total matches what
+  // the player sees — eliminating the map↔backpack discrepancy and making
+  // walk-gated rewards fire exactly when the on-screen counter says.
+  //
+  // Sanity clamp (NOT anti-cheat — just bug insurance): the client total
+  // can't legitimately exceed prevSteps + (max walking speed × elapsed)
+  // plus a generous buffer for bucket/commit slack. With no elapsed
+  // (first fix / long resume gap) we can't bound it, so we trust the
+  // cached client value as-is — it was itself produced by the same
+  // bounded local pipeline.
+  let adoptedClient = 0
+  if (clientSteps !== null && clientSteps > serverComputed) {
+    if (elapsedMs === null) {
+      adoptedClient = clientSteps
+    } else {
+      const elapsedSec = elapsedMs / 1000
+      const maxPlausibleGain = elapsedSec * STEP_FILTER.MAX_SPEED_MPS + 60 // +60 m slack
+      const ceiling = prevSteps + Math.ceil(maxPlausibleGain)
+      adoptedClient = Math.min(clientSteps, ceiling)
+    }
+  }
+  const effectiveSteps = Math.max(serverComputed, adoptedClient)
+  const stepsAdvanced = effectiveSteps > prevSteps
 
   if (shouldUpdateBaseline) {
     await supabase
@@ -96,26 +135,27 @@ export async function POST(request: Request) {
       .update({
         last_position: `(${lng},${lat})`,
         last_position_at: new Date(nowMs).toISOString(),
-        ...(stepsIncrement > 0 ? { steps_walked: newStepsWalked } : {}),
+        ...(stepsAdvanced ? { steps_walked: effectiveSteps } : {}),
       })
       .eq('id', playerSession.id)
-  } else if (stepsIncrement > 0) {
-    // Defensive: stepsIncrement can only be > 0 when validStep, which already
-    // requires acc ≤ ACCURACY_MAX_FOR_STEPS < ACCURACY_MAX_FOR_BASELINE — this
-    // branch is effectively unreachable but kept for clarity.
+  } else if (stepsAdvanced) {
     await supabase
       .from('player_sessions')
-      .update({ steps_walked: newStepsWalked })
+      .update({ steps_walked: effectiveSteps })
       .eq('id', playerSession.id)
   }
 
-  // Walk mission progress + egg hatching: update whenever steps change
+  // Walk mission progress + egg hatching: run whenever the effective
+  // total advanced — NOT just when the server's own per-POST haversine
+  // credited something. A flush POST may carry a client total that
+  // crosses a threshold even though this single segment's distance was
+  // tiny; we still want the egg to hatch / mission to complete now.
   let eggsHatched: Array<{ name: string; rarity: string; element: string }> = []
   let completedMissions: Array<{ title: string; rewardGold: number; rewardExp: number }> = []
-  if (stepsIncrement > 0 && session.status === 'active') {
+  if (stepsAdvanced && session.status === 'active') {
     const [missions, hatched] = await Promise.all([
-      updateWalkMissions(sessionId, user.id, newStepsWalked, supabase),
-      checkAndHatchEggs(sessionId, user.id, newStepsWalked, supabase),
+      updateWalkMissions(sessionId, user.id, effectiveSteps, supabase),
+      checkAndHatchEggs(sessionId, user.id, effectiveSteps, supabase),
     ])
     completedMissions = missions
     eggsHatched = hatched
@@ -129,7 +169,7 @@ export async function POST(request: Request) {
   // encounter accumulator (cumDistRef), which must not grow on rejected fixes.
   const reportedDistance = validStep ? distanceMoved : 0
 
-  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status, stepsWalked: newStepsWalked, distanceMoved: reportedDistance, eggsHatched, completedMissions })
+  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status, stepsWalked: effectiveSteps, distanceMoved: reportedDistance, eggsHatched, completedMissions })
 }
 
 async function updateWalkMissions(
