@@ -37,18 +37,41 @@ const RARITY_ALPHA: Record<string, number> = {
 }
 
 const ANIM_VARIANTS: Record<AnimState, TargetAndTransition> = {
+  // Organic idle: vertical bob + a slower breathing scale + an even
+  // slower micro-sway, each on its OWN period so the loop never aligns
+  // into a mechanical repeat — the creature reads as alive/breathing
+  // rather than bobbing on a spring.
   idle: {
     y: [0, -8, 0],
-    transition: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
+    scale: [1, 1.035, 1],
+    rotate: [-1.4, 1.4, -1.4],
+    transition: {
+      y:      { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
+      scale:  { duration: 3.7, repeat: Infinity, ease: 'easeInOut' },
+      rotate: { duration: 5.2, repeat: Infinity, ease: 'easeInOut' },
+    },
   },
+  // Attack: anticipation (pull back + crouch) → snap forward with a
+  // scale punch → settle. Kept ≤ the ~260 ms idle-reset window used by
+  // the encounter page so the strike fully reads before reverting.
   attack: {
-    x: [-20, 20, 0],
-    transition: { duration: 0.4, ease: 'easeOut' },
+    x: [0, -10, 26, 0],
+    scale: [1, 0.94, 1.14, 1],
+    transition: { duration: 0.3, ease: [0.2, 0.8, 0.2, 1], times: [0, 0.28, 0.55, 1] },
   },
+  // Damage: sharp recoil shake + a brief white flash AND a red tint so
+  // a hit reads instantly even peripherally; small scale dip sells the
+  // impact. Brightness eased down from 3 → 2.3 so it punches without
+  // strobing.
   damage: {
-    x: [0, -8, 8, -8, 0],
-    filter: ['brightness(1)', 'brightness(3)', 'brightness(1)'],
-    transition: { duration: 0.35 },
+    x: [0, -9, 9, -6, 0],
+    scale: [1, 0.93, 1],
+    filter: [
+      'brightness(1) saturate(1)',
+      'brightness(2.3) saturate(1.6) hue-rotate(-12deg)',
+      'brightness(1) saturate(1)',
+    ],
+    transition: { duration: 0.34, ease: 'easeOut' },
   },
   catch: {
     scale: [1, 0.8, 0.2],
@@ -60,10 +83,12 @@ const ANIM_VARIANTS: Record<AnimState, TargetAndTransition> = {
     opacity: [1, 0],
     transition: { duration: 0.5, ease: 'easeIn' },
   },
+  // Victory: a celebratory hop + bounce-scale + wiggle.
   victory: {
-    scale: [1, 1.2, 1],
-    rotate: [0, 10, -10, 0],
-    transition: { duration: 0.6 },
+    y: [0, -22, 0, -10, 0],
+    scale: [1, 1.18, 0.97, 1.06, 1],
+    rotate: [0, 9, -9, 5, 0],
+    transition: { duration: 0.85, ease: 'easeOut' },
   },
 }
 
