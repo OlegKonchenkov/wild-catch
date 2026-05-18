@@ -85,6 +85,15 @@ export default function BgmController() {
     audio.volume = BASE_VOLUME
     audioRef.current = audio
 
+    // The src is resolved behind a network fetch (admin override), so the
+    // audio element is often created AFTER the user's first gesture. If
+    // they already interacted (unlockedRef set), start playing the moment
+    // the element exists — otherwise music wouldn't start until a SECOND
+    // distinct gesture (the reported "non parte finché non clicco Avanti").
+    if (unlockedRef.current && !muted) {
+      audio.play().catch(() => { /* best-effort */ })
+    }
+
     const onError = () => setAvailable(false)
     audio.addEventListener('error', onError)
 
@@ -102,9 +111,13 @@ export default function BgmController() {
   useEffect(() => {
     if (!available) return
     const tryPlay = () => {
+      // Remember the gesture FIRST — even if the audio element isn't
+      // created yet (src still resolving), so the [src] creation effect
+      // can auto-start playback. Without this the one-shot listener is
+      // consumed on an early tap and the unlock is lost.
+      unlockedRef.current = true
       const audio = audioRef.current
       if (!audio) return
-      unlockedRef.current = true
       if (muted) return
       audio.play().catch(() => {
         // Some browsers may still reject (e.g. low-power mode). We treat

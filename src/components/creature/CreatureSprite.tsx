@@ -37,19 +37,13 @@ const RARITY_ALPHA: Record<string, number> = {
 }
 
 const ANIM_VARIANTS: Record<AnimState, TargetAndTransition> = {
-  // Organic idle: vertical bob + a slower breathing scale + an even
-  // slower micro-sway, each on its OWN period so the loop never aligns
-  // into a mechanical repeat — the creature reads as alive/breathing
-  // rather than bobbing on a spring.
+  // idle is generated per-size in `idleVariant()` below (amplitude must
+  // scale with sprite size or a battle-tuned 8 px bob clips/overpowers
+  // a 44–48 px popup / duel-selection thumbnail). This static entry is
+  // a safe fallback only.
   idle: {
-    y: [0, -8, 0],
-    scale: [1, 1.035, 1],
-    rotate: [-1.4, 1.4, -1.4],
-    transition: {
-      y:      { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
-      scale:  { duration: 3.7, repeat: Infinity, ease: 'easeInOut' },
-      rotate: { duration: 5.2, repeat: Infinity, ease: 'easeInOut' },
-    },
+    y: [0, -6, 0],
+    transition: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
   },
   // Attack: anticipation (pull back + crouch) → snap forward with a
   // scale punch → settle. Kept ≤ the ~260 ms idle-reset window used by
@@ -96,11 +90,34 @@ function toHex2(n: number) {
   return Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0')
 }
 
+// Size-aware organic idle. Bob amplitude tracks the sprite size so the
+// same component reads as a gentle breath on a 46 px duel-selection /
+// map-popup thumbnail AND a fuller float on a 200 px battle sprite —
+// never clipping its container, never looking absurd. Breathing scale
+// + micro-sway stay subtle and run on their OWN periods so the loop
+// never aligns into a mechanical repeat. Used for the default 'idle'
+// state everywhere (battle, bestiary, popups, pre-fight selection).
+function idleVariant(size: number): TargetAndTransition {
+  const bob = Math.max(2, Math.min(10, size * 0.045))
+  return {
+    y: [0, -bob, 0],
+    scale: [1, 1.03, 1],
+    rotate: [-1.2, 1.2, -1.2],
+    transition: {
+      y:      { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
+      scale:  { duration: 3.7, repeat: Infinity, ease: 'easeInOut' },
+      rotate: { duration: 5.2, repeat: Infinity, ease: 'easeInOut' },
+    },
+  }
+}
+
 export default function CreatureSprite({
   imageUrl, name, animState = 'idle', size = 200, element, rarity, showAura,
 }: Props) {
   const glowColor = element ? (ELEMENT_GLOW[element] ?? '#3A9DBC') : null
   const auraAlpha = rarity ? (RARITY_ALPHA[rarity] ?? 0.25) : 0.25
+  // idle is size-aware (see idleVariant); transient states stay fixed.
+  const currentVariant = animState === 'idle' ? idleVariant(size) : ANIM_VARIANTS[animState]
 
   // CSS drop-shadow: element-tinted when element known, generic dark otherwise
   const dropShadow = glowColor
@@ -193,7 +210,7 @@ export default function CreatureSprite({
         {/* The sprite — floats on top of everything */}
         <motion.div
           className="absolute inset-0 flex items-center justify-center z-10"
-          animate={ANIM_VARIANTS[animState]}
+          animate={currentVariant}
           key={animState}
         >
           {spriteNode}
@@ -207,7 +224,7 @@ export default function CreatureSprite({
     <motion.div
       className="relative flex items-center justify-center"
       style={{ width: size, height: size }}
-      animate={ANIM_VARIANTS[animState]}
+      animate={currentVariant}
       key={animState}
     >
       {spriteNode}
