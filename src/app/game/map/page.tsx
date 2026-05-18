@@ -1674,18 +1674,25 @@ function MapPageInner() {
           <span className="text-sm">👟</span>
           <div className="flex flex-col items-start leading-none">
             <span className="text-white font-bold text-sm leading-tight tabular-nums">{displayedSteps.toLocaleString('it-IT')} m</span>
-            <span className="text-white/30 text-[9px] uppercase tracking-wide mt-0.5">Distanza percorsa</span>
+            {/* GPS accuracy folded in here as the subtitle (replaces the
+                old "Distanza percorsa" label + a separate pill). One
+                element instead of two — same info, less UI clutter. The
+                shrinking ±Nm during warm-up is still the "acquiring GPS"
+                feedback the counter logic relies on. */}
+            <span
+              className="text-[9px] uppercase tracking-wide mt-0.5 font-medium"
+              style={{
+                color: gpsAccuracy === null
+                  ? 'rgba(255,255,255,0.30)'
+                  : gpsAccuracy <= 20  ? '#34D399'
+                  : gpsAccuracy <= 100 ? '#F7C841'
+                  :                      '#E85D2F',
+              }}
+            >
+              {gpsAccuracy === null ? 'GPS in cerca…' : `GPS ±${gpsAccuracy}m`}
+            </span>
           </div>
         </motion.div>
-        {gpsAccuracy !== null && (
-          <div className={`text-[10px] px-2 py-1 rounded-full backdrop-blur-sm border font-medium ${
-            gpsAccuracy <= 20  ? 'bg-[#34D399]/15 border-[#34D399]/30 text-[#34D399]' :
-            gpsAccuracy <= 100 ? 'bg-[#F7C841]/15 border-[#F7C841]/30 text-[#F7C841]' :
-                                 'bg-[#E85D2F]/15 border-[#E85D2F]/30 text-[#E85D2F]'
-          }`}>
-            GPS ±{gpsAccuracy}m
-          </div>
-        )}
         {escaActiveUntil && escaSecondsLeft > 0 && (
           <div
             className="backdrop-blur-sm rounded-2xl px-3 py-2 flex items-center gap-2 whitespace-nowrap"
