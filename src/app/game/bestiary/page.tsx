@@ -757,14 +757,38 @@ export default function BestiaryPage() {
                 <div className="h-[3px]" style={{ background: canEvolve ? '#F7C841' : caught ? rarityColor : 'rgba(255,255,255,0.04)' }} />
 
                 {/* Image area */}
-                <div className="relative aspect-square overflow-hidden flex items-center justify-center p-1">
+                <div className="relative aspect-square overflow-hidden flex items-center justify-center p-2">
+                  {/* Stage: rarity-tinted backlight + contact shadow so
+                      the creature reads as a curated portrait, not a
+                      flat square asset. Muted for uncaught (mystery). */}
+                  {creature.image_url && (
+                    <>
+                      <div
+                        className="absolute pointer-events-none"
+                        style={{
+                          inset: '10%', borderRadius: '50%',
+                          background: caught
+                            ? `radial-gradient(circle at 50% 44%, ${rarityColor}33 0%, ${rarityColor}14 44%, transparent 70%)`
+                            : 'radial-gradient(circle at 50% 44%, rgba(255,255,255,0.05) 0%, transparent 68%)',
+                        }}
+                      />
+                      <div
+                        className="absolute pointer-events-none"
+                        style={{
+                          bottom: '11%', left: '50%', width: '52%', height: '8%',
+                          transform: 'translateX(-50%)', borderRadius: '50%',
+                          background: 'rgba(0,0,0,0.42)', filter: 'blur(4px)',
+                        }}
+                      />
+                    </>
+                  )}
                   {creature.image_url ? (
                     <>
                       <Image
                         src={creature.image_url}
                         alt={caught ? creature.name : '???'}
                         width={80} height={80}
-                        className={`w-full h-full object-contain transition-all ${caught ? '' : 'silhouette'}`}
+                        className={`relative w-full h-full object-contain transition-all ${caught ? '' : 'silhouette'}`}
                       />
                       {!caught && (
                         <div className="absolute inset-0 flex items-center justify-center bg-[#0A1520]/40 rounded-lg">

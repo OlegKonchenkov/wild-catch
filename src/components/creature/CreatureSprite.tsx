@@ -219,15 +219,52 @@ export default function CreatureSprite({
     )
   }
 
-  // ── Default (backward-compatible, enhanced drop shadow when element passed) ─
+  // ── Default mode — now with a lightweight "stage" so the creature
+  //    reads as deliberately placed (grounded portrait) instead of a
+  //    flat rectangular asset dropped onto the surface. A soft radial
+  //    backlight sits BEHIND the sprite and a contact-shadow ellipse
+  //    sits at its feet; both stay ground-fixed (outside the animated
+  //    wrapper) so the sprite floats over a stable stage. Subtle and
+  //    size-scaled — invisible-but-felt on a 44 px thumbnail, richer at
+  //    portrait sizes. Element-tinted when known, neutral otherwise.
+  const stageColor = glowColor ?? '#3A9DBC'
+  const contactW = Math.round(size * 0.62)
+  const contactH = Math.max(4, Math.round(size * 0.07))
   return (
-    <motion.div
+    <div
       className="relative flex items-center justify-center"
       style={{ width: size, height: size }}
-      animate={currentVariant}
-      key={animState}
     >
-      {spriteNode}
-    </motion.div>
+      {/* Backlight glow */}
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          inset: '6%',
+          borderRadius: '50%',
+          background: `radial-gradient(circle at 50% 46%, ${stageColor}2e 0%, ${stageColor}12 42%, transparent 68%)`,
+        }}
+      />
+      {/* Contact shadow — grounds the creature */}
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          bottom: `${Math.round(size * 0.05)}px`,
+          left: '50%',
+          width: contactW,
+          height: contactH,
+          marginLeft: -contactW / 2,
+          borderRadius: '50%',
+          background: 'rgba(0,0,0,0.45)',
+          filter: `blur(${Math.max(2, Math.round(size * 0.03))}px)`,
+        }}
+      />
+      <motion.div
+        className="relative flex items-center justify-center w-full h-full"
+        animate={currentVariant}
+        key={animState}
+      >
+        {spriteNode}
+      </motion.div>
+    </div>
   )
 }
