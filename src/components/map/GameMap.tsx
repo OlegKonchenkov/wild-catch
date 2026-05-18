@@ -492,6 +492,27 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
     <div className="relative w-full h-full">
       <div ref={mapContainerRef} className="w-full h-full" />
 
+      {/* Atmospheric overlay — pure CSS, no tiles/provider/API change.
+          Three stacked static gradients, GPU-cheap, pointer-events:none
+          so map interaction is untouched:
+            1. Edge vignette  → focuses the eye on the player, gives the
+               flat CARTO tiles a "game viewport" depth. Centre stays
+               fully transparent so markers/labels read crisp.
+            2. Soft teal brand glow from the top — ties the map to the
+               splash / favicon / presence-halo identity.
+            3. Faint warm floor gradient at the bottom for depth.
+          Reversible: delete this block to restore the bare tiles. */}
+      <div
+        className="absolute inset-0 pointer-events-none z-[400]"
+        style={{
+          background:
+            'radial-gradient(ellipse 120% 90% at 50% 45%, transparent 55%, rgba(6,12,24,0.30) 78%, rgba(4,8,18,0.62) 100%), ' +
+            'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(58,188,168,0.10) 0%, transparent 55%), ' +
+            'linear-gradient(180deg, transparent 70%, rgba(20,12,6,0.22) 100%)',
+          mixBlendMode: 'normal',
+        }}
+      />
+
       {/* Re-center / follow button */}
       {playerPosition && (
         <button
