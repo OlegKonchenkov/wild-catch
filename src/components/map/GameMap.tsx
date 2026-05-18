@@ -115,10 +115,28 @@ function markerSize(hasImage: boolean): number {
   return hasImage ? 40 : 20
 }
 
+// Stable pulsing "presence" halo rendered as its OWN Leaflet marker,
+// sitting under the player marker. Created once and only repositioned
+// (never setIcon'd) so the CSS pulse animation runs uninterrupted —
+// re-creating the icon every GPS fix (~1 Hz) would restart the keyframe
+// and make it stutter. Gives the player dot the "alive" feel polished
+// location games have, without touching any position/credit logic.
+const PRESENCE_SIZE = 70
+function presenceHTML(): string {
+  return `
+    <div style="width:${PRESENCE_SIZE}px;height:${PRESENCE_SIZE}px;position:relative;pointer-events:none;">
+      <div class="wc-presence-core"></div>
+      <div class="wc-presence-ring"></div>
+      <div class="wc-presence-ring" style="animation-delay:1.1s;"></div>
+    </div>
+  `
+}
+
 export default function GameMap({ session, playerPosition, sessionId, creatureImageUrl, pins, onPinTap }: Props) {
   const mapRef = useRef<unknown>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const markerRef = useRef<unknown>(null)
+  const presenceRef = useRef<unknown>(null)
   const firstFixRef = useRef(true)
   const followingRef = useRef(true)
   const prevPosRef = useRef<{ lat: number; lng: number } | null>(null)
@@ -181,9 +199,55 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
       const map = Leaflet.map(mapContainerRef.current!, mapOpts)
       mapRef.current = map
 
+      // Inject the player-presence pulse styles once. Brand-teal halo so
+      // it reads on the dark CARTO tiles and matches the boot splash /
+      // favicon identity.
+      if (!document.getElementById('wc-presence-style')) {
+        const st = document.createElement('style')
+        st.id = 'wc-presence-style'
+        st.textContent = `
+          .wc-presence-core {
+            position:absolute; left:50%; top:50%;
+            width:18px; height:18px; margin:-9px 0 0 -9px;
+            border-radius:50%;
+            background:radial-gradient(circle,#3ABCA8 0%,rgba(58,188,168,0.35) 70%,transparent 72%);
+            box-shadow:0 0 14px 3px rgba(58,188,168,0.55);
+            animation:wcPresenceCore 2.6s ease-in-out infinite;
+          }
+          .wc-presence-ring {
+            position:absolute; left:50%; top:50%;
+            width:${PRESENCE_SIZE}px; height:${PRESENCE_SIZE}px;
+            margin:-${PRESENCE_SIZE / 2}px 0 0 -${PRESENCE_SIZE / 2}px;
+            border-radius:50%;
+            border:2px solid rgba(58,188,168,0.45);
+            animation:wcPresenceRing 2.6s ease-out infinite;
+          }
+          @keyframes wcPresenceCore { 0%,100%{transform:scale(0.82);opacity:0.75} 50%{transform:scale(1);opacity:1} }
+          @keyframes wcPresenceRing { 0%{transform:scale(0.28);opacity:0.7} 80%{transform:scale(1);opacity:0} 100%{opacity:0} }
+          @media (prefers-reduced-motion: reduce) {
+            .wc-presence-core,.wc-presence-ring{animation:none}
+            .wc-presence-ring{opacity:0.25}
+          }
+        `
+        document.head.appendChild(st)
+      }
+
       // Immediately create marker if we already have a GPS position
       const pos = playerPositionRef.current
       if (pos) {
+        // Presence halo first so it sits UNDER the player marker.
+        presenceRef.current = Leaflet.marker([pos.lat, pos.lng], {
+          icon: Leaflet.divIcon({
+            html: presenceHTML(),
+            iconSize: [PRESENCE_SIZE, PRESENCE_SIZE],
+            iconAnchor: [PRESENCE_SIZE / 2, PRESENCE_SIZE / 2],
+            className: '',
+          }),
+          zIndexOffset: 900,
+          interactive: false,
+          keyboard: false,
+        }).addTo(map)
+
         const sz = markerSize(!!creatureImageUrl)
         const icon = Leaflet.divIcon({
           html: markerHTML(null, creatureImageUrl),
@@ -222,6 +286,7 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
         (mapRef.current as { remove(): void }).remove()
         mapRef.current = null
         markerRef.current = null
+        presenceRef.current = null
         firstFixRef.current = true
         followingRef.current = true
         prevPosRef.current = null
@@ -253,6 +318,25 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
 
       const bearing = headingRef.current
       const sz = markerSize(!!creatureImageUrl)
+
+      // Presence halo — reposition only (NEVER setIcon) so the pulse
+      // animation never restarts. Lazily create it if the map was set
+      // up before the first fix arrived.
+      if (presenceRef.current) {
+        (presenceRef.current as import('leaflet').Marker).setLatLng([lat, lng])
+      } else {
+        presenceRef.current = Leaflet.marker([lat, lng], {
+          icon: Leaflet.divIcon({
+            html: presenceHTML(),
+            iconSize: [PRESENCE_SIZE, PRESENCE_SIZE],
+            iconAnchor: [PRESENCE_SIZE / 2, PRESENCE_SIZE / 2],
+            className: '',
+          }),
+          zIndexOffset: 900,
+          interactive: false,
+          keyboard: false,
+        }).addTo(map)
+      }
 
       if (markerRef.current) {
         const marker = markerRef.current as import('leaflet').Marker
@@ -323,6 +407,11 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
       const pulse     = hasReward && !isClaimed
         ? `<div style="position:absolute;width:36px;height:36px;left:-18px;top:-32px;border-radius:50%;border:2px solid #F7C84188;animation:pinPulse 1.8s ease-out infinite;"></div>`
         : ''
+      // Active reward pins get a gold glow so they pop off the dark
+      // tiles; claimed/plain keep the plain drop shadow.
+      const pinShadow = hasReward && !isClaimed
+        ? '0 2px 8px rgba(0,0,0,0.45), 0 0 14px 3px rgba(247,200,65,0.55)'
+        : '0 2px 8px rgba(0,0,0,0.45)'
       const icon = Leaflet.divIcon({
         html: `<div style="width:0;height:0;position:relative;">
           ${pulse}
@@ -331,7 +420,7 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
             left:-14px;top:-28px;
             background:${pinColor};border:3px solid ${pinBorder};
             border-radius:50% 50% 50% 0;transform:rotate(-45deg);
-            box-shadow:0 2px 8px rgba(0,0,0,0.45);
+            box-shadow:${pinShadow};
             opacity:${isClaimed ? 0.55 : 1};
           "></div>
           ${hasReward && !isClaimed ? `<div style="position:absolute;width:10px;height:10px;left:-5px;top:-37px;background:#E85D2F;border:2px solid #fff;border-radius:50%;"></div>` : ''}
