@@ -584,9 +584,22 @@ export default function EnigmiPage() {
             ))}
           </div>
         ) : enigmi.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-4 mt-16 text-white/30">
-            <span className="text-6xl">🧩</span>
-            <p className="text-sm text-center">
+          <div className="flex flex-col items-center justify-center gap-3 mt-14 text-white/30">
+            {/* Friendly Daimon (same launcher/splash art) instead of a
+                lone emoji — navy tile edge feathered into the page bg.
+                Reuses the existing icon asset, zero added weight. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icons/icon-512.png"
+              alt=""
+              style={{
+                width: 132, height: 132, objectFit: 'contain', opacity: 0.85,
+                WebkitMaskImage: 'radial-gradient(circle at 50% 50%, #000 58%, transparent 76%)',
+                maskImage: 'radial-gradient(circle at 50% 50%, #000 58%, transparent 76%)',
+                filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.4))',
+              }}
+            />
+            <p className="text-sm text-center -mt-1">
               Nessun enigma disponibile in questa sessione.<br />
               Esplora la mappa per scoprire misteri!
             </p>

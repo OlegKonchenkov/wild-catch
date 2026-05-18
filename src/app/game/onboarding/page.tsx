@@ -166,13 +166,16 @@ function SlideQRCodes() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
       <motion.div
-        className="w-32 h-32 mb-5 rounded-2xl flex items-center justify-center relative overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(247,200,65,0.3)' }}
+        className="w-36 h-36 mb-5 rounded-2xl flex items-center justify-center relative overflow-hidden"
+        style={{ background: '#0A1421', border: '1px solid rgba(247,200,65,0.3)' }}
         initial={{ scale: 0.7, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring' }}
       >
-        <span className="text-7xl">📱</span>
+        {/* Arcane sigil art framed as a viewfinder; scanner line +
+            corner brackets sit on top to sell the "scan the seal" idea */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/slide-qr.png" alt="" className="absolute inset-0 w-full h-full object-cover" />
         {/* Scanner line — slower, more dramatic */}
         <motion.div
           className="absolute inset-x-0 h-1 bg-[#F7C841]/60"
@@ -351,17 +354,34 @@ function SlideReady() {
     >
       <ConfettiBurst />
       <motion.div
-        className="text-7xl mb-6 relative"
-        variants={{ hidden: { scale: 0.5, rotate: -20, opacity: 0 }, show: { scale: 1, rotate: 0, opacity: 1 } }}
+        className="relative mb-6 flex items-center justify-center"
+        style={{ width: 188, height: 188 }}
+        variants={{ hidden: { scale: 0.5, opacity: 0 }, show: { scale: 1, opacity: 1 } }}
         transition={{ type: 'spring', stiffness: 200, damping: 14 }}
       >
         <motion.div
-          className="absolute -inset-4 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(58,188,168,0.3) 0%, transparent 65%)' }}
-          animate={{ scale: [1, 1.2, 1], opacity: [0.6, 1, 0.6] }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -inset-3 rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(58,188,168,0.32) 0%, transparent 66%)' }}
+          animate={{ scale: [1, 1.18, 1], opacity: [0.55, 1, 0.55] }}
+          transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
         />
-        <span className="relative">🌿</span>
+        {/* The guardian setting off — same creature identity as the
+            launcher / splash / slide 1; navy scene edge feathered into
+            the slide gradient with a radial mask. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <motion.img
+          src="/brand/slide-walk.png"
+          alt="Daimon"
+          className="relative"
+          style={{
+            width: 180, height: 180, objectFit: 'contain',
+            WebkitMaskImage: 'radial-gradient(circle at 50% 48%, #000 56%, transparent 75%)',
+            maskImage: 'radial-gradient(circle at 50% 48%, #000 56%, transparent 75%)',
+            filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.45))',
+          }}
+          animate={{ y: [0, -7, 0] }}
+          transition={{ duration: 3.6, repeat: Infinity, ease: 'easeInOut' }}
+        />
       </motion.div>
       <motion.h2
         className="text-3xl font-black text-white mb-3"
