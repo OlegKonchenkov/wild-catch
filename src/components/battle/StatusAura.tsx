@@ -17,7 +17,14 @@ import { STATUS_EFFECT_META } from '@/lib/game/combat'
  *
  * Subtle by design: low opacity (~50%), small particles, slow loops,
  * so the effect reads as "atmosphere" rather than "VFX explosion".
+ *
+ * Layering: CreatureSprite renders its sprite image at z-10 (when
+ * showAura is on) and the catch-net animation uses z-20. The status
+ * aura must read as IN FRONT of the creature, so every particle layer
+ * here is z-30 — above the sprite and the net, regardless of the
+ * (z-auto) wrapper each call site uses.
  */
+const FX_LAYER = 'absolute inset-0 pointer-events-none z-30'
 interface Props {
   status: StatusEffect | null | undefined
   /** Approximate sprite size — used to scale particles to fit. */
@@ -52,7 +59,7 @@ function ParalysisSparks({ color, glow, size }: { color: string; glow: string; s
     { x:  size * 0.32, y:  size * 0.32, delay: 0.6 },
   ]
   return (
-    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+    <div className={`${FX_LAYER} flex items-center justify-center`}>
       {positions.map((p, i) => (
         <motion.span
           key={i}
@@ -78,7 +85,7 @@ function ConfusionStars({ color, glow, size }: { color: string; glow: string; si
   const radius = size * 0.45
   return (
     <motion.div
-      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      className={`${FX_LAYER} flex items-center justify-center`}
       animate={{ rotate: 360 }}
       transition={{ duration: 3.5, repeat: Infinity, ease: 'linear' }}
     >
@@ -105,7 +112,7 @@ function ConfusionStars({ color, glow, size }: { color: string; glow: string; si
 function SleepZs({ color, size }: { color: string; size: number }) {
   const items = [0, 1, 2]
   return (
-    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+    <div className={`${FX_LAYER} flex items-center justify-center`}>
       {items.map(i => (
         <motion.span
           key={i}
@@ -144,7 +151,7 @@ function PoisonBubbles({ color, glow, size }: { color: string; glow: string; siz
     { x:  size * 0.25, delay: 1.8, sz: 7 },
   ]
   return (
-    <div className="absolute inset-0 pointer-events-none">
+    <div className={FX_LAYER}>
       {bubbles.map((b, i) => (
         <motion.div
           key={i}
