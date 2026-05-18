@@ -6,6 +6,7 @@ import { identify, resetIdentity, track } from '@/lib/analytics'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import PrivacyPolicyModal from '@/components/legal/PrivacyPolicyModal'
+import DaimonSplash from '@/components/DaimonSplash'
 
 interface SessionStats {
   id: string
@@ -298,67 +299,9 @@ function HomeLobby() {
   const isPlayable = selected && (selected.status === 'active' || selected.status === 'ready' || selected.status === 'ended')
 
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100svh', background: 'linear-gradient(160deg, #0D1E2E 0%, #0A1520 100%)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32,
-      }}>
-        <style>{`
-          @keyframes wc-spin { to { transform: rotate(360deg); } }
-          @keyframes wc-pulse { 0%,100% { opacity: 0.4; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.05); } }
-          @keyframes wc-ripple {
-            0% { transform: scale(0.6); opacity: 0.8; }
-            100% { transform: scale(2.2); opacity: 0; }
-          }
-          .wc-loader-ring {
-            width: 72px; height: 72px; border-radius: 50%; position: relative;
-            border: 3px solid rgba(58,188,168,0.15);
-            border-top-color: #3ABCA8;
-            animation: wc-spin 0.9s linear infinite;
-          }
-          .wc-loader-ring::before, .wc-loader-ring::after {
-            content: ''; position: absolute; border-radius: 50%;
-            border: 3px solid transparent;
-          }
-          .wc-loader-ring::before {
-            inset: 8px; border-top-color: rgba(247,200,65,0.6);
-            animation: wc-spin 1.4s linear infinite reverse;
-          }
-          .wc-loader-ring::after {
-            inset: 18px; border-top-color: rgba(58,157,188,0.5);
-            animation: wc-spin 2s linear infinite;
-          }
-          .wc-ripple {
-            position: absolute; inset: 0; border-radius: 50%;
-            border: 2px solid rgba(58,188,168,0.4);
-            animation: wc-ripple 1.8s ease-out infinite;
-          }
-          .wc-ripple:nth-child(2) { animation-delay: 0.6s; }
-          .wc-ripple:nth-child(3) { animation-delay: 1.2s; }
-          .wc-dots span {
-            width: 7px; height: 7px; border-radius: 50%;
-            background: #3ABCA8; display: inline-block;
-            animation: wc-pulse 1.2s ease-in-out infinite;
-          }
-          .wc-dots span:nth-child(2) { animation-delay: 0.2s; background: rgba(58,188,168,0.7); }
-          .wc-dots span:nth-child(3) { animation-delay: 0.4s; background: rgba(58,188,168,0.4); }
-        `}</style>
-        <div style={{ position: 'relative', width: 72, height: 72 }}>
-          <div className="wc-ripple" />
-          <div className="wc-ripple" />
-          <div className="wc-ripple" />
-          <div className="wc-loader-ring" />
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 20, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.06em', marginBottom: 8 }}>
-            Daimon
-          </div>
-          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }} className="wc-dots">
-            <span /><span /><span />
-          </div>
-        </div>
-      </div>
-    )
+    // Unified with the cold-start boot splash (app/loading.tsx + the
+    // browser-tab favicon) so the launch identity is consistent.
+    return <DaimonSplash />
   }
 
   return (

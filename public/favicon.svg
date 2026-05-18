@@ -1,22 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="40%" r="60%">
-      <stop offset="0%" stop-color="#1A3A5C"/>
-      <stop offset="100%" stop-color="#0A1520"/>
+    <radialGradient id="d-bg" cx="50%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#15324B"/>
+      <stop offset="100%" stop-color="#0A1421"/>
     </radialGradient>
-    <radialGradient id="orb" cx="50%" cy="38%" r="55%">
-      <stop offset="0%" stop-color="#5DD4F0"/>
-      <stop offset="100%" stop-color="#1E6A8A"/>
+    <radialGradient id="d-orb" cx="42%" cy="38%" r="68%">
+      <stop offset="0%" stop-color="#9BF0E2"/>
+      <stop offset="45%" stop-color="#3ABCA8"/>
+      <stop offset="100%" stop-color="#1C6F76"/>
+    </radialGradient>
+    <radialGradient id="d-aura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3ABCA8" stop-opacity="0.55"/>
+      <stop offset="70%" stop-color="#3ABCA8" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#3ABCA8" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
-  <circle cx="16" cy="16" r="12.5" fill="none" stroke="#3A9DBC" stroke-width="1.5" opacity="0.7"/>
-  <path d="M3.5,16 A12.5,12.5 0 0,1 28.5,16 Z" fill="#1E4A6A" opacity="0.8"/>
-  <line x1="3.5" y1="16" x2="28.5" y2="16" stroke="#3A9DBC" stroke-width="1.5" opacity="0.9"/>
-  <circle cx="16" cy="16" r="3.5" fill="url(#orb)"/>
-  <circle cx="16" cy="10" r="4.5" fill="#C8EEFA" opacity="0.9"/>
-  <circle cx="13.5" cy="9" r="1.2" fill="#3AB8D8"/>
-  <circle cx="18.5" cy="9" r="1.2" fill="#3AB8D8"/>
-  <path d="M12,12 Q8,9 9.5,6.5 Q12,10 15,12 Z" fill="#A0DDEF" opacity="0.85"/>
-  <path d="M20,12 Q24,9 22.5,6.5 Q20,10 17,12 Z" fill="#A0DDEF" opacity="0.85"/>
+
+  <!-- App tile -->
+  <rect width="32" height="32" rx="7.5" fill="url(#d-bg)"/>
+
+  <!-- Orbiting ring (location / compass cue) -->
+  <circle cx="16" cy="16" r="11.5" fill="none" stroke="#3A9DBC" stroke-width="1.4" opacity="0.55"/>
+  <circle cx="16" cy="4.5" r="1.6" fill="#F7C841"/>
+
+  <!-- Aura -->
+  <circle cx="16" cy="16" r="9" fill="url(#d-aura)"/>
+
+  <!-- Daimon core orb -->
+  <circle cx="16" cy="16" r="6.4" fill="url(#d-orb)"/>
+  <!-- Specular highlight -->
+  <ellipse cx="13.6" cy="13.2" rx="2.3" ry="1.6" fill="#EAFFFB" opacity="0.75"/>
+  <!-- Inner spark -->
+  <circle cx="16" cy="16" r="1.7" fill="#0A1421" opacity="0.55"/>
+  <circle cx="16" cy="16" r="0.9" fill="#EAFFFB"/>
 </svg>
