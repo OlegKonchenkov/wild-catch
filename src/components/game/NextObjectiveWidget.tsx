@@ -53,6 +53,10 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
   // client). Keyed by objective id so a NEW mission legitimately starts
   // from its own (lower) baseline.
   const progressFloorRef = useRef<{ id: string | null; value: number }>({ id: null, value: 0 })
+  // Tracks the objective id we've already asked the map page to flush for,
+  // so we request an immediate server reconcile exactly ONCE per mission
+  // when the optimistic counter first crosses its target — not every fix.
+  const flushRequestedForRef = useRef<string | null>(null)
 
   const fetchNext = useCallback(async () => {
     if (!sessionId) return
@@ -134,6 +138,23 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
   useEffect(() => {
     setOptimisticDelta(0)
   }, [objective?.id])
+
+  // Threshold flush: the optimistic counter just crossed this walk
+  // mission's target but the server (5 s POST cadence) hasn't credited
+  // it yet. Ask the map page for ONE immediate position reconcile so the
+  // mission completes now instead of after another 10-20 steps. Fires
+  // once per objective (guarded by flushRequestedForRef) and only when
+  // the server itself hasn't already completed it.
+  useEffect(() => {
+    if (!objective || objective.type !== 'walk') return
+    if (flushRequestedForRef.current === objective.id) return
+    const serverProgress = objective.progress
+    const optimisticTotal = serverProgress + optimisticDelta
+    if (optimisticTotal >= objective.target_count && serverProgress < objective.target_count) {
+      flushRequestedForRef.current = objective.id
+      window.dispatchEvent(new CustomEvent('wc:request-position-flush'))
+    }
+  }, [objective, optimisticDelta])
 
   // ── Progress computation (runs every render, BEFORE the early-return
   //    guard, so the tween hook below keeps a stable call order) ────────

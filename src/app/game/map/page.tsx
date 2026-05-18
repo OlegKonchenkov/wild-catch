@@ -20,6 +20,7 @@ import CreatureSprite from '@/components/creature/CreatureSprite'
 import EggHatchModal from '@/components/game/EggHatchModal'
 import Coachmark, { type CoachmarkStep } from '@/components/game/Coachmark'
 import NextObjectiveWidget from '@/components/game/NextObjectiveWidget'
+import EggHatchWidget from '@/components/game/EggHatchWidget'
 import {
   TUTORIAL_SESSION_ID,
   TUTORIAL_BONUS_SUGGERIMENTO_ID,
@@ -246,17 +247,39 @@ function MapPageInner() {
   useEffect(() => { declinedEnigmaPinIdsRef.current = declinedEnigmaPinIds }, [declinedEnigmaPinIds])
   useEffect(() => { sessionStatusRef.current = (session?.status as string) ?? 'active' }, [session?.status])
 
-  // Persist the optimistic step total to sessionStorage so a remount of
-  // the map (encounter/duel/boss back-button) doesn't snap the counter
-  // backward to whatever the server last persisted. Init reads this and
-  // takes max(server, cached).
+  // Page-exit beacon. The /position POST is throttled to one per 5 s, so
+  // when the user navigates away (encounter/duel/boss tap) or reloads,
+  // the last few seconds of walking may never reach the server. We fire
+  // a navigator.sendBeacon with the latest full fix on pagehide AND on
+  // visibilitychange→hidden (covers tab switch, app backgrounding on
+  // mobile, and hard reload). sendBeacon is fire-and-forget, queued by
+  // the browser even as the page tears down, and does NOT delay
+  // navigation — zero added latency, ~1 request at exit. The server's
+  // existing /position handler reconciles it like any other tick
+  // (advances steps, completes walk missions, hatches eggs).
   useEffect(() => {
-    const sid = sessionIdRef.current
-    if (!sid || stepsWalked <= 0) return
-    try {
-      sessionStorage.setItem(STEPS_CACHE_KEY(sid), String(stepsWalked))
-    } catch { /* quota */ }
-  }, [stepsWalked])
+    function flush() {
+      const fix = lastFixRef.current
+      const sid = sessionIdRef.current
+      if (!fix || !sid || sessionEndedRef.current) return
+      try {
+        const blob = new Blob(
+          [JSON.stringify({ lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, sessionId: sid })],
+          { type: 'application/json' },
+        )
+        navigator.sendBeacon('/api/game/position', blob)
+      } catch { /* sendBeacon unsupported or blocked — best effort */ }
+    }
+    function onVisibility() {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
 
   // Background ambience loop + ducking registration — starts on mount, stops on unmount
   useEffect(() => {
@@ -281,6 +304,10 @@ function MapPageInner() {
   const lastEncounterRef = useRef(0)
   const sessionIdRef = useRef<string | null>(null)
   const lastPosRef = useRef<{ lat: number; lng: number } | null>(null)
+  // Most recent FULL fix (incl. accuracy). Used by the page-exit beacon
+  // so the server can reconcile the last few unsent metres before the
+  // user navigates away / reloads.
+  const lastFixRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
   // State mirror of "have we received at least one GPS fix yet?" — used to
   // retrigger effects that need a position (e.g. the tutorial bonus pin
   // placement) which would otherwise read the ref once during their first
@@ -302,6 +329,12 @@ function MapPageInner() {
   const lastPositionPostAtRef = useRef(0)
   const positionPostTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
+  // Debounce for the threshold-flush (a widget detected the optimistic
+  // counter crossed a mission target / egg requirement and asked for an
+  // immediate reconcile). Caps the bypass-throttle path to ~1 request
+  // per FLUSH_DEBOUNCE_MS even if several thresholds cross at once.
+  const lastFlushAtRef = useRef(0)
+  const FLUSH_DEBOUNCE_MS = 3000
 
   // ── Optimistic local step counter ──────────────────────────────────────────
   // Two-layer model:
@@ -337,6 +370,26 @@ function MapPageInner() {
   const GPS_WARMUP_ACCURACY_M = 25
   const sessionStatusRef = useRef<string>('active')
   const [pendingDistance, setPendingDistance] = useState(0)
+
+  // Persist the FULL displayed optimistic total — committed stepsWalked
+  // PLUS the uncommitted pending bucket — to sessionStorage. A remount of
+  // the map (encounter/duel/boss back-button, or a hard reload) reads
+  // this and takes max(server, cached). Previously we cached only
+  // stepsWalked, so the pending bucket (up to the per-fix cap, ~10-40 m)
+  // vanished on reload and the counter snapped backward — the exact
+  // "torno sulla pagina e ho meno passi" the player reported. Folding
+  // pending into the cached number means the next mount restores the
+  // value the user actually saw; the fresh baseline restarts pending
+  // from 0 with no loss.
+  useEffect(() => {
+    const sid = sessionIdRef.current
+    const displayedTotal = stepsWalked + Math.round(pendingDistance)
+    if (!sid || displayedTotal <= 0) return
+    try {
+      sessionStorage.setItem(STEPS_CACHE_KEY(sid), String(displayedTotal))
+    } catch { /* quota */ }
+  }, [stepsWalked, pendingDistance])
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
@@ -738,11 +791,12 @@ function MapPageInner() {
             }
             if (typeof data?.steps_walked === 'number') {
               // Compare server's count to any locally-cached optimistic
-              // total from a previous mount. The server is authoritative
-              // for the bottom bound, but local credit may be ahead if a
-              // position POST didn't flush before the page navigated
-              // away (e.g. player tapped an encounter). Take the max so
-              // the visible counter is strictly non-decreasing.
+              // total from a previous mount (now includes the pending
+              // bucket — see the persist effect above). The server is
+              // authoritative for the bottom bound, but local credit may
+              // be ahead if a position POST didn't flush before the page
+              // navigated away. Take the max so the visible counter is
+              // strictly non-decreasing across navigation/reload.
               let cached = 0
               try {
                 const raw = sessionStorage.getItem(STEPS_CACHE_KEY(sid))
@@ -1144,6 +1198,38 @@ function MapPageInner() {
     }
   }, [triggerEncounter])
 
+  // Threshold flush: a walk-progress widget detected that the OPTIMISTIC
+  // local counter crossed its target (mission target_count, or an egg's
+  // steps_required) and the server — only reconciling on the 5 s POST
+  // cadence — hasn't credited it yet. We post ONE position immediately,
+  // bypassing the throttle, so the completion (mission reward / egg
+  // hatch) fires now instead of "after another 10-20 steps". Debounced
+  // so a burst of crossings is still ~1 request.
+  const flushPositionNow = useCallback(() => {
+    const now = Date.now()
+    if (now - lastFlushAtRef.current < FLUSH_DEBOUNCE_MS) return
+    if (!pendingPositionRef.current) {
+      // The throttled scheduler may have already consumed the last fix;
+      // fall back to the most recent full fix so the POST still has a body.
+      if (lastFixRef.current) pendingPositionRef.current = lastFixRef.current
+      else return
+    }
+    lastFlushAtRef.current = now
+    // Cancel any pending throttled post so we don't double-fire, then
+    // reconcile right now.
+    if (positionPostTimeoutRef.current) {
+      clearTimeout(positionPostTimeoutRef.current)
+      positionPostTimeoutRef.current = null
+    }
+    void firePositionPost()
+  }, [firePositionPost])
+
+  useEffect(() => {
+    function onFlush() { flushPositionNow() }
+    window.addEventListener('wc:request-position-flush', onFlush)
+    return () => window.removeEventListener('wc:request-position-flush', onFlush)
+  }, [flushPositionNow])
+
   const onGPSPosition = useCallback((pos: { lat: number; lng: number; accuracy: number }) => {
     const sid = sessionIdRef.current
     if (!sid || sessionEndedRef.current) return
@@ -1151,6 +1237,7 @@ function MapPageInner() {
     // Visual updates always happen at GPS rate — marker, accuracy, lastPos
     setGpsAccuracy(Math.round(pos.accuracy))
     lastPosRef.current = { lat: pos.lat, lng: pos.lng }
+    lastFixRef.current = { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy }
     // Promote "we have a fix" to state on the FIRST fix so effects gated
     // on a position (tutorial bonus pin) re-run as soon as GPS resolves.
     // setState bails out when value is unchanged, so calling unconditionally
@@ -1548,10 +1635,13 @@ function MapPageInner() {
         )}
       </div>
 
-      {/* Top-left HUD — persistent "next objective" widget. Self-hides when
-          no unlocked, non-completed mission exists. */}
-      <div className="absolute top-2 left-2 z-[900]">
+      {/* Top-left HUD — "next objective" widget + a compact "closest egg
+          to hatching" chip stacked under it. Both self-hide when there's
+          nothing to show, so the column collapses to zero footprint when
+          idle. */}
+      <div className="absolute top-2 left-2 z-[900] flex flex-col gap-1.5 items-start">
         <NextObjectiveWidget sessionId={sessionId} />
+        <EggHatchWidget sessionId={sessionId} />
       </div>
 
       {/* Top-right HUD column — step counter + GPS accuracy + esca */}
