@@ -20,51 +20,108 @@ interface GameGridSkeletonProps {
 
 export function GameMapSkeleton() {
   return (
-    <div className="relative h-full overflow-hidden" style={{ background: '#060C18' }}>
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(58,157,188,0.12),transparent_35%),radial-gradient(circle_at_75%_20%,rgba(52,211,153,0.08),transparent_28%),linear-gradient(180deg,#101922_0%,#060C18_100%)]" />
-          <div className="absolute inset-x-0 top-[14%] h-px bg-white/6" />
-          <div className="absolute inset-x-0 top-[34%] h-px bg-white/6" />
-          <div className="absolute inset-x-0 top-[58%] h-px bg-white/6" />
-          <div className="absolute inset-x-0 top-[78%] h-px bg-white/6" />
-          <div className="absolute inset-y-0 left-[22%] w-px bg-white/6" />
-          <div className="absolute inset-y-0 left-[48%] w-px bg-white/6" />
-          <div className="absolute inset-y-0 left-[74%] w-px bg-white/6" />
-          <div className="absolute left-[18%] top-[22%] h-24 w-px rotate-45 bg-white/8 origin-top" />
-          <div className="absolute left-[58%] top-[8%] h-40 w-px -rotate-12 bg-white/8 origin-top" />
-          <div className="absolute left-[42%] top-[44%] h-32 w-px rotate-[28deg] bg-white/8 origin-top" />
-        </div>
+    <div className="relative h-full overflow-hidden" style={{ background: '#0A1520' }}>
+      <style>{`
+        @keyframes wcsk-sweep { to { transform: rotate(360deg); } }
+        @keyframes wcsk-ring  { 0% { transform: scale(0.35); opacity: 0.55; } 80% { transform: scale(1); opacity: 0; } 100% { opacity: 0; } }
+        @keyframes wcsk-core  { 0%,100% { transform: scale(0.85); opacity: 0.8; } 50% { transform: scale(1); opacity: 1; } }
+        @keyframes wcsk-shim  { 0% { background-position: -180% 0; } 100% { background-position: 180% 0; } }
+        .wcsk-shim {
+          background-image: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(58,188,168,0.16) 50%, rgba(255,255,255,0.04) 100%);
+          background-size: 180% 100%;
+          animation: wcsk-shim 1.5s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .wcsk-sweep, .wcsk-ring, .wcsk-core, .wcsk-shim { animation: none; }
+        }
+      `}</style>
 
-        <div className="absolute right-4 top-4 flex flex-col gap-3">
-          <div className="rounded-2xl border border-white/8 bg-[#0D1E2E]/90 px-4 py-3 w-32 animate-pulse">
-            <div className="h-3 w-14 rounded bg-white/10 mb-2" />
-            <div className="h-2.5 w-20 rounded bg-white/6" />
-          </div>
-          <div className="h-10 w-28 rounded-full border border-[#34D399]/20 bg-[#34D399]/10 animate-pulse" />
-          <div className="h-10 w-32 rounded-full border border-[#34D399]/20 bg-[#34D399]/10 animate-pulse" />
-        </div>
+      {/* Map-grid hint (reads as streets so the transition to the real
+          tiles isn't a hard cut) */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,#101E2C_0%,#0A1520_100%)]" />
+        <div className="absolute inset-x-0 top-[16%] h-px bg-white/[0.05]" />
+        <div className="absolute inset-x-0 top-[40%] h-px bg-white/[0.05]" />
+        <div className="absolute inset-x-0 top-[66%] h-px bg-white/[0.05]" />
+        <div className="absolute inset-x-0 top-[86%] h-px bg-white/[0.05]" />
+        <div className="absolute inset-y-0 left-[20%] w-px bg-white/[0.05]" />
+        <div className="absolute inset-y-0 left-[50%] w-px bg-white/[0.05]" />
+        <div className="absolute inset-y-0 left-[78%] w-px bg-white/[0.05]" />
+        <div className="absolute left-[16%] top-[20%] h-32 w-px rotate-45 bg-white/[0.06] origin-top" />
+        <div className="absolute left-[60%] top-[6%] h-44 w-px -rotate-12 bg-white/[0.06] origin-top" />
+        <div className="absolute left-[40%] top-[46%] h-36 w-px rotate-[28deg] bg-white/[0.06] origin-top" />
+      </div>
 
-        <div className="absolute left-1/2 top-[48%] -translate-x-1/2 -translate-y-1/2">
-          <div className="relative flex h-24 w-24 items-center justify-center">
-            <div className="absolute inset-0 rounded-full bg-[#3A9DBC]/10 animate-ping" />
-            <div className="absolute inset-[10px] rounded-full border border-[#3A9DBC]/25 bg-[#0D1E2E] animate-pulse" />
-            <div className="absolute inset-[22px] rounded-full bg-[#3A9DBC]/40 animate-pulse" />
-          </div>
-        </div>
+      {/* Atmospheric overlay — matches the live map's vignette + teal
+          top-glow so loading → loaded is seamless */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 120% 90% at 50% 45%, transparent 55%, rgba(6,12,24,0.30) 78%, rgba(4,8,18,0.62) 100%), ' +
+            'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(58,188,168,0.10) 0%, transparent 55%)',
+        }}
+      />
 
-        <div className="absolute inset-x-4 bottom-4 rounded-[28px] border border-[#3A9DBC]/40 bg-[#0D1E2E]/96 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.35)]">
-          <div className="flex items-center gap-3">
-            <div className="h-14 w-14 rounded-2xl bg-white/8 animate-pulse" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-4 w-40 rounded bg-white/10 animate-pulse" />
-              <div className="h-3 w-28 rounded bg-[#3A9DBC]/20 animate-pulse" />
-            </div>
-          </div>
-          <div className="mt-4 flex gap-3">
-            <div className="h-14 flex-1 rounded-2xl bg-[#E85D2F]/80 animate-pulse" />
-            <div className="h-14 w-24 rounded-2xl bg-white/10 animate-pulse" />
+      {/* Centre: radar sweep + the same teal presence halo the live map
+          renders for the player, so the loading marker IS the player
+          marker materialising */}
+      <div className="absolute left-1/2 top-[47%] -translate-x-1/2 -translate-y-1/2">
+        <div className="relative h-44 w-44 flex items-center justify-center">
+          <div
+            className="wcsk-sweep absolute inset-0 rounded-full"
+            style={{
+              background: 'conic-gradient(from 0deg, rgba(58,188,168,0.22) 0deg, rgba(58,188,168,0.02) 60deg, transparent 110deg, transparent 360deg)',
+              animation: 'wcsk-sweep 2.6s linear infinite',
+            }}
+          />
+          <div className="absolute inset-0 rounded-full border border-[#3ABCA8]/15" />
+          <div className="absolute inset-[26%] rounded-full border border-[#3ABCA8]/12" />
+          <div
+            className="wcsk-ring absolute rounded-full border-2 border-[#3ABCA8]/40"
+            style={{ width: 132, height: 132, animation: 'wcsk-ring 2.6s ease-out infinite' }}
+          />
+          <div
+            className="wcsk-ring absolute rounded-full border-2 border-[#3ABCA8]/40"
+            style={{ width: 132, height: 132, animation: 'wcsk-ring 2.6s ease-out infinite', animationDelay: '1.1s' }}
+          />
+          <div
+            className="wcsk-core relative rounded-full"
+            style={{
+              width: 18, height: 18,
+              background: 'radial-gradient(circle,#3ABCA8 0%,rgba(58,188,168,0.35) 70%,transparent 72%)',
+              boxShadow: '0 0 16px 4px rgba(58,188,168,0.55)',
+              animation: 'wcsk-core 2.4s ease-in-out infinite',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Top-left: objective + egg widget placeholders (live map anchors) */}
+      <div className="absolute left-2 top-2 flex flex-col gap-1.5">
+        <div className="wcsk-shim h-[52px] w-[210px] rounded-xl border border-[#3ABCA8]/20" />
+        <div className="wcsk-shim h-[30px] w-[150px] rounded-lg border border-white/8" style={{ animationDelay: '0.2s' }} />
+      </div>
+
+      {/* Top-right: step counter card placeholder */}
+      <div className="absolute right-2 top-2">
+        <div className="wcsk-shim h-[52px] w-[124px] rounded-xl border border-white/10" style={{ animationDelay: '0.35s' }} />
+      </div>
+
+      {/* Bottom: encounter/objective action card placeholder */}
+      <div className="absolute inset-x-4 bottom-4 rounded-[28px] border border-[#3ABCA8]/30 bg-[#0D1E2E]/90 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.4)]">
+        <div className="flex items-center gap-3">
+          <div className="wcsk-shim h-14 w-14 rounded-2xl" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="wcsk-shim h-4 w-40 rounded" style={{ animationDelay: '0.15s' }} />
+            <div className="wcsk-shim h-3 w-28 rounded" style={{ animationDelay: '0.3s' }} />
           </div>
         </div>
+        <div className="mt-4 flex gap-3">
+          <div className="wcsk-shim h-14 flex-1 rounded-2xl" style={{ animationDelay: '0.1s' }} />
+          <div className="wcsk-shim h-14 w-24 rounded-2xl" style={{ animationDelay: '0.25s' }} />
+        </div>
+      </div>
     </div>
   )
 }

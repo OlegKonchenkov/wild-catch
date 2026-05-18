@@ -865,8 +865,35 @@ export default function BestiaryPage() {
                   {/* Rarity gradient stripe */}
                   <div className="h-[3px]" style={{ background: caught ? `linear-gradient(90deg, transparent 0%, ${rarityColor}CC 40%, ${rarityColor}CC 60%, transparent 100%)` : 'rgba(255,255,255,0.04)' }} />
 
+                  {/* Showcase rays — slow rotating light fan behind the
+                      creature, intensity scaled by rarity (subtle for
+                      comune, dramatic for leggendario/mitologico). Sits
+                      under the sprite; decorative only. */}
+                  {caught && (() => {
+                    const RAY_ALPHA: Record<string, number> = {
+                      comune: 0.05, non_comune: 0.08, raro: 0.13,
+                      epico: 0.20, leggendario: 0.30, mitologico: 0.42,
+                    }
+                    const a = RAY_ALPHA[creature.rarity] ?? 0.1
+                    return (
+                      <motion.div
+                        aria-hidden
+                        className="absolute left-1/2 pointer-events-none"
+                        style={{
+                          top: 150, width: 460, height: 460,
+                          marginLeft: -230, marginTop: -230,
+                          background: `conic-gradient(from 0deg, ${rarityColor}00 0deg, ${rarityColor}${Math.round(a * 255).toString(16).padStart(2, '0')} 18deg, ${rarityColor}00 40deg, ${rarityColor}00 90deg, ${rarityColor}${Math.round(a * 255).toString(16).padStart(2, '0')} 108deg, ${rarityColor}00 130deg, ${rarityColor}00 180deg, ${rarityColor}${Math.round(a * 255).toString(16).padStart(2, '0')} 198deg, ${rarityColor}00 220deg, ${rarityColor}00 270deg, ${rarityColor}${Math.round(a * 255).toString(16).padStart(2, '0')} 288deg, ${rarityColor}00 310deg, ${rarityColor}00 360deg)`,
+                          maskImage: 'radial-gradient(circle, #000 30%, transparent 68%)',
+                          WebkitMaskImage: 'radial-gradient(circle, #000 30%, transparent 68%)',
+                        }}
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 26, repeat: Infinity, ease: 'linear' }}
+                      />
+                    )
+                  })()}
+
                   {/* Creature image */}
-                  <div className="flex justify-center pt-7 pb-5">
+                  <div className="relative flex justify-center pt-7 pb-5">
                     {caught ? (
                       <div
                         className={creature.image_url ? 'cursor-zoom-in' : undefined}
