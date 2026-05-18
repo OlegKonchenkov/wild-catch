@@ -319,9 +319,19 @@ export default function DuelLobbyPage() {
               {[1,2,3,4].map(i => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)}
             </div>
           ) : history.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-white/30 pt-16">
-              <span className="text-5xl">📜</span>
-              <p className="text-sm">Nessun duello disputato</p>
+            <div className="flex flex-col items-center justify-center h-full gap-2 text-white/30 pt-12">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/icons/icon-512.png"
+                alt=""
+                style={{
+                  width: 120, height: 120, objectFit: 'contain', opacity: 0.8,
+                  WebkitMaskImage: 'radial-gradient(circle at 50% 50%, #000 56%, transparent 76%)',
+                  maskImage: 'radial-gradient(circle at 50% 50%, #000 56%, transparent 76%)',
+                  filter: 'drop-shadow(0 5px 16px rgba(0,0,0,0.4))',
+                }}
+              />
+              <p className="text-sm -mt-1">Nessun duello disputato</p>
             </div>
           ) : (
             <div className="space-y-2">

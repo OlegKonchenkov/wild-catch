@@ -560,8 +560,21 @@ function HomeLobby() {
         {/* ── Sessions ── */}
         <Section title="Le tue sessioni">
           {sessions.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: '20px 0' }}>
-              Nessuna sessione ancora.<br />Partecipa al tuo primo evento!
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '14px 0 18px' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/icons/icon-512.png"
+                alt=""
+                style={{
+                  width: 104, height: 104, objectFit: 'contain', opacity: 0.8,
+                  WebkitMaskImage: 'radial-gradient(circle at 50% 50%, #000 56%, transparent 76%)',
+                  maskImage: 'radial-gradient(circle at 50% 50%, #000 56%, transparent 76%)',
+                  filter: 'drop-shadow(0 5px 16px rgba(0,0,0,0.4))',
+                }}
+              />
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', textAlign: 'center', lineHeight: 1.5 }}>
+                Nessuna sessione ancora.<br />Partecipa al tuo primo evento!
+              </div>
             </div>
           ) : (
             <>

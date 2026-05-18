@@ -737,7 +737,23 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-hidden relative">{children}</main>
+      <main className="flex-1 overflow-hidden relative">
+        {/* Light cross-section transition. OPACITY ONLY — deliberately no
+            transform: a lingering translate would create a containing
+            block and break the `position: fixed` fullscreen overlays the
+            map / encounter / duel / boss screens rely on. Keyed by
+            pathname (no AnimatePresence exit) so the new section just
+            fades in cleanly with no unmount race or scroll jank. */}
+        <motion.div
+          key={pathname}
+          className="w-full h-full"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+        >
+          {children}
+        </motion.div>
+      </main>
 
       {/* Bottom navigation */}
       <nav
