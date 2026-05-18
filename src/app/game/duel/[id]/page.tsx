@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import StatusAura from '@/components/battle/StatusAura'
 import AttackAnimation from '@/components/battle/AttackAnimation'
+import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import { GameBattleSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
@@ -1279,6 +1280,9 @@ export default function DuelPage() {
         {/* Ground line */}
         <div className="absolute inset-x-0" style={{ top: '48%', height: 1, background: `linear-gradient(90deg, transparent, ${myTheme.glow}20, ${oppTheme.glow}20, transparent)` }} />
       </div>
+
+      {/* Animated per-element ambience over the static gradient */}
+      <BattleAtmosphere a={oppTheme.glow} b={myTheme.glow} />
 
       {/* ── Opponent disconnect banner ── */}
       <AnimatePresence>

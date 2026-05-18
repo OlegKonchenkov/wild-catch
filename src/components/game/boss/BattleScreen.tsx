@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AttackAnimation from '@/components/battle/AttackAnimation'
+import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import CreatureCard from '@/components/game/boss/CreatureCard'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
@@ -145,6 +146,9 @@ export default function BattleScreen({
         <div className="absolute inset-x-0" style={{ top: '38%', height: '24%', background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 50%, transparent 100%)' }} />
         <div className="absolute inset-x-0" style={{ top: '48%', height: 1, background: `linear-gradient(90deg, transparent, ${playerTheme.glow}18, rgba(247,200,65,0.18), transparent)` }} />
       </div>
+
+      {/* Animated ambience — boss gold vs the player's element */}
+      <BattleAtmosphere a="#F7C841" b={playerTheme.glow} />
 
       {/* Switch notice */}
       <AnimatePresence>

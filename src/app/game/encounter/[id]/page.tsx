@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import StatusAura from '@/components/battle/StatusAura'
+import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
 import TutorialEncounterLesson from '@/components/game/TutorialEncounterLesson'
 import { TUTORIAL_SESSION_ID } from '@/lib/game/tutorial'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
@@ -1341,6 +1342,9 @@ export default function EncounterPage() {
         {/* Ground line */}
         <div className="absolute inset-x-0 opacity-15" style={{ top: '48%', height: '1px', background: `linear-gradient(90deg, transparent 0%, ${wildTheme.glow}80 30%, ${playerTheme.glow}80 70%, transparent 100%)` }} />
       </div>
+
+      {/* Animated per-element ambience over the static gradient */}
+      <BattleAtmosphere a={wildTheme.glow} b={playerTheme.glow} />
 
       {/* ── BATTLE FIELD (flex-1) ── */}
       <div className="relative z-10 flex-1 min-h-0">
