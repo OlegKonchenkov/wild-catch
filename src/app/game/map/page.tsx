@@ -724,6 +724,25 @@ function MapPageInner() {
     }
   }
 
+  // First-session idle nudge. A casual event player who just spawned has
+  // no on-screen answer to "ok… and now what?" until they happen to
+  // walk. We show ONE gentle bottom-centre hint reinforcing the core
+  // loop, only while the player genuinely has nothing going on, and
+  // retire it forever the moment they start walking (the nudge worked)
+  // or they dismiss it. Pessimistic default (true) until localStorage
+  // is read so it never flashes for returning players.
+  const [idleHintSeen, setIdleHintSeen] = useState(true)
+  useEffect(() => {
+    try { setIdleHintSeen(localStorage.getItem('wc:idle-hint-seen') === '1') }
+    catch { setIdleHintSeen(true) }
+  }, [])
+  useEffect(() => {
+    if (stepsWalked > 0 && !idleHintSeen) {
+      setIdleHintSeen(true)
+      try { localStorage.setItem('wc:idle-hint-seen', '1') } catch { /* quota */ }
+    }
+  }, [stepsWalked, idleHintSeen])
+
   // First-run coachmarks — fire after the map is fully usable (session +
   // starter check both resolved) and only if not already seen on this device.
   const [showCoachmarks, setShowCoachmarks] = useState(false)
@@ -1754,6 +1773,53 @@ function MapPageInner() {
           queueRemaining={hatchQueue.length - 1}
           onDone={() => setHatchQueue(prev => prev.slice(1))}
         />
+      )}
+
+      {/* First-session idle nudge — bottom-centre, dismissible, single
+          use. Sits above the Leaflet attribution and clear of the SCAN /
+          recenter buttons (bottom-right). Gated so it never stacks on a
+          modal/coachmark and only when the player truly has nothing
+          going on yet. */}
+      {!idleHintSeen &&
+        hasGpsFix &&
+        inBounds &&
+        !sessionEnded &&
+        session?.status === 'active' &&
+        stepsWalked === 0 &&
+        !showEncounterPopup &&
+        !showStarterSelect &&
+        !showCoachmarks &&
+        hatchQueue.length === 0 &&
+        missionQueue.length === 0 &&
+        tutorialMomentQueue.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.4 }}
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[850] flex items-center gap-2.5 px-4 py-2.5 rounded-2xl max-w-[300px]"
+          style={{
+            background: 'rgba(15,31,46,0.92)',
+            border: '1px solid rgba(58,188,168,0.35)',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 4px 18px rgba(0,0,0,0.45), 0 0 0 1px rgba(58,188,168,0.12)',
+          }}
+        >
+          <span className="text-lg leading-none shrink-0">🧭</span>
+          <p className="text-[12px] leading-snug text-white/80 flex-1">
+            Inizia a <strong className="text-[#3ABCA8]">camminare</strong>: le creature
+            compaiono mentre ti muovi.
+          </p>
+          <button
+            onClick={() => {
+              setIdleHintSeen(true)
+              try { localStorage.setItem('wc:idle-hint-seen', '1') } catch { /* quota */ }
+            }}
+            aria-label="Chiudi suggerimento"
+            className="shrink-0 text-white/40 hover:text-white/80 text-sm leading-none px-1"
+          >
+            ✕
+          </button>
+        </motion.div>
       )}
 
       {/* QR scan button — dark glass, game-themed */}
