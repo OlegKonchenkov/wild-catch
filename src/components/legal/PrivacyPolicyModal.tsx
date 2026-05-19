@@ -245,6 +245,7 @@ export default function PrivacyPolicyModal({
                 'partecipazione alla sessione, progressi, inventario, creature, missioni, duelli, QR riscattati e ricompense',
                 'posizione GPS e accuratezza durante il gioco, necessarie alle funzioni basate sulla mappa e sugli incontri',
                 "dati tecnici essenziali per tenere aperta la sessione sul dispositivo, come l'identificativo sessione salvato in locale",
+                "se attivi le notifiche push: l'identificativo della sottoscrizione push del browser/dispositivo (endpoint e chiavi) necessario a recapitare gli avvisi",
               ]}
             />
           </PolicySection>
@@ -266,6 +267,19 @@ export default function PrivacyPolicyModal({
               usa i permessi del browser/dispositivo per la geolocalizzazione. Senza GPS
               alcune funzioni basate sulla mappa potrebbero non essere disponibili o
               risultare limitate durante la sessione.
+            </p>
+          </PolicySection>
+
+          <PolicySection title="Notifiche push">
+            <p style={{ margin: 0 }}>
+              Le notifiche push sono <strong style={{ color: '#fff' }}>facoltative</strong> e
+              vengono attivate solo con una tua azione esplicita e con il permesso del
+              browser/dispositivo. Le usiamo unicamente per avvisarti di eventi di gioco
+              rilevanti (es. esito duelli, missioni completate, salita di livello, boss
+              sconfitti) e di comunicazioni degli organizzatori. Puoi revocarle in
+              qualsiasi momento dal pannello Notifiche o dalle impostazioni del browser:
+              la sottoscrizione viene eliminata e quelle non più valide sono rimosse
+              automaticamente.
             </p>
           </PolicySection>
 
