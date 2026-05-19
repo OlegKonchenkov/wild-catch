@@ -488,83 +488,112 @@ function HomeLobby() {
           </Section>
         )}
 
-        {/* ── Settings panel ── */}
+        {/* ════════ SETTINGS ════════
+            IA in tre blocchi, come le app curate:
+              1. Account  → identità (nickname, info)
+              2. Preferenze → audio / vibrazione / notifiche
+              3. Gestione account → azioni di sessione + zona pericolo (in fondo)
+        */}
         {showSettings && (
-          <Section title="Impostazioni profilo">
-            <Card>
-              {/* Nickname */}
-              <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>NICKNAME</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input className="input" placeholder="Inserisci nickname" value={editNick} onChange={e => setEditNick(e.target.value)} maxLength={24} style={{ flex: 1 }} />
-                  <button
-                    className="btn btn-teal"
-                    style={{ width: 'auto', paddingLeft: 18, paddingRight: 18 }}
-                    disabled={editNick.trim().length < 2 || savingNick}
-                    onClick={handleUpdateNick}
-                  >
-                    {savingNick ? <span className="spinner" /> : 'Salva'}
-                  </button>
+          <>
+            {/* ── 1. Account ── */}
+            <Section title="Account">
+              <Card>
+                <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>Nickname</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input className="input" placeholder="Inserisci nickname" value={editNick} onChange={e => setEditNick(e.target.value)} maxLength={24} style={{ flex: 1 }} />
+                    <button
+                      className="btn btn-teal"
+                      style={{ width: 'auto', paddingLeft: 18, paddingRight: 18 }}
+                      disabled={editNick.trim().length < 2 || savingNick}
+                      onClick={handleUpdateNick}
+                    >
+                      {savingNick ? <span className="spinner" /> : 'Salva'}
+                    </button>
+                  </div>
+                  {settingMsg && <div className={`msg ${settingMsg.ok ? 'ok' : 'err'}`}>{settingMsg.ok ? '✓' : '⚠'} {settingMsg.text}</div>}
                 </div>
-                {settingMsg && <div className={`msg ${settingMsg.ok ? 'ok' : 'err'}`}>{settingMsg.ok ? '✓' : '⚠'} {settingMsg.text}</div>}
+
+                {/* key/value rows — stile impostazioni iOS/Linear */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '13px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>Email</span>
+                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '62%' }}>{user?.email ?? '—'}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '13px 18px' }}>
+                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>Registrato il</span>
+                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>
+                    {user?.created_at ? new Date(user.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}
+                  </span>
+                </div>
+              </Card>
+            </Section>
+
+            {/* ── 2. Preferenze ── */}
+            <Section title="Preferenze">
+              <Card>
+                <PlayerPreferences />
+              </Card>
+            </Section>
+
+            {/* ── 3. Gestione account (azioni di sessione + danger zone, in fondo) ── */}
+            <Section title="Gestione account">
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.32)', margin: '-4px 2px 12px', lineHeight: 1.5 }}>
+                Azioni legate al tuo accesso e ai tuoi dati.
               </div>
 
-              {/* Account info */}
-              <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>ACCOUNT</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>📧 {user?.email}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>
-                  Registrato il {user?.created_at ? new Date(user.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}
-                </div>
-              </div>
-
-              {/* Sign out */}
-              <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <button className="btn btn-logout" onClick={handleSignOut} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {/* Disconnetti — reversibile: trattato come azione neutra */}
+              <Card>
+                <button
+                  onClick={handleSignOut}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '15px 18px', background: 'transparent', border: 'none',
+                    color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: 600,
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, flexShrink: 0 }}>
                     <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
                     <polyline points="16 17 21 12 16 7"/>
                     <line x1="21" y1="12" x2="9" y2="12"/>
                   </svg>
-                  Disconnetti
+                  <span style={{ flex: 1 }}>Disconnetti</span>
+                  <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 18, lineHeight: 1 }}>›</span>
                 </button>
-              </div>
+              </Card>
 
-              {/* Delete account */}
-              <div style={{ padding: '16px 18px' }}>
-                <div className="danger-zone">
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#E85D2F', marginBottom: 4 }}>⚠ Elimina account</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 12, lineHeight: 1.5 }}>
-                    Tutti i tuoi dati verranno eliminati permanentemente. Questa azione è irreversibile.
-                    Scrivi <strong style={{ color: '#E85D2F' }}>ELIMINA</strong> per confermare.
+              {/* Elimina account — irreversibile: zona pericolo isolata */}
+              <div style={{ marginTop: 14 }}>
+                <Card accent="#E85D2F">
+                  <div style={{ padding: '16px 18px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 15 }}>⚠️</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#F0764A' }}>Elimina account</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 12, lineHeight: 1.55 }}>
+                      Tutti i tuoi dati verranno eliminati permanentemente. Questa azione è
+                      irreversibile. Scrivi <strong style={{ color: '#F0764A' }}>ELIMINA</strong> per confermare.
+                    </div>
+                    <input
+                      className="input"
+                      placeholder='Scrivi "ELIMINA" per confermare'
+                      value={deleteConfirm}
+                      onChange={e => setDeleteConfirm(e.target.value)}
+                      style={{ marginBottom: 10 }}
+                    />
+                    <button
+                      className="btn btn-red"
+                      disabled={deleteConfirm !== 'ELIMINA' || deleting}
+                      onClick={handleDeleteAccount}
+                    >
+                      {deleting ? <><span className="spinner" /> Eliminazione...</> : '🗑 Elimina account definitivamente'}
+                    </button>
                   </div>
-                  <input
-                    className="input"
-                    placeholder='Scrivi "ELIMINA" per confermare'
-                    value={deleteConfirm}
-                    onChange={e => setDeleteConfirm(e.target.value)}
-                    style={{ marginBottom: 10 }}
-                  />
-                  <button
-                    className="btn btn-red"
-                    disabled={deleteConfirm !== 'ELIMINA' || deleting}
-                    onClick={handleDeleteAccount}
-                  >
-                    {deleting ? <><span className="spinner" /> Eliminazione...</> : '🗑 Elimina account definitivamente'}
-                  </button>
-                </div>
+                </Card>
               </div>
-            </Card>
-          </Section>
-        )}
-
-        {/* ── Preferenze (audio / notifiche / vibrazione) ── */}
-        {showSettings && (
-          <Section title="Preferenze">
-            <Card>
-              <PlayerPreferences />
-            </Card>
-          </Section>
+            </Section>
+          </>
         )}
 
         {/* ── Sessions ── */}
