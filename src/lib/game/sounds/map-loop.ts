@@ -16,6 +16,7 @@
 
 import { newAudioContext } from './shared-ac'
 import { getAudioOverride } from '../audio-overrides'
+import { isMusicMuted } from '@/lib/audioPrefs'
 import { startSampleLoop } from './sample-loop'
 
 // ── Melody data ────────────────────────────────────────────────────────────────
@@ -149,6 +150,7 @@ export function unduckMapAmbience(rampMs = 900): void {
 // ── Main ambience start ────────────────────────────────────────────────────────
 export function startMapAmbience(vol = 0.12): () => void {
   if (typeof window === 'undefined') return () => {}
+  if (isMusicMuted()) return () => {}
 
   // Admin-uploaded override: bypass the synth path and play the file in loop.
   // Ducking from `duckMapAmbience`/`unduckMapAmbience` is a no-op in this

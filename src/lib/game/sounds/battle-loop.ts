@@ -13,6 +13,7 @@
 
 import { newAudioContext } from './shared-ac'
 import { getAudioOverride, type AudioSlot } from '../audio-overrides'
+import { isMusicMuted } from '@/lib/audioPrefs'
 import { startSampleLoop } from './sample-loop'
 
 /**
@@ -252,6 +253,7 @@ function openHat(ac: AudioContext, t: number, vol: number): void {
 //   5. Full kit      — kick 1&3, snare 2&4, 8th hats, open hat on "3 and"
 export function startEncounterLoop(vol = 0.12): () => void {
   if (typeof window === 'undefined') return () => {}
+  if (isMusicMuted()) return () => {}
 
   const override = tryStartOverride('encounter', vol)
   if (override) return override

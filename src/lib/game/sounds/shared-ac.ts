@@ -22,6 +22,8 @@
  *   – Call registerAmbienceDucking(null, null) to unregister (e.g. on unmount).
  */
 
+import { isSfxMuted } from '@/lib/audioPrefs'
+
 let _ac: AudioContext | null = null
 let _nextSoundAt = 0  // AudioContext time (seconds) when next queued sound may start
 
@@ -75,6 +77,9 @@ export function registerAmbienceDucking(
 
 export function getSharedAC(): AudioContext | null {
   if (typeof window === 'undefined') return null
+  // SFX muted by the player → no synth event/attack sounds. Every consumer
+  // guards with `if (!ac) return`, so this silences them cleanly.
+  if (isSfxMuted()) return null
 
   if (!_ac || _ac.state === 'closed') {
     const fresh = newAudioContext()

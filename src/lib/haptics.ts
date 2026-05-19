@@ -7,10 +7,13 @@
 //  - the API is missing (iOS)
 //  - the user's OS has disabled vibration
 
+import { isHapticsOff } from '@/lib/audioPrefs'
+
 type Pattern = number | number[]
 
 function safeVibrate(pattern: Pattern): void {
   if (typeof navigator === 'undefined') return
+  if (isHapticsOff()) return
   const v = navigator.vibrate?.bind(navigator)
   if (!v) return
   try { v(pattern) } catch {}

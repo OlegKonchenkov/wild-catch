@@ -4,6 +4,7 @@ import { AnimatePresence } from 'framer-motion'
 import { getAttackAnimation } from './animations/registry'
 import type { AttackAnimationProps } from './animations/types'
 import { playDefaultAttack } from '@/lib/game/sounds/attack-defaults'
+import { isSfxMuted } from '@/lib/audioPrefs'
 
 /**
  * Plug-and-play attack animation component.
@@ -26,6 +27,7 @@ export default function AttackAnimation({
 
   // Sound playback
   useEffect(() => {
+    if (isSfxMuted()) return
     if (!soundUrl) {
       playDefaultAttack(element, rarity)
       return

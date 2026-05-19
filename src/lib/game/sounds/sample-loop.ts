@@ -11,6 +11,8 @@
  * looped. Acceptable trade-off for this feature's scope.
  */
 
+import { isMusicMuted } from '@/lib/audioPrefs'
+
 export interface SampleLoopOptions {
   /** Target volume after fade-in (0..1). Defaults to 0.45. */
   volume?: number
@@ -27,6 +29,7 @@ export interface SampleLoopOptions {
  */
 export function startSampleLoop(src: string, opts: SampleLoopOptions = {}): () => void {
   if (typeof window === 'undefined') return () => {}
+  if (isMusicMuted()) return () => {}
 
   const targetVolume = opts.volume ?? 0.45
   const fadeInMs     = opts.fadeInMs  ?? 250

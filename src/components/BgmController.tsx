@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { isMusicMuted, setMusicMuted, onPrefsChange } from '@/lib/audioPrefs'
 
 /**
  * Singleton background-music controller.
@@ -51,11 +52,15 @@ async function resolveIntroSrc(): Promise<string> {
 export default function BgmController() {
   const [src, setSrc] = useState<string>(BGM_SRC)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  // Always start unmuted on every onboarding mount — feedback was that
-  // a persisted "off" preference made the music silently never come
-  // back. The toggle stays interactive for the duration of the session;
-  // we just don't carry the preference across visits.
+  // Music mute is now a persisted player preference (Impostazioni). Start
+  // from `false` for SSR/hydration safety, then sync from the stored pref
+  // on mount and stay in sync if it's toggled elsewhere (settings panel).
   const [muted, setMuted] = useState(false)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read client-only pref + subscribe
+    setMuted(isMusicMuted())
+    return onPrefsChange(() => setMuted(isMusicMuted()))
+  }, [])
   // `available` flips false on `error` event (404 or decode failure). We
   // start optimistic and let the asset's load failure hide the UI — that
   // way deploys without the file simply look like the feature isn't on.
@@ -161,7 +166,11 @@ export default function BgmController() {
   }, [muted, available])
 
   function toggle() {
-    setMuted(prev => !prev)
+    setMuted(prev => {
+      const next = !prev
+      setMusicMuted(next) // persist + broadcast (keeps settings panel in sync)
+      return next
+    })
   }
 
   if (!available) return null

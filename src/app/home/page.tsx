@@ -6,6 +6,7 @@ import { identify, resetIdentity, track } from '@/lib/analytics'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import PrivacyPolicyModal from '@/components/legal/PrivacyPolicyModal'
+import PlayerPreferences from '@/components/game/PlayerPreferences'
 import DaimonSplash from '@/components/DaimonSplash'
 
 interface SessionStats {
@@ -553,6 +554,15 @@ function HomeLobby() {
                   </button>
                 </div>
               </div>
+            </Card>
+          </Section>
+        )}
+
+        {/* ── Preferenze (audio / notifiche / vibrazione) ── */}
+        {showSettings && (
+          <Section title="Preferenze">
+            <Card>
+              <PlayerPreferences />
             </Card>
           </Section>
         )}
