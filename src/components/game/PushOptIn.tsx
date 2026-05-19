@@ -46,7 +46,23 @@ export default function PushOptIn() {
         </div>
       )
     }
-    return null
+    return (
+      <div className={`${wrap} text-[11px] text-white/40`}
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        ⚠️ Questo browser non supporta le notifiche push.
+      </div>
+    )
+  }
+
+  // Browser is fine but the server has no VAPID key configured yet.
+  if (state === 'unconfigured') {
+    return (
+      <div className={`${wrap} text-[11px] leading-relaxed text-white/45`}
+        style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
+        🔧 Notifiche non ancora configurate sul server. Se sei l&apos;amministratore:
+        imposta le variabili <strong>VAPID</strong> e riavvia l&apos;app.
+      </div>
+    )
   }
 
   if (state === 'denied') {

@@ -10,21 +10,25 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return out
 }
 
-type PushState = 'unsupported' | 'default' | 'denied' | 'subscribed' | 'loading'
+type PushState = 'unsupported' | 'unconfigured' | 'default' | 'denied' | 'subscribed' | 'loading'
 
 export function usePushNotifications() {
   const [state, setState] = useState<PushState>('loading')
   const [busy, setBusy] = useState(false)
 
-  const supported =
+  // Browser capability is separate from server configuration so the UI can
+  // explain *why* push is unavailable instead of rendering nothing.
+  const browserSupported =
     typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&
     'PushManager' in window &&
-    'Notification' in window &&
-    !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    'Notification' in window
+  const hasVapidKey = !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  const supported = browserSupported && hasVapidKey
 
   useEffect(() => {
-    if (!supported) { setState('unsupported'); return }
+    if (!browserSupported) { setState('unsupported'); return }
+    if (!hasVapidKey) { setState('unconfigured'); return }
     let cancelled = false
     ;(async () => {
       try {
@@ -39,7 +43,7 @@ export function usePushNotifications() {
       }
     })()
     return () => { cancelled = true }
-  }, [supported])
+  }, [browserSupported, hasVapidKey])
 
   const subscribe = useCallback(async () => {
     if (!supported || busy) return
