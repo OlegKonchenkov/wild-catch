@@ -2,7 +2,26 @@
 import { useEffect, useState } from 'react'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 
-const wrap = 'mx-4 mt-2 mb-1 rounded-xl px-3 py-2'
+const TEAL = '#3ABCA8'
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return <div style={{ padding: '14px 18px' }}>{children}</div>
+}
+
+function Head({ title, right }: { title: string; right?: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <span style={{ fontSize: 20, width: 24, textAlign: 'center', flexShrink: 0 }}>🔔</span>
+      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{title}</span>
+      {right}
+    </div>
+  )
+}
+
+const noteStyle: React.CSSProperties = {
+  fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5,
+  margin: '6px 0 0', paddingLeft: 36,
+}
 
 export default function PushOptIn() {
   const { state, busy, subscribe, unsubscribe } = usePushNotifications()
@@ -17,7 +36,7 @@ export default function PushOptIn() {
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (navigator as unknown as { standalone?: boolean }).standalone === true
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only env detection (navigator/matchMedia)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only env detection
     setIosNeedsInstall(isIOS && !standalone)
   }, [])
 
@@ -32,85 +51,120 @@ export default function PushOptIn() {
     setTimeout(() => setTestState('idle'), 4000)
   }
 
-  if (state === 'loading') return null
+  if (state === 'loading') {
+    return <Shell><Head title="Notifiche push" /><p style={noteStyle}>Verifica supporto…</p></Shell>
+  }
 
-  // iOS Safari (not installed): Web Push is impossible until added to Home.
   if (state === 'unsupported') {
-    if (iosNeedsInstall) {
-      return (
-        <div className={`${wrap} text-[11px] leading-relaxed text-white/55`}
-          style={{ background: 'rgba(58,188,168,0.08)', border: '1px solid rgba(58,188,168,0.22)' }}>
-          📲 Per ricevere le notifiche su iPhone/iPad: tocca <strong>Condividi</strong> →{' '}
-          <strong>Aggiungi alla schermata Home</strong>, poi apri l&apos;app da lì e
-          riattiva le notifiche da qui.
-        </div>
-      )
-    }
     return (
-      <div className={`${wrap} text-[11px] text-white/40`}
-        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        ⚠️ Questo browser non supporta le notifiche push.
-      </div>
+      <Shell>
+        <Head title="Notifiche push" />
+        <p style={noteStyle}>
+          {iosNeedsInstall
+            ? <>📲 Su iPhone/iPad: <strong>Condividi</strong> → <strong>Aggiungi alla schermata Home</strong>, poi apri l&apos;app da lì e torna qui per attivarle.</>
+            : <>⚠️ Questo browser non supporta le notifiche push.</>}
+        </p>
+      </Shell>
     )
   }
 
-  // Browser is fine but the server has no VAPID key configured yet.
   if (state === 'unconfigured') {
     return (
-      <div className={`${wrap} text-[11px] leading-relaxed text-white/45`}
-        style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
-        🔧 Notifiche non ancora configurate sul server. Se sei l&apos;amministratore:
-        imposta le variabili <strong>VAPID</strong> e riavvia l&apos;app.
-      </div>
+      <Shell>
+        <Head title="Notifiche push" />
+        <p style={{ ...noteStyle, color: 'rgba(251,191,36,0.75)' }}>
+          🔧 Non ancora configurate sul server. Amministratore: imposta le variabili
+          <strong> VAPID</strong> e riavvia/redeploy l&apos;app.
+        </p>
+      </Shell>
     )
   }
 
   if (state === 'denied') {
     return (
-      <div className={`${wrap} text-[11px] text-white/40`}
-        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        🔕 Notifiche bloccate dal browser — riattivale dalle impostazioni del sito.
-      </div>
+      <Shell>
+        <Head title="Notifiche push" />
+        <p style={noteStyle}>
+          🔕 Bloccate dal browser. Riattivale dalle impostazioni del sito (icona lucchetto
+          nella barra indirizzi) e ricarica.
+        </p>
+      </Shell>
     )
   }
 
   if (state === 'subscribed') {
     return (
-      <div className={wrap}
-        style={{ background: 'rgba(58,188,168,0.10)', border: '1px solid rgba(58,188,168,0.3)' }}>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] font-semibold" style={{ color: '#3ABCA8' }}>
-            🔔 Notifiche push attive
-          </span>
-          <button onClick={unsubscribe} disabled={busy}
-            className="text-[11px] font-bold text-white/45 hover:text-white/70 disabled:opacity-40 shrink-0">
+      <Shell>
+        <Head
+          title="Notifiche push"
+          right={
+            <span style={{
+              fontSize: 11, fontWeight: 700, color: TEAL,
+              background: 'rgba(58,188,168,0.14)', border: '1px solid rgba(58,188,168,0.35)',
+              borderRadius: 999, padding: '3px 9px',
+            }}>
+              Attive
+            </span>
+          }
+        />
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingLeft: 36 }}>
+          <button
+            onClick={sendTest}
+            disabled={testState === 'sending'}
+            style={{
+              flex: 1, padding: '9px 10px', borderRadius: 10, cursor: 'pointer',
+              fontSize: 12, fontWeight: 700,
+              background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              opacity: testState === 'sending' ? 0.6 : 1,
+            }}
+          >
+            {testState === 'sending' ? 'Invio…'
+              : testState === 'sent' ? '✅ Inviata'
+              : testState === 'error' ? '⚠ Errore'
+              : 'Prova'}
+          </button>
+          <button
+            onClick={unsubscribe}
+            disabled={busy}
+            style={{
+              flex: 1, padding: '9px 10px', borderRadius: 10, cursor: 'pointer',
+              fontSize: 12, fontWeight: 700,
+              background: 'transparent', color: 'rgba(255,255,255,0.5)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              opacity: busy ? 0.5 : 1,
+            }}
+          >
             Disattiva
           </button>
         </div>
-        <button onClick={sendTest} disabled={testState === 'sending'}
-          className="mt-2 w-full rounded-lg py-1.5 text-[11px] font-bold disabled:opacity-50"
-          style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)' }}>
-          {testState === 'sending' ? 'Invio…'
-            : testState === 'sent' ? '✅ Inviata — controlla la notifica'
-            : testState === 'error' ? '⚠ Errore invio'
-            : 'Invia notifica di prova'}
-        </button>
-      </div>
+      </Shell>
     )
   }
 
   // state === 'default'
   return (
-    <div className="mx-4 mt-2 mb-1">
-      <button onClick={subscribe} disabled={busy}
-        className="w-full flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all disabled:opacity-50"
-        style={{ background: 'rgba(58,188,168,0.16)', color: '#3ABCA8', border: '1px solid rgba(58,188,168,0.4)' }}>
-        {busy ? '⏳ Attivazione…' : '🔔 Attiva notifiche push'}
-      </button>
-      <p className="mt-1.5 px-1 text-[10px] leading-relaxed text-white/35">
-        Ti avvisiamo solo per eventi importanti (duelli, missioni, livelli, boss e
-        comunicazioni degli organizzatori). Facoltative e disattivabili quando vuoi.
+    <Shell>
+      <Head title="Notifiche push" />
+      <p style={noteStyle}>
+        Ti avvisiamo solo per eventi importanti — duelli, missioni, livelli, boss e
+        comunicazioni degli organizzatori. Facoltative, disattivabili quando vuoi.
       </p>
-    </div>
+      <button
+        onClick={subscribe}
+        disabled={busy}
+        style={{
+          width: 'calc(100% - 36px)', marginLeft: 36, marginTop: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          padding: '12px 16px', borderRadius: 12, border: 'none', cursor: 'pointer',
+          background: `linear-gradient(135deg, ${TEAL} 0%, #2FA593 100%)`,
+          color: '#06231E', fontSize: 14, fontWeight: 800, letterSpacing: '0.01em',
+          boxShadow: '0 6px 18px rgba(58,188,168,0.28)',
+          opacity: busy ? 0.6 : 1,
+        }}
+      >
+        {busy ? '⏳ Attivazione…' : '🔔 Attiva notifiche'}
+      </button>
+    </Shell>
   )
 }

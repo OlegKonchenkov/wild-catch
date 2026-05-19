@@ -96,15 +96,7 @@ export default function PlayerPreferences() {
           on={haptics} onToggle={() => setHapticsOff(haptics)}
         />
       )}
-      <div style={{ padding: '14px 6px 16px' }}>
-        <div style={{
-          fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)',
-          padding: '0 12px 2px',
-        }}>
-          NOTIFICHE PUSH
-        </div>
-        <PushOptIn />
-      </div>
+      <PushOptIn />
     </div>
   )
 }

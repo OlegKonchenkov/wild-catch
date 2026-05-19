@@ -388,15 +388,33 @@ function HomeLobby() {
         {/* ── Top bar ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <span style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 18, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.04em' }}>Daimon</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button
-              onClick={() => { setShowSettings(v => !v); setSettingMsg(null); setEditingNickInline(false) }}
-              style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(58,188,168,0.4)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(58,188,168,0.15)', color: '#3ABCA8', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-              title="Profilo"
-            >
-              {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
-            </button>
-          </div>
+          <button
+            onClick={() => { setShowSettings(v => !v); setSettingMsg(null); setEditingNickInline(false) }}
+            aria-label={showSettings ? 'Chiudi impostazioni' : 'Apri impostazioni e profilo'}
+            title={showSettings ? 'Chiudi impostazioni' : 'Impostazioni'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '5px 12px 5px 5px', borderRadius: 999, cursor: 'pointer',
+              background: showSettings ? 'rgba(58,188,168,0.2)' : 'rgba(58,188,168,0.1)',
+              border: `1px solid ${showSettings ? 'rgba(58,188,168,0.6)' : 'rgba(58,188,168,0.3)'}`,
+              transition: 'background 0.18s, border-color 0.18s',
+            }}
+          >
+            <span style={{ position: 'relative', width: 30, height: 30, flexShrink: 0 }}>
+              <span style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(58,188,168,0.18)', color: '#3ABCA8', fontWeight: 700, fontSize: 12 }}>
+                {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+              </span>
+              {/* gear micro-badge → segnala chiaramente che apre le impostazioni */}
+              <span style={{
+                position: 'absolute', right: -3, bottom: -3, width: 15, height: 15, borderRadius: '50%',
+                background: '#0D1E2E', border: '1px solid rgba(58,188,168,0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, lineHeight: 1,
+              }}>⚙️</span>
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.02em' }}>
+              {showSettings ? 'Chiudi' : 'Profilo'}
+            </span>
+          </button>
         </div>
 
         {/* ── Welcome ── */}
@@ -542,25 +560,18 @@ function HomeLobby() {
                 Azioni legate al tuo accesso e ai tuoi dati.
               </div>
 
-              {/* Disconnetti — reversibile: trattato come azione neutra */}
+              {/* Disconnetti — reversibile: pulsante prominente come da preferenza utente */}
               <Card>
-                <button
-                  onClick={handleSignOut}
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '15px 18px', background: 'transparent', border: 'none',
-                    color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: 600,
-                    cursor: 'pointer', textAlign: 'left',
-                  }}
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, flexShrink: 0 }}>
-                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-                    <polyline points="16 17 21 12 16 7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                  </svg>
-                  <span style={{ flex: 1 }}>Disconnetti</span>
-                  <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 18, lineHeight: 1 }}>›</span>
-                </button>
+                <div style={{ padding: '14px 18px' }}>
+                  <button className="btn btn-logout" onClick={handleSignOut} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                      <polyline points="16 17 21 12 16 7"/>
+                      <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    Disconnetti
+                  </button>
+                </div>
               </Card>
 
               {/* Elimina account — irreversibile: zona pericolo isolata */}
