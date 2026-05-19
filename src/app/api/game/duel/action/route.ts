@@ -4,6 +4,7 @@ import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollC
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { getEquipmentBonuses } from '@/lib/game/equipment'
+import { sendPushToUser } from '@/lib/push'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
 import type { Element } from '@/lib/types'
@@ -85,6 +86,8 @@ export async function POST(request: Request) {
       { user_id: userId,     session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: oppUserId, opponent_name: timeoutProfileMap[oppUserId!] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: myCreatures, opp_creatures: oppCreatures } },
       { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: userId, winner_name: timeoutProfileMap[userId] ?? null, my_creatures: oppCreatures, opp_creatures: myCreatures } },
     ]).then(undefined, () => {})
+    void sendPushToUser(oppUserId!, { title: '⚔️ Duello perso', body: 'Non ti sei riconnesso in tempo: il duello è andato all\'avversario.', url: '/game/duel', tag: 'duel_result' })
+    void sendPushToUser(userId, { title: '⚔️ Duello vinto!', body: 'L\'avversario non si è riconnesso in tempo.', url: '/game/duel', tag: 'duel_result' })
     return NextResponse.json({ ended: true, winnerId: userId })
   }
 
@@ -115,6 +118,7 @@ export async function POST(request: Request) {
       { user_id: oppUserId!, session_id: duel.session_id, type: 'duel_won',  payload: { opponent_id: userId, opponent_name: surrenderProfileMap[userId] ?? null, exp: DUEL_WIN_EXP, gold: DUEL_WIN_GOLD, my_creatures: surrenderOpp, opp_creatures: surrenderMine } },
       { user_id: userId,     session_id: duel.session_id, type: 'duel_lost', payload: { winner_id: oppUserId, winner_name: surrenderProfileMap[oppUserId!] ?? null, my_creatures: surrenderMine, opp_creatures: surrenderOpp } },
     ]).then(undefined, () => {})
+    void sendPushToUser(oppUserId!, { title: '⚔️ Duello vinto!', body: 'L\'avversario si è arreso.', url: '/game/duel', tag: 'duel_result' })
     return NextResponse.json({ ended: true, winnerId: oppUserId })
   }
 

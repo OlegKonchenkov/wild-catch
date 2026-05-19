@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { sendPushToUser, sendPushToSession } from '@/lib/push'
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -75,6 +76,11 @@ export async function POST(request: Request) {
     payload: { title, message, sentAt: new Date().toISOString() },
   })
   await admin.removeChannel(channel)
+
+  // Web Push so backgrounded/closed players still get the announcement.
+  const pushPayload = { title, body: message, url: '/game/map', tag: 'admin_notify' }
+  if (userId) await sendPushToUser(userId, pushPayload)
+  else if (sessionId) await sendPushToSession(sessionId, pushPayload)
 
   return NextResponse.json({ sent: true })
 }

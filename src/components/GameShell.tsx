@@ -9,6 +9,7 @@ import { track } from '@/lib/analytics'
 import { haptics } from '@/lib/haptics'
 import LevelUpModal, { type LevelUpInfo } from '@/components/game/LevelUpModal'
 import NotifPopupComponent, { type NotifPopupData } from '@/components/game/NotifPopup'
+import PushOptIn from '@/components/game/PushOptIn'
 import CountUp from '@/components/game/CountUp'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
@@ -833,6 +834,8 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                 <h2 className="font-bold text-white text-base">🔔 Notifiche</h2>
                 <button onClick={() => setShowNotifPanel(false)} className="text-white/40 hover:text-white text-xl">✕</button>
               </div>
+              {/* Push opt-in */}
+              <PushOptIn />
               {/* Tabs */}
               <div className="flex-none px-4 py-2 border-b border-white/8">
                 <div className="flex gap-1 bg-white/5 rounded-xl p-1">

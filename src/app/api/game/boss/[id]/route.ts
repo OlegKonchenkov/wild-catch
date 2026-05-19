@@ -5,6 +5,7 @@ import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollC
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { getEquipmentBonuses } from '@/lib/game/equipment'
+import { sendPushToUser } from '@/lib/push'
 import type { Element } from '@/lib/types'
 
 type Params = { params: Promise<{ id: string }> }
@@ -244,6 +245,12 @@ async function grantBossFightRewards({
     type: 'boss_won',
     payload: { fight_id: fightId, gold: goldReward, exp: reward?.exp ?? 50, boss_name: bossName },
   }).then(undefined, () => {})
+  void sendPushToUser(userId, {
+    title: '👑 Boss sconfitto!',
+    body: `Hai battuto ${bossName} · +${goldReward} 🪙 · +${reward?.exp ?? 50} ⭐`,
+    url: '/game/map',
+    tag: 'boss_won',
+  })
 
   if (levelUp) {
     admin.from('player_game_events').insert({

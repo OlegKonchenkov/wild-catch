@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { sendPushToUser } from '@/lib/push'
 import { getMissionUnlockState, type MissionUnlockContext, type MissionUnlockFields } from '@/lib/game/mission-unlocks'
 import { TUTORIAL_MISSION_FRAMMENTO_GRANTS, isTutorialSession } from '@/lib/game/tutorial'
 
@@ -205,6 +206,12 @@ export async function incrementMissionProgress({
         rewardExp: mission.reward_exp,
         levelUp,
         tutorialFrammentoGranted,
+      })
+      void sendPushToUser(userId, {
+        title: '🎯 Missione completata!',
+        body: `${mission.title}${mission.reward_gold ? ` · +${mission.reward_gold} 🪙` : ''}${mission.reward_exp ? ` · +${mission.reward_exp} ⭐` : ''}`,
+        url: '/game/missions',
+        tag: `mission_${mission.id}`,
       })
     }
   }

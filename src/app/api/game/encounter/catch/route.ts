@@ -4,6 +4,7 @@ import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
 import { RARITY_CATCH_RATES, CATCH_DIFFICULTY_MULT } from '@/lib/types'
 import { incrementMissionProgress } from '@/lib/game/missions'
+import { sendPushToUser } from '@/lib/push'
 import type { StatusEffect } from '@/lib/game/combat'
 
 export async function POST(request: Request) {
@@ -298,6 +299,12 @@ export async function POST(request: Request) {
       type: 'level_up',
       payload: { new_level: levelUp.newLevel, gold_reward: levelUp.goldReward },
     }).then(undefined, () => {})
+    void sendPushToUser(user.id, {
+      title: '⭐ Livello superato!',
+      body: `Hai raggiunto il livello ${levelUp.newLevel}${levelUp.goldReward ? ` · +${levelUp.goldReward} 🪙` : ''}`,
+      url: '/game/map',
+      tag: 'level_up',
+    })
   }
   adminEvt.from('player_game_events').insert({
     user_id: user.id,
