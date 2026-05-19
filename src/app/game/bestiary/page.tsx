@@ -12,40 +12,9 @@ import type { StatusEffect } from '@/lib/game/combat'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { GameGridSkeleton } from '@/components/game/GameLoading'
 import EquipmentManager from '@/components/game/EquipmentManager'
+import EnigmaFragmentPanel from '@/components/game/EnigmaFragmentPanel'
 
 const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
-
-function getVideoEmbed(url: string): { type: 'iframe'; src: string } | { type: 'video'; src: string } | null {
-  try {
-    const u = new URL(url)
-    // YouTube watch
-    if ((u.hostname === 'www.youtube.com' || u.hostname === 'youtube.com') && u.searchParams.get('v')) {
-      return { type: 'iframe', src: `https://www.youtube.com/embed/${u.searchParams.get('v')}` }
-    }
-    // YouTube short URL
-    if (u.hostname === 'youtu.be') {
-      const id = u.pathname.slice(1).split('?')[0]
-      return { type: 'iframe', src: `https://www.youtube.com/embed/${id}` }
-    }
-    // YouTube embed already
-    if ((u.hostname === 'www.youtube.com' || u.hostname === 'youtube.com') && u.pathname.startsWith('/embed/')) {
-      return { type: 'iframe', src: url }
-    }
-    // Vimeo
-    if (u.hostname === 'vimeo.com' || u.hostname === 'www.vimeo.com') {
-      const id = u.pathname.split('/').filter(Boolean).pop()
-      if (id) return { type: 'iframe', src: `https://player.vimeo.com/video/${id}` }
-    }
-    // Direct video file
-    if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(url)) {
-      return { type: 'video', src: url }
-    }
-    // Fallback: try iframe
-    return { type: 'iframe', src: url }
-  } catch {
-    return null
-  }
-}
 const MYSTERY_HINTS: Record<string, string> = {
   fiamma:    'Percepisci calore nelle vicinanze...',
   adriatico: 'Senti il profumo del mare...',
@@ -65,9 +34,8 @@ export default function BestiaryPage() {
   const [search, setSearch]                 = useState('')
   const [showFilters, setShowFilters]       = useState(false)
   const [showWeakness, setShowWeakness]     = useState(false)
-  const [showEnigma, setShowEnigma]         = useState(false)
   const [showStatusInfo, setShowStatusInfo] = useState(false)
-  const [detailTab, setDetailTab]           = useState<'panoramica' | 'equip'>('panoramica')
+  const [detailTab, setDetailTab]           = useState<'panoramica' | 'equip' | 'enigma'>('panoramica')
   const [equipReloadKey, setEquipReloadKey] = useState(0)
   const [equipCounts, setEquipCounts]       = useState<Record<string, number>>({})
   const [loading, setLoading]               = useState(true)
@@ -631,7 +599,7 @@ export default function BestiaryPage() {
                 <div key={slotIdx} className="relative flex-1" style={{ height: 72 }}>
                   {/* Main tap target */}
                   <button
-                    onClick={() => { if (pc && cr) { setSelected({ creature: cr, pc }); setShowEnigma(false); setShowStatusInfo(false); setDetailTab('panoramica') } }}
+                    onClick={() => { if (pc && cr) { setSelected({ creature: cr, pc }); setShowStatusInfo(false); setDetailTab('panoramica') } }}
                     className="w-full h-full rounded-xl overflow-hidden transition-all relative"
                     style={{
                       background: pc
@@ -744,7 +712,7 @@ export default function BestiaryPage() {
                     : { delay: i * 0.02 }
                 }
                 whileTap={{ scale: 0.93 }}
-                onClick={() => { setSelected({ creature, pc }); setShowEnigma(false); setShowStatusInfo(false); setDetailTab('panoramica') }}
+                onClick={() => { setSelected({ creature, pc }); setShowStatusInfo(false); setDetailTab('panoramica') }}
                 className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all
                   ${canEvolve
                     ? 'border-2 border-[#F7C841]'
@@ -1032,23 +1000,27 @@ export default function BestiaryPage() {
                   {caught ? (
                     <>
                       {/* Tab bar */}
-                      <div className="flex gap-1.5 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                      <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
                         {([
-                          { id: 'panoramica' as const, label: 'Panoramica' },
-                          { id: 'equip' as const, label: '🛡️ Equipaggiamento' },
-                        ]).map(t => (
-                          <button key={t.id}
-                            onClick={() => setDetailTab(t.id)}
-                            className="flex-1 py-2 rounded-lg text-xs font-bold transition-all"
-                            style={detailTab === t.id
-                              ? { background: 'rgba(58,188,168,0.18)', color: '#3ABCA8', border: '1px solid rgba(58,188,168,0.4)' }
-                              : { color: 'rgba(255,255,255,0.4)', border: '1px solid transparent' }}>
-                            {t.label}
-                          </button>
-                        ))}
+                          { id: 'panoramica' as const, label: 'Info',   icon: '📖', accent: '58,188,168',  fg: '#3ABCA8' },
+                          { id: 'equip'      as const, label: 'Equip',  icon: '🛡️', accent: '58,188,168',  fg: '#3ABCA8' },
+                          { id: 'enigma'     as const, label: 'Enigma', icon: '🧩', accent: '123,77,184',  fg: '#C084FC' },
+                        ]).map(t => {
+                          const active = detailTab === t.id
+                          return (
+                            <button key={t.id}
+                              onClick={() => setDetailTab(t.id)}
+                              className="flex-1 py-2 rounded-lg text-[11px] font-bold transition-all flex items-center justify-center gap-1 whitespace-nowrap"
+                              style={active
+                                ? { background: `rgba(${t.accent},0.18)`, color: t.fg, border: `1px solid rgba(${t.accent},0.4)` }
+                                : { color: 'rgba(255,255,255,0.4)', border: '1px solid transparent' }}>
+                              <span className="text-sm leading-none">{t.icon}</span>{t.label}
+                            </button>
+                          )
+                        })}
                       </div>
 
-                      {detailTab === 'equip' ? (
+                      {detailTab === 'equip' && (
                         <EquipmentManager
                           key={`${pc.id}:${equipReloadKey}`}
                           sessionId={sessionRef.current}
@@ -1059,7 +1031,19 @@ export default function BestiaryPage() {
                           playerLevel={playerLevel}
                           onChanged={() => setEquipReloadKey(k => k + 1)}
                         />
-                      ) : (
+                      )}
+
+                      {detailTab === 'enigma' && (
+                        <EnigmaFragmentPanel
+                          enigmaTitle={(creature.enigma_frammento as any)?.enigma?.title ?? null}
+                          fragmentTitle={creature.enigma_frammento?.title ?? creature.enigma_title ?? null}
+                          description={creature.enigma_frammento?.description ?? creature.enigma_description ?? null}
+                          imageUrl={creature.enigma_frammento?.image_url ?? creature.enigma_image_url ?? null}
+                          videoUrl={creature.enigma_frammento?.video_url ?? creature.enigma_video_url ?? null}
+                        />
+                      )}
+
+                      {detailTab === 'panoramica' && (
                       <div className="space-y-4">
                       {/* Description */}
                       {creature.description && (
@@ -1328,92 +1312,6 @@ export default function BestiaryPage() {
                         </button>
                       )}
 
-                      {/* Enigma button */}
-                      {(() => {
-                        // Nuovo sistema FK: dati dal frammento collegato
-                        const fk = creature.enigma_frammento
-                        const hasEnigmaData = !!(
-                          creature.enigma_title || creature.enigma_description ||
-                          (fk && (fk.title || fk.description))
-                        )
-                        // Titolo frammento e enigma da mostrare
-                        const framTitle = fk?.title ?? creature.enigma_title
-                        const framDesc  = fk?.description ?? creature.enigma_description
-                        const framImg   = fk?.image_url ?? creature.enigma_image_url
-                        const framVideo = fk?.video_url ?? creature.enigma_video_url
-                        const enigmaTitle = (fk as any)?.enigma?.title ?? null
-
-                        return (
-                          <>
-                            <button
-                              onClick={() => setShowEnigma(v => !v)}
-                              disabled={!hasEnigmaData}
-                              className={`w-full font-bold py-3 rounded-xl text-sm transition-all
-                                ${hasEnigmaData
-                                  ? 'bg-[#4A1D7A]/60 border border-[#7B4DB8]/50 text-[#C084FC] hover:bg-[#4A1D7A]/90'
-                                  : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'}`}>
-                              🧩 Frammento Enigma
-                              {hasEnigmaData && (
-                                <span className="ml-2 text-white/40 text-xs">{showEnigma ? '▲' : '▼'}</span>
-                              )}
-                            </button>
-
-                            <AnimatePresence>
-                              {showEnigma && hasEnigmaData && (
-                                <motion.div
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: 'auto' }}
-                                  exit={{ opacity: 0, height: 0 }}
-                                  transition={{ duration: 0.25 }}
-                                  className="overflow-hidden">
-                                  <div className="bg-[#1A0D2E] border border-[#7B4DB8]/30 rounded-2xl p-4 space-y-3">
-                                    {/* Badge riferimento enigma */}
-                                    {enigmaTitle && (
-                                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#7B4DB8]/20 border border-[#7B4DB8]/30">
-                                        <span className="text-sm">🔍</span>
-                                        <p className="text-xs text-[#C084FC]/80">
-                                          Aiuta a risolvere: <span className="font-bold text-[#C084FC]">{enigmaTitle}</span>
-                                        </p>
-                                      </div>
-                                    )}
-                                    {framTitle && (
-                                      <h4 className="text-sm font-bold text-[#C084FC]">{framTitle}</h4>
-                                    )}
-                                    {framDesc && (
-                                      <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{framDesc}</p>
-                                    )}
-                                    {framImg && (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img src={framImg} alt="Frammento"
-                                        className="w-full rounded-xl object-cover max-h-48 cursor-zoom-in"
-                                        onClick={() => window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: framImg }))}
-                                        title="Tocca per ingrandire" />
-                                    )}
-                                    {framVideo && (() => {
-                                      const embed = getVideoEmbed(framVideo)
-                                      if (!embed) return null
-                                      return (
-                                        <div className="relative w-full rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                                          {embed.type === 'iframe' ? (
-                                            <iframe
-                                              src={embed.src}
-                                              className="absolute inset-0 w-full h-full"
-                                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                              allowFullScreen
-                                            />
-                                          ) : (
-                                            <video src={embed.src} controls className="absolute inset-0 w-full h-full" />
-                                          )}
-                                        </div>
-                                      )
-                                    })()}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </>
-                        )
-                      })()}
                       </div>
                       )}
                     </>
