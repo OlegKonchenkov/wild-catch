@@ -120,7 +120,7 @@ export default function EnigmaSolvedModal({ enigmaTitle, solution, reward, fresh
               <div className="flex items-center justify-between rounded-2xl px-5 py-3"
                 style={{ background: 'rgba(52,211,153,0.10)', border: '1px solid rgba(52,211,153,0.22)' }}>
                 <span className="text-sm text-white/55">EXP</span>
-                <span className="font-extrabold text-[#34D399] text-base">+{reward.exp}</span>
+                <span className="font-extrabold text-[#34D399] text-base">+{reward.exp} ⭐</span>
               </div>
             )}
             {!!reward.gold && reward.gold > 0 && (

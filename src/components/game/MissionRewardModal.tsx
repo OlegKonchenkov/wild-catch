@@ -111,7 +111,7 @@ export default function MissionRewardModal({ missions, onDone }: MissionRewardMo
             <div className="flex items-center justify-between rounded-2xl px-5 py-3"
               style={{ background: 'rgba(52,211,153,0.10)', border: '1px solid rgba(52,211,153,0.22)' }}>
               <span className="text-sm text-white/50">EXP ricompensa</span>
-              <span className="font-extrabold text-[#34D399] text-base">+{mission.rewardExp} EXP</span>
+              <span className="font-extrabold text-[#34D399] text-base">+{mission.rewardExp} ⭐</span>
             </div>
           )}
           {mission.rewardGold > 0 && (

@@ -540,9 +540,35 @@ export default function PlayersPage() {
                     <select value={grantItemId} onChange={e => setGrantItemId(e.target.value)}
                       className="w-full bg-[#0F1F2E] text-white border border-white/20 rounded-lg px-3 py-2">
                       <option value="">— Seleziona oggetto —</option>
-                      {items.map((item: any) => (
-                        <option key={item.id} value={item.id}>{item.name} ({item.type})</option>
-                      ))}
+                      {(() => {
+                        const GROUPS: Array<{ types: string[]; label: string }> = [
+                          { types: ['arma', 'corazza', 'elmo', 'accessorio'], label: '🛡️ Equipaggiamento' },
+                          { types: ['rete'], label: '🎯 Reti' },
+                          { types: ['esca'], label: '🍖 Esche' },
+                          { types: ['uovo'], label: '🥚 Uova' },
+                          { types: ['battaglia', 'pozione', 'cura'], label: '⚔️ Battaglia' },
+                          { types: ['custom'], label: '🎁 Custom' },
+                        ]
+                        const seen = new Set<string>()
+                        const groups = GROUPS.map(g => {
+                          const list = items.filter((it: any) => g.types.includes(it.type))
+                          list.forEach((it: any) => seen.add(it.id))
+                          return { label: g.label, list }
+                        })
+                        const others = items.filter((it: any) => !seen.has(it.id))
+                        if (others.length) groups.push({ label: '📦 Altro', list: others })
+                        return groups
+                          .filter(g => g.list.length > 0)
+                          .map(g => (
+                            <optgroup key={g.label} label={g.label}>
+                              {g.list.map((item: any) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name}{item.rarity ? ` · ${item.rarity}` : ''} ({item.type})
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))
+                      })()}
                     </select>
                   </div>
                   <div>

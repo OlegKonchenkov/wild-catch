@@ -2150,14 +2150,14 @@ export default function EncounterPage() {
                       {caughtExpGain > 0 && (
                         <div className="flex items-center justify-between rounded-xl px-4 py-3"
                           style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
-                          <span className="text-sm text-white/50">EXP</span>
+                          <span className="text-sm text-white/50">⭐ EXP</span>
                           <span className="font-extrabold text-[#34D399]">+{caughtExpGain}</span>
                         </div>
                       )}
                       {caughtGoldGain > 0 && (
                         <div className="flex items-center justify-between rounded-xl px-4 py-3"
                           style={{ background: 'rgba(247,200,65,0.08)', border: '1px solid rgba(247,200,65,0.2)' }}>
-                          <span className="text-sm text-white/50">Oro</span>
+                          <span className="text-sm text-white/50">🪙 Oro</span>
                           <span className="font-extrabold" style={{ color: '#F7C841' }}>+{caughtGoldGain}</span>
                         </div>
                       )}
