@@ -19,6 +19,10 @@ const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; c
   battaglia: { icon: '⚔️', label: 'Battaglia', hint: 'Potenzia ATK in duello',               color: '#FBBF24' },
   pozione:   { icon: '🧪', label: 'Pozione',   hint: 'Neutralizza debolezza elementale',     color: '#F472B6' },
   cura:      { icon: '💊', label: 'Cura',       hint: 'Ripristina HP creatura in battaglia',  color: '#34D399' },
+  arma:      { icon: '🗡️', label: 'Arma',       hint: 'Equipaggia dalla DaimonDex (+ATK)',     color: '#FB7185' },
+  corazza:   { icon: '🛡️', label: 'Corazza',   hint: 'Equipaggia dalla DaimonDex (+HP/DEF)',  color: '#60A5FA' },
+  elmo:      { icon: '⛑️', label: 'Elmo',       hint: 'Equipaggia dalla DaimonDex (+HP/DEF)',  color: '#FBBF24' },
+  accessorio:{ icon: '💍', label: 'Accessorio', hint: 'Equipaggia dalla DaimonDex (bonus misti)', color: '#C084FC' },
 }
 
 const RARITY_COLOR: Record<string, string> = {
@@ -557,6 +561,11 @@ export default function BackpackPage() {
                           {item.effect_value > 0 && (
                             <p className="text-xs mt-0.5" style={{ color: meta.color }}>
                               {(item.type === 'rete' || item.type === 'esca') ? `×${item.effect_value}` : `+${item.effect_value}%`}{' '}{meta.hint}
+                            </p>
+                          )}
+                          {(['arma', 'corazza', 'elmo', 'accessorio'] as ItemType[]).includes(item.type as ItemType) && (
+                            <p className="text-xs mt-0.5" style={{ color: meta.color }}>
+                              🛡️ Equipaggia dalla DaimonDex
                             </p>
                           )}
                         </div>

@@ -2,7 +2,27 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-const VALID_TYPES = ['rete', 'esca', 'uovo', 'battaglia', 'pozione', 'cura', 'custom'] as const
+const EQUIP_TYPES = ['arma', 'corazza', 'elmo', 'accessorio'] as const
+const VALID_TYPES = ['rete', 'esca', 'uovo', 'battaglia', 'pozione', 'cura', 'custom', ...EQUIP_TYPES] as const
+const VALID_RARITIES = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico'] as const
+
+function isEquip(type: string): boolean {
+  return (EQUIP_TYPES as readonly string[]).includes(type)
+}
+
+function equipFields(type: string, body: Record<string, unknown>): Record<string, unknown> {
+  if (!isEquip(type)) {
+    return { bonus_hp: 0, bonus_atk: 0, bonus_def: 0, rarity: null }
+  }
+  const rarityRaw = String(body.rarity ?? '')
+  const rarity = (VALID_RARITIES as readonly string[]).includes(rarityRaw) ? rarityRaw : 'comune'
+  return {
+    bonus_hp: Math.max(0, Math.round(Number(body.bonus_hp) || 0)),
+    bonus_atk: Math.max(0, Math.round(Number(body.bonus_atk) || 0)),
+    bonus_def: Math.max(0, Math.round(Number(body.bonus_def) || 0)),
+    rarity,
+  }
+}
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -48,6 +68,7 @@ export async function POST(request: Request) {
     is_redeemable: type === 'custom' ? true : (is_redeemable ?? false),
     reward: reward ?? {},
     in_shop: type === 'custom' ? (in_shop ?? true) : true,
+    ...equipFields(type, body),
   }
   if (type === 'uovo') {
     insertData.egg_rarity = egg_rarity ?? 'comune'
@@ -84,6 +105,7 @@ export async function PUT(request: Request) {
     is_redeemable: type === 'custom' ? true : (is_redeemable ?? false),
     reward: reward ?? {},
     in_shop: type === 'custom' ? (in_shop ?? true) : true,
+    ...equipFields(type, body),
   }
   if (type === 'uovo') {
     updateData.egg_rarity = egg_rarity ?? 'comune'

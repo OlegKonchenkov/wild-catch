@@ -11,6 +11,7 @@ import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { GameGridSkeleton } from '@/components/game/GameLoading'
+import EquipmentManager from '@/components/game/EquipmentManager'
 
 const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
 
@@ -66,6 +67,9 @@ export default function BestiaryPage() {
   const [showWeakness, setShowWeakness]     = useState(false)
   const [showEnigma, setShowEnigma]         = useState(false)
   const [showStatusInfo, setShowStatusInfo] = useState(false)
+  const [detailTab, setDetailTab]           = useState<'panoramica' | 'equip'>('panoramica')
+  const [equipReloadKey, setEquipReloadKey] = useState(0)
+  const [equipCounts, setEquipCounts]       = useState<Record<string, number>>({})
   const [loading, setLoading]               = useState(true)
   // Creature IDs that were caught for the first time but not yet revealed
   // in the bestiary. Drives a one-time sparkle animation on the matching
@@ -204,6 +208,27 @@ export default function BestiaryPage() {
     window.addEventListener('wc:refresh-bestiary', fetchPlayerCreatures)
     return () => window.removeEventListener('wc:refresh-bestiary', fetchPlayerCreatures)
   }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Equipped-piece counts per owned creature — drives the grid badge.
+  useEffect(() => {
+    const sid = sessionRef.current
+    if (!sid || playerCreatures.length === 0) { setEquipCounts({}); return }
+    let cancelled = false
+    const ids = playerCreatures.map(p => p.id)
+    supabase
+      .from('creature_equipment')
+      .select('player_creature_id')
+      .in('player_creature_id', ids)
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        const counts: Record<string, number> = {}
+        for (const r of data as { player_creature_id: string }[]) {
+          counts[r.player_creature_id] = (counts[r.player_creature_id] ?? 0) + 1
+        }
+        setEquipCounts(counts)
+      })
+    return () => { cancelled = true }
+  }, [supabase, playerCreatures, equipReloadKey])
 
   function getPc(creatureId: string) {
     return playerCreatures.find(pc => pc.creature_id === creatureId) ?? null
@@ -606,7 +631,7 @@ export default function BestiaryPage() {
                 <div key={slotIdx} className="relative flex-1" style={{ height: 72 }}>
                   {/* Main tap target */}
                   <button
-                    onClick={() => { if (pc && cr) setSelected({ creature: cr, pc }) }}
+                    onClick={() => { if (pc && cr) { setSelected({ creature: cr, pc }); setShowEnigma(false); setShowStatusInfo(false); setDetailTab('panoramica') } }}
                     className="w-full h-full rounded-xl overflow-hidden transition-all relative"
                     style={{
                       background: pc
@@ -719,7 +744,7 @@ export default function BestiaryPage() {
                     : { delay: i * 0.02 }
                 }
                 whileTap={{ scale: 0.93 }}
-                onClick={() => { setSelected({ creature, pc }); setShowEnigma(false); setShowStatusInfo(false) }}
+                onClick={() => { setSelected({ creature, pc }); setShowEnigma(false); setShowStatusInfo(false); setDetailTab('panoramica') }}
                 className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all
                   ${canEvolve
                     ? 'border-2 border-[#F7C841]'
@@ -832,6 +857,14 @@ export default function BestiaryPage() {
                       </div>
                     )
                   })()}
+                  {/* Equipped gear badge — bottom-right */}
+                  {pc && (equipCounts[pc.id] ?? 0) > 0 && (
+                    <div className="absolute bottom-1 right-1 text-[8px] font-bold px-1 py-0.5 rounded-md leading-none flex items-center gap-0.5"
+                      style={{ background: 'rgba(58,188,168,0.22)', color: '#3ABCA8', border: '1px solid rgba(58,188,168,0.5)' }}
+                      title="Equipaggiamento">
+                      ⚙️{equipCounts[pc.id]}
+                    </div>
+                  )}
                 </div>
 
                 {/* Name + element + rarity */}
@@ -998,6 +1031,36 @@ export default function BestiaryPage() {
                 <div className="px-5 pt-5 space-y-4">
                   {caught ? (
                     <>
+                      {/* Tab bar */}
+                      <div className="flex gap-1.5 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                        {([
+                          { id: 'panoramica' as const, label: 'Panoramica' },
+                          { id: 'equip' as const, label: '🛡️ Equipaggiamento' },
+                        ]).map(t => (
+                          <button key={t.id}
+                            onClick={() => setDetailTab(t.id)}
+                            className="flex-1 py-2 rounded-lg text-xs font-bold transition-all"
+                            style={detailTab === t.id
+                              ? { background: 'rgba(58,188,168,0.18)', color: '#3ABCA8', border: '1px solid rgba(58,188,168,0.4)' }
+                              : { color: 'rgba(255,255,255,0.4)', border: '1px solid transparent' }}>
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {detailTab === 'equip' ? (
+                        <EquipmentManager
+                          key={`${pc.id}:${equipReloadKey}`}
+                          sessionId={sessionRef.current}
+                          playerCreatureId={pc.id}
+                          baseHp={creature.hp}
+                          baseAtk={creature.atk}
+                          baseDef={creature.def ?? 0}
+                          playerLevel={playerLevel}
+                          onChanged={() => setEquipReloadKey(k => k + 1)}
+                        />
+                      ) : (
+                      <div className="space-y-4">
                       {/* Description */}
                       {creature.description && (
                         <p className="text-sm text-white/50 leading-relaxed italic -mt-1">{creature.description}</p>
@@ -1351,6 +1414,8 @@ export default function BestiaryPage() {
                           </>
                         )
                       })()}
+                      </div>
+                      )}
                     </>
                   ) : (
                     /* ── NOT CAUGHT: mystery view ── */

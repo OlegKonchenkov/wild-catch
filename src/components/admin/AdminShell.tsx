@@ -11,6 +11,7 @@ const NAV = [
   { href: '/admin/creatures',   label: '🐾 Creature'   },
   { href: '/admin/missions',    label: '🎯 Missioni'   },
   { href: '/admin/items',       label: '🎒 Oggetti'    },
+  { href: '/admin/equipaggiamento', label: '🛡️ Equipaggiamento' },
   { href: '/admin/qrcodes',     label: '📷 QR Codes'   },
   { href: '/admin/enigmi',      label: '🧩 Enigmi'     },
   { href: '/admin/invites',     label: '🎟️ Inviti'     },

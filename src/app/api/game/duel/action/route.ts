@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
+import { getEquipmentBonuses } from '@/lib/game/equipment'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
 import type { Element } from '@/lib/types'
@@ -234,9 +235,12 @@ export async function POST(request: Request) {
     const healLevels = Object.fromEntries(
       (healPlayerSessions ?? []).map((row: { user_id: string; level: number | null }) => [row.user_id, row.level ?? 1]),
     ) as Record<string, number>
+    const healEquip = (await getEquipmentBonuses(supabase, [(myHealActive as any).player_creature_id]))
+      .get((myHealActive as any).player_creature_id) ?? { hp: 0, atk: 0, def: 0 }
     const healStats = scaleCombatStats(
       { hp: myHealCreature.hp, atk: myHealCreature.atk, def: myHealCreature.def ?? 0 },
       healLevels[userId],
+      healEquip,
     )
 
     const attackerStatus = (myHealActive as any).active_status as StatusEffect | null
@@ -418,13 +422,21 @@ export async function POST(request: Request) {
   const levelByUser = Object.fromEntries(
     (playerSessions ?? []).map((row: { user_id: string; level: number | null }) => [row.user_id, row.level ?? 1]),
   ) as Record<string, number>
+  const equipBonusMap = await getEquipmentBonuses(supabase, [
+    (myActive as any).player_creature_id,
+    (oppActive as any).player_creature_id,
+  ])
+  const myEquipBonus = equipBonusMap.get((myActive as any).player_creature_id) ?? { hp: 0, atk: 0, def: 0 }
+  const oppEquipBonus = equipBonusMap.get((oppActive as any).player_creature_id) ?? { hp: 0, atk: 0, def: 0 }
   const myCombatStats = scaleCombatStats(
     { hp: myCreature.hp, atk: myCreature.atk, def: myCreature.def ?? 0 },
     levelByUser[userId],
+    myEquipBonus,
   )
   const oppCombatStats = scaleCombatStats(
     { hp: oppCreature.hp, atk: oppCreature.atk, def: oppCreature.def ?? 0 },
     levelByUser[oppUserId!] ?? 1,
+    oppEquipBonus,
   )
 
   // ── Status effect pre-turn processing ─────────────────────────────────────

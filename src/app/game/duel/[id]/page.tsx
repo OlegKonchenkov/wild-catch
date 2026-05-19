@@ -256,13 +256,18 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
   )
 }
 
-function getScaledLineupStats(entry: LineupEntry | undefined, playerLevels: Record<string, number>) {
+function getScaledLineupStats(
+  entry: LineupEntry | undefined,
+  playerLevels: Record<string, number>,
+  equipBonus: Record<string, { hp: number; atk: number; def: number }> = {},
+) {
   const creature = entry?.player_creatures?.creatures
   if (!entry || !creature) return null
 
   return scaleCombatStats(
     { hp: creature.hp, atk: creature.atk, def: creature.def ?? 0 },
     playerLevels[entry.user_id] ?? 1,
+    equipBonus[entry.player_creature_id] ?? { hp: 0, atk: 0, def: 0 },
   )
 }
 
@@ -285,6 +290,7 @@ export default function DuelPage() {
   const [duel, setDuel]                     = useState<any>(null)
   const [myLineup, setMyLineup]             = useState<LineupEntry[]>([])
   const [oppLineup, setOppLineup]           = useState<LineupEntry[]>([])
+  const [equipBonus, setEquipBonus]         = useState<Record<string, { hp: number; atk: number; def: number }>>({})
   const [log, setLog]                       = useState<string[]>([])
   const [waiting, setWaiting]               = useState(true)
   const [result, setResult]                 = useState<'won' | 'lost' | 'cancelled' | null>(null)
@@ -560,6 +566,28 @@ export default function DuelPage() {
           setOppLineup(opp)
           // Both lineups loaded — prevent re-fetch on subsequent turn changes
           if (mine.length > 0 && opp.length > 0) duelActivatedRef.current = true
+
+          // Equipped gear bonuses for every creature in the duel (own rows via
+          // RLS, opponent rows via the ce_duel_read policy). Needed so HP bars
+          // and stat readouts match the server's equipped maximums.
+          const pcIds = lineups.map((l: LineupEntry) => l.player_creature_id).filter(Boolean)
+          if (pcIds.length > 0) {
+            const { data: equipRows } = await supabase
+              .from('creature_equipment')
+              .select('player_creature_id, items(bonus_hp, bonus_atk, bonus_def)')
+              .in('player_creature_id', pcIds)
+            if (equipRows && !cancelled) {
+              const map: Record<string, { hp: number; atk: number; def: number }> = {}
+              for (const r of equipRows as any[]) {
+                const acc = map[r.player_creature_id] ?? { hp: 0, atk: 0, def: 0 }
+                acc.hp  += r.items?.bonus_hp  ?? 0
+                acc.atk += r.items?.bonus_atk ?? 0
+                acc.def += r.items?.bonus_def ?? 0
+                map[r.player_creature_id] = acc
+              }
+              setEquipBonus(map)
+            }
+          }
         }
 
         const filtered = ((inv ?? []) as any[])
@@ -1219,8 +1247,8 @@ export default function DuelPage() {
   const oppActive   = oppLineup.find(l => l.is_active)
   const myActiveCr  = myActive?.player_creatures?.creatures
   const oppActiveCr = oppActive?.player_creatures?.creatures
-  const myCombatStats = getScaledLineupStats(myActive, playerLevels)
-  const oppCombatStats = getScaledLineupStats(oppActive, playerLevels)
+  const myCombatStats = getScaledLineupStats(myActive, playerLevels, equipBonus)
+  const oppCombatStats = getScaledLineupStats(oppActive, playerLevels, equipBonus)
   const myHp        = myActive?.current_hp ?? 0
   const myHpMax     = myCombatStats?.hp ?? myActiveCr?.hp ?? 100
   const oppHp       = oppActive?.current_hp ?? 0
@@ -1718,7 +1746,7 @@ export default function DuelPage() {
             {[...myLineup].sort((a, b) => a.slot - b.slot).map(entry => {
               const cr = entry.player_creatures?.creatures
               if (!cr) return null
-              const scaledMax = getScaledLineupStats(entry, playerLevels)?.hp ?? cr.hp
+              const scaledMax = getScaledLineupStats(entry, playerLevels, equipBonus)?.hp ?? cr.hp
               const hpPct = Math.max(0, Math.min(100, (entry.current_hp / scaledMax) * 100))
               const hpColor = hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444'
               const isActive = entry.is_active

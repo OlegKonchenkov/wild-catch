@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { scaleCombatStats } from '@/lib/game/combat'
+import { getEquipmentBonuses } from '@/lib/game/equipment'
 
 // Room code chars: exclude ambiguous 0, O, I, 1
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -54,6 +55,7 @@ export async function POST(request: Request) {
 
   const hpMap = new Map<string, number>()
   let opponentSlot1Atk = 0
+  const equipBonusMap = await getEquipmentBonuses(supabase, lineup.map(l => l.playerCreatureId))
   for (const entry of lineup) {
     const { data: pc } = await supabase
       .from('player_creatures')
@@ -66,6 +68,7 @@ export async function POST(request: Request) {
     const scaledStats = scaleCombatStats(
       { hp: creature?.hp ?? 100, atk: creature?.atk ?? 0, def: creature?.def ?? 0 },
       playerLevel,
+      equipBonusMap.get(entry.playerCreatureId) ?? { hp: 0, atk: 0, def: 0 },
     )
     hpMap.set(entry.playerCreatureId, scaledStats.hp)
     if (entry.slot === 1) opponentSlot1Atk = (pc as any).creatures?.atk ?? 0

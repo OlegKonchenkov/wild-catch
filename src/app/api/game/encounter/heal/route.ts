@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getEquipmentBonuses } from '@/lib/game/equipment'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -55,7 +56,9 @@ export async function POST(request: Request) {
     .eq('id', encounter.player_creature_id)
     .single()
 
-  const maxHp: number = (pc as any)?.creatures?.hp ?? 100
+  const equipBonus = (await getEquipmentBonuses(supabase, [encounter.player_creature_id])).get(encounter.player_creature_id)
+    ?? { hp: 0, atk: 0, def: 0 }
+  const maxHp: number = ((pc as any)?.creatures?.hp ?? 100) + equipBonus.hp
   const rawHealAmount = Math.round(maxHp * (inv.items.effect_value / 100))
 
   // Update server-side HP authoritatively (migration 037+). The actual

@@ -56,15 +56,19 @@ export function normalizeCombatLevel(level: number | null | undefined): number {
 export function scaleCombatStats(
   base: BaseCombatStats,
   level: number | null | undefined,
+  bonus: Partial<BaseCombatStats> = {},
 ): ScaledCombatStats {
   const normalizedLevel = normalizeCombatLevel(level)
   const levelDelta = normalizedLevel - 1
+  const hpBase  = base.hp  + (bonus.hp  ?? 0)
+  const atkBase = base.atk + (bonus.atk ?? 0)
+  const defBase = base.def + (bonus.def ?? 0)
 
   return {
     level: normalizedLevel,
-    hp: roundStat(base.hp * (1 + levelDelta * HP_PER_LEVEL)),
-    atk: roundStat(base.atk * (1 + levelDelta * ATK_PER_LEVEL)),
-    def: roundStat(base.def * (1 + levelDelta * DEF_PER_LEVEL), 0),
+    hp: roundStat(hpBase * (1 + levelDelta * HP_PER_LEVEL)),
+    atk: roundStat(atkBase * (1 + levelDelta * ATK_PER_LEVEL)),
+    def: roundStat(defBase * (1 + levelDelta * DEF_PER_LEVEL), 0),
   }
 }
 

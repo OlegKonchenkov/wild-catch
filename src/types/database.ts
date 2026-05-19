@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      audio_overrides: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          file_name: string | null
+          file_url: string
+          id: string
+          session_id: string | null
+          slot: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          file_name?: string | null
+          file_url: string
+          id?: string
+          session_id?: string | null
+          slot: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          file_name?: string | null
+          file_url?: string
+          id?: string
+          session_id?: string | null
+          slot?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_overrides_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       boss_fights: {
         Row: {
           boss_active_slot: number
@@ -80,6 +121,58 @@ export type Database = {
           },
           {
             foreignKeyName: "boss_fights_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creature_equipment: {
+        Row: {
+          created_at: string | null
+          id: string
+          item_id: string
+          player_creature_id: string
+          session_id: string
+          slot: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          item_id: string
+          player_creature_id: string
+          session_id: string
+          slot: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          item_id?: string
+          player_creature_id?: string
+          session_id?: string
+          slot?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creature_equipment_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creature_equipment_player_creature_id_fkey"
+            columns: ["player_creature_id"]
+            isOneToOne: false
+            referencedRelation: "player_creatures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creature_equipment_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
@@ -331,6 +424,7 @@ export type Database = {
           creature_id: string
           id: string
           player_creature_id: string | null
+          player_hp: number | null
           player_status: string | null
           player_status_turns: number
           resolved_at: string | null
@@ -347,6 +441,7 @@ export type Database = {
           creature_id: string
           id?: string
           player_creature_id?: string | null
+          player_hp?: number | null
           player_status?: string | null
           player_status_turns?: number
           resolved_at?: string | null
@@ -363,6 +458,7 @@ export type Database = {
           creature_id?: string
           id?: string
           player_creature_id?: string | null
+          player_hp?: number | null
           player_status?: string | null
           player_status_turns?: number
           resolved_at?: string | null
@@ -610,6 +706,9 @@ export type Database = {
       }
       items: {
         Row: {
+          bonus_atk: number
+          bonus_def: number
+          bonus_hp: number
           created_at: string | null
           description: string
           effect_value: number
@@ -619,6 +718,7 @@ export type Database = {
           in_shop: boolean
           is_redeemable: boolean
           name: string
+          rarity: string | null
           reward: Json
           session_id: string | null
           shop_price: number
@@ -626,6 +726,9 @@ export type Database = {
           type: string
         }
         Insert: {
+          bonus_atk?: number
+          bonus_def?: number
+          bonus_hp?: number
           created_at?: string | null
           description: string
           effect_value?: number
@@ -635,6 +738,7 @@ export type Database = {
           in_shop?: boolean
           is_redeemable?: boolean
           name: string
+          rarity?: string | null
           reward?: Json
           session_id?: string | null
           shop_price?: number
@@ -642,6 +746,9 @@ export type Database = {
           type: string
         }
         Update: {
+          bonus_atk?: number
+          bonus_def?: number
+          bonus_hp?: number
           created_at?: string | null
           description?: string
           effect_value?: number
@@ -651,6 +758,7 @@ export type Database = {
           in_shop?: boolean
           is_redeemable?: boolean
           name?: string
+          rarity?: string | null
           reward?: Json
           session_id?: string | null
           shop_price?: number
@@ -982,6 +1090,45 @@ export type Database = {
           },
         ]
       }
+      player_enigma_frammenti: {
+        Row: {
+          frammento_id: string
+          id: string
+          obtained_at: string | null
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          frammento_id: string
+          id?: string
+          obtained_at?: string | null
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          frammento_id?: string
+          id?: string
+          obtained_at?: string | null
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_enigma_frammenti_frammento_id_fkey"
+            columns: ["frammento_id"]
+            isOneToOne: false
+            referencedRelation: "enigma_frammenti"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_enigma_frammenti_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_enigma_suggerimenti: {
         Row: {
           id: string
@@ -1017,6 +1164,45 @@ export type Database = {
             columns: ["suggerimento_id"]
             isOneToOne: false
             referencedRelation: "enigma_suggerimenti"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_enigmi: {
+        Row: {
+          enigma_id: string
+          id: string
+          session_id: string
+          solved_at: string | null
+          user_id: string
+        }
+        Insert: {
+          enigma_id: string
+          id?: string
+          session_id: string
+          solved_at?: string | null
+          user_id: string
+        }
+        Update: {
+          enigma_id?: string
+          id?: string
+          session_id?: string
+          solved_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_enigmi_enigma_id_fkey"
+            columns: ["enigma_id"]
+            isOneToOne: false
+            referencedRelation: "enigmi"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_enigmi_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -1097,6 +1283,7 @@ export type Database = {
       }
       player_missions: {
         Row: {
+          baseline_steps: number | null
           completed_at: string | null
           id: string
           mission_id: string
@@ -1105,6 +1292,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          baseline_steps?: number | null
           completed_at?: string | null
           id?: string
           mission_id: string
@@ -1113,6 +1301,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          baseline_steps?: number | null
           completed_at?: string | null
           id?: string
           mission_id?: string
@@ -1185,6 +1374,7 @@ export type Database = {
           last_position: unknown
           last_position_at: string | null
           level: number
+          onboarding_seen: boolean
           role: string
           score: number
           score_final: number | null
@@ -1203,6 +1393,7 @@ export type Database = {
           last_position?: unknown
           last_position_at?: string | null
           level?: number
+          onboarding_seen?: boolean
           role?: string
           score?: number
           score_final?: number | null
@@ -1221,6 +1412,7 @@ export type Database = {
           last_position?: unknown
           last_position_at?: string | null
           level?: number
+          onboarding_seen?: boolean
           role?: string
           score?: number
           score_final?: number | null
@@ -1562,6 +1754,7 @@ export type Database = {
           duration_minutes: number
           end_at: string | null
           id: string
+          kind: string
           name: string
           narrative_config: Json
           start_at: string | null
@@ -1575,6 +1768,7 @@ export type Database = {
           duration_minutes?: number
           end_at?: string | null
           id?: string
+          kind?: string
           name: string
           narrative_config?: Json
           start_at?: string | null
@@ -1588,6 +1782,7 @@ export type Database = {
           duration_minutes?: number
           end_at?: string | null
           id?: string
+          kind?: string
           name?: string
           narrative_config?: Json
           start_at?: string | null

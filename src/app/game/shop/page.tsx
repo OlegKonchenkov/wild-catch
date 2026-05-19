@@ -22,6 +22,10 @@ const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; c
   battaglia: { icon: '⚔️', label: 'Battaglia',  hint: 'Potenzia ATK in duello',                  color: '#FBBF24' },
   pozione:   { icon: '🧪', label: 'Pozione',    hint: 'Neutralizza debolezza elementale',        color: '#F472B6' },
   cura:      { icon: '💊', label: 'Cura',        hint: 'Ripristina HP creatura in battaglia',     color: '#34D399' },
+  arma:      { icon: '🗡️', label: 'Arma',        hint: 'Equipaggiamento (+ATK)',                  color: '#FB7185' },
+  corazza:   { icon: '🛡️', label: 'Corazza',    hint: 'Equipaggiamento (+HP/DEF)',               color: '#60A5FA' },
+  elmo:      { icon: '⛑️', label: 'Elmo',        hint: 'Equipaggiamento (+HP/DEF)',               color: '#FBBF24' },
+  accessorio:{ icon: '💍', label: 'Accessorio',  hint: 'Equipaggiamento (bonus misti)',           color: '#C084FC' },
 }
 
 export default function ShopPage() {

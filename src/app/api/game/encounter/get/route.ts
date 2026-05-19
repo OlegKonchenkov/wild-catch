@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getEquipmentBonuses } from '@/lib/game/equipment'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -41,21 +42,25 @@ export async function GET(request: Request) {
       .eq('session_id', encounter.session_id)
 
     if (pcs) {
+      const equipBonuses = await getEquipmentBonuses(supabase, squadIds)
       squadCreatures = squadIds
         .map(sid => (pcs as any[]).find(pc => pc.id === sid))
         .filter(Boolean)
-        .map((pc: any) => ({
+        .map((pc: any) => {
+          const b = equipBonuses.get(pc.id) ?? { hp: 0, atk: 0, def: 0 }
+          return {
           pcId: pc.id,
           id: pc.creatures.id,
           name: pc.creatures.name,
-          hp: pc.creatures.hp,
-          atk: pc.creatures.atk,
+          hp: pc.creatures.hp + b.hp,
+          atk: pc.creatures.atk + b.atk,
           element: pc.creatures.element,
           rarity: pc.creatures.rarity,
           image_url: pc.creatures.image_url ?? null,
           attack_sound_url: null,
           attack_sound_duration_ms: null,
-        }))
+          }
+        })
 
       // Try to enrich with sound data (requires 018_attack_sound migration)
       const creatureIds = squadCreatures.map(c => c.id)

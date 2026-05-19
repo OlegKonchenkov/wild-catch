@@ -9,6 +9,7 @@ import {
 } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
+import { getEquipmentBonuses } from '@/lib/game/equipment'
 import type { Element } from '@/lib/types'
 
 export async function POST(request: Request) {
@@ -76,6 +77,13 @@ export async function POST(request: Request) {
 
   const playerCr = (playerCreature as any).creatures
 
+  // Equipped gear adds flat bonuses to the player creature's base stats.
+  const equipBonus = (await getEquipmentBonuses(supabase, [lookupId])).get(lookupId)
+    ?? { hp: 0, atk: 0, def: 0 }
+  const playerMaxHp = playerCr.hp + equipBonus.hp
+  const playerAtk = playerCr.atk + equipBonus.atk
+  const playerDef = (playerCr.def ?? 0) + equipBonus.def
+
   let atkMultiplier = 1
   let antiWeakness = false
   let attackItemType: string | null = null
@@ -111,11 +119,11 @@ export async function POST(request: Request) {
   const serverPlayerHp = (encounter as any).player_hp
   let playerHpRemaining: number
   if (typeof serverPlayerHp === 'number') {
-    playerHpRemaining = Math.max(0, Math.min(serverPlayerHp, playerCr.hp))
+    playerHpRemaining = Math.max(0, Math.min(serverPlayerHp, playerMaxHp))
   } else {
     playerHpRemaining = Math.max(0, Math.min(
-      Number.isFinite(currentPlayerHp) ? Number(currentPlayerHp) : playerCr.hp,
-      playerCr.hp,
+      Number.isFinite(currentPlayerHp) ? Number(currentPlayerHp) : playerMaxHp,
+      playerMaxHp,
     ))
   }
   let playerTookDamage = false
@@ -135,9 +143,9 @@ export async function POST(request: Request) {
     effect: playerStatus,
     turnsLeft: playerStatusTurns,
     currentHp: playerHpRemaining,
-    maxHp: playerCr.hp,
-    atk: playerCr.atk,
-    def: playerCr.def ?? 0,
+    maxHp: playerMaxHp,
+    atk: playerAtk,
+    def: playerDef,
   })
   playerHpRemaining = playerStatusTick.currentHp
   newPlayerStatus = playerStatusTick.nextEffect
@@ -170,7 +178,7 @@ export async function POST(request: Request) {
   const playerCrit = Math.random() < 0.10
   const critMult = playerCrit ? 1.75 : 1
   if (!skipPlayerAttack && wildHpRemaining > 0) {
-    playerDamage = Math.round(calculateFightDamage(playerCr.atk) * elementMult * atkMultiplier * critMult)
+    playerDamage = Math.round(calculateFightDamage(playerAtk) * elementMult * atkMultiplier * critMult)
     wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
   }
 

@@ -26,6 +26,23 @@ describe('combat helpers', () => {
     expect(s).toMatchObject({ level: 1, hp: 100, atk: 20, def: 10 })
   })
 
+  it('scaleCombatStats: omitting the bonus arg is identical to a zero bonus', () => {
+    const base = { hp: 100, atk: 20, def: 10 }
+    expect(scaleCombatStats(base, 12)).toEqual(scaleCombatStats(base, 12, { hp: 0, atk: 0, def: 0 }))
+    expect(scaleCombatStats(base, 12)).toEqual(scaleCombatStats(base, 12, {}))
+  })
+
+  it('scaleCombatStats: equipment bonus is added to the base before level scaling', () => {
+    const base = { hp: 100, atk: 20, def: 10 }
+    const bonus = { hp: 50, atk: 10, def: 5 }
+    expect(scaleCombatStats(base, 1, bonus)).toMatchObject({ level: 1, hp: 150, atk: 30, def: 15 })
+    const plain = scaleCombatStats(base, 30)
+    const geared = scaleCombatStats(base, 30, bonus)
+    expect(geared.hp).toBeGreaterThan(plain.hp)
+    expect(geared.atk).toBeGreaterThan(plain.atk)
+    expect(geared.def).toBeGreaterThan(plain.def)
+  })
+
   it('scaleCombatStats: stats increase monotonically from level 1 → 10 → 50', () => {
     const base = { hp: 100, atk: 20, def: 10 }
     const s10 = scaleCombatStats(base, 10)

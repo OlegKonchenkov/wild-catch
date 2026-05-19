@@ -8,6 +8,7 @@ import {
   STATUS_EFFECT_META,
 } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
+import { getEquipmentBonuses } from '@/lib/game/equipment'
 
 /**
  * POST /api/game/encounter/switch
@@ -72,10 +73,14 @@ export async function POST(request: Request) {
   const newPlayerCr = (newPc as any).creatures
   const wildCreature = (encounter as any).creatures
 
+  const equipBonus = (await getEquipmentBonuses(supabase, [newActivePcId])).get(newActivePcId)
+    ?? { hp: 0, atk: 0, def: 0 }
+  const newPlayerMaxHp = newPlayerCr.hp + equipBonus.hp
+
   // Sanity: never switch to a fainted creature (defensive — UI prevents it)
   const incomingHp = Math.max(0, Math.min(
-    Number.isFinite(currentPlayerHp) ? Number(currentPlayerHp) : newPlayerCr.hp,
-    newPlayerCr.hp,
+    Number.isFinite(currentPlayerHp) ? Number(currentPlayerHp) : newPlayerMaxHp,
+    newPlayerMaxHp,
   ))
   if (incomingHp <= 0) {
     return NextResponse.json({ error: 'Creatura priva di HP' }, { status: 400 })

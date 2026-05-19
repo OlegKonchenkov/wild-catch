@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { selectCreatureForEncounter } from '@/lib/game/rng'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getEquipmentBonuses } from '@/lib/game/equipment'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -125,21 +126,25 @@ export async function POST(request: Request) {
       .eq('session_id', sessionId)
 
     if (pcs) {
+      const equipBonuses = await getEquipmentBonuses(supabase, squadIds)
       squadCreatures = squadIds
         .map(sid => (pcs as any[]).find(pc => pc.id === sid))
         .filter(Boolean)
-        .map((pc: any) => ({
+        .map((pc: any) => {
+          const b = equipBonuses.get(pc.id) ?? { hp: 0, atk: 0, def: 0 }
+          return {
           pcId: pc.id,
           id: pc.creatures.id,
           name: pc.creatures.name,
-          hp: pc.creatures.hp,
-          atk: pc.creatures.atk,
+          hp: pc.creatures.hp + b.hp,
+          atk: pc.creatures.atk + b.atk,
           element: pc.creatures.element,
           rarity: pc.creatures.rarity,
           image_url: pc.creatures.image_url ?? null,
           attack_sound_url: null,
           attack_sound_duration_ms: null,
-        }))
+          }
+        })
 
       // Try to enrich with sound data (requires 018_attack_sound migration)
       const creatureIds = squadCreatures.map(c => c.id)
@@ -175,7 +180,12 @@ export async function POST(request: Request) {
       .eq('id', primaryCreatureId)
       .eq('user_id', user.id)
       .maybeSingle()
-    primaryCreatureMaxHp = (pcRow as any)?.creatures?.hp ?? null
+    const baseHp = (pcRow as any)?.creatures?.hp ?? null
+    if (baseHp !== null) {
+      const b = (await getEquipmentBonuses(supabase, [primaryCreatureId])).get(primaryCreatureId)
+        ?? { hp: 0, atk: 0, def: 0 }
+      primaryCreatureMaxHp = baseHp + b.hp
+    }
   }
   const { data: encounter, error: encError } = await supabase
     .from('encounters')

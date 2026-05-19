@@ -158,23 +158,39 @@ export default function DuelLobbyPage() {
           .eq('user_id', user.id)
           .eq('session_id', sessionId)
           .single(),
-      ]).then(([creaturesRes, levelRes]) => {
+        supabase
+          .from('creature_equipment')
+          .select('player_creature_id, items(bonus_hp, bonus_atk, bonus_def)')
+          .eq('user_id', user.id)
+          .eq('session_id', sessionId),
+      ]).then(([creaturesRes, levelRes, equipRes]) => {
         const data = creaturesRes.data
         if (levelRes.data) setPlayerLevel((levelRes.data as { level?: number | null }).level ?? 1)
           if (!data || data.length === 0) { setNoCreatures(true); setLoadingCreatures(false); return }
+          const equipMap: Record<string, { hp: number; atk: number; def: number }> = {}
+          for (const r of ((equipRes.data ?? []) as any[])) {
+            const acc = equipMap[r.player_creature_id] ?? { hp: 0, atk: 0, def: 0 }
+            acc.hp  += r.items?.bonus_hp  ?? 0
+            acc.atk += r.items?.bonus_atk ?? 0
+            acc.def += r.items?.bonus_def ?? 0
+            equipMap[r.player_creature_id] = acc
+          }
           const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
           const mapped: SquadCreature[] = (data as any[])
             .filter(pc => pc.creatures)
-            .map(pc => ({
+            .map(pc => {
+              const b = equipMap[pc.id] ?? { hp: 0, atk: 0, def: 0 }
+              return {
               playerCreatureId: pc.id,
               name: pc.creatures.name,
               element: pc.creatures.element,
               rarity: pc.creatures.rarity,
-              hp: pc.creatures.hp,
-              atk: pc.creatures.atk,
-              def: pc.creatures.def ?? 0,
+              hp: pc.creatures.hp + b.hp,
+              atk: pc.creatures.atk + b.atk,
+              def: (pc.creatures.def ?? 0) + b.def,
               image_url: pc.creatures.image_url,
-            }))
+              }
+            })
             .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity))
           setCreatures(mapped)
           if (mapped.length === 0) setNoCreatures(true)

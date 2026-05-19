@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
+import { getEquipmentBonuses } from '@/lib/game/equipment'
 import type { Element } from '@/lib/types'
 
 type Params = { params: Promise<{ id: string }> }
@@ -351,6 +352,8 @@ export async function POST(request: Request, { params }: Params) {
       }
     }
 
+    const equipBonusMap = await getEquipmentBonuses(supabase, pcIds)
+
     const playerLineup = lineup.map((e: any, i: number) => {
       const pc = pcMap[e.playerCreatureId]
       const cr = pc?.creatures
@@ -358,6 +361,7 @@ export async function POST(request: Request, { params }: Params) {
       const scaledStats = scaleCombatStats(
         { hp: cr?.hp ?? 100, atk: cr?.atk ?? 10, def: cr?.def ?? 0 },
         playerLevel,
+        equipBonusMap.get(e.playerCreatureId) ?? { hp: 0, atk: 0, def: 0 },
       )
       return {
         slot: i,
