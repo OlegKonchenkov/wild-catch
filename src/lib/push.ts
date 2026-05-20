@@ -65,6 +65,31 @@ async function deliver(subs: SubscriptionRow[], payload: PushPayload): Promise<v
 }
 
 /**
+ * Best-effort player display name (nickname) for personalised copy.
+ * Returns null on any failure so callers can fall back to neutral text.
+ */
+export async function getDisplayName(userId: string): Promise<string | null> {
+  try {
+    if (!userId) return null
+    const admin = createAdminClient()
+    const { data } = await admin
+      .from('profiles')
+      .select('nickname')
+      .eq('user_id', userId)
+      .maybeSingle()
+    const nick = (data as { nickname?: string | null } | null)?.nickname?.trim()
+    return nick && nick.length > 0 ? nick : null
+  } catch {
+    return null
+  }
+}
+
+/** Pick a random entry — for light copy variety so pushes don't feel canned. */
+export function pickOne<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+
+/**
  * Fire-and-forget push to every device of a user. Never throws — push is a
  * best-effort enhancement on top of the in-app realtime notifications.
  */

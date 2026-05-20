@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sendPushToUser } from '@/lib/push'
+import { sendPushToUser, getDisplayName, pickOne } from '@/lib/push'
 import { getMissionUnlockState, type MissionUnlockContext, type MissionUnlockFields } from '@/lib/game/mission-unlocks'
 import { TUTORIAL_MISSION_FRAMMENTO_GRANTS, isTutorialSession } from '@/lib/game/tutorial'
 
@@ -207,12 +207,21 @@ export async function incrementMissionProgress({
         levelUp,
         tutorialFrammentoGranted,
       })
-      void sendPushToUser(userId, {
-        title: '🎯 Missione completata!',
-        body: `${mission.title}${mission.reward_gold ? ` · +${mission.reward_gold} 🪙` : ''}${mission.reward_exp ? ` · +${mission.reward_exp} ⭐` : ''}`,
-        url: '/game/missions',
-        tag: `mission_${mission.id}`,
-      })
+      void (async () => {
+        const nick = await getDisplayName(userId)
+        const who = nick ? `${nick}, ` : ''
+        const rw = [
+          mission.reward_gold ? `+${mission.reward_gold} 🪙` : '',
+          mission.reward_exp ? `+${mission.reward_exp} ⭐` : '',
+        ].filter(Boolean).join(' · ')
+        const title = pickOne(['🎯 Missione completata!', '✅ Obiettivo raggiunto!', '🏅 Ben fatto!'])
+        const body = pickOne([
+          `${who}"${mission.title}" completata.${rw ? ` Ricompensa: ${rw}.` : ''}`,
+          `${who}hai portato a termine "${mission.title}".${rw ? ` ${rw}` : ''}`,
+          `${who}"${mission.title}" è fatta.${rw ? ` Incassati ${rw}.` : ''}`,
+        ])
+        await sendPushToUser(userId, { title, body, url: '/game/missions', tag: `mission_${mission.id}` })
+      })()
     }
   }
 
