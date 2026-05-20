@@ -1790,6 +1790,7 @@ export type Database = {
           kind: string
           name: string
           narrative_config: Json
+          push_reminders_sent: number[]
           start_at: string | null
           starter_kit: Json | null
           status: string
@@ -1804,6 +1805,7 @@ export type Database = {
           kind?: string
           name: string
           narrative_config?: Json
+          push_reminders_sent?: number[]
           start_at?: string | null
           starter_kit?: Json | null
           status?: string
@@ -1818,6 +1820,7 @@ export type Database = {
           kind?: string
           name?: string
           narrative_config?: Json
+          push_reminders_sent?: number[]
           start_at?: string | null
           starter_kit?: Json | null
           status?: string

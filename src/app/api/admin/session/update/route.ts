@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sendPushToSession } from '@/lib/push'
 
 export async function PATCH(request: Request) {
   const supabase = await createClient()
@@ -51,6 +52,17 @@ export async function PATCH(request: Request) {
       payload: { sessionId, endAt: newEndAt },
     })
     await supabase.removeChannel(channel)
+
+    // Push + reset reminder marks (la nuova end_at potrebbe sbloccare
+    // soglie 30/10/1 min già state notificate sulla scadenza precedente).
+    const endHHMM = new Date(newEndAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+    after(() => sendPushToSession(sessionId, {
+      title: '⏰ Durata sessione aggiornata',
+      body: `La sessione ora termina alle ${endHHMM}.`,
+      url: '/game/map',
+      tag: `session_${sessionId}_duration`,
+    }))
+    await supabase.from('sessions').update({ push_reminders_sent: [] }).eq('id', sessionId).then(undefined, () => {})
   }
 
   return NextResponse.json({ updated: true, endAt: newEndAt })

@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sendPushToSession } from '@/lib/push'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -30,6 +31,13 @@ export async function POST(request: Request) {
     start_at: startAt.toISOString(),
     end_at: endAt.toISOString(),
   }).eq('id', sessionId)
+
+  after(() => sendPushToSession(sessionId, {
+    title: '🎮 La sessione è iniziata!',
+    body: `Hai ${session.duration_minutes} minuti per esplorare. Buon gioco!`,
+    url: '/game/map',
+    tag: `session_${sessionId}_start`,
+  }))
 
   return NextResponse.json({ started: true, endAt: endAt.toISOString() })
 }

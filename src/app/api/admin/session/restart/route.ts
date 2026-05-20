@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { sendPushToSession } from '@/lib/push'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -33,6 +34,16 @@ export async function POST(request: Request) {
     payload: { sessionId },
   })
   await admin.removeChannel(channel)
+
+  after(() => sendPushToSession(sessionId, {
+    title: '🔄 Sessione riavviata',
+    body: 'Gli organizzatori hanno riportato la sessione in stand-by.',
+    url: '/home',
+    tag: `session_${sessionId}_restart`,
+  }))
+
+  // Reset reminder marks so we can fire 30/10/1-min reminders again on the next run
+  await admin.from('sessions').update({ push_reminders_sent: [] }).eq('id', sessionId).then(undefined, () => {})
 
   return NextResponse.json({ restarted: true })
 }

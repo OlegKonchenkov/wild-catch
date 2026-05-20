@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { sendPushToSession } from '@/lib/push'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -70,6 +71,13 @@ export async function POST(request: Request) {
     payload: { sessionId },
   })
   await admin.removeChannel(channel)
+
+  after(() => sendPushToSession(sessionId, {
+    title: '🏁 Sessione terminata',
+    body: 'L\'evento è concluso. Controlla classifica e DaimonDex!',
+    url: '/home',
+    tag: `session_${sessionId}_end`,
+  }))
 
   return NextResponse.json({ closed: true })
 }
