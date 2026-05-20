@@ -1,23 +1,34 @@
 /**
- * Map background ambience — enchanted forest, synthesized via Web Audio API.
+ * Map background ambience — "borgo all'alba" feel.
  *
- * Layers:
- *   1. Main melody   – G-major pentatonic, 4 phrases × ~5 s = ~21 s loop,
- *                      richer timbre: sine + octave + 5th-harmonic
- *   2. Counter-melody– soft high voice echoing key phrase endings
- *   3. Bass pulses   – pizzicato G2/D2/A2 one per phrase, adds warmth
- *   4. Random chimes – G pentatonic bell tones every 6–18 s
- *   5. Rare bird call– soft chirp every 12–28 s
+ * Loop structure (G major pentatonic, ~21 s):
+ *   1. Pluck melody   – Karplus-Strong plucked string (mandolino/chitarra),
+ *                       wide stereo via Haas delay
+ *   2. Counter-voice  – soft sine echoes through CATHEDRAL reverb
+ *                       (distant, ethereal)
+ *   3. Pizzicato bass – sine + 2nd harmonic, dry, anchored centre
+ *   4. Pad bed        – sustained Gmaj7 chord under everything, SMALL reverb,
+ *                       LFO-modulated lowpass for movement
+ *   5. FM bell chimes – metallic glockenspiel timbre, SMALL reverb,
+ *                       random every 6–18 s
+ *   6. Bird call      – occasional chirp every 12–28 s
  *
- * Ducking API:
- *   duckMapAmbience(duckTo?, rampMs?)  – smoothly lower ambience volume
- *   unduckMapAmbience(rampMs?)         – smoothly restore full volume
+ * Signal flow:
+ *   sources → duckGain → master bus
+ *   reverb sends → duckGain → master bus  (so duck affects wet tails too)
+ *
+ * Ducking API preserved:
+ *   duckMapAmbience(duckTo?, rampMs?)
+ *   unduckMapAmbience(rampMs?)
  */
 
 import { newAudioContext } from './shared-ac'
 import { getAudioOverride } from '../audio-overrides'
 import { isMusicMuted } from '@/lib/audioPrefs'
 import { startSampleLoop } from './sample-loop'
+import { getMasterBus } from './master-bus'
+import { createReverb } from './procedural-reverb'
+import { pluckString, pad, fmBell, haasWidth } from './synths'
 
 // ── Melody data ────────────────────────────────────────────────────────────────
 // G major pentatonic: G4=392 A4=440 B4=493.88 D5=587.33 E5=659.25 G5=783.99
@@ -81,32 +92,11 @@ const BASS: [number, number, number][] = [
   [18.5, 110.00, 0.55],
 ]
 
-// ── Note renderers (all route through a provided dest AudioNode) ───────────────
-function scheduleNote(ac: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vol: number): void {
-  const master = ac.createGain()
-  master.gain.setValueAtTime(0, t)
-  master.gain.linearRampToValueAtTime(vol, t + 0.012)
-  master.gain.exponentialRampToValueAtTime(vol * 0.54, t + 0.10)
-  master.gain.setValueAtTime(vol * 0.54, t + dur * 0.60)
-  master.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-  master.connect(dest)
+// Gmaj7 chord for the sustained pad bed: G2 D3 G3 B3 D4 F#4
+const PAD_CHORD = [97.999, 146.832, 195.998, 246.94, 293.66, 369.99]
 
-  const o1 = ac.createOscillator()
-  o1.type = 'sine'; o1.frequency.value = freq
-  o1.connect(master); o1.start(t); o1.stop(t + dur + 0.05)
-
-  const o2 = ac.createOscillator()
-  const g2 = ac.createGain()
-  o2.type = 'sine'; o2.frequency.value = freq * 2; g2.gain.value = 0.16
-  o2.connect(g2); g2.connect(master); o2.start(t); o2.stop(t + dur + 0.05)
-
-  const o3 = ac.createOscillator()
-  const g3 = ac.createGain()
-  o3.type = 'sine'; o3.frequency.value = freq * 3; g3.gain.value = 0.06
-  o3.connect(g3); g3.connect(master); o3.start(t); o3.stop(t + dur + 0.03)
-}
-
-function scheduleHigh(ac: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vol: number): void {
+// ── Counter-voice (soft sine echo, used via reverb cathedral) ─────────────────
+function scheduleCounter(ac: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vol: number): void {
   const o = ac.createOscillator()
   const g = ac.createGain()
   o.type = 'sine'; o.frequency.value = freq
@@ -117,7 +107,9 @@ function scheduleHigh(ac: AudioContext, dest: AudioNode, freq: number, t: number
   o.start(t); o.stop(t + dur + 0.03)
 }
 
+// ── Bass (pizzicato sine + 2nd harmonic) ──────────────────────────────────────
 function scheduleBass(ac: AudioContext, dest: AudioNode, freq: number, t: number, dur: number, vol: number): void {
+  // Fundamental
   const o = ac.createOscillator()
   const g = ac.createGain()
   o.type = 'sine'; o.frequency.value = freq
@@ -125,10 +117,19 @@ function scheduleBass(ac: AudioContext, dest: AudioNode, freq: number, t: number
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
   o.connect(g); g.connect(dest)
   o.start(t); o.stop(t + dur + 0.05)
+
+  // 2nd harmonic for warmth — softer and shorter
+  const o2 = ac.createOscillator()
+  const g2 = ac.createGain()
+  o2.type = 'triangle'; o2.frequency.value = freq * 2
+  g2.gain.setValueAtTime(vol * 0.07, t)
+  g2.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.5)
+  o2.connect(g2); g2.connect(dest)
+  o2.start(t); o2.stop(t + dur * 0.55)
 }
 
 // ── Module-level state for ducking ─────────────────────────────────────────────
-let _master: GainNode | null = null
+let _master:   GainNode    | null = null
 let _masterAC: AudioContext | null = null
 
 export function duckMapAmbience(duckTo = 0.08, rampMs = 350): void {
@@ -153,8 +154,6 @@ export function startMapAmbience(vol = 0.12): () => void {
   if (isMusicMuted()) return () => {}
 
   // Admin-uploaded override: bypass the synth path and play the file in loop.
-  // Ducking from `duckMapAmbience`/`unduckMapAmbience` is a no-op in this
-  // path (gates only the synth master). Acceptable for v1.
   const override = getAudioOverride('map')
   if (override) return startSampleLoop(override, { volume: Math.max(0.1, vol * 3) })
 
@@ -165,12 +164,22 @@ export function startMapAmbience(vol = 0.12): () => void {
   if (!ac) return () => {}
   const actx: AudioContext = ac
 
-  // Master gain — all ambience routes through here for ducking control
-  const masterGain = actx.createGain()
-  masterGain.gain.value = 1.0
-  masterGain.connect(actx.destination)
-  _master = masterGain
+  // Duck-gain sits in front of the master bus. Reverb sends and dry sources
+  // all feed into it, so duckMapAmbience smoothly dims wet tails together
+  // with dry signal — no awkward "reverb keeps blaring under modal" moment.
+  const duckGain = actx.createGain()
+  duckGain.gain.value = 1.0
+  duckGain.connect(getMasterBus(actx))
+  _master   = duckGain
   _masterAC = actx
+
+  // Reverb sends — built once for the lifetime of the loop, then shared
+  const reverbSmall     = createReverb(actx, 'small',     duckGain)
+  const reverbCathedral = createReverb(actx, 'cathedral', duckGain)
+
+  // Stereo widener for the melody — Haas effect at 14 ms / ±0.55 pan
+  // Routes to duckGain (dry path, no reverb on melody — it's the focal voice)
+  const melodyWidener = haasWidth(actx, duckGain, 14, 0.55)
 
   function onVisibility() {
     if (document.hidden) actx.suspend().catch(() => {})
@@ -181,19 +190,26 @@ export function startMapAmbience(vol = 0.12): () => void {
   function scheduleMelodyLoop(startTime: number): void {
     if (stopped) return
 
+    // Melody — Karplus-Strong plucked string through stereo widener
     let t = startTime
     for (const [freq, dur] of MELODY) {
-      scheduleNote(actx, masterGain, freq, t, dur, vol * 0.22)
+      pluckString(actx, freq, t, dur * 0.92, vol * 1.05, melodyWidener.input)
       t += dur
     }
 
+    // Counter-voice — sine through cathedral reverb (distant, ethereal)
     for (const [offset, freq, dur] of COUNTER) {
-      scheduleHigh(actx, masterGain, freq, startTime + offset, dur, vol)
+      scheduleCounter(actx, reverbCathedral, freq, startTime + offset, dur, vol)
     }
 
+    // Bass — dry, anchored centre
     for (const [offset, freq, dur] of BASS) {
-      scheduleBass(actx, masterGain, freq, startTime + offset, dur, vol)
+      scheduleBass(actx, duckGain, freq, startTime + offset, dur, vol)
     }
+
+    // Pad bed — Gmaj7 sustained across the whole loop, with reverb small
+    // Lower volume than melody so the pluck stays in front
+    pad(actx, PAD_CHORD, startTime, LOOP_DUR, vol * 0.18, reverbSmall)
 
     const msUntilNext = Math.max(50, (LOOP_DUR - 1.0) * 1000)
     const timer = setTimeout(() => scheduleMelodyLoop(startTime + LOOP_DUR), msUntilNext)
@@ -201,6 +217,7 @@ export function startMapAmbience(vol = 0.12): () => void {
   }
   scheduleMelodyLoop(actx.currentTime + 0.4)
 
+  // G pentatonic chime notes for the random sparkles
   const chimeNotes = [392.00, 493.88, 587.33, 659.25, 783.99, 880.00, 1046.5, 1318.5, 1567.98]
 
   function scheduleChime(): void {
@@ -213,15 +230,8 @@ export function startMapAmbience(vol = 0.12): () => void {
       const cnt  = 2 + Math.floor(Math.random() * 3)
       for (let j = 0; j < cnt; j++) {
         const freq = chimeNotes[base + j]
-        const o    = actx.createOscillator()
-        const g    = actx.createGain()
-        o.type = 'sine'; o.frequency.value = freq
-        const t2 = now + j * 0.16
-        g.gain.setValueAtTime(0, t2)
-        g.gain.linearRampToValueAtTime(vol * (0.25 + j * 0.04), t2 + 0.015)
-        g.gain.exponentialRampToValueAtTime(0.0001, t2 + 1.3)
-        o.connect(g); g.connect(masterGain)
-        o.start(t2); o.stop(t2 + 1.35)
+        // FM bell through small reverb — sparkles ring out into the room
+        fmBell(actx, freq, now + j * 0.16, 1.10, vol * (0.32 + j * 0.04), reverbSmall)
       }
       scheduleChime()
     }, delay)
@@ -245,7 +255,8 @@ export function startMapAmbience(vol = 0.12): () => void {
       g.gain.setValueAtTime(0, now)
       g.gain.linearRampToValueAtTime(vol * 0.36, now + 0.02)
       g.gain.exponentialRampToValueAtTime(0.0001, now + 0.20)
-      o.connect(g); g.connect(masterGain)
+      // Bird through small reverb — distant, sits in the room
+      o.connect(g); g.connect(reverbSmall)
       o.start(now); o.stop(now + 0.22)
       scheduleBird()
     }, delay)
@@ -255,7 +266,7 @@ export function startMapAmbience(vol = 0.12): () => void {
 
   return () => {
     stopped = true
-    _master = null
+    _master   = null
     _masterAC = null
     document.removeEventListener('visibilitychange', onVisibility)
     timers.forEach(clearTimeout)
