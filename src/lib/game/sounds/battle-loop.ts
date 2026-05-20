@@ -233,14 +233,18 @@ export function startEncounterLoop(vol = 0.12): () => void {
   duckGain.connect(getMasterBus(ac))
   const reverbSmall = createReverb(ac, 'small', duckGain)
 
-  // Side-chain bus for pad/counter/stabs — kick pumps this gain so layers
-  // breathe under the drums (cinematic / modern game feel)
+  // Side-chain bus for pad/counter/stabs — kick pumps this single gain so
+  // both the dry path (→ duckGain) and the wet path (→ reverbSmall) duck
+  // together. Earlier version had two separate pumped nodes which left the
+  // dry signal pumped while letting the wet tail keep ringing.
   const sideChain = ac.createGain()
   sideChain.gain.value = 1.0
   sideChain.connect(duckGain)
-  const sideChainWithReverb = ac.createGain()
-  sideChainWithReverb.gain.value = 1.0
-  sideChainWithReverb.connect(reverbSmall)
+  // Wet send level (not pumped — already downstream of sideChain)
+  const reverbSend = ac.createGain()
+  reverbSend.gain.value = 0.45
+  sideChain.connect(reverbSend)
+  reverbSend.connect(reverbSmall)
 
   const BEAT     = 60 / 142   // ≈ 0.4225 s per beat
   const E8       = BEAT / 2   // eighth note
@@ -313,15 +317,15 @@ export function startEncounterLoop(vol = 0.12): () => void {
     let lt = t0
     for (const [f, d] of LEAD) { synthLeadSaw(ac, f, lt, d * 0.80, vol * 0.22, duckGain); lt += d }
 
-    // Counter-melody → sideChainWithReverb → reverbSmall (pumps + ambient)
-    for (const [f, off, d] of COUNTER) { triVoice(ac, f, t0 + off, d * 0.85, vol * 0.13, sideChainWithReverb) }
+    // Counter-melody → sideChain (dry + wet via reverbSend, pumps with kick)
+    for (const [f, off, d] of COUNTER) { triVoice(ac, f, t0 + off, d * 0.85, vol * 0.13, sideChain) }
 
-    // Bass → duckGain (dry, anchored)
+    // Bass → duckGain (dry, anchored, no pump)
     let bt = t0
     for (const [f, d] of BASS) { subBass(ac, f, bt, d * 0.82, vol * 0.48, duckGain); bt += d }
 
-    // Chord stabs → sideChainWithReverb (pumps with kicks)
-    for (const [freqs, beat] of STABS) { chordStab(ac, freqs, t0 + beat * BEAT, vol * 0.10, sideChainWithReverb) }
+    // Chord stabs → sideChain (dry + wet, pumps with kick)
+    for (const [freqs, beat] of STABS) { chordStab(ac, freqs, t0 + beat * BEAT, vol * 0.10, sideChain) }
 
     // Full drum kit — 4 bars, all dry through duckGain
     for (let bar = 0; bar < 4; bar++) {
@@ -331,9 +335,8 @@ export function startEncounterLoop(vol = 0.12): () => void {
 
       for (const kt of kickHits) {
         kick(ac, kt, vol * 1.6, duckGain)
-        // Pump the side-chain bus (pad/counter/stabs duck under kick)
-        schedulePump(sideChain, ac, kt, 0.32, 0.16)
-        schedulePump(sideChainWithReverb, ac, kt, 0.32, 0.16)
+        // Single pump on the shared side-chain bus → both dry and wet duck
+        schedulePump(sideChain, ac, kt, 0.30, 0.16)
       }
 
       snare(ac, b0 + BEAT,     vol * 0.95, duckGain)  // beat 2
@@ -399,13 +402,15 @@ function startBattleLoop(cfg: BattleLoopConfig): () => void {
   const leadReverb = createReverb(actx, cfg.cathedral ? 'cathedral' : 'small', duckGain)
   const padReverb  = createReverb(actx, 'small', duckGain)
 
-  // Side-chain bus — pad/stabs pump under the kick
+  // Side-chain bus — pad/stabs go dry to duckGain and wet to padReverb, both
+  // downstream of the one pumped gain so they duck together under each kick.
   const sideChain = actx.createGain()
   sideChain.gain.value = 1.0
   sideChain.connect(duckGain)
-  const sideChainWithPadReverb = actx.createGain()
-  sideChainWithPadReverb.gain.value = 1.0
-  sideChainWithPadReverb.connect(padReverb)
+  const padReverbSend = actx.createGain()
+  padReverbSend.gain.value = 0.40
+  sideChain.connect(padReverbSend)
+  padReverbSend.connect(padReverb)
 
   const loopDur = cfg.melody.reduce((s, [, d]) => s + d, 0)
   const beatDur = 60 / cfg.bpm
@@ -437,15 +442,16 @@ function startBattleLoop(cfg: BattleLoopConfig): () => void {
       bt += dur
     }
 
-    // Pad bed (boss) — D minor sustained, with side-chain pumping under kicks
+    // Pad bed (boss) — D minor sustained, routed through sideChain so it
+    // gets both dry presence (→ duckGain) and reverb tail (→ padReverb)
     if (cfg.padChord) {
-      pad(actx, cfg.padChord, startTime, loopDur, cfg.vol * 0.20, sideChainWithPadReverb)
+      pad(actx, cfg.padChord, startTime, loopDur, cfg.vol * 0.20, sideChain)
     }
 
     // Chord stabs
     if (cfg.stabs) {
       for (const [freqs, beat] of cfg.stabs) {
-        chordStab(actx, freqs, startTime + beat * beatDur, cfg.vol * 0.10, sideChainWithPadReverb)
+        chordStab(actx, freqs, startTime + beat * beatDur, cfg.vol * 0.10, sideChain)
       }
     }
 
@@ -462,8 +468,8 @@ function startBattleLoop(cfg: BattleLoopConfig): () => void {
       const beatInBar = i % 4
       if (beatInBar === 0 || beatInBar === 2) {
         kick(actx, tb, cfg.vol * 1.6, duckGain)
+        // One pump on the shared side-chain bus → dry and wet duck together
         schedulePump(sideChain, actx, tb, pumpDepth, beatDur * 0.45)
-        schedulePump(sideChainWithPadReverb, actx, tb, pumpDepth, beatDur * 0.45)
       }
       if (beatInBar === 1 || beatInBar === 3) {
         snare(actx, tb, cfg.vol * 0.90, duckGain)

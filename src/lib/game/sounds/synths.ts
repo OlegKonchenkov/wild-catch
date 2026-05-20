@@ -21,19 +21,23 @@
  */
 
 /**
- * Karplus-Strong plucked-string synthesis.
+ * Plucked-string voice — additive synthesis with a pluck envelope.
  *
- * Algorithm:
- *   1. Excite a delay line of length 1/freq with a short noise burst.
- *   2. Feed the delay output through a 1st-order lowpass (sets brightness
- *      decay) and back into the delay input with feedback gain ≈ 0.985.
- *   3. The recirculating noise burst becomes a decaying harmonic spectrum
- *      that closely models a pluck.
+ * NOT Karplus-Strong: the K-S delay-line approach relies on DelayNode delays
+ * smaller than Chrome's 128-sample render quantum (~2.9 ms at 44.1 kHz),
+ * which doesn't work for notes above ~344 Hz — they all get clamped to the
+ * same wrong pitch. The previous attempt at K-S broke the entire melody
+ * range. This version is simpler and produces correct pitches everywhere:
  *
- * Caveats:
- *   - DelayNode minimum delay is implementation-dependent (~one render
- *     quantum on Chrome ≈ 0.7 ms). For freq > ~1500 Hz we fall back to a
- *     simpler triangle voice to avoid timing artefacts.
+ *   - Triangle fundamental (body) with a 1.2% pitch glide at the attack
+ *     (mimics string tension stabilising)
+ *   - 2nd harmonic sine (warmth)
+ *   - 3rd harmonic sine (shimmer, very low gain)
+ *   - Pluck envelope: fast attack (3 ms), sharp drop in first 80 ms,
+ *     exponential decay through the rest of `dur`
+ *
+ * Sounds like a soft plectrum pluck — not a perfect mandolin, but
+ * consistently musical at every frequency.
  */
 export function pluckString(
   ac: AudioContext,
@@ -43,71 +47,35 @@ export function pluckString(
   vol: number,
   dest: AudioNode,
 ): void {
-  // Fallback for very high frequencies where the K-S delay is too short.
-  if (freq > 1500) {
-    const o = ac.createOscillator()
-    const g = ac.createGain()
-    o.type = 'triangle'
-    o.frequency.value = freq
-    g.gain.setValueAtTime(0, t)
-    g.gain.linearRampToValueAtTime(vol, t + 0.005)
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur)
-    o.connect(g); g.connect(dest)
-    o.start(t); o.stop(t + dur + 0.03)
-    return
-  }
-
-  const delayTime = 1 / freq
-
-  // 4 ms exciter noise burst — clipped to the pluck attack
-  const burstLen = Math.max(32, Math.floor(ac.sampleRate * 0.004))
-  const burstBuf = ac.createBuffer(1, burstLen, ac.sampleRate)
-  const bd = burstBuf.getChannelData(0)
-  for (let i = 0; i < burstLen; i++) {
-    bd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / burstLen, 0.5)
-  }
-  const burst = ac.createBufferSource()
-  burst.buffer = burstBuf
-
-  const delay = ac.createDelay(0.05)
-  delay.delayTime.value = delayTime
-
-  // Damping LPF in feedback loop — controls timbre decay rate
-  const damp = ac.createBiquadFilter()
-  damp.type = 'lowpass'
-  damp.frequency.value = Math.min(8000, freq * 6 + 1500)
-  damp.Q.value = 0.5
-
-  // Feedback gain — sets sustain length; 0.985 gives ~2-3s natural decay,
-  // we scale via envelope to allow shorter `dur` values
-  const feedback = ac.createGain()
-  feedback.gain.value = 0.985
-
-  // Output envelope (multiplies the recirculating signal so the caller can
-  // request a shorter pluck without changing the feedback gain)
   const out = ac.createGain()
   out.gain.setValueAtTime(0, t)
-  out.gain.linearRampToValueAtTime(vol, t + 0.005)
-  out.gain.setValueAtTime(vol, t + Math.max(0.02, dur * 0.55))
-  out.gain.exponentialRampToValueAtTime(0.001, t + dur + 0.05)
-
-  // Graph: burst → delay → damp → out → dest
-  //                  ↑          │
-  //                  └─feedback─┘
-  burst.connect(delay)
-  delay.connect(damp)
-  damp.connect(feedback)
-  feedback.connect(delay)
-  damp.connect(out)
+  out.gain.linearRampToValueAtTime(vol, t + 0.003)
+  out.gain.exponentialRampToValueAtTime(vol * 0.40, t + 0.08)
+  out.gain.exponentialRampToValueAtTime(0.001, t + dur)
   out.connect(dest)
 
-  burst.start(t); burst.stop(t + 0.05)
+  // Fundamental — triangle with a tiny pitch glide at attack
+  const o1 = ac.createOscillator()
+  o1.type = 'triangle'
+  o1.frequency.setValueAtTime(freq * 1.012, t)
+  o1.frequency.exponentialRampToValueAtTime(freq, t + 0.020)
+  const g1 = ac.createGain(); g1.gain.value = 1.0
+  o1.connect(g1); g1.connect(out)
+  o1.start(t); o1.stop(t + dur + 0.05)
 
-  // Schedule cleanup ramp to silence the feedback loop so it doesn't ring
-  // forever (the gain envelope mutes it, but we also want the AudioParam
-  // automations to release the underlying nodes for GC).
-  feedback.gain.setValueAtTime(0.985, t + dur)
-  feedback.gain.linearRampToValueAtTime(0, t + dur + 0.4)
+  // 2nd harmonic — sine
+  const o2 = ac.createOscillator()
+  o2.type = 'sine'; o2.frequency.value = freq * 2
+  const g2 = ac.createGain(); g2.gain.value = 0.32
+  o2.connect(g2); g2.connect(out)
+  o2.start(t); o2.stop(t + dur + 0.05)
+
+  // 3rd harmonic — sine, very soft for shimmer
+  const o3 = ac.createOscillator()
+  o3.type = 'sine'; o3.frequency.value = freq * 3
+  const g3 = ac.createGain(); g3.gain.value = 0.10
+  o3.connect(g3); g3.connect(out)
+  o3.start(t); o3.stop(t + dur + 0.05)
 }
 
 /**

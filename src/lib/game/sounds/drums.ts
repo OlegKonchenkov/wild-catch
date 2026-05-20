@@ -194,29 +194,23 @@ export function tom(ac: AudioContext, t: number, freq: number, vol: number, dest
  * Schedule a side-chain ducking dip on a gain node, synchronised with a
  * drum hit. Creates the "pumping" feel where pads breathe under the kick.
  *
- * The gain is multiplied by (1 - depth) at the trigger time, then ramped
- * back to its base value over `releaseS` seconds. The gain node's intrinsic
- * value before the call is treated as the "rest" value to return to.
+ * Assumes the gain node's resting value is 1.0. Uses setTargetAtTime, which
+ * smoothly retargets without needing cancelScheduledValues — so rapid pumps
+ * just stack into each other without clicks or race conditions.
  *
  * Caller controls how often this fires — typically you call it for every
  * kick on beat 1 of each bar, sometimes also on beat 3.
  */
 export function schedulePump(
   gainNode: GainNode,
-  ac: AudioContext,
+  _ac: AudioContext,
   t: number,
   depth = 0.45,
   releaseS = 0.18,
 ): void {
-  const baseVal = gainNode.gain.value
-  const duckTo  = baseVal * (1 - depth)
-  // Cancel any in-flight automations so successive pumps stack cleanly
-  gainNode.gain.cancelScheduledValues(t - 0.001)
-  gainNode.gain.setValueAtTime(baseVal, t - 0.001)
-  // Fast attack (3 ms) into duck
-  gainNode.gain.linearRampToValueAtTime(duckTo, t + 0.003)
-  // Hold briefly so the dip is perceived as a "duck" not a "click"
-  gainNode.gain.setValueAtTime(duckTo, t + 0.025)
-  // Release back to base
-  gainNode.gain.linearRampToValueAtTime(baseVal, t + 0.025 + releaseS)
+  const duckTo = 1.0 - depth
+  // Attack: setTargetAtTime with a 4ms time constant ≈ 95% complete in 12ms
+  // Release: longer time constant for a natural breathe-back
+  gainNode.gain.setTargetAtTime(duckTo, t,          0.004)
+  gainNode.gain.setTargetAtTime(1.0,    t + 0.05,   releaseS / 3)
 }

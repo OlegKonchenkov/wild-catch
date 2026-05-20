@@ -6,19 +6,15 @@
  * deliberately stay on ac.destination so their volume isn't gated by the
  * music compressor — they're already tuned individually.
  *
- * Signal chain:
+ * Signal chain (intentionally minimal, post-incident calibration):
  *
- *   input → soft tanh saturator (2× oversample) → musical compressor
- *         → makeup gain → brick-wall limiter → ac.destination
+ *   input → gentle compressor → makeup (1.0) → brick-wall limiter → destination
  *
- * Why each stage:
- *   - Saturator (WaveShaperNode, tanh curve, oversampled to avoid aliasing)
- *     adds even-order harmonics on loud transients → warmth, perceived
- *     loudness, no harsh digital clipping.
- *   - Compressor (ratio 3.5:1, knee 6 dB) glues stacked layers (lead + pad
- *     + drums + reverb send) into one cohesive mix.
- *   - Limiter (ratio 20:1, 1 ms attack) prevents clipping on extreme stacks
- *     (boss intro hit + chord swell + reverb tail + side-chain pump).
+ * The earlier version had a tanh saturator + aggressive comp + makeup 1.35 —
+ * combined with the existing pads/leads this saturated the mix and produced
+ * audible pumping. The new chain is "transparent glue": compressor with a
+ * wide knee (12 dB) and modest ratio (2:1) only catches extreme peaks; the
+ * limiter is purely a safety net.
  *
  * Cache is keyed by AudioContext via WeakMap so multiple loops sharing one
  * AC share one bus, and the entry is automatically GC'd if the AC is freed.
@@ -26,46 +22,30 @@
 
 const cache = new WeakMap<AudioContext, GainNode>()
 
-function makeTanhCurve(amount: number): Float32Array<ArrayBuffer> {
-  const n = 2048
-  const curve = new Float32Array(new ArrayBuffer(n * 4))
-  const norm = Math.tanh(amount)
-  for (let i = 0; i < n; i++) {
-    const x = (i / (n - 1)) * 2 - 1
-    curve[i] = Math.tanh(amount * x) / norm
-  }
-  return curve
-}
-
 function build(ac: AudioContext): GainNode {
   const input = ac.createGain()
   input.gain.value = 1.0
 
-  const saturator = ac.createWaveShaper()
-  saturator.curve = makeTanhCurve(2.2)
-  saturator.oversample = '2x'
-
+  // Gentle compressor — wide knee, modest ratio. Catches occasional peaks
+  // without colouring the steady-state mix.
   const comp = ac.createDynamicsCompressor()
-  comp.threshold.value = -16
-  comp.knee.value = 6
-  comp.ratio.value = 3.5
-  comp.attack.value = 0.005
-  comp.release.value = 0.12
+  comp.threshold.value = -10
+  comp.knee.value = 12
+  comp.ratio.value = 2.0
+  comp.attack.value = 0.010
+  comp.release.value = 0.20
 
-  const makeup = ac.createGain()
-  makeup.gain.value = 1.35
-
+  // Brick-wall safety limiter — only activates near 0 dBFS to prevent
+  // clipping on rare extreme stacks. Does nothing in normal playback.
   const limiter = ac.createDynamicsCompressor()
-  limiter.threshold.value = -2
+  limiter.threshold.value = -1
   limiter.knee.value = 0
   limiter.ratio.value = 20
   limiter.attack.value = 0.001
   limiter.release.value = 0.05
 
-  input.connect(saturator)
-  saturator.connect(comp)
-  comp.connect(makeup)
-  makeup.connect(limiter)
+  input.connect(comp)
+  comp.connect(limiter)
   limiter.connect(ac.destination)
 
   return input

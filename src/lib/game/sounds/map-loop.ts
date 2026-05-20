@@ -177,6 +177,14 @@ export function startMapAmbience(vol = 0.12): () => void {
   const reverbSmall     = createReverb(actx, 'small',     duckGain)
   const reverbCathedral = createReverb(actx, 'cathedral', duckGain)
 
+  // Pad bus: dry to duckGain + tiny send to small reverb. Pad needs dry
+  // presence as the foundation — was wet-only before which made it wash.
+  const padBus = actx.createGain(); padBus.gain.value = 1.0
+  padBus.connect(duckGain)
+  const padReverbSend = actx.createGain(); padReverbSend.gain.value = 0.30
+  padBus.connect(padReverbSend)
+  padReverbSend.connect(reverbSmall)
+
   // Stereo widener for the melody — Haas effect at 14 ms / ±0.55 pan
   // Routes to duckGain (dry path, no reverb on melody — it's the focal voice)
   const melodyWidener = haasWidth(actx, duckGain, 14, 0.55)
@@ -207,9 +215,9 @@ export function startMapAmbience(vol = 0.12): () => void {
       scheduleBass(actx, duckGain, freq, startTime + offset, dur, vol)
     }
 
-    // Pad bed — Gmaj7 sustained across the whole loop, with reverb small
+    // Pad bed — Gmaj7 sustained across the whole loop, dry-heavy + tiny reverb
     // Lower volume than melody so the pluck stays in front
-    pad(actx, PAD_CHORD, startTime, LOOP_DUR, vol * 0.18, reverbSmall)
+    pad(actx, PAD_CHORD, startTime, LOOP_DUR, vol * 0.18, padBus)
 
     const msUntilNext = Math.max(50, (LOOP_DUR - 1.0) * 1000)
     const timer = setTimeout(() => scheduleMelodyLoop(startTime + LOOP_DUR), msUntilNext)

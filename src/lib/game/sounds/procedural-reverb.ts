@@ -45,22 +45,26 @@ interface PresetConfig {
   wetGain:       number                              // 0..1
 }
 
+// Calibrated low after the first attempt sounded too wet/unstable. Wet
+// gains kept conservative (around 0.15-0.20) so reverb adds depth without
+// turning the mix into a soup. Cathedral feedback brought below 0.80 for
+// stability (0.86 was near comb-resonance threshold).
 const PRESETS: Record<ReverbPreset, PresetConfig> = {
   small: {
     combDelays:    [0.0297, 0.0371, 0.0411, 0.0437],
-    combFeedback:  0.74,
+    combFeedback:  0.68,
     combDamping:   4500,
     allpassDelays: [0.0051, 0.0117],
     allpassG:      0.7,
-    wetGain:       0.30,
+    wetGain:       0.15,
   },
   cathedral: {
     combDelays:    [0.0571, 0.0683, 0.0789, 0.0913],
-    combFeedback:  0.86,
+    combFeedback:  0.78,
     combDamping:   2800,
     allpassDelays: [0.0073, 0.0149],
     allpassG:      0.72,
-    wetGain:       0.42,
+    wetGain:       0.20,
   },
 }
 
