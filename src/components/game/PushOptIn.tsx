@@ -93,52 +93,43 @@ export default function PushOptIn() {
   }
 
   if (state === 'subscribed') {
+    // Compact single line once active — non ruba spazio.
     return (
-      <Shell>
-        <Head
-          title="Notifiche push"
-          right={
-            <span style={{
-              fontSize: 11, fontWeight: 700, color: TEAL,
-              background: 'rgba(58,188,168,0.14)', border: '1px solid rgba(58,188,168,0.35)',
-              borderRadius: 999, padding: '3px 9px',
-            }}>
-              Attive
-            </span>
-          }
-        />
-        <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingLeft: 36 }}>
-          <button
-            onClick={sendTest}
-            disabled={testState === 'sending'}
-            style={{
-              flex: 1, padding: '9px 10px', borderRadius: 10, cursor: 'pointer',
-              fontSize: 12, fontWeight: 700,
-              background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              opacity: testState === 'sending' ? 0.6 : 1,
-            }}
-          >
-            {testState === 'sending' ? 'Invio…'
-              : testState === 'sent' ? '✅ Inviata'
-              : testState === 'error' ? '⚠ Errore'
-              : 'Prova'}
-          </button>
-          <button
-            onClick={unsubscribe}
-            disabled={busy}
-            style={{
-              flex: 1, padding: '9px 10px', borderRadius: 10, cursor: 'pointer',
-              fontSize: 12, fontWeight: 700,
-              background: 'transparent', color: 'rgba(255,255,255,0.5)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              opacity: busy ? 0.5 : 1,
-            }}
-          >
-            Disattiva
-          </button>
-        </div>
-      </Shell>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '11px 18px',
+      }}>
+        <span style={{ fontSize: 16, width: 24, textAlign: 'center', flexShrink: 0 }}>🔔</span>
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: TEAL }}>
+          Notifiche attive
+        </span>
+        <button
+          onClick={sendTest}
+          disabled={testState === 'sending'}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)',
+            padding: '4px 6px', opacity: testState === 'sending' ? 0.6 : 1,
+          }}
+        >
+          {testState === 'sending' ? 'Invio…'
+            : testState === 'sent' ? '✅ Inviata'
+            : testState === 'error' ? '⚠ Errore'
+            : 'Prova'}
+        </button>
+        <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
+        <button
+          onClick={unsubscribe}
+          disabled={busy}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)',
+            padding: '4px 6px', opacity: busy ? 0.5 : 1,
+          }}
+        >
+          Disattiva
+        </button>
+      </div>
     )
   }
 
