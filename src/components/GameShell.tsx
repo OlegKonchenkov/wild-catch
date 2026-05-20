@@ -287,6 +287,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null)
   const [showNotifPanel, setShowNotifPanel] = useState(false)
   const [notifTab, setNotifTab] = useState<'messaggi' | 'eventi'>('messaggi')
+  const [showPushSettings, setShowPushSettings] = useState(false)
   const [notifications, setNotifications] = useState<AdminNotificationRow[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -832,10 +833,30 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/10 flex-shrink-0">
                 <h2 className="font-bold text-white text-base">🔔 Notifiche</h2>
-                <button onClick={() => setShowNotifPanel(false)} className="text-white/40 hover:text-white text-xl">✕</button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setShowPushSettings(v => !v)}
+                    aria-label={showPushSettings ? 'Nascondi impostazioni notifiche' : 'Impostazioni notifiche push'}
+                    aria-expanded={showPushSettings}
+                    title="Impostazioni notifiche push"
+                    className="flex items-center justify-center transition-all"
+                    style={{
+                      width: 32, height: 32, borderRadius: 8, cursor: 'pointer',
+                      background: showPushSettings ? 'rgba(58,188,168,0.18)' : 'transparent',
+                      border: `1px solid ${showPushSettings ? 'rgba(58,188,168,0.45)' : 'rgba(255,255,255,0.08)'}`,
+                      color: showPushSettings ? '#3ABCA8' : 'rgba(255,255,255,0.55)',
+                      fontSize: 15, lineHeight: 1,
+                    }}
+                  >⚙️</button>
+                  <button onClick={() => setShowNotifPanel(false)} className="text-white/40 hover:text-white text-xl px-2">✕</button>
+                </div>
               </div>
-              {/* Push opt-in */}
-              <PushOptIn />
+              {/* Push opt-in — visibile solo su tap dell'ingranaggio */}
+              {showPushSettings && (
+                <div className="border-b border-white/8 flex-shrink-0">
+                  <PushOptIn expanded />
+                </div>
+              )}
               {/* Tabs */}
               <div className="flex-none px-4 py-2 border-b border-white/8">
                 <div className="flex gap-1 bg-white/5 rounded-xl p-1">

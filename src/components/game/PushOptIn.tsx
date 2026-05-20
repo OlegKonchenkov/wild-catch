@@ -23,11 +23,14 @@ const noteStyle: React.CSSProperties = {
   margin: '6px 0 0', paddingLeft: 36,
 }
 
-export default function PushOptIn() {
+export default function PushOptIn({ expanded = false }: { expanded?: boolean } = {}) {
   const { state, busy, subscribe, unsubscribe } = usePushNotifications()
   const [iosNeedsInstall, setIosNeedsInstall] = useState(false)
   const [testState, setTestState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [actionsOpen, setActionsOpen] = useState(false)
+  // `expanded` forces the actions panel open (used in the bell where the
+  // parent already controls show/hide via a gear button in the header).
+  const showActions = expanded || actionsOpen
 
   useEffect(() => {
     const ua = navigator.userAgent || ''
@@ -106,23 +109,25 @@ export default function PushOptIn() {
             </div>
             <div style={{ fontSize: 12, color: TEAL, marginTop: 2 }}>Attive</div>
           </div>
-          <button
-            type="button"
-            onClick={() => setActionsOpen(v => !v)}
-            aria-label={actionsOpen ? 'Nascondi opzioni notifiche' : 'Mostra opzioni notifiche'}
-            aria-expanded={actionsOpen}
-            title="Opzioni notifiche"
-            style={{
-              width: 36, height: 36, borderRadius: 10, cursor: 'pointer', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: actionsOpen ? 'rgba(58,188,168,0.18)' : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${actionsOpen ? 'rgba(58,188,168,0.45)' : 'rgba(255,255,255,0.1)'}`,
-              color: actionsOpen ? TEAL : 'rgba(255,255,255,0.6)',
-              fontSize: 16, lineHeight: 1, transition: 'background 0.18s, border-color 0.18s, color 0.18s',
-            }}
-          >⚙️</button>
+          {!expanded && (
+            <button
+              type="button"
+              onClick={() => setActionsOpen(v => !v)}
+              aria-label={actionsOpen ? 'Nascondi opzioni notifiche' : 'Mostra opzioni notifiche'}
+              aria-expanded={actionsOpen}
+              title="Opzioni notifiche"
+              style={{
+                width: 36, height: 36, borderRadius: 10, cursor: 'pointer', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: actionsOpen ? 'rgba(58,188,168,0.18)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${actionsOpen ? 'rgba(58,188,168,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                color: actionsOpen ? TEAL : 'rgba(255,255,255,0.6)',
+                fontSize: 16, lineHeight: 1, transition: 'background 0.18s, border-color 0.18s, color 0.18s',
+              }}
+            >⚙️</button>
+          )}
         </div>
-        {actionsOpen && (
+        {showActions && (
           <div style={{ display: 'flex', gap: 8, padding: '0 18px 14px 54px' }}>
             <button
               onClick={sendTest}
