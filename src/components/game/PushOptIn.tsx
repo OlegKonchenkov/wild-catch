@@ -27,6 +27,7 @@ export default function PushOptIn() {
   const { state, busy, subscribe, unsubscribe } = usePushNotifications()
   const [iosNeedsInstall, setIosNeedsInstall] = useState(false)
   const [testState, setTestState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [actionsOpen, setActionsOpen] = useState(false)
 
   useEffect(() => {
     const ua = navigator.userAgent || ''
@@ -93,42 +94,67 @@ export default function PushOptIn() {
   }
 
   if (state === 'subscribed') {
-    // Compact single line once active — non ruba spazio.
+    // Riga "pulita" come le altre preferenze; le azioni stanno dentro un
+    // pannello che si apre cliccando l'ingranaggio.
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '11px 18px',
-      }}>
-        <span style={{ fontSize: 16, width: 24, textAlign: 'center', flexShrink: 0 }}>🔔</span>
-        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: TEAL }}>
-          Notifiche attive
-        </span>
-        <button
-          onClick={sendTest}
-          disabled={testState === 'sending'}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)',
-            padding: '4px 6px', opacity: testState === 'sending' ? 0.6 : 1,
-          }}
-        >
-          {testState === 'sending' ? 'Invio…'
-            : testState === 'sent' ? '✅ Inviata'
-            : testState === 'error' ? '⚠ Errore'
-            : 'Prova'}
-        </button>
-        <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
-        <button
-          onClick={unsubscribe}
-          disabled={busy}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)',
-            padding: '4px 6px', opacity: busy ? 0.5 : 1,
-          }}
-        >
-          Disattiva
-        </button>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px' }}>
+          <span style={{ fontSize: 20, width: 24, textAlign: 'center', flexShrink: 0 }}>🔔</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>
+              Notifiche
+            </div>
+            <div style={{ fontSize: 12, color: TEAL, marginTop: 2 }}>Attive</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionsOpen(v => !v)}
+            aria-label={actionsOpen ? 'Nascondi opzioni notifiche' : 'Mostra opzioni notifiche'}
+            aria-expanded={actionsOpen}
+            title="Opzioni notifiche"
+            style={{
+              width: 36, height: 36, borderRadius: 10, cursor: 'pointer', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: actionsOpen ? 'rgba(58,188,168,0.18)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${actionsOpen ? 'rgba(58,188,168,0.45)' : 'rgba(255,255,255,0.1)'}`,
+              color: actionsOpen ? TEAL : 'rgba(255,255,255,0.6)',
+              fontSize: 16, lineHeight: 1, transition: 'background 0.18s, border-color 0.18s, color 0.18s',
+            }}
+          >⚙️</button>
+        </div>
+        {actionsOpen && (
+          <div style={{ display: 'flex', gap: 8, padding: '0 18px 14px 54px' }}>
+            <button
+              onClick={sendTest}
+              disabled={testState === 'sending'}
+              style={{
+                flex: 1, padding: '9px 10px', borderRadius: 10, cursor: 'pointer',
+                fontSize: 12, fontWeight: 700,
+                background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                opacity: testState === 'sending' ? 0.6 : 1,
+              }}
+            >
+              {testState === 'sending' ? 'Invio…'
+                : testState === 'sent' ? '✅ Inviata'
+                : testState === 'error' ? '⚠ Errore'
+                : 'Invia notifica di prova'}
+            </button>
+            <button
+              onClick={unsubscribe}
+              disabled={busy}
+              style={{
+                padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+                fontSize: 12, fontWeight: 700,
+                background: 'transparent', color: 'rgba(255,255,255,0.55)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                opacity: busy ? 0.5 : 1,
+              }}
+            >
+              Disattiva
+            </button>
+          </div>
+        )}
       </div>
     )
   }
