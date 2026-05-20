@@ -19,8 +19,8 @@ interface SessionRow {
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET
   if (!secret) return false
-  // Vercel cron sends an Authorization header derived from CRON_SECRET; we
-  // also accept a manual Bearer token for local testing.
+  // Supabase pg_cron (migration 043) attaches `Authorization: Bearer
+  // ${CRON_SECRET}` via pg_net. Same header works for manual local calls.
   const auth = request.headers.get('authorization') ?? ''
   return auth === `Bearer ${secret}`
 }
