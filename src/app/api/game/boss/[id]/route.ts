@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
@@ -245,7 +245,7 @@ async function grantBossFightRewards({
     type: 'boss_won',
     payload: { fight_id: fightId, gold: goldReward, exp: reward?.exp ?? 50, boss_name: bossName },
   }).then(undefined, () => {})
-  void (async () => {
+  after(async () => {
     const nick = await getDisplayName(userId)
     const who = nick ? `${nick}, ` : ''
     const xp = reward?.exp ?? 50
@@ -260,7 +260,7 @@ async function grantBossFightRewards({
       `${who}impresa compiuta contro ${bossName}! +${goldReward} 🪙 · +${xp} ⭐`,
     ])
     await sendPushToUser(userId, { title, body, url: '/game/map', tag: 'boss_won' })
-  })()
+  })
 
   if (levelUp) {
     admin.from('player_game_events').insert({

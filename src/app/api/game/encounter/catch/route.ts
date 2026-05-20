@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
@@ -299,7 +299,7 @@ export async function POST(request: Request) {
       type: 'level_up',
       payload: { new_level: levelUp.newLevel, gold_reward: levelUp.goldReward },
     }).then(undefined, () => {})
-    void (async () => {
+    after(async () => {
       const nick = await getDisplayName(user.id)
       const who = nick ? `${nick}, ` : ''
       const title = pickOne([
@@ -314,7 +314,7 @@ export async function POST(request: Request) {
         `${who}ora sei livello ${levelUp.newLevel}.${reward} Nuove sfide ti aspettano.`,
       ])
       await sendPushToUser(user.id, { title, body, url: '/game/map', tag: 'level_up' })
-    })()
+    })
   }
   adminEvt.from('player_game_events').insert({
     user_id: user.id,

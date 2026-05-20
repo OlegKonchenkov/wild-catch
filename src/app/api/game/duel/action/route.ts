@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
@@ -89,22 +89,22 @@ export async function POST(request: Request) {
     {
       const winnerName = timeoutProfileMap[userId] ?? 'L\'avversario'
       const loserName = timeoutProfileMap[oppUserId!] ?? null
-      void sendPushToUser(oppUserId!, {
+      after(() => sendPushToUser(oppUserId!, {
         title: '⏱️ Duello perso',
         body: pickOne([
           `Tempo scaduto: ${winnerName} si aggiudica il duello. Rivincita?`,
           `Non sei rientrato in tempo — ${winnerName} vince. La prossima è tua!`,
         ]),
         url: '/game/duel', tag: 'duel_result',
-      })
-      void sendPushToUser(userId, {
+      }))
+      after(() => sendPushToUser(userId, {
         title: '🏆 Duello vinto!',
         body: pickOne([
           `${loserName ?? 'L\'avversario'} non è tornato in tempo: vittoria a tavolino!`,
           `Vittoria! ${loserName ?? 'Lo sfidante'} ha lasciato il campo.`,
         ]),
         url: '/game/duel', tag: 'duel_result',
-      })
+      }))
     }
     return NextResponse.json({ ended: true, winnerId: userId })
   }
@@ -138,14 +138,14 @@ export async function POST(request: Request) {
     ]).then(undefined, () => {})
     {
       const loserName = surrenderProfileMap[userId] ?? 'L\'avversario'
-      void sendPushToUser(oppUserId!, {
+      after(() => sendPushToUser(oppUserId!, {
         title: '🏆 Duello vinto!',
         body: pickOne([
           `${loserName} si è arreso: la vittoria è tua!`,
           `${loserName} ha gettato la spugna. Ben giocato!`,
         ]),
         url: '/game/duel', tag: 'duel_result',
-      })
+      }))
     }
     return NextResponse.json({ ended: true, winnerId: oppUserId })
   }

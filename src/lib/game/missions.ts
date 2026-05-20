@@ -1,3 +1,4 @@
+import { after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendPushToUser, getDisplayName, pickOne } from '@/lib/push'
 import { getMissionUnlockState, type MissionUnlockContext, type MissionUnlockFields } from '@/lib/game/mission-unlocks'
@@ -207,7 +208,7 @@ export async function incrementMissionProgress({
         levelUp,
         tutorialFrammentoGranted,
       })
-      void (async () => {
+      after(async () => {
         const nick = await getDisplayName(userId)
         const who = nick ? `${nick}, ` : ''
         const rw = [
@@ -221,7 +222,7 @@ export async function incrementMissionProgress({
           `${who}"${mission.title}" è fatta.${rw ? ` Incassati ${rw}.` : ''}`,
         ])
         await sendPushToUser(userId, { title, body, url: '/game/missions', tag: `mission_${mission.id}` })
-      })()
+      })
     }
   }
 
