@@ -24,6 +24,51 @@ A single `<BattleScene>` compositor renders layers 1–3; a `<BattleHud>` set re
 
 ---
 
+## Stato avanzamento - aggiornato 2026-05-21
+
+**Branch corrente:** `feat/battle-immersive-ui`
+
+**Ultimi commit rilevanti:**
+- `ff38557` - stato WIP salvato prima di continuare il lavoro.
+- `bf9f2f6` - prima rifinitura della scena immersiva.
+- `56ceb56` - polish della lower HUD.
+- `f85e798` - evidenza piu chiara del membro squadra attivo.
+- `6642b70` - VS + fulmini molto piu vicini al mockup.
+- `67ecb88` - layout immersivo collegato a incontri, duelli e boss fight.
+- `1cbb61c` - preferenza per gli sprite/cutout nelle lineup di battaglia.
+- `645d895` - admin artwork aggiornato per salvare cutout come sprite battle.
+- `5309c20` - reidratazione degli incontri con `sprite_url` vuoto o mancante.
+
+**Cosa e gia in app:**
+- Il nuovo layer condiviso in `src/components/battle/` esiste ed e usato: `BattleScene`, `ElementBackdrop`, `SceneParticles`, `VsEmblem`, `CombatantCard`, `SquadBar`, `ActionBar`, `TurnTimer`, `DamageBurst`, `ImmersiveBattleLayout`, `CaptureOverlay`.
+- Il mockup e stato avvicinato con scena full-screen, creature separate nei due ambienti, seam centrale, fulmini/VS dorato, action bar piu compatta, squad bar compatta e membro attivo molto piu leggibile.
+- Il layout immersivo e attivo per `encounter`, `duel` e `boss`. Il vecchio layout resta disponibile con `NEXT_PUBLIC_BATTLE_LEGACY_UI=1`.
+- Attacchi, danni, crit/freeze, status notice, switch notice, timer lineare, squad switch e overlay cattura sono collegati al nuovo layout senza cambiare la logica combat.
+- Gli incontri e i boss propagano `sprite_url` nella UI. Le sessioni/incontri gia salvati con sprite mancante vengono reidratati dal DB.
+- L'admin creature ora permette di scegliere fra `Sprite battle` e `Card`: `Sprite battle` salva su `creatures.sprite_url` e storage `creature-artwork/creatures/cutouts/${id}.png`; `Card` resta su `image_url`.
+- Verifiche passate: `npm run typecheck`, test `battle-scene`, test admin artwork route, test boss route, test encounter get route.
+
+**Nota importante sullo schema asset:**
+- Il piano originale prevedeva una nuova colonna `sprite_cutout_url`. Nel repo attuale esiste gia `creatures.sprite_url`, quindi l'implementazione corrente usa `sprite_url` come campo cutout/battle sprite per evitare una migrazione immediata.
+- `resolveCreatureSprite()` supporta comunque `sprite_cutout_url || sprite_url || image_url`, quindi in futuro possiamo ancora migrare a `sprite_cutout_url` se vogliamo separare semanticamente i campi.
+- La route admin usa `OPENAI_IMAGE_MODEL ?? 'gpt-image-1.5'`: per chiudere al 100% la Task A1 come scritta, va deciso se impostare `OPENAI_IMAGE_MODEL=gpt-image-2` in env oppure cambiare il fallback del codice a `gpt-image-2`.
+
+**Stato per fase:**
+- **Phase A - Asset pipeline:** parziale. La route admin supporta cutout/legacy e salvataggio non distruttivo su `sprite_url`; non sono ancora implementati `kind:'scene'`, migrazione `sprite_cutout_url`, script batch `regen:creatures`, o rigenerazione completa bestiario. Background presenti: `bosco.webp` e `terra.webp`; mancanti `fiamma.webp`, `adriatico.webp`, `armonia.webp`, `arena.webp`.
+- **Phase B - Core compositor:** sostanzialmente completata. Componenti scena, backdrop, particelle, VS e compositor sono presenti.
+- **Phase C - HUD overlays:** sostanzialmente completata per la battle UI. `CombatantCard`, `SquadBar`, `ActionBar`, `TurnTimer` sono cablati tramite `ImmersiveBattleLayout`. `BattleTopBar` esiste e viene usato nel demo, ma non e ancora cablato nelle schermate reali perche il top bar globale resta fuori dalla battle scene.
+- **Phase D - Damage / impact:** parziale-avanzata. `DamageBurst`, crit/freeze, HP ghost bar e passaggio `AttackAnimation` sono presenti. Restano da rifinire micro screen-shake/zoom punch, reazioni super-effective e timing di impatto piu cinematografico.
+- **Phase E - Wire screens:** completata come primo rollout. Incontri, duelli e boss usano il layout immersivo, con fallback legacy via env flag.
+- **Phase F - Game-designer polish:** ancora da fare come passata dedicata. Priorita consigliata: rigenerare/verificare sprite Miniera via `Sprite battle`, completare background mancanti, poi fare polish su attacco, svenimento/cambio, cattura, vittoria/sconfitta e items drawer.
+
+**Prossimo passo consigliato:**
+1. Rigenerare o incollare Miniera in Admin -> Creatures con modalita `Sprite battle`, poi testare incontro/boss/duello.
+2. Generare i 4 background mancanti.
+3. Decidere se restare su `sprite_url` o introdurre davvero `sprite_cutout_url`.
+4. Fare una passata Phase F su animazioni: attacco, lancio rete/cattura, svenimento, cambio creatura, status, vittoria/sconfitta.
+
+---
+
 ## 0. Read first / ground truth
 
 Before writing code, read these so you match existing conventions:
