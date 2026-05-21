@@ -778,7 +778,7 @@ function buildCreatureSummaries(lineups: any[], userId: string) {
       if (!cr) return null
       return {
         name:      cr.name      ?? null,
-        image_url: cr.image_url ?? cr.sprite_url ?? null,
+        image_url: cr.sprite_url ?? cr.image_url ?? null,
         rarity:    cr.rarity    ?? null,
         element:   cr.element   ?? null,
         hp:        cr.hp        ?? null,

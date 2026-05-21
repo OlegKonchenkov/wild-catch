@@ -44,6 +44,38 @@ function NetSvg() {
   )
 }
 
+function CaptureParticles() {
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      {Array.from({ length: 16 }).map((_, i) => {
+        const angle = (Math.PI * 2 * i) / 16
+        const distance = 54 + (i % 4) * 12
+        const x = Math.cos(angle) * distance
+        const y = Math.sin(angle) * distance
+        const color = i % 2 === 0 ? '#34D399' : '#F0CE7A'
+        return (
+          <motion.span
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              top: '23%',
+              left: '70%',
+              width: i % 3 === 0 ? 5 : 3,
+              height: i % 3 === 0 ? 5 : 3,
+              color,
+              background: color,
+              boxShadow: '0 0 12px currentColor',
+            }}
+            initial={{ x: 0, y: 0, scale: 0.2, opacity: 0 }}
+            animate={{ x, y, scale: [0.2, 1, 0.35], opacity: [0, 1, 0] }}
+            transition={{ duration: 0.68, delay: i * 0.012, ease: 'easeOut' }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
 export default function CaptureOverlay({ phase, success, creatureName }: Props) {
   return (
     <>
@@ -60,22 +92,25 @@ export default function CaptureOverlay({ phase, success, creatureName }: Props) 
           >
             <NetSvg />
             {phase === 'hit' && (
-              <motion.div
-                className="absolute rounded-full"
-                style={{
-                  top: '23%',
-                  left: '70%',
-                  width: 74,
-                  height: 74,
-                  marginLeft: -37,
-                  marginTop: -37,
-                  background: 'radial-gradient(circle, rgba(58,188,168,.75), transparent 70%)',
-                  filter: 'blur(2px)',
-                }}
-                initial={{ opacity: 0, scale: 0.2 }}
-                animate={{ opacity: [0, 0.95, 0], scale: [0.2, 1.8, 2.4] }}
-                transition={{ duration: 0.45 }}
-              />
+              <>
+                <motion.div
+                  className="absolute rounded-full"
+                  style={{
+                    top: '23%',
+                    left: '70%',
+                    width: 92,
+                    height: 92,
+                    marginLeft: -46,
+                    marginTop: -46,
+                    background: 'radial-gradient(circle, rgba(58,188,168,.82), rgba(240,206,122,.28) 34%, transparent 72%)',
+                    filter: 'blur(2px)',
+                  }}
+                  initial={{ opacity: 0, scale: 0.2 }}
+                  animate={{ opacity: [0, 0.95, 0], scale: [0.2, 1.7, 2.55] }}
+                  transition={{ duration: 0.48 }}
+                />
+                <CaptureParticles />
+              </>
             )}
           </motion.div>
         )}

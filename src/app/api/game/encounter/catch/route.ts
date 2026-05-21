@@ -326,7 +326,7 @@ export async function POST(request: Request) {
       element:          creature.element,
       evolved:          evolvedTriggered,
       gold:             goldGain,
-      image_url:        creature.image_url ?? creature.sprite_url ?? null,
+      image_url:        creature.sprite_url ?? creature.image_url ?? null,
       hp:               creature.hp  ?? null,
       atk:              creature.atk ?? null,
       def:              creature.def ?? null,

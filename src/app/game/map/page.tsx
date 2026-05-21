@@ -1942,7 +1942,7 @@ function MapPageInner() {
               }}
             >
               <CreatureSprite
-                imageUrl={pendingEncounter.creature.image_url || pendingEncounter.creature.sprite_url || ''}
+                imageUrl={pendingEncounter.creature.sprite_url || pendingEncounter.creature.image_url || ''}
                 name={pendingEncounter.creature.name}
                 size={48}
                 element={pendingEncounter.creature.element}

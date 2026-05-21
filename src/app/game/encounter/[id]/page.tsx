@@ -1523,7 +1523,7 @@ export default function EncounterPage() {
             transition={{ type: 'spring', stiffness: 80, damping: 14, delay: 1.5 }}
           >
             <CreatureCard
-              imageUrl={state.creature.image_url ?? ''}
+              imageUrl={state.creature.sprite_url ?? state.creature.image_url ?? ''}
               name={state.creature.name ?? '?'}
               element={wildElem}
               rarity={state.creature.rarity ?? 'comune'}
@@ -2210,7 +2210,7 @@ export default function EncounterPage() {
                       transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.2 }}
                     >
                       <CreatureSprite
-                        imageUrl={cr?.image_url ?? state.creature.image_url ?? ''}
+                        imageUrl={cr?.sprite_url ?? cr?.image_url ?? state.creature.sprite_url ?? state.creature.image_url ?? ''}
                         name={cr?.name ?? state.creature.name ?? ''}
                         animState="idle"
                         size={160}

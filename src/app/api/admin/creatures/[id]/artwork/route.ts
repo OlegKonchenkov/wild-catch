@@ -62,7 +62,9 @@ export async function POST(
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY non configurata' }, { status: 500 })
 
-  const model = process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1.5'
+  const model = kind === 'cutout'
+    ? process.env.OPENAI_CUTOUT_IMAGE_MODEL ?? 'gpt-image-1.5'
+    : process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-2'
   const enhancedPrompt = kind === 'cutout'
     ? `Single creature sprite for a mobile creature-catching game set in the Italian Adriatic coast and Apennine forests. Cute-but-characterful chibi fantasy style, hand-painted semi-stylized shading, soft rim light, centered full body, facing camera 3/4. TRANSPARENT BACKGROUND, no ground, no platform, no baked shadow, no scenery, no text, no UI, no border. Square. Subject: ${prompt.trim()}`
     : `Creature card artwork for a mobile creature-catching game set in the Italian Adriatic coast and Apennine forests. Chibi/cute fantasy style, vibrant colors, no text, square format, atmospheric background suitable for game cards. The creature: ${prompt.trim()}`

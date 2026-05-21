@@ -397,7 +397,7 @@ export default function BattleScreen({
               transition={showBossIntro ? { type: 'spring', stiffness: 80, damping: 14, delay: 3.3 } : { duration: 0.25 }}
             >
               <CreatureCard
-                imageUrl={activeBoss.image_url || activeBoss.sprite_url}
+                imageUrl={activeBoss.sprite_url || activeBoss.image_url}
                 name={activeBoss.name}
                 element={activeBoss.element}
                 rarity="leggendaria"

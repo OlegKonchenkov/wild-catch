@@ -153,6 +153,29 @@ function CenterNotice({ notice, seamPct = 44 }: { notice?: ImmersiveNotice | nul
   )
 }
 
+function ImpactFlash({ damage, seamPct }: { damage: ImmersiveDamage; seamPct: number }) {
+  const isCrit = damage.kind === 'crit'
+  const isHeal = damage.kind === 'heal'
+  const color = isHeal ? '#34D399' : isCrit ? '#F7C841' : damage.kind === 'poison' ? '#4ADE80' : '#EF4444'
+  const origin = damage.target === 'enemy' ? `72% ${Math.max(16, seamPct - 26)}%` : `28% ${Math.min(84, seamPct + 26)}%`
+
+  return (
+    <motion.div
+      key={`impact-${damage.id}`}
+      aria-hidden
+      className="pointer-events-none absolute inset-0"
+      style={{
+        zIndex: 18,
+        background: `radial-gradient(circle at ${origin}, ${color}${isCrit ? '88' : '66'} 0%, ${color}22 18%, transparent 42%)`,
+        mixBlendMode: isCrit ? 'screen' : 'plus-lighter',
+      }}
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: [0, isCrit ? 0.7 : 0.38, 0], scale: [0.98, isCrit ? 1.035 : 1.015, 1] }}
+      transition={{ duration: isCrit ? 0.32 : 0.22, ease: 'easeOut' }}
+    />
+  )
+}
+
 export default function ImmersiveBattleLayout({
   enemy,
   player,
@@ -176,6 +199,7 @@ export default function ImmersiveBattleLayout({
 }: Props) {
   const enemyHpPct = clampPct(enemy.currentHp, enemy.maxHp)
   const playerHpPct = clampPct(player.currentHp, player.maxHp)
+  const sceneFreeze = freeze || damage?.kind === 'crit'
 
   return (
     <div
@@ -186,7 +210,7 @@ export default function ImmersiveBattleLayout({
         enemy={{ element: enemy.element, spriteUrl: spriteFor(enemy), name: enemy.name, rarity: enemy.rarity, animState: enemy.animState, fainting: enemy.fainting, hpPct: enemyHpPct }}
         player={{ element: player.element, spriteUrl: spriteFor(player), name: player.name, rarity: player.rarity, animState: player.animState, fainting: player.fainting, hpPct: playerHpPct }}
         arena={arena}
-        freeze={freeze}
+        freeze={sceneFreeze}
         bossGold={bossGold}
         seamPct={seamPct}
       >
@@ -215,6 +239,8 @@ export default function ImmersiveBattleLayout({
         <StatusLayer combatant={player} target="player" />
 
         <CenterNotice notice={notice} seamPct={seamPct} />
+
+        {damage && <ImpactFlash damage={damage} seamPct={seamPct} />}
 
         {damage && (
           <DamageBurst

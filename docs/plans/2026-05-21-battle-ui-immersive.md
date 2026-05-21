@@ -6,7 +6,7 @@
 
 **Architecture:** Layer separation. Today each creature image has its background **baked in** (one square illustration). We split that into reusable layers:
 1. **Background** — one wide scene per element (5) + one neutral arena (duels), served from `/public/backgrounds/battle/`.
-2. **Creature** — transparent PNG, **freshly generated** (native transparent output from gpt-image-2 — NOT background-removed from the old art), composited on top with the existing aura/contact-shadow treatment.
+2. **Creature** — transparent PNG, **freshly generated** (native transparent output from gpt-image-1.5 — NOT background-removed from the old art), composited on top with the existing aura/contact-shadow treatment.
 3. **Atmosphere** — seam fog, VS emblem, per-element particles, dynamic reactions (low-HP darken, crit freeze).
 4. **HUD** — light glass info cards, portrait squad bar, hierarchic action bar, hairline timer.
 
@@ -15,12 +15,12 @@ A single `<BattleScene>` compositor renders layers 1–3; a `<BattleHud>` set re
 **Asset strategy (decided by the product owner):** regenerate **everything** — both the creature sprites (as clean native transparent cutouts) and their element backgrounds — for maximum quality and thematic coherence with the game's world (Italian Adriatic/Apennine mythological bestiary, the cute-but-characterful chibi monster style visible in the current art). We do NOT background-remove the old art (fragile, leaves halos/leftover ground).
 
 **NON-DESTRUCTIVE — this is a hard requirement.** Everything new is additive so the owner can `git revert` and be back to today's app with today's images:
-- New creature art is written to a NEW column `sprite_cutout_url` and a NEW storage path. The existing `image_url` (baked art) and its storage object are **never overwritten or deleted**.
+- New creature cutout art is written to the existing `sprite_url` battle-sprite field and a separate storage path. The existing `image_url` (baked art) and its storage object are **never overwritten or deleted**.
 - Backgrounds are NEW files under `/public/backgrounds/battle/`.
 - The sprite resolver prefers the new cutout but **falls back to the old `image_url`**, so the old assets stay live and usable.
 - Old images get deleted ONLY later, on explicit owner approval, after they confirm they like the result.
 
-**Tech Stack:** Next.js 16 App Router · React · framer-motion (already in repo) · Supabase (DB + Storage) · OpenAI **gpt-image-2** for asset generation (NOT gpt-image-1.5) · TypeScript strict.
+**Tech Stack:** Next.js 16 App Router · React · framer-motion (already in repo) · Supabase (DB + Storage) · OpenAI **gpt-image-1.5** for transparent creature cutouts, **gpt-image-2** for opaque/background assets · TypeScript strict.
 
 ---
 
@@ -51,10 +51,10 @@ A single `<BattleScene>` compositor renders layers 1–3; a `<BattleHud>` set re
 **Nota importante sullo schema asset:**
 - Il piano originale prevedeva una nuova colonna `sprite_cutout_url`. Nel repo attuale esiste gia `creatures.sprite_url`, quindi l'implementazione corrente usa `sprite_url` come campo cutout/battle sprite per evitare una migrazione immediata.
 - `resolveCreatureSprite()` supporta comunque `sprite_cutout_url || sprite_url || image_url`, quindi in futuro possiamo ancora migrare a `sprite_cutout_url` se vogliamo separare semanticamente i campi.
-- La route admin usa `OPENAI_IMAGE_MODEL ?? 'gpt-image-1.5'`: per chiudere al 100% la Task A1 come scritta, va deciso se impostare `OPENAI_IMAGE_MODEL=gpt-image-2` in env oppure cambiare il fallback del codice a `gpt-image-2`.
+- La route admin usa ora un modello per tipo: `OPENAI_CUTOUT_IMAGE_MODEL ?? 'gpt-image-1.5'` per `kind:'cutout'`; `OPENAI_IMAGE_MODEL ?? 'gpt-image-2'` per artwork opaco/card.
 
 **Stato per fase:**
-- **Phase A - Asset pipeline:** parziale. La route admin supporta cutout/legacy e salvataggio non distruttivo su `sprite_url`; non sono ancora implementati `kind:'scene'`, migrazione `sprite_cutout_url`, script batch `regen:creatures`, o rigenerazione completa bestiario. Background presenti: `bosco.webp` e `terra.webp`; mancanti `fiamma.webp`, `adriatico.webp`, `armonia.webp`, `arena.webp`.
+- **Phase A - Asset pipeline:** parziale. La route admin supporta cutout/legacy e salvataggio non distruttivo su `sprite_url`; non sono ancora implementati `kind:'scene'`, script batch `regen:creatures`, o rigenerazione completa bestiario. Background presenti: `bosco.webp` e `terra.webp`; mancanti `fiamma.webp`, `adriatico.webp`, `armonia.webp`, `arena.webp`.
 - **Phase B - Core compositor:** sostanzialmente completata. Componenti scena, backdrop, particelle, VS e compositor sono presenti.
 - **Phase C - HUD overlays:** sostanzialmente completata per la battle UI. `CombatantCard`, `SquadBar`, `ActionBar`, `TurnTimer` sono cablati tramite `ImmersiveBattleLayout`. `BattleTopBar` esiste e viene usato nel demo, ma non e ancora cablato nelle schermate reali perche il top bar globale resta fuori dalla battle scene.
 - **Phase D - Damage / impact:** parziale-avanzata. `DamageBurst`, crit/freeze, HP ghost bar e passaggio `AttackAnimation` sono presenti. Restano da rifinire micro screen-shake/zoom punch, reazioni super-effective e timing di impatto piu cinematografico.
@@ -62,9 +62,9 @@ A single `<BattleScene>` compositor renders layers 1–3; a `<BattleHud>` set re
 - **Phase F - Game-designer polish:** ancora da fare come passata dedicata. Priorita consigliata: rigenerare/verificare sprite Miniera via `Sprite battle`, completare background mancanti, poi fare polish su attacco, svenimento/cambio, cattura, vittoria/sconfitta e items drawer.
 
 **Prossimo passo consigliato:**
-1. Rigenerare o incollare Miniera in Admin -> Creatures con modalita `Sprite battle`, poi testare incontro/boss/duello.
+1. Rigenerare o incollare Miniera in Admin -> Creatures con modalita `Sprite battle`, poi testare incontro/boss/duello. Al 2026-05-21 i record reali di Miniera/Muschio/Spinoso/Petroso hanno `sprite_url` vuoto: per questo gli incontri ricadono ancora su `image_url`.
 2. Generare i 4 background mancanti.
-3. Decidere se restare su `sprite_url` o introdurre davvero `sprite_cutout_url`.
+3. Restare su `sprite_url` per questa fase; valutare `sprite_cutout_url` solo in un refactor futuro se serve una separazione semantica piu forte.
 4. Fare una passata Phase F su animazioni: attacco, lancio rete/cattura, svenimento, cambio creatura, status, vittoria/sconfitta.
 
 ---
@@ -81,7 +81,7 @@ Before writing code, read these so you match existing conventions:
 - `src/app/game/encounter/[id]/page.tsx` — current encounter screen (~2456 lines). Render block starts at line ~1329. Action buttons CATTURA / LOTTA / OGGETTI / FUGGI.
 - `src/app/game/duel/[id]/page.tsx` and `src/app/game/boss/[id]/page.tsx` — the other two screens.
 - `src/components/battle/` — `AttackAnimation`, `BattleAtmosphere`, `FloatingDamage`, `StatusAura`, `animations/`.
-- `src/app/api/admin/creatures/[id]/artwork/route.ts` — current artwork generation (uses gpt-image-1.5; you will upgrade it).
+- `src/app/api/admin/creatures/[id]/artwork/route.ts` — artwork generation now uses kind-specific models (`gpt-image-1.5` cutout, `gpt-image-2` opaque/card by default).
 
 **Visual target:** `docs/mockups/2026-05-21-battle-immersive.html` (open in a browser) + the screenshot the product owner approved ("lo voglio ESATTAMENTE come questo mockup"). Match it: full-scene halves, golden VS + lightning arc, semi-transparent info cards (name + element pill + rarity stars/label + HP bar/numbers; player card also ATK), portrait squad bar with gold-crowned active slot, colored action buttons (CATTURA orange, LOTTA purple, OGGETTI/FUGGI dark), top bar (Lv + XP, gold, timer, bell).
 
@@ -91,38 +91,38 @@ Before writing code, read these so you match existing conventions:
 
 The owner wants to be able to throw the whole redesign away and return to the current app with the current images. Honor these rules everywhere:
 
-1. **Never write to `creatures.image_url`** during this work. It holds the current baked art = the rollback safety net. New art goes to `creatures.sprite_cutout_url` only.
+1. **Never write to `creatures.image_url`** during this work. It holds the current baked art = the rollback safety net. New transparent battle art goes to `creatures.sprite_url` only.
 2. **Never overwrite or delete the old storage objects** (`creature-artwork/creatures/${id}.png`). New cutouts go to a **separate** path `creature-artwork/creatures/cutouts/${id}.png`.
 3. **Backgrounds are additive** new files in `/public/backgrounds/battle/`. They don't replace anything.
-4. **The resolver falls back to old art**: `resolveCreatureSprite()` returns `sprite_cutout_url || image_url || ''`. So even mid-migration (some creatures regenerated, some not) the app always has an image.
-5. **Rollback procedure** (document it in the PR description): `git revert` the Phase B–F commits → battle screens return to using `image_url`. The `sprite_cutout_url` column + cutout files can stay (harmless) or be dropped later. No data loss either way.
+4. **The resolver falls back to old art**: `resolveCreatureSprite()` returns `sprite_cutout_url || sprite_url || image_url || ''`. So even mid-migration (some creatures regenerated, some not) the app always has an image.
+5. **Rollback procedure** (document it in the PR description): `git revert` the Phase B–F commits → battle screens return to using `image_url`. The `sprite_url` values + cutout files can stay (harmless) or be cleared later. No data loss either way.
 6. **Deletion of old assets happens later**, in a SEPARATE follow-up, only after the owner explicitly approves the new look. Do not include any `DELETE`/storage-remove of old art in this plan's commits.
 
 ---
 
-## Phase A — Asset pipeline (gpt-image-2 + cutouts + backgrounds)
+## Phase A — Asset pipeline (gpt-image-1.5 cutouts + gpt-image-2 backgrounds)
 
 > This phase is mostly **yours alone** (CLI/storage/asset gen). Nothing renders differently yet. **Non-destructive** — see the Safety section above.
 
-### Task A1: Upgrade artwork route to gpt-image-2 with transparency option
+### Task A1: Upgrade artwork route with kind-specific image models
 
 **Files:**
 - Modify: `src/app/api/admin/creatures/[id]/artwork/route.ts`
 
 **What to change:**
-1. Model `'gpt-image-1.5'` → `'gpt-image-2'`.
+1. Use `gpt-image-1.5` for transparent creature cutouts and `gpt-image-2` for opaque/card/background-style generation.
 2. Add param `kind?: 'cutout' | 'scene' | 'legacy'` (default `'cutout'` for this work).
-   - `'cutout'` → `background:'transparent'`, `output_format:'png'`, `size:'1024x1024'`. Writes to storage `creatures/cutouts/${id}.png` and sets **`sprite_cutout_url` ONLY**. **Must NOT touch `image_url`.**
-   - `'scene'` → opaque, portrait `1024x1536`, for element backgrounds (used by the background generation step).
-   - `'legacy'` → the current behavior (opaque → `image_url`), kept only for back-compat / manual fixes. Not used by this redesign.
-3. Manual-URL mode: keep it, but route it to `sprite_cutout_url` when `kind:'cutout'` so admins can paste a hand-made cutout without overwriting the baked art.
+   - `'cutout'` → `background:'transparent'`, `output_format:'png'`, `size:'1024x1024'`. Writes to storage `creatures/cutouts/${id}.png` and sets **`sprite_url` ONLY**. **Must NOT touch `image_url`.**
+   - `'scene'` → opaque, portrait `1024x1536`, for element backgrounds (used by the background generation step; can be a follow-up route/script if not implemented in the creature route).
+   - `'legacy'` → opaque/card behavior (→ `image_url`), kept only for back-compat / manual fixes. Not used by this redesign.
+3. Manual-URL mode: keep it, but route it to `sprite_url` when `kind:'cutout'` so admins can paste a hand-made cutout without overwriting the baked art.
 4. Cutout prompt suffix: `"...single centered creature, full body, TRANSPARENT BACKGROUND, no ground, no platform, no shadow, no scenery, no text, soft rim light, square."`
 5. **Guardrail:** the only path that writes `image_url` is `kind:'legacy'`. The redesign never calls it. This keeps the rollback net intact.
 
 **Step 1: Read the file and confirm current shape.**
 Run: open `src/app/api/admin/creatures/[id]/artwork/route.ts`.
 
-**Step 2: Apply edits** (model + params + cutout storage path + sprite_cutout_url write). Keep manual-URL mode working.
+**Step 2: Apply edits** (kind-specific model + params + cutout storage path + `sprite_url` write). Keep manual-URL mode working.
 
 **Step 3: Typecheck.**
 Run: `npm run typecheck`
@@ -131,38 +131,27 @@ Expected: no NEW errors (a pre-existing `web-push` module error is unrelated —
 **Step 4: Commit.**
 ```bash
 git add src/app/api/admin/creatures/[id]/artwork/route.ts
-git commit -m "feat(artwork): gpt-image-2 + transparent cutout generation"
+git commit -m "feat(artwork): transparent sprite cutout generation"
 ```
 
 ---
 
-### Task A2: Migration — `sprite_cutout_url`
+### Task A2: Schema decision — use existing `sprite_url` for now
 
-**Files:**
-- Create: `supabase/migrations/044_creature_cutout.sql`
+**Decision updated 2026-05-21:** the repo already has `creatures.sprite_url`, so the active implementation uses it as the battle cutout field. No migration is required for this phase. A future `sprite_cutout_url` migration remains optional if we later want to separate "small thumbnail sprite" from "battle transparent cutout".
 
-```sql
--- Transparent PNG cutout of each creature (no baked background). The battle
--- scene composites this over a per-element background. Falls back to
--- image_url when null. Original baked art in image_url is preserved.
-ALTER TABLE creatures ADD COLUMN IF NOT EXISTS sprite_cutout_url TEXT;
-```
+**Step 1: Do not create a migration in the current phase.**
 
-**Step 1: Write the migration file above.**
-
-**Step 2: Push it (you have CLI).**
-Run: `npx supabase db push`
-Expected: migration 044 applied. Verify:
-Run: `npx supabase db diff` (should report no pending changes) or query `select column_name from information_schema.columns where table_name='creatures' and column_name='sprite_cutout_url';`
+**Step 2: Verify schema consistency.**
+Confirm `creatures.sprite_url` exists in `src/types/database.ts`, API selects, and resolver fallbacks.
 
 **Step 3: Regenerate Supabase types** (kills a lot of `any`):
-Run: `npx supabase gen types typescript --linked > src/types/database.ts`
-(verify the generated file compiles; if the project uses a different path, match it.)
+Only regenerate `src/types/database.ts` if a future migration is actually added.
 
 **Step 4: Commit.**
 ```bash
-git add supabase/migrations/044_creature_cutout.sql src/types/database.ts
-git commit -m "feat(db): add creatures.sprite_cutout_url + regen types"
+git add docs/plans/2026-05-21-battle-ui-immersive.md
+git commit -m "docs(battle): record sprite_url cutout schema decision"
 ```
 
 ---
@@ -205,7 +194,7 @@ git commit -m "feat(assets): per-element battle backgrounds + neutral arena"
 
 ### Task A4: Regenerate creatures as native transparent sprites (non-destructive, batch)
 
-We **regenerate** every creature as a clean native transparent PNG via gpt-image-2 — we do NOT background-remove the old art. This gives crisp edges and lets us upgrade the style to be more on-theme and consistent across the whole bestiary. The old art in `image_url` stays untouched (rollback).
+We **regenerate** every creature as a clean native transparent PNG via gpt-image-1.5 — we do NOT background-remove the old art. This gives crisp edges and lets us upgrade the style to be more on-theme and consistent across the whole bestiary. The old art in `image_url` stays untouched (rollback).
 
 **Shared style guide (use for EVERY creature so the bestiary feels like one family).** Prefix every creature prompt with this preamble, then append the per-creature subject:
 
@@ -220,9 +209,9 @@ no scenery, no text, no UI, no border. Square. Subject:
 
 Per-creature subject = build from the creature's existing `name` + `description` + element + rarity (rarer → more ornate/imposing; element → motif: bosco=plants/moss, fiamma=embers/lava, adriatico=water/shells, terra=rock/crystal, armonia=light/runes). Keep the subject faithful to the creature's established identity so players still recognize it (e.g. "Muschio" stays a round moss creature).
 
-gpt-image-2 params: `size:'1024x1024'`, `quality:'high'`, `background:'transparent'`, `output_format:'png'`.
+gpt-image-1.5 params: `size:'1024x1024'`, `quality:'high'`, `background:'transparent'`, `output_format:'png'`.
 
-> **Consistency tip:** generations are independent and style can drift. Lock it by (a) keeping the style preamble byte-identical for all, and (b) optionally passing 1–2 approved creatures as style references via the gpt-image-2 *edits/reference* input once you have a couple you like.
+> **Consistency tip:** generations are independent and style can drift. Lock it by keeping the style preamble byte-identical for all and hand-reviewing the first 2 approved creatures before batching.
 
 **Files:**
 - Create: `scripts/regenerate-creatures.ts`
@@ -230,8 +219,8 @@ gpt-image-2 params: `size:'1024x1024'`, `quality:'high'`, `background:'transpare
 
 **Step 1:** Write the script. It must be **idempotent and non-destructive**:
 - For each creature, build the prompt (preamble + subject from name/description/element/rarity).
-- Call gpt-image-2 (transparent). Upload the PNG to `creature-artwork/creatures/cutouts/${id}.png`. Set `creatures.sprite_cutout_url` ONLY. **Never touch `image_url`.**
-- Skip creatures that already have a `sprite_cutout_url` unless a `--force` flag is passed.
+- Call gpt-image-1.5 (transparent). Upload the PNG to `creature-artwork/creatures/cutouts/${id}.png`. Set `creatures.sprite_url` ONLY. **Never touch `image_url`.**
+- Skip creatures that already have a `sprite_url` unless a `--force` flag is passed.
 - Support `--only <id>` to regenerate a single creature (for hand-tuning).
 - Log each result with the public cutout URL for QA. Failures are logged, not fatal.
 
@@ -241,7 +230,7 @@ QA the cutout URL: clean transparent edges, recognizable, on-style.
 
 **Step 3:** Once the style is approved, run the full batch.
 Run: `npm run regen:creatures`
-Expected: every creature gets `sprite_cutout_url`; `image_url` unchanged for all.
+Expected: every creature gets `sprite_url`; `image_url` unchanged for all.
 
 **Step 4: QA** ~8 cutouts across elements/rarities. Re-tune prompt or re-run `--force --only <id>` for any that miss.
 
@@ -251,7 +240,7 @@ git add scripts/regenerate-creatures.ts package.json package-lock.json
 git commit -m "feat(assets): regenerate creatures as native transparent sprites (non-destructive)"
 ```
 
-**Acceptance for Phase A:** every creature has a clean native-transparent `sprite_cutout_url`; `image_url` untouched for all (rollback intact); 6 background webp files exist; artwork route uses gpt-image-2 and writes cutouts to the cutout path only.
+**Acceptance for Phase A:** every creature has a clean native-transparent `sprite_url`; `image_url` untouched for all (rollback intact); 6 background webp files exist; artwork route uses gpt-image-1.5 for transparent cutouts and writes cutouts to the cutout path only.
 
 ---
 
@@ -277,8 +266,8 @@ export const ELEMENT_BACKGROUND: Record<Element, string> = {
 export const ARENA_BACKGROUND = '/backgrounds/battle/arena.webp'
 
 /** Cutout-first sprite resolver: transparent cutout, else baked art, else ''. */
-export function resolveCreatureSprite(c: { sprite_cutout_url?: string | null; image_url?: string | null }): string {
-  return c.sprite_cutout_url || c.image_url || ''
+export function resolveCreatureSprite(c: { sprite_cutout_url?: string | null; sprite_url?: string | null; image_url?: string | null }): string {
+  return c.sprite_cutout_url || c.sprite_url || c.image_url || ''
 }
 ```
 
@@ -498,7 +487,7 @@ Commit `feat(battle): HP drain ghost + verified hit reaction`.
   </BattleScene>
   ```
 - Keep the net-throw catch overlay, catch-success banner, items bottom-sheet (or migrate to side-drawer in Phase F), switch confirm, and the result overlays.
-- Feed `spriteUrl={resolveCreatureSprite(creature)}` for both combatants. Ensure the encounter `start`/`get` API selects `sprite_cutout_url` (add it to the `.select(...)` if missing — search the encounter API routes).
+- Feed `spriteUrl={resolveCreatureSprite(creature)}` for both combatants. Ensure the encounter `start`/`get` API selects `sprite_url` (add it to the `.select(...)` if missing — search the encounter API routes).
 
 **Verify:**
 - Run `npm run typecheck` (no new errors).
@@ -575,7 +564,7 @@ Commit each task separately (`polish(battle): entrance choreography`, etc.).
 3. Combat logic, APIs, realtime, anti-cheat, timers, switch/heal/item/flee flows are behaviorally unchanged (verify by playing each mode end-to-end).
 4. `npm run typecheck` shows no NEW errors; `npx vitest run` green except the 4 known pre-existing balance failures.
 5. Animations: entrance, attack, crit freeze, catch dissolve, faint, victory/defeat all present and smooth on a mid-tier phone.
-6. New creatures generated via the admin artwork tool produce a transparent cutout automatically (gpt-image-2 + `background:transparent`).
+6. New creatures generated via the admin artwork tool produce a transparent cutout automatically (gpt-image-1.5 + `background:transparent`).
 
 ---
 
@@ -585,7 +574,7 @@ Commit each task separately (`polish(battle): entrance choreography`, etc.).
 - [ ] `npx supabase gen types typescript --linked` to regen DB types
 - [ ] Generate the 6 background webp via gpt-image-2 (needs `OPENAI_API_KEY`)
 - [ ] Dry-run regeneration on ONE creature, get owner sign-off on the style, THEN batch
-- [ ] Run the creature regeneration batch (non-destructive: writes `sprite_cutout_url` + cutout path only)
+- [ ] Run the creature regeneration batch (non-destructive: writes `sprite_url` + cutout path only)
 - [ ] Confirm storage bucket `creature-artwork` is public and holds `creatures/cutouts/*` (old `creatures/*.png` untouched)
 - [ ] Verify NO creature's `image_url` changed (e.g. snapshot before/after)
 - [ ] Verify `OPENAI_API_KEY` present in the env you run against
