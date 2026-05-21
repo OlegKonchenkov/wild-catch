@@ -42,6 +42,7 @@ export interface PlayerSlot {
   fainted: boolean
   is_active: boolean
   image_url: string
+  sprite_url?: string | null
   attack_sound_url?: string | null
   attack_sound_duration_ms?: number | null
   active_status?: StatusEffect | null
@@ -59,6 +60,7 @@ export interface SquadCreature {
   atk: number
   def: number
   image_url: string
+  sprite_url?: string | null
 }
 
 export interface BattagliaItem {

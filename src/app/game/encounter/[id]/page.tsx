@@ -513,6 +513,42 @@ export default function EncounterPage() {
   }, [state?.encounterId, supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Timer ─────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const missingSpriteIds = squadCreatures
+      .filter(c => c.sprite_url === undefined)
+      .map(c => c.id)
+    if (missingSpriteIds.length === 0) return
+
+    let cancelled = false
+    supabase
+      .from('creatures')
+      .select('id, sprite_url')
+      .in('id', missingSpriteIds)
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        const spriteById = new Map((data as Array<{ id: string; sprite_url: string | null }>).map(row => [row.id, row.sprite_url ?? null]))
+        const applySprites = (squad: SquadCreature[]) => squad.map(c => (
+          c.sprite_url === undefined ? { ...c, sprite_url: spriteById.get(c.id) ?? null } : c
+        ))
+
+        const nextSquad = applySprites(squadCreatures)
+        setSquadCreatures(nextSquad)
+        setState(prev => {
+          if (!prev?.squadCreatures) return prev
+          const next = { ...prev, squadCreatures: applySprites(prev.squadCreatures) }
+          try { sessionStorage.setItem(`encounter_${id}`, JSON.stringify(next)) } catch {}
+          return next
+        })
+
+        const active = nextSquad[activeSlot]
+        if (active) {
+          setPlayerCreature(prev => prev ? { ...prev, spriteUrl: active.sprite_url ?? prev.spriteUrl ?? null } : prev)
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [activeSlot, id, squadCreatures, supabase])
+
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
     setTurnTimer(45)
@@ -1516,7 +1552,7 @@ export default function EncounterPage() {
                 : { duration: 0.28, ease: 'easeOut' }}
             >
               <CreatureCard
-                imageUrl={playerCreature?.imageUrl ?? ''}
+                imageUrl={playerCreature?.spriteUrl ?? playerCreature?.imageUrl ?? ''}
                 name={playerCreature?.name ?? '...'}
                 element={playerElem}
                 rarity={playerCreature?.rarity ?? 'comune'}
@@ -2028,9 +2064,9 @@ export default function EncounterPage() {
               onClick={e => e.stopPropagation()}
             >
               <div className="flex flex-col items-center text-center gap-3">
-                {squadCreatures[pendingSwitchSlot].image_url && (
+                {(squadCreatures[pendingSwitchSlot].sprite_url || squadCreatures[pendingSwitchSlot].image_url) && (
                   <img
-                    src={squadCreatures[pendingSwitchSlot].image_url ?? ''}
+                    src={squadCreatures[pendingSwitchSlot].sprite_url ?? squadCreatures[pendingSwitchSlot].image_url ?? ''}
                     alt={squadCreatures[pendingSwitchSlot].name}
                     className="w-16 h-16 object-contain"
                   />

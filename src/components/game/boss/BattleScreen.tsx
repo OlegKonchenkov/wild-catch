@@ -169,7 +169,7 @@ export default function BattleScreen({
     element: slot.element,
     hp: slot.current_hp,
     maxHp: slot.max_hp,
-    imageUrl: slot.image_url,
+    imageUrl: slot.sprite_url ?? slot.image_url,
     active: slot.is_active,
     fainted: slot.fainted,
   }))
@@ -221,6 +221,7 @@ export default function BattleScreen({
           maxHp: activePlayer.max_hp,
           atk: activePlayer.atk,
           imageUrl: activePlayer.image_url,
+          spriteUrl: activePlayer.sprite_url,
           animState,
           fainting: playerFainting,
           statusEffect: activePlayer.active_status,
@@ -438,7 +439,7 @@ export default function BattleScreen({
               transition={showBossIntro ? { type: 'spring', stiffness: 80, damping: 14, delay: 4.0 } : { duration: 0.25 }}
             >
               <CreatureCard
-                imageUrl={activePlayer.image_url}
+                imageUrl={activePlayer.sprite_url ?? activePlayer.image_url}
                 name={activePlayer.name}
                 element={activePlayer.element}
                 rarity={activePlayer.rarity}
@@ -638,10 +639,10 @@ export default function BattleScreen({
                     cursor:     canSwitch ? 'pointer' : 'default',
                   }}
                 >
-                  {slot.image_url ? (
+                  {(slot.sprite_url || slot.image_url) ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={slot.image_url}
+                      src={slot.sprite_url ?? slot.image_url}
                       alt={slot.name}
                       className="w-6 h-6 object-contain shrink-0"
                       style={{ filter: isFainted ? 'grayscale(1)' : 'none' }}
@@ -904,9 +905,9 @@ export default function BattleScreen({
                 onClick={e => e.stopPropagation()}
               >
                 <p className="text-white/60 text-sm text-center mb-3">Cambia creatura?</p>
-                {slot.image_url && (
+                {(slot.sprite_url || slot.image_url) && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={slot.image_url} alt={slot.name} className="w-16 h-16 object-contain mx-auto mb-2" />
+                  <img src={slot.sprite_url ?? slot.image_url} alt={slot.name} className="w-16 h-16 object-contain mx-auto mb-2" />
                 )}
                 <p className="text-white font-bold text-center text-lg mb-1">{slot.name}</p>
                 <p className="text-white/40 text-xs text-center mb-4">Il Capo Palestra potrà contrattaccare</p>
