@@ -9,6 +9,13 @@ const ELEMENT_EMOJI: Record<Element, string> = {
   terra: '\u26F0\uFE0F',
   armonia: '\uD83C\uDFB5',
 }
+const ELEMENT_GLOW: Record<Element, string> = {
+  bosco: '#48D76F',
+  fiamma: '#FF6938',
+  adriatico: '#2ED7FF',
+  terra: '#E6A35C',
+  armonia: '#C472FF',
+}
 const hpColor = (pct: number) => (pct > 0.5 ? '#34D399' : pct > 0.25 ? '#FBBF24' : '#EF4444')
 
 export interface SquadMember {
@@ -35,11 +42,12 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
   return (
     <div
       className={className}
-      style={{ position: 'absolute', left: 0, right: 0, bottom: 102, zIndex: 10, display: 'flex', justifyContent: 'center', gap: 7, padding: '0 10px', ...style }}
+      style={{ position: 'absolute', left: 0, right: 0, bottom: 106, zIndex: 10, display: 'flex', justifyContent: 'center', gap: 8, padding: '0 13px', ...style }}
     >
       {members.map((m) => {
         const pct = m.maxHp > 0 ? Math.max(0, Math.min(1, m.hp / m.maxHp)) : 0
         const tappable = !!onSwitch && !m.active && !m.fainted && !switchDisabled
+        const glow = ELEMENT_GLOW[m.element]
         return (
           <button
             key={m.id}
@@ -47,37 +55,51 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
             disabled={!tappable}
             onClick={tappable ? () => onSwitch!(m.id) : undefined}
             aria-label={m.name}
+            className="squad-card"
             style={{
-              position: 'relative', flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 7px 5px 5px', borderRadius: 12,
-              background: m.active ? 'rgba(20,17,8,.72)' : 'rgba(10,13,18,.62)',
-              border: `1px solid ${m.active ? '#F0CE7A' : 'rgba(255,255,255,.12)'}`,
-              backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
-              boxShadow: m.active ? '0 0 14px rgba(240,206,122,.38), inset 0 1px 0 rgba(255,255,255,.08)' : 'inset 0 1px 0 rgba(255,255,255,.05)',
+              position: 'relative', flex: 1, minWidth: 0, height: 58, display: 'flex', alignItems: 'center', gap: 7,
+              padding: '6px 7px 6px 6px', borderRadius: 13,
+              background: m.active
+                ? 'linear-gradient(145deg,rgba(45,33,12,.88),rgba(10,14,17,.78))'
+                : 'linear-gradient(145deg,rgba(12,18,23,.74),rgba(6,9,13,.7))',
+              border: `1px solid ${m.active ? '#FFC857' : `${glow}54`}`,
+              backdropFilter: 'blur(12px) saturate(1.2)', WebkitBackdropFilter: 'blur(12px) saturate(1.2)',
+              boxShadow: m.active
+                ? '0 0 18px rgba(255,190,70,.52), inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 16px rgba(255,179,54,.1)'
+                : `inset 0 1px 0 rgba(255,255,255,.07), 0 5px 14px rgba(0,0,0,.26), 0 0 10px ${glow}16`,
               cursor: tappable ? 'pointer' : 'default',
               opacity: m.fainted ? 0.6 : 1,
-              transition: 'border-color .2s, box-shadow .2s',
+              transition: 'transform .12s ease, border-color .2s ease, box-shadow .2s ease, filter .2s ease',
             }}
           >
             {m.active && (
-              <span style={{ position: 'absolute', top: -8, left: 8, fontSize: 12, color: '#F0CE7A', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{'\u265B'}</span>
+              <span style={{ position: 'absolute', top: -12, left: 8, fontSize: 14, color: '#FFD76D', textShadow: '0 0 8px rgba(255,196,70,.8), 0 1px 3px rgba(0,0,0,.7)' }}>{'\u265B'}</span>
             )}
-            <span style={{ position: 'relative', flexShrink: 0, width: 34, height: 34, borderRadius: 9, overflow: 'hidden', background: 'rgba(0,0,0,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', filter: m.fainted ? 'grayscale(1)' : 'none' }}>
+            <span
+              style={{
+                position: 'relative', flexShrink: 0, width: 44, height: 44, borderRadius: 10, overflow: 'hidden',
+                background: `radial-gradient(circle at 50% 42%, ${glow}36, rgba(0,0,0,.5) 68%)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                filter: m.fainted ? 'grayscale(1)' : 'none',
+                boxShadow: `inset 0 0 0 1px rgba(255,255,255,.08), 0 0 12px ${glow}38`,
+              }}
+            >
               {m.imageUrl
-                ? <Image src={m.imageUrl} alt={m.name} width={34} height={34} style={{ objectFit: 'cover' }} />
-                : <span style={{ fontSize: 18 }}>{ELEMENT_EMOJI[m.element]}</span>}
+                ? <Image src={m.imageUrl} alt={m.name} width={44} height={44} style={{ objectFit: 'contain', transform: 'scale(1.18)' }} />
+                : <span style={{ fontSize: 22, filter: `drop-shadow(0 0 6px ${glow})` }}>{ELEMENT_EMOJI[m.element]}</span>}
               {m.fainted && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#EF4444', fontWeight: 800 }}>{'\u2715'}</span>}
             </span>
-            <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-              <span style={{ display: 'block', fontWeight: 700, fontSize: 10.5, color: '#ECEFF1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</span>
-              <span style={{ display: 'block', height: 4, borderRadius: 999, background: 'rgba(255,255,255,.13)', overflow: 'hidden', margin: '3px 0 2px' }}>
-                <span style={{ display: 'block', height: '100%', width: `${pct * 100}%`, background: hpColor(pct), transition: 'width .35s' }} />
+            <span style={{ flex: 1, minWidth: 0, height: '100%', display: 'grid', alignContent: 'center', textAlign: 'left' }}>
+              <span style={{ display: 'block', fontWeight: 800, fontSize: 10.5, color: '#F7FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,.7)' }}>{m.name}</span>
+              <span style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5, fontFamily: 'var(--font-mono, monospace)', fontSize: 8.5, fontWeight: 800, color: 'rgba(255,255,255,.78)' }}>{Math.round(m.hp)}/{m.maxHp}</span>
+              <span style={{ display: 'block', height: 5, borderRadius: 999, background: 'rgba(255,255,255,.14)', overflow: 'hidden', marginTop: 3, boxShadow: 'inset 0 1px 2px rgba(0,0,0,.45)' }}>
+                <span style={{ display: 'block', height: '100%', width: `${pct * 100}%`, background: `linear-gradient(90deg,${hpColor(pct)},#5CF0B0)`, boxShadow: `0 0 8px ${hpColor(pct)}88`, transition: 'width .35s' }} />
               </span>
-              <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 8, color: 'rgba(255,255,255,.6)' }}>{Math.round(m.hp)}/{m.maxHp}</span>
             </span>
           </button>
         )
       })}
+      <style>{`.squad-card:active:not(:disabled){transform:scale(.98)}.squad-card:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}`}</style>
     </div>
   )
 }

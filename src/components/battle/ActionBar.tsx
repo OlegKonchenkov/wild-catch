@@ -17,11 +17,11 @@ export interface BattleAction {
   loading?: boolean
 }
 
-const FILL: Record<Exclude<ActionTone, 'dark'>, { bg: string; shadow: string; ring: string }> = {
-  orange: { bg: 'linear-gradient(135deg,#F0703B 0%,#D24A1C 100%)', shadow: '0 8px 22px rgba(226,80,28,.5)', ring: 'rgba(255,170,120,.35)' },
-  purple: { bg: 'linear-gradient(135deg,#8A57C9 0%,#5E37A0 100%)', shadow: '0 8px 22px rgba(123,77,184,.45)', ring: 'rgba(190,150,240,.32)' },
-  red: { bg: 'linear-gradient(135deg,#D14530 0%,#9A2C1C 100%)', shadow: '0 8px 22px rgba(193,58,43,.5)', ring: 'rgba(255,140,120,.32)' },
-  gold: { bg: 'linear-gradient(135deg,#F4CE62 0%,#C99A2E 100%)', shadow: '0 8px 22px rgba(240,206,122,.45)', ring: 'rgba(255,232,170,.4)' },
+const FILL: Record<Exclude<ActionTone, 'dark'>, { bg: string; shadow: string; ring: string; icon: string }> = {
+  orange: { bg: 'linear-gradient(150deg,#F16E35 0%,#C94118 100%)', shadow: '0 8px 20px rgba(226,80,28,.34)', ring: 'rgba(255,178,128,.45)', icon: 'rgba(255,238,218,.22)' },
+  purple: { bg: 'linear-gradient(150deg,#8051C7 0%,#4E2A8B 100%)', shadow: '0 8px 20px rgba(123,77,184,.32)', ring: 'rgba(195,156,255,.4)', icon: 'rgba(232,216,255,.18)' },
+  red: { bg: 'linear-gradient(150deg,#D14530 0%,#8F261A 100%)', shadow: '0 8px 20px rgba(193,58,43,.34)', ring: 'rgba(255,140,120,.36)', icon: 'rgba(255,220,210,.18)' },
+  gold: { bg: 'linear-gradient(150deg,#F4CE62 0%,#B98624 100%)', shadow: '0 8px 20px rgba(240,206,122,.32)', ring: 'rgba(255,232,170,.42)', icon: 'rgba(60,37,8,.18)' },
 }
 
 function Spinner({ size = 18 }: { size?: number }) {
@@ -39,9 +39,9 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
       className={className}
       style={{
         position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 11,
-        padding: '11px 12px calc(12px + env(safe-area-inset-bottom, 0px))',
-        display: 'flex', gap: 8, alignItems: 'stretch',
-        background: 'linear-gradient(180deg,transparent,rgba(3,5,9,.7) 30%,rgba(3,5,9,.95) 100%)',
+        padding: '10px 13px calc(12px + env(safe-area-inset-bottom, 0px))',
+        display: 'flex', gap: 9, alignItems: 'stretch',
+        background: 'linear-gradient(180deg,transparent,rgba(3,5,9,.62) 24%,rgba(3,5,9,.94) 100%)',
       }}
     >
       {actions.map((a) => {
@@ -57,24 +57,32 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
             disabled={disabled}
             onClick={a.onClick}
             style={{
-              flex: a.primary ? 1.3 : 1, minWidth: 0,
+              flex: a.primary ? 1.12 : 1, minWidth: 0, height: 58,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: a.primary ? 2 : 3, padding: a.primary ? '9px 10px' : '10px 5px',
-              borderRadius: 15, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.55 : 1,
+              gap: 4, padding: '7px 6px',
+              borderRadius: 16, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.55 : 1,
               color: filled ? '#fff' : '#c9d1d9',
-              border: filled ? `1px solid ${f!.ring}` : '1px solid rgba(255,255,255,.10)',
-              background: filled ? f!.bg : 'linear-gradient(180deg,rgba(20,26,34,.72),rgba(12,16,22,.72))',
+              border: filled ? `1px solid ${f!.ring}` : '1px solid rgba(255,255,255,.12)',
+              background: filled ? f!.bg : 'linear-gradient(180deg,rgba(21,28,36,.68),rgba(8,12,17,.72))',
               boxShadow: filled
-                ? `${f!.shadow}, inset 0 1px 0 rgba(255,255,255,.28), inset 0 -2px 6px rgba(0,0,0,.18)`
-                : 'inset 0 1px 0 rgba(255,255,255,.06)',
+                ? `${f!.shadow}, inset 0 1px 0 rgba(255,255,255,.24), inset 0 -2px 7px rgba(0,0,0,.2)`
+                : 'inset 0 1px 0 rgba(255,255,255,.07), 0 6px 16px rgba(0,0,0,.22)',
               backdropFilter: filled ? undefined : 'blur(8px)', WebkitBackdropFilter: filled ? undefined : 'blur(8px)',
-              transition: 'transform .1s ease, filter .15s ease',
+              transition: 'transform .1s ease, filter .15s ease, border-color .15s ease',
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', filter: filled ? 'drop-shadow(0 1px 1px rgba(0,0,0,.3))' : undefined, color: filled ? '#fff' : (tone === 'dark' ? '#aeb8c2' : undefined) }}>
+            <span
+              style={{
+                width: 24, height: 24, borderRadius: 9,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: filled ? f!.icon : 'rgba(255,255,255,.06)',
+                filter: filled ? 'drop-shadow(0 1px 1px rgba(0,0,0,.3))' : undefined,
+                color: filled ? '#fff' : '#aeb8c2',
+              }}
+            >
               {a.loading ? <Spinner size={a.primary ? 22 : 20} /> : a.icon}
             </span>
-            <span style={{ fontWeight: 800, fontSize: a.primary ? 13.5 : 11.5, letterSpacing: '.02em', textTransform: 'uppercase', lineHeight: 1 }}>
+            <span style={{ fontWeight: 900, fontSize: a.primary ? 12.5 : 11, letterSpacing: '.02em', textTransform: 'uppercase', lineHeight: 1, textShadow: filled ? '0 1px 2px rgba(0,0,0,.38)' : undefined }}>
               {a.label}
             </span>
             {a.sub && (
@@ -83,7 +91,7 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
           </button>
         )
       })}
-      <style>{`@keyframes abSpin{to{transform:rotate(360deg)}} .ab-btn:active:not(:disabled){transform:scale(.96)} .ab-btn:hover:not(:disabled){filter:brightness(1.06)}`}</style>
+      <style>{`@keyframes abSpin{to{transform:rotate(360deg)}} .ab-btn:active:not(:disabled){transform:scale(.97)} .ab-btn:hover:not(:disabled){filter:brightness(1.07) saturate(1.04)}`}</style>
     </div>
   )
 }

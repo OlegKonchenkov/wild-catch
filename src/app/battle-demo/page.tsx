@@ -120,8 +120,8 @@ export default function BattleDemoPage() {
 
   const squad: SquadMember[] = [
     { id: 'miniera', name: 'Miniera', element: 'terra', hp: playerHp, maxHp: PLAYER_MAX, imageUrl: MINIERA, active: activeSquad === 'miniera' },
-    { id: 'spinoso', name: 'Spinoso', element: 'bosco', hp: 280, maxHp: 280, active: activeSquad === 'spinoso' },
-    { id: 'petroso', name: 'Petroso', element: 'terra', hp: 310, maxHp: 310, active: activeSquad === 'petroso' },
+    { id: 'spinoso', name: 'Spinoso', element: 'bosco', hp: 280, maxHp: 280, imageUrl: MUSCHIO, active: activeSquad === 'spinoso' },
+    { id: 'petroso', name: 'Petroso', element: 'terra', hp: 310, maxHp: 310, imageUrl: MINIERA, active: activeSquad === 'petroso' },
   ]
 
   const actions: BattleAction[] = [
