@@ -1,59 +1,72 @@
 'use client'
 
 interface Props {
-  /** Seconds left in the current turn. */
+  /** Seconds left in the current timer window. */
   seconds: number
-  /** Full turn budget (kept for API parity / future progress use). */
+  /** Full timer budget. */
   total: number
-  /** Current turn number (1-based). */
+  /** Kept for older callers; the immersive encounter no longer shows turns. */
   turn?: number
-  /** Number of turn pips to show. */
+  /** Kept for older callers; the immersive encounter no longer shows turn pips. */
   pips?: number
   className?: string
   style?: React.CSSProperties
 }
 
-/**
- * Turn indicator: a pip stepper on the left + "TURNO N" and a mono seconds
- * readout on the right (matches the mockup). Seconds go red + shake under 5s.
- */
-export default function TurnTimer({ seconds, total, turn = 1, pips = 6, className, style }: Props) {
-  void total
+export default function TurnTimer({ seconds, total, className, style }: Props) {
+  const safeTotal = Math.max(1, total)
+  const pct = Math.max(0, Math.min(1, seconds / safeTotal))
   const urgent = seconds <= 5
-  const accent = urgent ? '#EF4444' : '#F0CE7A'
+  const accent = urgent ? '#EF4444' : '#39E6A5'
 
   return (
     <div
       className={className}
-      style={{ position: 'absolute', left: 0, right: 0, bottom: 92, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '0 18px', ...style }}
+      style={{ position: 'absolute', left: 0, right: 0, bottom: 82, zIndex: 10, display: 'flex', alignItems: 'center', gap: 10, padding: '0 15px', ...style }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', width: 150 }}>
-        {Array.from({ length: pips }).map((_, i) => {
-          const done = i < turn
-          const active = i === turn - 1
-          return (
-            <div key={i} style={{ display: 'contents' }}>
-              <span
-                style={{
-                  width: active ? 9 : 7, height: active ? 9 : 7, borderRadius: '50%', flexShrink: 0,
-                  background: done ? '#34D399' : 'rgba(255,255,255,.18)',
-                  boxShadow: active ? '0 0 8px rgba(52,211,153,.8)' : 'none',
-                  border: active ? '1px solid rgba(255,255,255,.5)' : 'none',
-                }}
-              />
-              {i < pips - 1 && (
-                <span style={{ flex: 1, height: 2, background: i < turn - 1 ? '#34D399' : 'rgba(255,255,255,.14)' }} />
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-mono, monospace)', fontSize: 11, fontWeight: 700 }}>
-        <span style={{ color: 'rgba(255,255,255,.5)', letterSpacing: '.06em' }}>TURNO {turn}</span>
-        <span style={{ color: accent, animation: urgent ? 'ttShake .4s ease-in-out infinite' : undefined }}>⏱ {Math.max(0, Math.ceil(seconds))}s</span>
+      <span style={{ position: 'relative', flex: 1, height: 6, borderRadius: 999, background: 'rgba(255,255,255,.16)', overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(0,0,0,.5)' }}>
+        <span
+          style={{
+            display: 'block',
+            height: '100%',
+            width: `${pct * 100}%`,
+            borderRadius: 999,
+            background: `linear-gradient(90deg, ${accent}, #F0CE7A)`,
+            boxShadow: `0 0 12px ${accent}99`,
+            transition: 'width .35s linear, background .2s ease',
+          }}
+        />
+        <span
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: `${pct * 100}%`,
+            width: 12,
+            height: 12,
+            borderRadius: '50%',
+            transform: 'translate(-50%,-50%)',
+            background: accent,
+            border: '2px solid rgba(255,255,255,.72)',
+            boxShadow: `0 0 12px ${accent}`,
+            transition: 'left .35s linear, background .2s ease',
+          }}
+        />
       </span>
-      <style>{`@keyframes ttShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}`}</style>
+      <span
+        style={{
+          minWidth: 34,
+          textAlign: 'right',
+          fontFamily: 'var(--font-mono, monospace)',
+          fontSize: 11,
+          fontWeight: 800,
+          color: accent,
+          textShadow: urgent ? `0 0 10px ${accent}` : undefined,
+          animation: urgent ? 'ttPulse .55s ease-in-out infinite' : undefined,
+        }}
+      >
+        {Math.max(0, Math.ceil(seconds))}s
+      </span>
+      <style>{`@keyframes ttPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}`}</style>
     </div>
   )
 }

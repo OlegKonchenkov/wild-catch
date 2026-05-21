@@ -41,15 +41,30 @@ interface BattleSceneProps {
 }
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+const ELEMENT_STAGE_GLOW: Record<Element, string> = {
+  bosco: '#58E57E',
+  fiamma: '#FF6B36',
+  adriatico: '#27D8FF',
+  terra: '#F2A247',
+  armonia: '#D179FF',
+}
 
 // z-order: backdrop(0-4) · seam(5) · cards(6) · creatures(8) · VS(9) · HUD(10-12).
 // Creatures sit ABOVE the info cards on purpose — they're the focal point, so a
 // card never occludes a creature.
 function CreatureStage({
-  c, maxSize, slideFrom, band,
-}: { c: BattleCombatant; maxSize: number; slideFrom: number; band: CSSProperties }) {
+  c, maxSize, slideFrom, band, plateScale = 1.18, plateLift = 0,
+}: {
+  c: BattleCombatant
+  maxSize: number
+  slideFrom: number
+  band: CSSProperties
+  plateScale?: number
+  plateLift?: number
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState(maxSize)
+  const glow = ELEMENT_STAGE_GLOW[c.element] ?? '#F0CE7A'
   useEffect(() => {
     const el = ref.current
     if (!el || typeof ResizeObserver === 'undefined') return
@@ -62,14 +77,46 @@ function CreatureStage({
   }, [maxSize])
 
   return (
-    <div ref={ref} className="absolute flex items-end justify-center" style={band}>
+    <div ref={ref} className="absolute flex items-end" style={band}>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute"
+        style={{
+          left: '50%',
+          bottom: plateLift,
+          transform: 'translateX(-50%)',
+          width: Math.round(size * plateScale),
+          height: Math.max(18, Math.round(size * 0.18)),
+          borderRadius: '50%',
+          zIndex: 0,
+          background: `radial-gradient(ellipse at center, ${glow}62 0%, ${glow}2b 35%, rgba(0,0,0,.3) 58%, transparent 76%)`,
+          filter: `blur(${Math.max(6, Math.round(size * 0.045))}px)`,
+          opacity: 0.9,
+          mixBlendMode: 'screen',
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute"
+        style={{
+          left: '50%',
+          bottom: plateLift - Math.max(2, Math.round(size * 0.025)),
+          transform: 'translateX(-50%)',
+          width: Math.round(size * plateScale * 0.92),
+          height: Math.max(10, Math.round(size * 0.08)),
+          borderRadius: '50%',
+          zIndex: 0,
+          background: 'radial-gradient(ellipse at center, rgba(0,0,0,.56), rgba(0,0,0,.22) 58%, transparent 76%)',
+          filter: `blur(${Math.max(5, Math.round(size * 0.035))}px)`,
+        }}
+      />
       <motion.div
         initial={{ x: slideFrom, opacity: 0 }}
         animate={c.fainting
           ? { x: 0, opacity: 0.5, y: 20, scale: 0.9, filter: 'grayscale(1) brightness(.55)' }
           : { x: 0, opacity: 1, y: 0, scale: 1, filter: 'grayscale(0) brightness(1)' }}
         transition={{ x: { type: 'spring', stiffness: 180, damping: 20, delay: 0.15 }, opacity: { duration: 0.5 }, default: { duration: 0.5 } }}
-        style={{ display: 'flex', alignItems: 'flex-end' }}
+        style={{ display: 'flex', alignItems: 'flex-end', position: 'relative', zIndex: 1 }}
       >
         <CreatureSprite
           imageUrl={c.spriteUrl}
@@ -111,8 +158,8 @@ export default function BattleScene({
   const enemyDim = Math.min(0.32, 0.3 * (1 - clamp01(enemy.hpPct))) + (freeze ? 0.1 : 0)
   const playerDim = Math.min(0.32, 0.3 * (1 - clamp01(player.hpPct))) + (freeze ? 0.1 : 0)
 
-  const enemyBand: CSSProperties = { left: '22%', right: 0, top: '8%', height: `${seamPct - 12}%`, zIndex: 8 }
-  const playerBand: CSSProperties = { left: 0, right: '22%', top: `${seamPct + 1}%`, bottom: '21%', zIndex: 8 }
+  const enemyBand: CSSProperties = { left: '37%', right: '-9%', top: '8.5%', height: `${seamPct - 10}%`, zIndex: 8, justifyContent: 'center' }
+  const playerBand: CSSProperties = { left: '-12%', right: '30%', top: `${seamPct + 3}%`, bottom: '15%', zIndex: 8, justifyContent: 'center' }
 
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ display: 'flex', flexDirection: 'column', isolation: 'isolate' }}>
@@ -128,8 +175,8 @@ export default function BattleScene({
         aria-hidden
         className="pointer-events-none absolute left-0 right-0"
         style={{
-          top: `${seamPct}%`, transform: 'translateY(-50%)', height: 128, zIndex: 5,
-          background: 'linear-gradient(180deg,transparent,rgba(4,6,10,.6) 45%,rgba(4,6,10,.6) 55%,transparent)',
+          top: `${seamPct}%`, transform: 'translateY(-50%)', height: 156, zIndex: 5,
+          background: 'linear-gradient(180deg,transparent,rgba(4,6,10,.52) 38%,rgba(4,6,10,.7) 50%,rgba(4,6,10,.5) 62%,transparent)',
           backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
         }}
       />
@@ -137,8 +184,8 @@ export default function BattleScene({
       {enemy.hpPct < 0.25 && <DangerVignette top="0" height={`${seamPct}%`} anchor="30%" />}
       {player.hpPct < 0.25 && <DangerVignette top={`${seamPct}%`} height={`${100 - seamPct}%`} anchor="70%" />}
 
-      <CreatureStage c={enemy} maxSize={200} slideFrom={120} band={enemyBand} />
-      <CreatureStage c={player} maxSize={248} slideFrom={-120} band={playerBand} />
+      <CreatureStage c={enemy} maxSize={236} slideFrom={120} band={enemyBand} plateScale={1.15} plateLift={-3} />
+      <CreatureStage c={player} maxSize={276} slideFrom={-120} band={playerBand} plateScale={1.22} plateLift={-6} />
 
       <VsEmblem struck={vsStruck} gold={bossGold} topPct={seamPct} />
 

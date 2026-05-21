@@ -27,7 +27,7 @@ export default function ElementBackdrop({ element, half, dim = 0, frozen = false
   const src = element === 'arena' ? ARENA_BACKGROUND : ELEMENT_BACKGROUND[element]
   const theme = element === 'arena' ? DEFAULT_THEME : (ELEMENT_THEME[element] ?? DEFAULT_THEME)
   const glowPos = half === 'top' ? '50% 8%' : '50% 92%'
-  const objPos = half === 'top' ? '50% 42%' : '50% 60%'
+  const objPos = half === 'top' ? '60% 54%' : '42% 72%'
   const fallback =
     `radial-gradient(120% 85% at ${glowPos}, ${theme.glow}26, transparent 56%),` +
     `linear-gradient(180deg, ${theme.bg}, ${theme.ground})`
@@ -50,6 +50,18 @@ export default function ElementBackdrop({ element, half, dim = 0, frozen = false
           />
         </div>
       )}
+
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          zIndex: 2,
+          background: half === 'top'
+            ? `radial-gradient(78% 28% at 72% 84%, ${theme.glow}30, rgba(0,0,0,.16) 48%, transparent 72%), linear-gradient(180deg, transparent 54%, rgba(1,4,6,.2) 82%, rgba(1,4,6,.46) 100%)`
+            : `radial-gradient(85% 32% at 34% 50%, ${theme.glow}2e, rgba(245,174,88,.16) 42%, transparent 72%), linear-gradient(180deg, rgba(10,6,3,.2) 0%, transparent 28%, rgba(0,0,0,.4) 100%)`,
+          mixBlendMode: 'screen',
+        }}
+      />
 
       <SceneParticles element={element} count={particleCount} seed={half === 'top' ? 2 : 7} paused={frozen} />
 

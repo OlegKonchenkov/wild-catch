@@ -125,15 +125,15 @@ export default function BattleDemoPage() {
   ]
 
   const actions: BattleAction[] = [
-    { id: 'cattura', label: 'CATTURA', icon: <IconCapture size={24} />, primary: true, tone: 'orange', onClick: doCatch },
-    { id: 'lotta', label: 'Lotta', icon: <IconSwords size={22} />, tone: 'purple', onClick: () => doAttack('player') },
-    { id: 'oggetti', label: 'Oggetti', icon: <IconFlask size={22} />, tone: 'dark' },
-    { id: 'fuggi', label: 'Fuggi', icon: <IconFlee size={22} />, tone: 'dark', onClick: reset },
+    { id: 'cattura', label: 'CATTURA', icon: <IconCapture size={21} />, primary: true, tone: 'orange', onClick: doCatch },
+    { id: 'lotta', label: 'Lotta', icon: <IconSwords size={20} />, tone: 'purple', onClick: () => doAttack('player') },
+    { id: 'oggetti', label: 'Oggetti', icon: <IconFlask size={19} />, tone: 'dark' },
+    { id: 'fuggi', label: 'Fuggi', icon: <IconFlee size={19} />, tone: 'dark', onClick: reset },
   ]
 
   return (
-    <main style={{ minHeight: '100dvh', background: 'radial-gradient(1000px 600px at 50% -10%,#11151b,transparent 70%),#05060a', color: '#ECEFF1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '20px 12px 40px', fontFamily: 'var(--font-dm-sans), system-ui, sans-serif' }}>
-      <div style={{ textAlign: 'center', maxWidth: 520 }}>
+    <main style={{ minHeight: '100dvh', background: 'radial-gradient(1000px 600px at 50% -10%,#11151b,transparent 70%),#05060a', color: '#ECEFF1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '0 10px 28px', fontFamily: 'var(--font-dm-sans), system-ui, sans-serif' }}>
+      <div style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap' }}>
         <h1 style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em' }}>Wild Catch — Battle UI immersiva (anteprima)</h1>
         <p style={{ color: '#9aa4ae', fontSize: 12, marginTop: 4 }}>Arte reale · animazioni reali. Le creature combattono da sole; usa i pulsanti per provare attacco/critico.</p>
       </div>
@@ -142,7 +142,7 @@ export default function BattleDemoPage() {
       <motion.div
         animate={shake}
         style={{
-          position: 'relative', width: 'min(100vw, 420px)', height: 'min(86dvh, 880px)',
+          position: 'relative', width: 'min(100vw, 430px)', height: 'min(100dvh, 930px)',
           borderRadius: 30, overflow: 'hidden', background: '#04060a',
           boxShadow: '0 40px 100px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.05)',
         }}
@@ -156,13 +156,13 @@ export default function BattleDemoPage() {
             seamPct={44}
           >
             <BattleTopBar level={12} xpPct={0.64} gold={2448} sessionLabel="43h 48m" notifications={1} />
-            <CombatantCard side="enemy" name="Muschio" element="bosco" rarity="comune" currentHp={enemyHp} maxHp={ENEMY_MAX} stars={1} style={{ top: 66, left: 10 }} />
-            <CombatantCard side="player" name="Miniera" element="terra" rarity="leggendario" currentHp={playerHp} maxHp={PLAYER_MAX} atk={102} style={{ top: '54%', right: 10 }} />
+            <CombatantCard side="enemy" name="Muschio" element="bosco" rarity="comune" currentHp={enemyHp} maxHp={ENEMY_MAX} stars={1} style={{ top: 70, left: 12 }} />
+            <CombatantCard side="player" name="Miniera" element="terra" rarity="leggendario" currentHp={playerHp} maxHp={PLAYER_MAX} atk={102} style={{ top: '52.5%', right: 10 }} />
             {bursts.map((b) => (
               <DamageBurst key={b.id} amount={b.amount} kind={b.kind} target={b.target} label={b.label} onComplete={() => setBursts((prev) => prev.filter((x) => x.id !== b.id))} />
             ))}
             <SquadBar members={squad} onSwitch={setActiveSquad} />
-            <TurnTimer seconds={seconds} total={15} turn={1} />
+            <TurnTimer seconds={seconds} total={15} />
             <ActionBar actions={actions} />
           </BattleScene>
         </div>
