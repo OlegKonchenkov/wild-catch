@@ -515,7 +515,7 @@ export default function EncounterPage() {
   // ── Timer ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const missingSpriteIds = squadCreatures
-      .filter(c => c.sprite_url === undefined)
+      .filter(c => !c.sprite_url)
       .map(c => c.id)
     if (missingSpriteIds.length === 0) return
 
@@ -528,7 +528,7 @@ export default function EncounterPage() {
         if (cancelled || !data) return
         const spriteById = new Map((data as Array<{ id: string; sprite_url: string | null }>).map(row => [row.id, row.sprite_url ?? null]))
         const applySprites = (squad: SquadCreature[]) => squad.map(c => (
-          c.sprite_url === undefined ? { ...c, sprite_url: spriteById.get(c.id) ?? null } : c
+          !c.sprite_url ? { ...c, sprite_url: spriteById.get(c.id) ?? null } : c
         ))
 
         const nextSquad = applySprites(squadCreatures)
@@ -542,7 +542,7 @@ export default function EncounterPage() {
 
         const active = nextSquad[activeSlot]
         if (active) {
-          setPlayerCreature(prev => prev ? { ...prev, spriteUrl: active.sprite_url ?? prev.spriteUrl ?? null } : prev)
+          setPlayerCreature(prev => prev ? { ...prev, spriteUrl: active.sprite_url || prev.spriteUrl || null } : prev)
         }
       })
 
