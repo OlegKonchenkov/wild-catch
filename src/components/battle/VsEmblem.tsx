@@ -10,80 +10,117 @@ interface Props {
   topPct?: number
 }
 
-const BOLTS: Array<{ d: string; fork?: boolean }> = [
-  { d: 'M210 55 L184 46 L166 58 L140 43 L112 54 L82 40 L52 54 L22 48 L0 53' },
-  { d: 'M210 55 L178 64 L151 53 L126 67 L98 58 L69 70 L38 60 L7 66' },
-  { d: 'M210 55 L188 37 L160 35 L132 27 L108 35 L82 26 L56 34 L28 29' },
-  { d: 'M210 55 L236 46 L254 58 L280 43 L308 54 L338 40 L368 54 L398 48 L420 53' },
-  { d: 'M210 55 L242 64 L269 53 L294 67 L322 58 L351 70 L382 60 L413 66' },
-  { d: 'M210 55 L232 37 L260 35 L288 27 L312 35 L338 26 L364 34 L392 29' },
-  { d: 'M112 54 L96 82 L77 73', fork: true },
-  { d: 'M151 53 L138 76 L120 71', fork: true },
-  { d: 'M69 70 L56 91 L39 83', fork: true },
-  { d: 'M308 54 L324 82 L343 73', fork: true },
-  { d: 'M269 53 L282 76 L300 71', fork: true },
-  { d: 'M351 70 L364 91 L381 83', fork: true },
+const BOLTS: Array<{ d: string; kind: 'main' | 'branch' | 'hair' }> = [
+  { kind: 'main', d: 'M226 62 L207 58 L190 65 L170 57 L151 62 L130 54 L111 59 L90 50 L73 57 L53 52 L34 59 L16 56 L0 61' },
+  { kind: 'main', d: 'M294 62 L313 58 L330 65 L350 57 L369 62 L390 54 L409 59 L430 50 L447 57 L467 52 L486 59 L504 56 L520 61' },
+  { kind: 'branch', d: 'M202 59 L186 50 L169 52 L151 45 L132 49 L112 42 L92 47 L73 40 L53 46 L34 42 L12 48' },
+  { kind: 'branch', d: 'M318 59 L334 50 L351 52 L369 45 L388 49 L408 42 L428 47 L447 40 L467 46 L486 42 L508 48' },
+  { kind: 'branch', d: 'M188 64 L171 73 L151 69 L130 78 L110 72 L89 82 L67 76 L45 84 L23 80' },
+  { kind: 'branch', d: 'M332 64 L349 73 L369 69 L390 78 L410 72 L431 82 L453 76 L475 84 L497 80' },
+  { kind: 'hair', d: 'M116 58 L101 79 L84 75 L72 91' },
+  { kind: 'hair', d: 'M170 57 L156 81 L139 76' },
+  { kind: 'hair', d: 'M74 57 L58 38 L42 42' },
+  { kind: 'hair', d: 'M404 58 L419 79 L436 75 L448 91' },
+  { kind: 'hair', d: 'M350 57 L364 81 L381 76' },
+  { kind: 'hair', d: 'M446 57 L462 38 L478 42' },
 ]
 
 const SPARKS = [
-  { cx: 166, cy: 58, r: 2.2 },
-  { cx: 254, cy: 58, r: 2.2 },
-  { cx: 112, cy: 54, r: 1.8 },
-  { cx: 308, cy: 54, r: 1.8 },
-  { cx: 52, cy: 54, r: 1.3 },
-  { cx: 368, cy: 54, r: 1.3 },
+  { cx: 226, cy: 62, r: 2.4 },
+  { cx: 294, cy: 62, r: 2.4 },
+  { cx: 151, cy: 62, r: 1.1 },
+  { cx: 369, cy: 62, r: 1.1 },
+  { cx: 74, cy: 57, r: 0.9 },
+  { cx: 446, cy: 57, r: 0.9 },
 ]
 
-/**
- * Golden VS emblem with forked lightning arcing across the full seam.
- * Decorative only: blurred gold aura, hot white core, flickering sparks.
- */
 export default function VsEmblem({ struck = true, gold = '#F7C841', topPct = 50 }: Props) {
+  const widthFor = (kind: 'main' | 'branch' | 'hair', layer: 'aura' | 'amber' | 'core') => {
+    if (layer === 'aura') return kind === 'main' ? 9 : kind === 'branch' ? 4.2 : 2
+    if (layer === 'amber') return kind === 'main' ? 2.7 : kind === 'branch' ? 1.25 : 0.75
+    return kind === 'main' ? 1.05 : kind === 'branch' ? 0.48 : 0.32
+  }
+  const opacityFor = (kind: 'main' | 'branch' | 'hair', layer: 'aura' | 'amber' | 'core') => {
+    if (layer === 'aura') return kind === 'main' ? 1 : kind === 'branch' ? 0.62 : 0.36
+    if (layer === 'amber') return kind === 'main' ? 1 : kind === 'branch' ? 0.74 : 0.48
+    return kind === 'main' ? 0.92 : kind === 'branch' ? 0.58 : 0.34
+  }
   const boltAnim = (i: number) => ({
     initial: { pathLength: struck ? 0 : 1, opacity: struck ? 0 : 1 },
     animate: { pathLength: 1, opacity: 1 },
-    transition: { duration: 0.42, delay: struck ? 0.03 + i * 0.018 : 0, ease: 'easeOut' as const },
+    transition: { duration: 0.5, delay: struck ? 0.02 + i * 0.018 : 0, ease: 'easeOut' as const },
   })
 
   return (
     <div
       aria-hidden
       className="pointer-events-none absolute"
-      style={{ left: 0, right: 0, top: `${topPct}%`, transform: 'translateY(-50%)', height: 150, zIndex: 9 }}
+      style={{ left: 0, right: 0, top: `${topPct}%`, transform: 'translateY(-50%)', height: 138, zIndex: 9 }}
     >
-      <svg width="100%" height="100%" viewBox="0 0 420 110" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
+      <svg width="100%" height="100%" viewBox="0 0 520 118" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
         <defs>
-          <linearGradient id="vsGlow" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor={gold} stopOpacity="0" /><stop offset=".13" stopColor={gold} stopOpacity=".9" />
-            <stop offset=".5" stopColor="#FFE9A8" /><stop offset=".87" stopColor={gold} stopOpacity=".9" /><stop offset="1" stopColor={gold} stopOpacity="0" />
+          <linearGradient id="vsAmber" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor={gold} stopOpacity="0" />
+            <stop offset=".12" stopColor="#D9821F" stopOpacity=".42" />
+            <stop offset=".42" stopColor={gold} stopOpacity=".96" />
+            <stop offset=".5" stopColor="#FFF0A8" stopOpacity="1" />
+            <stop offset=".58" stopColor={gold} stopOpacity=".96" />
+            <stop offset=".88" stopColor="#D9821F" stopOpacity=".42" />
+            <stop offset="1" stopColor={gold} stopOpacity="0" />
           </linearGradient>
-          <linearGradient id="vsCore" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="#fff" stopOpacity="0" /><stop offset=".18" stopColor="#FFF6D6" /><stop offset=".5" stopColor="#fff" /><stop offset=".82" stopColor="#FFF6D6" /><stop offset="1" stopColor="#fff" stopOpacity="0" />
+          <linearGradient id="vsHotCore" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#fff" stopOpacity="0" />
+            <stop offset=".18" stopColor="#FFE2A1" stopOpacity=".7" />
+            <stop offset=".5" stopColor="#FFFDF0" />
+            <stop offset=".82" stopColor="#FFE2A1" stopOpacity=".7" />
+            <stop offset="1" stopColor="#fff" stopOpacity="0" />
           </linearGradient>
-          <filter id="vsBlur" x="-20%" y="-300%" width="140%" height="700%"><feGaussianBlur stdDeviation="3.4" /></filter>
-          <filter id="vsCoreGlow" x="-20%" y="-300%" width="140%" height="700%">
-            <feGaussianBlur stdDeviation="0.8" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
+          <radialGradient id="vsCenterFlare" cx="50%" cy="52%" r="48%">
+            <stop offset="0" stopColor="#FFF6B8" stopOpacity=".95" />
+            <stop offset=".34" stopColor={gold} stopOpacity=".48" />
+            <stop offset="1" stopColor={gold} stopOpacity="0" />
+          </radialGradient>
+          <filter id="vsWideBlur" x="-20%" y="-260%" width="140%" height="620%"><feGaussianBlur stdDeviation="4.6" /></filter>
+          <filter id="vsSoftBlur" x="-20%" y="-260%" width="140%" height="620%"><feGaussianBlur stdDeviation="1.35" /></filter>
         </defs>
 
+        <motion.ellipse
+          cx="260"
+          cy="62"
+          rx="118"
+          ry="32"
+          fill="url(#vsCenterFlare)"
+          filter="url(#vsWideBlur)"
+          animate={{ opacity: [0.38, 0.72, 0.42], scaleX: [0.92, 1.06, 0.92] }}
+          transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
         <motion.g
-          filter="url(#vsBlur)"
-          animate={{ opacity: [0.9, 0.56, 1, 0.72, 0.9] }}
-          transition={{ duration: 2.1, repeat: Infinity, ease: 'easeInOut' }}
+          filter="url(#vsWideBlur)"
+          animate={{ opacity: [0.5, 0.88, 0.62, 0.78, 0.5] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
         >
           {BOLTS.map((bolt, i) => (
-            <motion.path key={i} d={bolt.d} fill="none" stroke="url(#vsGlow)" strokeWidth={bolt.fork ? 3 : 6.5} strokeLinecap="round" strokeLinejoin="round" {...boltAnim(i)} />
+            <motion.path key={i} d={bolt.d} fill="none" stroke="url(#vsAmber)" strokeWidth={widthFor(bolt.kind, 'aura')} strokeLinecap="round" strokeLinejoin="round" opacity={opacityFor(bolt.kind, 'aura')} {...boltAnim(i)} />
           ))}
         </motion.g>
 
         <motion.g
-          filter="url(#vsCoreGlow)"
-          animate={{ opacity: [1, 0.78, 1, 0.88, 1] }}
-          transition={{ duration: 1.7, repeat: Infinity, ease: 'easeInOut' }}
+          filter="url(#vsSoftBlur)"
+          animate={{ opacity: [0.84, 0.98, 0.74, 1, 0.84] }}
+          transition={{ duration: 1.65, repeat: Infinity, ease: 'easeInOut' }}
         >
           {BOLTS.map((bolt, i) => (
-            <motion.path key={i} d={bolt.d} fill="none" stroke="url(#vsCore)" strokeWidth={bolt.fork ? 1.05 : 2.1} strokeLinecap="round" strokeLinejoin="round" {...boltAnim(i)} />
+            <motion.path key={i} d={bolt.d} fill="none" stroke="url(#vsAmber)" strokeWidth={widthFor(bolt.kind, 'amber')} strokeLinecap="round" strokeLinejoin="round" opacity={opacityFor(bolt.kind, 'amber')} {...boltAnim(i)} />
+          ))}
+        </motion.g>
+
+        <motion.g
+          animate={{ opacity: [0.68, 1, 0.72, 0.94, 0.68] }}
+          transition={{ duration: 1.35, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          {BOLTS.map((bolt, i) => (
+            <motion.path key={i} d={bolt.d} fill="none" stroke="url(#vsHotCore)" strokeWidth={widthFor(bolt.kind, 'core')} strokeLinecap="round" strokeLinejoin="round" opacity={opacityFor(bolt.kind, 'core')} {...boltAnim(i)} />
           ))}
         </motion.g>
 
@@ -93,38 +130,78 @@ export default function VsEmblem({ struck = true, gold = '#F7C841', topPct = 50 
             cx={s.cx}
             cy={s.cy}
             r={s.r}
-            fill="#FFF5C8"
-            initial={{ opacity: struck ? 0 : 0.9, scale: struck ? 0.4 : 1 }}
-            animate={{ opacity: [0.25, 1, 0.2, 0.85, 0.25], scale: [0.8, 1.45, 0.75, 1.15, 0.8] }}
-            transition={{ duration: 1.2 + i * 0.08, repeat: Infinity, ease: 'easeInOut', delay: struck ? 0.18 + i * 0.035 : i * 0.04 }}
-            style={{ filter: `drop-shadow(0 0 ${Math.round(s.r * 4)}px ${gold})` }}
+            fill="#FFF1B8"
+            initial={{ opacity: struck ? 0 : 0.7, scale: struck ? 0.4 : 1 }}
+            animate={{ opacity: [0.18, 0.9, 0.25, 0.7, 0.18], scale: [0.7, 1.45, 0.8, 1.1, 0.7] }}
+            transition={{ duration: 1.4 + i * 0.07, repeat: Infinity, ease: 'easeInOut', delay: struck ? 0.18 + i * 0.04 : i * 0.04 }}
+            style={{ filter: `drop-shadow(0 0 ${Math.max(5, Math.round(s.r * 5))}px ${gold})` }}
           />
         ))}
       </svg>
 
-      <div className="absolute" style={{ left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 168, height: 168 }}>
+      <div className="absolute" style={{ left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 98, height: 98 }}>
         <motion.div
-          style={{ width: '100%', height: '100%', borderRadius: '50%', background: `radial-gradient(circle, ${gold}55, ${gold}24 38%, transparent 70%)`, filter: 'blur(8px)' }}
-          animate={{ opacity: [0.55, 0.9, 0.55], scale: [0.9, 1.06, 0.9] }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: `radial-gradient(circle, ${gold}30, transparent 70%)`, filter: 'blur(8px)' }}
+          animate={{ opacity: [0.46, 0.86, 0.46], scale: [0.9, 1.08, 0.9] }}
+          transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
         />
-      </div>
-
-      <div className="absolute" style={{ left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 82, height: 82 }}>
-        <motion.div
-          className="flex items-center justify-center"
+        <svg viewBox="0 0 100 100" style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
+          <defs>
+            <linearGradient id="vsRingStroke" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0" stopColor="#FFF1AF" />
+              <stop offset=".42" stopColor={gold} />
+              <stop offset="1" stopColor="#B96C18" />
+            </linearGradient>
+            <filter id="vsRingGlow" x="-90%" y="-90%" width="280%" height="280%">
+              <feGaussianBlur stdDeviation="2.4" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          <circle cx="50" cy="50" r="34" fill="rgba(7,8,10,.46)" stroke="rgba(255,214,109,.28)" strokeWidth="1" />
+          <motion.circle
+            cx="50"
+            cy="50"
+            r="36"
+            fill="none"
+            stroke="url(#vsRingStroke)"
+            strokeWidth="2.4"
+            strokeDasharray="38 10 12 18"
+            strokeLinecap="round"
+            filter="url(#vsRingGlow)"
+            animate={{ rotate: 360, opacity: [0.72, 1, 0.76] }}
+            transition={{ rotate: { duration: 8, repeat: Infinity, ease: 'linear' }, opacity: { duration: 1.8, repeat: Infinity, ease: 'easeInOut' } }}
+            style={{ transformOrigin: '50% 50%' }}
+          />
+          <motion.circle
+            cx="50"
+            cy="50"
+            r="42"
+            fill="none"
+            stroke={gold}
+            strokeWidth="0.8"
+            strokeDasharray="4 10"
+            opacity=".45"
+            animate={{ rotate: -360 }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+            style={{ transformOrigin: '50% 50%' }}
+          />
+        </svg>
+        <motion.span
+          className="absolute inset-0 flex items-center justify-center"
           style={{
-            width: '100%', height: '100%', borderRadius: '50%',
-            background: 'radial-gradient(circle at 50% 36%, rgba(32,36,44,.96), rgba(8,10,14,.85))',
-            border: `1.5px solid ${gold}b0`,
-            boxShadow: `0 0 46px ${gold}80, 0 0 80px ${gold}35, 0 8px 22px rgba(0,0,0,.62), inset 0 1px 0 ${gold}70, inset 0 0 22px ${gold}40`,
+            fontFamily: 'Georgia, Times New Roman, serif',
+            fontWeight: 700,
+            fontSize: 39,
+            color: '#FFE18A',
+            textShadow: `0 0 10px ${gold}, 0 0 24px ${gold}b0, 0 2px 2px rgba(0,0,0,.72)`,
+            letterSpacing: 0,
           }}
-          initial={{ scale: struck ? 0.5 : 1, opacity: struck ? 0 : 1 }}
+          initial={{ scale: struck ? 0.62 : 1, opacity: struck ? 0 : 1 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: struck ? 0.08 : 0, type: 'spring', stiffness: 320, damping: 15 }}
+          transition={{ delay: struck ? 0.08 : 0, type: 'spring', stiffness: 300, damping: 16 }}
         >
-          <span style={{ fontWeight: 800, fontSize: 31, color: gold, textShadow: `0 0 20px ${gold}d0, 0 1px 1px rgba(0,0,0,.65)`, letterSpacing: 0 }}>VS</span>
-        </motion.div>
+          VS
+        </motion.span>
       </div>
     </div>
   )
