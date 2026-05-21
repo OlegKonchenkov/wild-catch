@@ -17,10 +17,10 @@ function buildSupabase() {
 function buildAdmin() {
   return {
     from: vi.fn(() => ({
-      update: vi.fn(() => ({
+      update: vi.fn((payload: Record<string, string>) => ({
         eq: vi.fn(() => ({
           select: vi.fn(() => ({
-            single: vi.fn(async () => ({ data: { id: 'c-1', image_url: 'http://x.png' }, error: null })),
+            single: vi.fn(async () => ({ data: { id: 'c-1', ...payload }, error: null })),
           })),
         })),
       })),
@@ -56,8 +56,22 @@ describe('Admin /api/admin/creatures/[id]/artwork', () => {
     expect(res.status).toBe(400)
   })
 
+  it('POST 400 when artwork kind is invalid', async () => {
+    const res = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ imageUrl: 'http://x.png', kind: 'poster' }) }), ctx)
+    expect(res.status).toBe(400)
+  })
+
   it('POST 200 with valid imageUrl', async () => {
     const res = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ imageUrl: 'http://x.png' }) }), ctx)
     expect(res.status).toBe(200)
+  })
+
+  it('POST 200 with cutout URL stores and returns spriteUrl', async () => {
+    const res = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ imageUrl: 'http://sprite.png', kind: 'cutout' }) }), ctx)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.kind).toBe('cutout')
+    expect(body.spriteUrl).toBe('http://sprite.png')
   })
 })

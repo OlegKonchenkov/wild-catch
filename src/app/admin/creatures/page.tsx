@@ -22,6 +22,7 @@ interface Creature {
   def: number
   evolution_of: string | null
   image_url: string
+  sprite_url?: string | null
   session_id: string | null
   catch_difficulty: number
   enigma_title: string | null
@@ -66,6 +67,7 @@ const EMPTY_FORM = {
 }
 
 type ImageMode = 'preview' | 'url' | 'upload' | 'ai'
+type ArtworkKind = 'legacy' | 'cutout'
 
 export default function CreaturesPage() {
   const [creatures, setCreatures] = useState<Creature[]>([])
@@ -85,6 +87,7 @@ export default function CreaturesPage() {
   const [manualUrl, setManualUrl] = useState('')
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiQuality, setAiQuality] = useState<'low' | 'medium' | 'high'>('medium')
+  const [artworkKind, setArtworkKind] = useState<ArtworkKind>('cutout')
   const [artworkLoading, setArtworkLoading] = useState(false)
   const [artworkError, setArtworkError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -140,6 +143,7 @@ export default function CreaturesPage() {
   function openNew() {
     setPanel('new'); setFormData({ ...EMPTY_FORM }); setFormError(null)
     setImageMode('preview'); setManualUrl(''); setAiPrompt(''); setArtworkError(null)
+    setArtworkKind('cutout')
     setSoundOpen(false); setSoundError(null); setStatusOpen(false)
   }
 
@@ -155,7 +159,8 @@ export default function CreaturesPage() {
       attack_sound_url: c.attack_sound_url ?? '', attack_sound_duration_ms: c.attack_sound_duration_ms ?? '',
       status_effect: c.status_effect ?? '', status_effect_chance: c.status_effect_chance != null ? Math.round(c.status_effect_chance * 100) : 15 } as any)
     setFormError(null); setImageMode('preview')
-    setManualUrl(c.image_url ?? ''); setAiPrompt(c.description ?? ''); setArtworkError(null)
+    setManualUrl(c.sprite_url ?? ''); setAiPrompt(c.description ?? ''); setArtworkError(null)
+    setArtworkKind('cutout')
     setSoundError(null); setStatusOpen(!!c.status_effect)
   }
 
@@ -211,8 +216,8 @@ export default function CreaturesPage() {
     setArtworkLoading(true); setArtworkError(null)
     try {
       const body = imageMode === 'url'
-        ? { imageUrl: manualUrl }
-        : { prompt: aiPrompt || formData.description || formData.name, quality: aiQuality }
+        ? { imageUrl: manualUrl, kind: artworkKind }
+        : { prompt: aiPrompt || formData.description || formData.name, quality: aiQuality, kind: artworkKind }
       const res = await fetch(`/api/admin/creatures/${targetId}/artwork`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       })
@@ -235,7 +240,7 @@ export default function CreaturesPage() {
       if (!uploadRes.ok) { setArtworkError(uploadData.error ?? 'Errore upload'); return }
       const artRes = await fetch(`/api/admin/creatures/${targetId}/artwork`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: uploadData.url }),
+        body: JSON.stringify({ imageUrl: uploadData.url, kind: artworkKind }),
       })
       const artData = await artRes.json()
       if (!artRes.ok) { setArtworkError(artData.error ?? 'Errore salvataggio artwork') }
@@ -489,8 +494,14 @@ export default function CreaturesPage() {
                   {/* Image section */}
                   <div className="mb-4">
                     <div className="relative h-36 bg-[#07111B] rounded-xl overflow-hidden mb-2 flex items-center justify-center">
-                      {editingCreature?.image_url ? (
-                        <Image src={editingCreature.image_url} alt={editingCreature.name} fill className="object-contain" sizes="320px" />
+                      {(artworkKind === 'cutout' ? editingCreature?.sprite_url || editingCreature?.image_url : editingCreature?.image_url) ? (
+                        <Image
+                          src={(artworkKind === 'cutout' ? editingCreature?.sprite_url || editingCreature?.image_url : editingCreature?.image_url) ?? ''}
+                          alt={editingCreature?.name ?? 'Creatura'}
+                          fill
+                          className="object-contain"
+                          sizes="320px"
+                        />
                       ) : (
                         <span className="text-5xl opacity-20">🐾</span>
                       )}
@@ -499,6 +510,26 @@ export default function CreaturesPage() {
                           <div className="w-8 h-8 border-2 border-[#3A9DBC] border-t-transparent rounded-full spin-slow" />
                         </div>
                       )}
+                    </div>
+
+                    <div className="flex gap-1 mb-2 bg-white/5 p-1 rounded-lg">
+                      {([
+                        ['cutout', 'Sprite battle'],
+                        ['legacy', 'Card'],
+                      ] as Array<[ArtworkKind, string]>).map(([kind, label]) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          onClick={() => {
+                            setArtworkKind(kind)
+                            setManualUrl(kind === 'cutout' ? editingCreature?.sprite_url ?? '' : editingCreature?.image_url ?? '')
+                            setArtworkError(null)
+                          }}
+                          className={`flex-1 text-xs py-1.5 rounded-md font-semibold transition-all ${artworkKind === kind ? 'bg-[#F7C841] text-[#180F03]' : 'text-white/45 hover:text-white'}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
                     </div>
 
                     {/* Image mode tabs */}

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
+type ArtworkKind = 'legacy' | 'cutout'
+
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non autenticato', status: 401 }
@@ -24,6 +26,12 @@ export async function POST(
   const { id } = await params
   const body = await request.json()
   const { prompt, imageUrl, quality = 'medium' } = body
+  let kind: ArtworkKind = 'legacy'
+  if (body.kind === 'cutout') kind = 'cutout'
+  else if (body.kind !== undefined && body.kind !== 'legacy') {
+    return NextResponse.json({ error: 'Tipo artwork non valido' }, { status: 400 })
+  }
+  const dbColumn = kind === 'cutout' ? 'sprite_url' : 'image_url'
 
   const admin = createAdminClient()
 
@@ -33,12 +41,17 @@ export async function POST(
       return NextResponse.json({ error: 'URL immagine non valido' }, { status: 400 })
     }
     const { data, error } = await admin.from('creatures')
-      .update({ image_url: imageUrl })
+      .update({ [dbColumn]: imageUrl })
       .eq('id', id)
-      .select('id, image_url')
+      .select(`id, ${dbColumn}`)
       .single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ imageUrl: data.image_url })
+    const savedUrl = (data as Record<string, string | null>)[dbColumn]
+    return NextResponse.json({
+      imageUrl: savedUrl,
+      spriteUrl: kind === 'cutout' ? savedUrl : undefined,
+      kind,
+    })
   }
 
   // --- AI generation mode ---
@@ -49,8 +62,10 @@ export async function POST(
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY non configurata' }, { status: 500 })
 
-  // Build a game-specific system prompt
-  const enhancedPrompt = `Creature card artwork for a mobile creature-catching game set in the Italian Adriatic coast and Apennine forests. Chibi/cute fantasy style, vibrant colors, no text, square format, transparent-ish background suitable for game cards. The creature: ${prompt.trim()}`
+  const model = process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1.5'
+  const enhancedPrompt = kind === 'cutout'
+    ? `Single creature sprite for a mobile creature-catching game set in the Italian Adriatic coast and Apennine forests. Cute-but-characterful chibi fantasy style, hand-painted semi-stylized shading, soft rim light, centered full body, facing camera 3/4. TRANSPARENT BACKGROUND, no ground, no platform, no baked shadow, no scenery, no text, no UI, no border. Square. Subject: ${prompt.trim()}`
+    : `Creature card artwork for a mobile creature-catching game set in the Italian Adriatic coast and Apennine forests. Chibi/cute fantasy style, vibrant colors, no text, square format, atmospheric background suitable for game cards. The creature: ${prompt.trim()}`
 
   const openaiRes = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
@@ -59,11 +74,12 @@ export async function POST(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-image-1.5',
+      model,
       prompt: enhancedPrompt,
       n: 1,
       size: '1024x1024',
       quality,
+      background: kind === 'cutout' ? 'transparent' : 'auto',
       output_format: 'png',
     }),
   })
@@ -87,7 +103,7 @@ export async function POST(
   let finalUrl = ''
   try {
     const buffer = Buffer.from(b64, 'base64')
-    const storagePath = `creatures/${id}.png`
+    const storagePath = kind === 'cutout' ? `creatures/cutouts/${id}.png` : `creatures/${id}.png`
     const storageBucket = 'creature-artwork'
 
     await admin.storage.createBucket(storageBucket, { public: true }).catch(() => {})
@@ -108,11 +124,17 @@ export async function POST(
 
   // Save URL to DB
   const { data, error: dbError } = await admin.from('creatures')
-    .update({ image_url: finalUrl })
+    .update({ [dbColumn]: finalUrl })
     .eq('id', id)
-    .select('id, image_url')
+    .select(`id, ${dbColumn}`)
     .single()
 
   if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 })
-  return NextResponse.json({ imageUrl: data.image_url, generated: true })
+  const savedUrl = (data as Record<string, string | null>)[dbColumn]
+  return NextResponse.json({
+    imageUrl: savedUrl,
+    spriteUrl: kind === 'cutout' ? savedUrl : undefined,
+    generated: true,
+    kind,
+  })
 }
