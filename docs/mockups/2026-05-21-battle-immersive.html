@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wild Catch — Battle UI · Immersive Full-Scene (concept)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0b0d10;
+    --paper:#ECEFF1;
+    --muted:#8C96A0;
+    --hp-good:#4FD18B;
+    --hp-mid:#F2C14E;
+    --hp-low:#E8553B;
+    --gold:#E8C26A;
+    --blood:#C13A2B;
+    --glass:rgba(14,18,24,.46);
+    --glass-brd:rgba(255,255,255,.14);
+    --disp:'Bricolage Grotesque',sans-serif;
+    --body:'Hanken Grotesk',sans-serif;
+    --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #15191f 0%, transparent 70%),
+      #06070a;
+    color:var(--paper);font-family:var(--body);
+    min-height:100vh;padding:48px 24px 80px;
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+  }
+  .pagehead{text-align:center;max-width:760px;margin-bottom:28px}
+  .pagehead h1{font-family:var(--disp);font-weight:800;font-size:30px;letter-spacing:-.02em;
+    background:linear-gradient(90deg,#fff,#9fb0bd);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .pagehead p{color:var(--muted);font-size:14px;margin-top:8px;line-height:1.6}
+  .pagehead .tag{display:inline-block;margin-top:14px;font-family:var(--mono);font-size:11px;
+    color:var(--gold);border:1px solid rgba(232,194,106,.3);border-radius:999px;padding:5px 12px;letter-spacing:.04em}
+
+  .stage{display:flex;gap:40px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:14px}
+  .col .cap{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+
+  /* ── phone frame ───────────────────────────── */
+  .phone{
+    width:344px;height:744px;border-radius:46px;padding:10px;
+    background:linear-gradient(160deg,#1c2026,#0c0e12);
+    box-shadow:0 40px 90px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.05);
+    position:relative;
+  }
+  .screen{
+    width:100%;height:100%;border-radius:38px;overflow:hidden;position:relative;
+    background:#05070a;isolation:isolate;
+  }
+
+  /* ── battle scene layering ─────────────────── */
+  .scene{position:absolute;inset:0;display:flex;flex-direction:column}
+  .half{position:relative;flex:1;overflow:hidden}
+
+  /* FOREST (bosco) — enemy half */
+  .bg-bosco{
+    background:
+      radial-gradient(120% 90% at 70% -10%, rgba(120,200,120,.28), transparent 55%),
+      radial-gradient(80% 70% at 20% 30%, rgba(40,110,70,.5), transparent 60%),
+      linear-gradient(180deg,#0f2417 0%,#0a1a12 60%,#06100b 100%);
+  }
+  /* god rays */
+  .bg-bosco::before{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(102deg, rgba(180,230,160,.05) 0 14px, transparent 14px 60px);
+    mix-blend-mode:screen;opacity:.7}
+  /* foliage masses */
+  .foliage{position:absolute;border-radius:50%;filter:blur(14px);opacity:.55}
+  .f1{width:200px;height:160px;background:radial-gradient(circle,#1f5a36,transparent 70%);top:-40px;left:-30px}
+  .f2{width:170px;height:150px;background:radial-gradient(circle,#175030,transparent 70%);top:-20px;right:-40px}
+  .f3{width:140px;height:120px;background:radial-gradient(circle,#0f3d24,transparent 70%);bottom:-30px;left:40%}
+
+  /* EMBER ROCK (terra/fiamma) — player half */
+  .bg-ember{
+    background:
+      radial-gradient(110% 80% at 30% 120%, rgba(255,150,60,.4), transparent 55%),
+      radial-gradient(90% 70% at 75% 80%, rgba(200,70,30,.45), transparent 60%),
+      linear-gradient(180deg,#160d09 0%,#221008 55%,#3a1606 100%);
+  }
+  .bg-ember::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(60% 40% at 50% 100%, rgba(255,180,80,.35), transparent 70%);
+    mix-blend-mode:screen}
+  .rock{position:absolute;background:#120a06;filter:blur(1px)}
+  .r1{width:180px;height:120px;bottom:-50px;left:-30px;clip-path:polygon(0 100%,20% 30%,55% 55%,80% 20%,100% 100%)}
+  .r2{width:200px;height:130px;bottom:-60px;right:-40px;clip-path:polygon(0 100%,25% 40%,60% 60%,85% 25%,100% 100%)}
+
+  /* floating particles */
+  .parts{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  .p{position:absolute;border-radius:50%;opacity:0;animation:rise linear infinite}
+  .p.spore{background:rgba(190,240,170,.8);box-shadow:0 0 6px rgba(190,240,170,.6)}
+  .p.ember{background:rgba(255,170,70,.9);box-shadow:0 0 8px rgba(255,140,40,.8)}
+  @keyframes rise{
+    0%{transform:translateY(20px) translateX(0);opacity:0}
+    15%{opacity:.9}
+    100%{transform:translateY(-180px) translateX(14px);opacity:0}
+  }
+
+  /* ── creature placeholder (stands in for the TRANSPARENT cutout) ── */
+  .creature{position:absolute;left:50%;transform:translateX(-50%);
+    display:flex;flex-direction:column;align-items:center;animation:float 4s ease-in-out infinite}
+  .creature.enemy{top:14%}
+  .creature.player{bottom:14%}
+  @keyframes float{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-9px)}}
+  .body{width:150px;height:150px;border-radius:46% 54% 50% 50%/55% 55% 45% 45%;position:relative;
+    box-shadow:inset -14px -18px 36px rgba(0,0,0,.45), inset 10px 12px 24px rgba(255,255,255,.18)}
+  .body.bosco{background:radial-gradient(circle at 38% 32%, #8fe08a, #3f9a52 55%, #246b39 100%)}
+  .body.ember{background:radial-gradient(circle at 38% 32%, #ffd089, #d98432 50%, #8a4a1f 100%)}
+  .eye{position:absolute;top:46%;width:17px;height:22px;background:#10140f;border-radius:50%;
+    box-shadow:inset 0 -3px 0 rgba(255,255,255,.15)}
+  .eye::after{content:"";position:absolute;top:3px;left:3px;width:6px;height:6px;border-radius:50%;background:#fff;opacity:.85}
+  .eye.l{left:34%}.eye.r{right:34%}
+  .glow{position:absolute;inset:-30% ;border-radius:50%;filter:blur(26px);z-index:-1;opacity:.7;animation:pulse 3.6s ease-in-out infinite}
+  .glow.bosco{background:radial-gradient(circle,rgba(80,210,120,.6),transparent 65%)}
+  .glow.ember{background:radial-gradient(circle,rgba(255,150,60,.6),transparent 65%)}
+  @keyframes pulse{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:.85;transform:scale(1.12)}}
+  .contact{position:absolute;bottom:-8px;width:120px;height:18px;border-radius:50%;
+    background:rgba(0,0,0,.5);filter:blur(8px)}
+
+  /* ── seam between the two scenes ─────────────── */
+  .seam{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:120px;pointer-events:none;z-index:6;
+    background:linear-gradient(180deg,transparent,rgba(5,7,10,.55) 45%,rgba(5,7,10,.55) 55%,transparent);
+    -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+  .vs{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:8;
+    width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle,rgba(20,24,30,.85),rgba(10,12,16,.7));
+    border:1px solid rgba(232,194,106,.5);box-shadow:0 0 24px rgba(232,194,106,.25),inset 0 0 12px rgba(232,194,106,.15)}
+  .vs span{font-family:var(--disp);font-weight:800;font-size:22px;letter-spacing:-.02em;
+    color:var(--gold);text-shadow:0 0 14px rgba(232,194,106,.6)}
+  .vs::before{content:"";position:absolute;left:-90px;right:-90px;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(232,194,106,.5),transparent)}
+
+  /* ── floating diegetic UI (light, NOT heavy cards) ── */
+  .ui{position:absolute;z-index:10;padding:9px 12px;border-radius:16px;
+    background:var(--glass);border:1px solid var(--glass-brd);
+    -webkit-backdrop-filter:blur(12px) saturate(1.2);backdrop-filter:blur(12px) saturate(1.2);
+    box-shadow:0 8px 26px rgba(0,0,0,.4)}
+  .ui-enemy{top:16px;left:16px;min-width:158px}
+  .ui-player{bottom:118px;left:16px;min-width:188px}
+  .ui .nm{font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:-.01em;display:flex;align-items:center;gap:7px}
+  .pill{font-family:var(--body);font-weight:600;font-size:10px;padding:2px 7px;border-radius:999px;
+    border:1px solid currentColor;opacity:.9}
+  .pill.bosco{color:#7fd58e}.pill.ember{color:#f0a45a}
+  .meta{display:flex;align-items:center;gap:8px;margin-top:5px}
+  .meta .sub{font-family:var(--body);font-size:11px;color:var(--muted)}
+  .hp{margin-top:8px;display:flex;align-items:center;gap:8px}
+  .bar{flex:1;height:6px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:999px}
+  .hpnum{font-family:var(--mono);font-weight:700;font-size:10px;color:rgba(255,255,255,.7)}
+  .atk{font-family:var(--mono);font-weight:800;font-size:11px;color:#ff9d6b}
+
+  /* ── arena damage ─────────────────────────── */
+  .dmg{position:absolute;left:50%;top:42%;transform:translateX(-50%);z-index:9;text-align:center}
+  .dmg .num{font-family:var(--disp);font-weight:800;font-size:52px;line-height:1;color:#fff;
+    text-shadow:0 0 18px rgba(193,58,43,.9),0 2px 8px rgba(0,0,0,.8)}
+  .dmg.crit .num{font-size:70px;color:var(--gold);text-shadow:0 0 26px rgba(232,194,106,.95),0 0 52px rgba(232,194,106,.5),0 2px 10px #000}
+  .dmg .splat{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:150px;height:150px;z-index:-1;
+    background:radial-gradient(circle,rgba(193,58,43,.55),transparent 62%);filter:blur(4px)}
+  .dmg.crit .splat{background:radial-gradient(circle,rgba(232,194,106,.6),transparent 60%);width:200px;height:200px}
+  .dmg .label{margin-top:4px;font-family:var(--disp);font-style:italic;font-weight:600;font-size:13px;
+    color:var(--gold);letter-spacing:.02em}
+
+  /* crit freeze vignette */
+  .freeze{position:absolute;inset:0;z-index:7;pointer-events:none;
+    background:radial-gradient(120% 80% at 50% 42%, transparent 35%, rgba(0,0,0,.55) 100%)}
+
+  /* ── squad portraits (rings, not pills) ── */
+  .squad{position:absolute;left:0;right:0;bottom:78px;z-index:10;display:flex;justify-content:center;gap:14px}
+  .port{width:46px;height:46px;border-radius:50%;position:relative;
+    background:rgba(14,18,24,.5);border:1px solid rgba(255,255,255,.14);
+    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+    display:flex;align-items:center;justify-content:center;font-size:20px}
+  .port.active{transform:scale(1.18);border-color:var(--gold);box-shadow:0 0 14px rgba(232,194,106,.4)}
+  .port .arc{position:absolute;inset:-3px;border-radius:50%;
+    background:conic-gradient(var(--hp-good) var(--hp,80%), rgba(255,255,255,.1) 0)}
+  .port .inner{position:absolute;inset:3px;border-radius:50%;background:rgba(10,13,17,.9);display:flex;align-items:center;justify-content:center}
+  .port .nmt{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);white-space:nowrap;
+    font-family:var(--body);font-size:9px;color:var(--gold)}
+
+  /* ── action bar (hierarchic) ── */
+  .actions{position:absolute;left:0;right:0;bottom:0;z-index:11;padding:14px 16px 18px;
+    display:flex;gap:10px;align-items:stretch;
+    background:linear-gradient(180deg,transparent,rgba(5,7,10,.85) 40%)}
+  .primary{flex:1;border-radius:18px;padding:15px 18px;border:none;cursor:pointer;
+    background:linear-gradient(135deg,#3aa86a,#1f7a48);
+    box-shadow:0 8px 22px rgba(31,122,72,.45),inset 0 1px 0 rgba(255,255,255,.2);
+    display:flex;align-items:center;justify-content:center;gap:9px}
+  .primary .v{font-family:var(--disp);font-weight:800;font-size:17px;color:#fff;letter-spacing:.01em}
+  .primary .ic{font-size:18px}
+  .secn{width:54px;border-radius:18px;border:1px solid rgba(255,255,255,.12);
+    background:rgba(14,18,24,.5);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--muted)}
+  .secn .si{font-size:18px}
+  .secn .sl{font-family:var(--body);font-size:8px;text-transform:uppercase;letter-spacing:.06em}
+
+  /* timer hairline */
+  .timer{position:absolute;left:0;right:0;bottom:80px;height:2px;z-index:10}
+  .timer i{display:block;height:100%;width:62%;background:linear-gradient(90deg,var(--gold),transparent);opacity:.8}
+
+  /* top status bar (kept minimal) */
+  .topbar{position:absolute;top:0;left:0;right:0;z-index:12;display:flex;justify-content:space-between;
+    padding:14px 16px;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.55)}
+  .topbar b{color:var(--gold)}
+
+  /* low-hp darkening for the impact phone */
+  .danger .bg-ember{filter:brightness(.7) saturate(1.3)}
+
+  /* ── spec / legend ─────────────────────────── */
+  .spec{max-width:840px;margin-top:48px;width:100%;
+    background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:26px 30px}
+  .spec h2{font-family:var(--disp);font-weight:700;font-size:20px;margin-bottom:6px}
+  .spec .lead{color:var(--muted);font-size:13px;margin-bottom:20px;line-height:1.6}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
+  .layer{border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 16px;background:rgba(255,255,255,.02)}
+  .layer .z{font-family:var(--mono);font-size:10px;color:var(--gold)}
+  .layer h3{font-family:var(--disp);font-weight:700;font-size:14px;margin:4px 0 6px}
+  .layer p{font-size:12px;color:var(--muted);line-height:1.55}
+  .layer .real{display:inline-block;margin-top:8px;font-family:var(--mono);font-size:9px;padding:3px 7px;border-radius:6px}
+  .real.art{background:rgba(232,194,106,.14);color:var(--gold)}
+  .real.css{background:rgba(80,210,120,.14);color:#7fd58e}
+  .swatches{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+  .sw{width:54px;height:54px;border-radius:10px;position:relative;border:1px solid rgba(255,255,255,.1)}
+  .sw span{position:absolute;bottom:-16px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:8px;color:var(--muted)}
+  .fonts{margin-top:26px;display:flex;flex-direction:column;gap:6px}
+  .fonts div{font-size:13px;color:var(--muted)}
+  .fonts b{color:var(--paper)}
+</style>
+</head>
+<body>
+
+  <div class="pagehead">
+    <h1>Wild Catch · Battle UI — Immersive Full-Scene</h1>
+    <p>Concept di redesign: la creatura vive <em>dentro</em> la sua scena (sfondo per-elemento riusabile + sprite ritagliato trasparente). L'UI è ridotta a overlay leggeri di vetro che non coprono l'arte. Le scene qui sono finte in CSS — l'arte vera (sfondi + ritagli) va prodotta a parte.</p>
+    <span class="tag">mockup statico · struttura/composizione reale · arte placeholder</span>
+  </div>
+
+  <div class="stage">
+
+    <!-- ───────────── PHONE 1 — base ───────────── -->
+    <div class="col">
+      <div class="cap">Stato base</div>
+      <div class="phone"><div class="screen">
+        <div class="scene">
+          <!-- enemy half -->
+          <div class="half bg-bosco">
+            <div class="foliage f1"></div><div class="foliage f2"></div><div class="foliage f3"></div>
+            <div class="parts" id="spores"></div>
+            <div class="creature enemy">
+              <div class="glow bosco"></div>
+              <div class="body bosco"><div class="eye l"></div><div class="eye r"></div></div>
+              <div class="contact"></div>
+            </div>
+          </div>
+          <!-- player half -->
+          <div class="half bg-ember">
+            <div class="rock r1"></div><div class="rock r2"></div>
+            <div class="parts" id="embers"></div>
+            <div class="creature player">
+              <div class="glow ember"></div>
+              <div class="body ember"><div class="eye l"></div><div class="eye r"></div></div>
+              <div class="contact"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="seam"></div>
+        <div class="vs"><span>VS</span></div>
+
+        <!-- top status -->
+        <div class="topbar"><span>Lv <b>12</b> · 2448 oro</span><span>⏱ 43:48</span></div>
+
+        <!-- enemy UI -->
+        <div class="ui ui-enemy">
+          <div class="nm">Muschio <span class="pill bosco">★ Comune</span></div>
+          <div class="meta"><span class="sub">🌿 Bosco</span></div>
+          <div class="hp"><div class="bar"><i style="width:100%;background:var(--hp-good)"></i></div><span class="hpnum">30/30</span></div>
+        </div>
+
+        <!-- player UI -->
+        <div class="ui ui-player">
+          <div class="nm">Miniera <span class="pill ember">◆ Leggendario</span></div>
+          <div class="meta"><span class="sub">⛰ Terra</span><span class="atk">⚔ 102</span></div>
+          <div class="hp"><div class="bar"><i style="width:100%;background:var(--hp-good)"></i></div><span class="hpnum">324/324</span></div>
+        </div>
+
+        <!-- squad -->
+        <div class="squad">
+          <div class="port active"><div class="arc" style="--hp:100%"></div><div class="inner">⛰</div><div class="nmt">Miniera</div></div>
+          <div class="port"><div class="arc" style="--hp:100%"></div><div class="inner">🌵</div></div>
+          <div class="port"><div class="arc" style="--hp:100%"></div><div class="inner">🪨</div></div>
+        </div>
+
+        <div class="timer"><i></i></div>
+
+        <!-- actions: 1 primary + secondaries -->
+        <div class="actions">
+          <button class="primary"><span class="ic">🎯</span><span class="v">CATTURA</span></button>
+          <button class="secn"><span class="si">⚔</span><span class="sl">Lotta</span></button>
+          <button class="secn"><span class="si">🎒</span><span class="sl">Item</span></button>
+          <button class="secn"><span class="si">🏃</span><span class="sl">Fuggi</span></button>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────────── PHONE 2 — impact / crit ───────────── -->
+    <div class="col">
+      <div class="cap">Momento d'impatto (critico)</div>
+      <div class="phone"><div class="screen danger">
+        <div class="scene">
+          <div class="half bg-bosco">
+            <div class="foliage f1"></div><div class="foliage f2"></div><div class="foliage f3"></div>
+            <div class="parts" id="spores2"></div>
+            <div class="creature enemy" style="animation:none">
+              <div class="glow bosco"></div>
+              <div class="body bosco" style="filter:brightness(2) saturate(1.4)"><div class="eye l"></div><div class="eye r"></div></div>
+              <div class="contact"></div>
+            </div>
+          </div>
+          <div class="half bg-ember">
+            <div class="rock r1"></div><div class="rock r2"></div>
+            <div class="parts" id="embers2"></div>
+            <div class="creature player">
+              <div class="glow ember"></div>
+              <div class="body ember"><div class="eye l"></div><div class="eye r"></div></div>
+              <div class="contact"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- freeze-frame vignette during the crit beat -->
+        <div class="freeze"></div>
+        <div class="seam"></div>
+
+        <!-- crit damage -->
+        <div class="dmg crit">
+          <div class="splat"></div>
+          <div class="num">−87</div>
+          <div class="label">Colpo critico! ×1.75</div>
+        </div>
+
+        <div class="topbar"><span>Lv <b>12</b> · 2448 oro</span><span>⏱ 43:48</span></div>
+
+        <div class="ui ui-enemy">
+          <div class="nm">Muschio <span class="pill bosco">★ Comune</span></div>
+          <div class="meta"><span class="sub">🌿 Bosco</span></div>
+          <div class="hp"><div class="bar"><i style="width:18%;background:var(--hp-low)"></i></div><span class="hpnum">5/30</span></div>
+        </div>
+
+        <div class="ui ui-player">
+          <div class="nm">Miniera <span class="pill ember">◆ Leggendario</span></div>
+          <div class="meta"><span class="sub">⛰ Terra</span><span class="atk">⚔ 102</span></div>
+          <div class="hp"><div class="bar"><i style="width:100%;background:var(--hp-good)"></i></div><span class="hpnum">324/324</span></div>
+        </div>
+
+        <div class="squad">
+          <div class="port active"><div class="arc" style="--hp:100%"></div><div class="inner">⛰</div><div class="nmt">Miniera</div></div>
+          <div class="port"><div class="arc" style="--hp:100%"></div><div class="inner">🌵</div></div>
+          <div class="port"><div class="arc" style="--hp:62%"></div><div class="inner">🪨</div></div>
+        </div>
+
+        <div class="timer"><i style="width:35%"></i></div>
+
+        <div class="actions">
+          <button class="primary" style="background:linear-gradient(135deg,#c1402b,#8a2a1c);box-shadow:0 8px 22px rgba(193,58,43,.45),inset 0 1px 0 rgba(255,255,255,.2)"><span class="ic">⚔</span><span class="v">ATTACCA</span></button>
+          <button class="secn"><span class="si">🎯</span><span class="sl">Cattura</span></button>
+          <button class="secn"><span class="si">🎒</span><span class="sl">Item</span></button>
+          <button class="secn"><span class="si">🏃</span><span class="sl">Fuggi</span></button>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <!-- ───────────── spec ───────────── -->
+  <div class="spec">
+    <h2>Come è composta — lo stack di livelli</h2>
+    <p class="lead">Ogni metà schermo è la stessa pila di 4 livelli. Cambia solo l'elemento. Questo è ciò che rende il sistema scalabile: una nuova creatura ha bisogno solo del suo ritaglio trasparente, lo sfondo dell'elemento esiste già.</p>
+    <div class="grid">
+      <div class="layer">
+        <div class="z">z-0 · livello fondo</div>
+        <h3>Sfondo per-elemento</h3>
+        <p>1 scena wide per elemento (bosco, fiamma, adriatico, terra, armonia) + 1 arena neutra per i duelli. Riusata da tutte le creature di quell'elemento.</p>
+        <span class="real art">arte da produrre · 6 file</span>
+      </div>
+      <div class="layer">
+        <div class="z">z-1 · soggetto</div>
+        <h3>Creatura ritagliata</h3>
+        <p>PNG trasparente (solo la creatura). Posizionata, scalata, con ombra di contatto + aura elemento — già gestite da CreatureSprite. Reagisce: bob, attacco, danno.</p>
+        <span class="real art">ritaglio da pipeline · 1×creatura</span>
+      </div>
+      <div class="layer">
+        <div class="z">z-2 · atmosfera</div>
+        <h3>Giuntura + effetti</h3>
+        <p>Banda di nebbia che fonde le due scene + VS. Particelle (spore/braci). Reazioni dinamiche: scurire a HP bassi, freeze-frame sul critico.</p>
+        <span class="real css">CSS / SVG · 0 asset</span>
+      </div>
+      <div class="layer">
+        <div class="z">z-3 · interfaccia</div>
+        <h3>Overlay diegetici</h3>
+        <p>Chip di vetro leggeri (nome + HP + elemento) che galleggiano sull'arte invece di card pesanti. Squad come ritratti tondi. Azione primaria dominante.</p>
+        <span class="real css">CSS · 0 asset</span>
+      </div>
+    </div>
+
+    <div class="swatches">
+      <div class="sw" style="background:#0b0d10"><span>ink</span></div>
+      <div class="sw" style="background:#E8C26A"><span>oro</span></div>
+      <div class="sw" style="background:#C13A2B"><span>danno</span></div>
+      <div class="sw" style="background:#4FD18B"><span>hp+</span></div>
+      <div class="sw" style="background:#F2C14E"><span>hp~</span></div>
+      <div class="sw" style="background:#E8553B"><span>hp-</span></div>
+    </div>
+
+    <div class="fonts">
+      <div><b style="font-family:'Bricolage Grotesque'">Bricolage Grotesque</b> — display / nomi / verbi azione / numeri di danno</div>
+      <div><b style="font-family:'Hanken Grotesk'">Hanken Grotesk</b> — UI / label / sottotitoli</div>
+      <div><b style="font-family:'JetBrains Mono'">JetBrains Mono</b> — HP, ATK, timer (cifre tabellari, non "ballano")</div>
+    </div>
+  </div>
+
+<script>
+  function spawn(id, cls, n){
+    const host=document.getElementById(id); if(!host) return;
+    for(let i=0;i<n;i++){
+      const p=document.createElement('div');
+      p.className='p '+cls;
+      const s=2+Math.random()*3;
+      p.style.width=s+'px';p.style.height=s+'px';
+      p.style.left=(Math.random()*100)+'%';
+      p.style.bottom=(Math.random()*40)+'%';
+      p.style.animationDuration=(4+Math.random()*4)+'s';
+      p.style.animationDelay=(Math.random()*5)+'s';
+      host.appendChild(p);
+    }
+  }
+  spawn('spores','spore',16); spawn('embers','ember',18);
+  spawn('spores2','spore',16); spawn('embers2','ember',18);
+</script>
+</body>
+</html>
