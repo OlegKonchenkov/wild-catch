@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wild Catch — Battle UI · Anteprima con ARTE REALE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#ECEFF1; --muted:#9aa4ae;
+    --hp-good:#34D399; --hp-mid:#FBBF24; --hp-low:#EF4444;
+    --gold:#F0CE7A; --blood:#C13A2B;
+    --bosco:#2ECC6A; --amber:#F0A848;
+    --glass:rgba(8,12,20,.52); --glass-brd:rgba(255,255,255,.14);
+    --disp:'Bricolage Grotesque',sans-serif; --body:'Hanken Grotesk',sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(1200px 700px at 50% -10%,#11151b,transparent 70%),#05060a;color:var(--paper);
+    font-family:var(--body);min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:18px;padding:40px 16px 64px}
+  .head{text-align:center;max-width:680px}
+  .head h1{font-family:var(--disp);font-weight:800;font-size:24px;letter-spacing:-.02em;
+    background:linear-gradient(90deg,#fff,#9fb0bd);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .head p{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.6}
+  .head .tag{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--gold);
+    border:1px solid rgba(240,206,122,.32);border-radius:999px;padding:5px 12px;letter-spacing:.04em}
+  .controls{display:flex;gap:8px}
+  .controls button{font-family:var(--mono);font-size:11px;color:var(--paper);background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:7px 14px;cursor:pointer}
+  .controls button:hover{background:rgba(255,255,255,.12)}
+
+  /* phone */
+  .phone{width:390px;height:844px;border-radius:50px;padding:11px;
+    background:linear-gradient(160deg,#20242b,#0b0d11);position:relative;
+    box-shadow:0 50px 110px rgba(0,0,0,.65),inset 0 0 0 1px rgba(255,255,255,.05)}
+  .screen{width:100%;height:100%;border-radius:40px;overflow:hidden;position:relative;background:#04060a;isolation:isolate}
+
+  .scene{position:absolute;inset:0;display:flex;flex-direction:column}
+  .half{position:relative;flex:1;overflow:hidden}
+  .half .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .half.enemy .bg{object-position:50% 42%}
+  .half.player .bg{object-position:50% 60%}
+  /* gentle ambient zoom so the painted scene breathes */
+  .half.enemy .bg{animation:drift1 22s ease-in-out infinite}
+  .half.player .bg{animation:drift2 26s ease-in-out infinite}
+  @keyframes drift1{0%,100%{transform:scale(1.04) translateY(0)}50%{transform:scale(1.08) translateY(-6px)}}
+  @keyframes drift2{0%,100%{transform:scale(1.05) translateY(0)}50%{transform:scale(1.09) translateY(5px)}}
+  /* element wash + low-hp darken hook */
+  .half::after{content:"";position:absolute;inset:0;pointer-events:none;transition:background .4s,backdrop-filter .4s}
+  .half.enemy::after{background:radial-gradient(120% 80% at 50% 30%,rgba(46,204,106,.10),transparent 60%)}
+  .half.player::after{background:radial-gradient(120% 80% at 50% 80%,rgba(240,168,72,.12),transparent 60%)}
+  .half.hurt::after{background:radial-gradient(120% 90% at 50% 50%,transparent 30%,rgba(120,8,4,.5) 100%)}
+
+  .parts{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}
+  .p{position:absolute;border-radius:50%;opacity:0;animation:rise linear infinite}
+  .p.spore{background:rgba(200,245,180,.85);box-shadow:0 0 7px rgba(190,240,170,.7)}
+  .p.dust{background:rgba(255,200,120,.85);box-shadow:0 0 8px rgba(255,170,80,.75)}
+  @keyframes rise{0%{transform:translateY(20px);opacity:0}15%{opacity:.9}100%{transform:translateY(-200px) translateX(16px);opacity:0}}
+
+  /* creature */
+  .cre{position:absolute;left:50%;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center}
+  .cre.enemy{top:5%}
+  .cre.player{bottom:4%}
+  .cre .glow{position:absolute;width:74%;height:60%;top:18%;border-radius:50%;filter:blur(34px);z-index:-1;
+    animation:pulse 3.8s ease-in-out infinite}
+  .cre.enemy .glow{background:radial-gradient(circle,rgba(46,204,106,.55),transparent 65%)}
+  .cre.player .glow{background:radial-gradient(circle,rgba(240,168,72,.6),transparent 65%)}
+  @keyframes pulse{0%,100%{opacity:.45;transform:scale(.92)}50%{opacity:.8;transform:scale(1.1)}}
+  .cre img{display:block;filter:drop-shadow(0 14px 18px rgba(0,0,0,.5));}
+  .cre.enemy img{width:190px}
+  .cre.player img{width:236px}
+  /* idle breathe/float */
+  .cre.enemy .sprite{animation:floatA 4s ease-in-out infinite}
+  .cre.player .sprite{animation:floatB 4.6s ease-in-out infinite}
+  @keyframes floatA{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-8px) scaleY(1.015)}}
+  @keyframes floatB{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-6px) scaleY(1.01)}}
+  .cre .contact{position:absolute;bottom:6px;width:56%;height:18px;border-radius:50%;
+    background:rgba(0,0,0,.55);filter:blur(9px);z-index:-1}
+  /* hit reactions (added by JS) */
+  .cre.lunge .sprite{animation:lunge .42s cubic-bezier(.3,1.4,.5,1)}
+  @keyframes lunge{0%{transform:translateY(0)}30%{transform:translateY(10px) scale(.97)}55%{transform:translateY(-46px) scale(1.04)}100%{transform:translateY(0)}}
+  .cre.recoil .sprite{animation:recoil .5s ease}
+  @keyframes recoil{0%{transform:translateX(0)}20%{transform:translateX(12px) rotate(3deg)}45%{transform:translateX(-9px) rotate(-2deg)}100%{transform:translateX(0)}}
+  .cre.flash img{animation:flash .3s ease}
+  @keyframes flash{0%,100%{filter:drop-shadow(0 14px 18px rgba(0,0,0,.5))}40%{filter:drop-shadow(0 0 0 #fff) brightness(2.4) saturate(1.3)}}
+
+  /* seam + VS */
+  .seam{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:128px;z-index:6;pointer-events:none;
+    background:linear-gradient(180deg,transparent,rgba(4,6,10,.6) 45%,rgba(4,6,10,.6) 55%,transparent);
+    backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+  .vsWrap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:8;width:280px;height:120px;pointer-events:none}
+  .bolt{position:absolute;inset:0}
+  .bolt path{fill:none;stroke:url(#g);stroke-width:2.4;filter:drop-shadow(0 0 6px rgba(240,206,122,.9));
+    stroke-linecap:round;stroke-linejoin:round}
+  .vs{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:66px;height:66px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle,rgba(22,26,33,.92),rgba(8,10,14,.78));
+    border:1.5px solid rgba(240,206,122,.6);box-shadow:0 0 28px rgba(240,206,122,.35),inset 0 0 14px rgba(240,206,122,.18)}
+  .vs span{font-family:var(--disp);font-weight:800;font-size:25px;color:var(--gold);text-shadow:0 0 16px rgba(240,206,122,.7)}
+
+  /* glass info cards */
+  .card{position:absolute;z-index:10;padding:10px 13px;border-radius:18px;background:var(--glass);
+    border:1px solid var(--glass-brd);backdrop-filter:blur(13px) saturate(1.2);-webkit-backdrop-filter:blur(13px) saturate(1.2);
+    box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  .card.enemy{top:54px;left:16px;min-width:172px;border-color:rgba(46,204,106,.4)}
+  .card.player{bottom:150px;right:16px;min-width:196px;border-color:rgba(240,168,72,.45)}
+  .nm{font-family:var(--disp);font-weight:700;font-size:18px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+  .pill{font-family:var(--body);font-weight:700;font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid currentColor}
+  .pill.bosco{color:#7fe0a0}.pill.terra{color:#f0b878}
+  .stars{color:var(--gold);font-size:12px;letter-spacing:1px}.stars .off{color:rgba(255,255,255,.22)}
+  .meta{display:flex;align-items:center;gap:9px;margin-top:5px}
+  .sub{font-family:var(--body);font-size:11px;color:var(--muted)}
+  .atk{font-family:var(--mono);font-weight:800;font-size:12px;color:#ffb27a}
+  .hp{margin-top:8px;display:flex;align-items:center;gap:8px}
+  .bar{flex:1;height:7px;border-radius:999px;background:rgba(255,255,255,.13);overflow:hidden;position:relative}
+  .bar .ghost{position:absolute;inset:0;height:100%;border-radius:999px;background:rgba(255,90,70,.5);transition:width .9s ease .15s}
+  .bar i{position:relative;display:block;height:100%;border-radius:999px;transition:width .35s ease}
+  .hpnum{font-family:var(--mono);font-weight:700;font-size:10px;color:rgba(255,255,255,.72)}
+
+  /* damage burst */
+  .dmg{position:absolute;left:50%;top:30%;transform:translateX(-50%);z-index:9;text-align:center;opacity:0}
+  .dmg.show{animation:dpop .9s ease forwards}
+  @keyframes dpop{0%{opacity:0;transform:translateX(-50%) translateY(10px) scale(.6)}
+    20%{opacity:1;transform:translateX(-50%) translateY(-6px) scale(1.1)}
+    100%{opacity:0;transform:translateX(-50%) translateY(-54px) scale(1)}}
+  .dmg .num{font-family:var(--disp);font-weight:800;font-size:54px;line-height:1;color:#fff;
+    text-shadow:0 0 18px rgba(193,58,43,.9),0 2px 8px rgba(0,0,0,.8)}
+  .dmg.crit .num{font-size:72px;color:var(--gold);text-shadow:0 0 26px rgba(240,206,122,.95),0 0 54px rgba(240,206,122,.5),0 2px 10px #000}
+  .dmg .splat{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:150px;height:150px;z-index:-1;
+    background:radial-gradient(circle,rgba(193,58,43,.55),transparent 62%);filter:blur(4px)}
+  .dmg.crit .splat{background:radial-gradient(circle,rgba(240,206,122,.6),transparent 60%);width:210px;height:210px}
+  .dmg .lab{margin-top:4px;font-family:var(--disp);font-style:italic;font-weight:700;font-size:13px;color:var(--gold)}
+  .freeze{position:absolute;inset:0;z-index:7;pointer-events:none;opacity:0;
+    background:radial-gradient(120% 80% at 50% 38%,transparent 35%,rgba(0,0,0,.6) 100%);transition:opacity .12s}
+  .freeze.on{opacity:1}
+  .screen.shake{animation:shake .14s 2}
+  @keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-3px,1px)}75%{transform:translate(3px,-1px)}}
+
+  /* squad */
+  .squad{position:absolute;left:0;right:0;bottom:96px;z-index:10;display:flex;justify-content:center;gap:18px}
+  .port{width:50px;height:50px;border-radius:14px;position:relative;background:rgba(10,13,18,.6);
+    border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    display:flex;align-items:center;justify-content:center;overflow:visible}
+  .port img{width:42px;height:42px;object-fit:contain}
+  .port .ico{font-size:22px}
+  .port.active{transform:translateY(-4px) scale(1.12);border-color:var(--gold);box-shadow:0 0 16px rgba(240,206,122,.45)}
+  .port.active::before{content:"♛";position:absolute;top:-16px;left:50%;transform:translateX(-50%);color:var(--gold);font-size:13px}
+  .port .hpb{position:absolute;left:5px;right:5px;bottom:4px;height:3px;border-radius:2px;background:rgba(0,0,0,.5);overflow:hidden}
+  .port .hpb i{display:block;height:100%;background:var(--hp-good)}
+
+  /* timer hairline */
+  .timer{position:absolute;left:0;right:0;bottom:88px;height:2px;z-index:10}
+  .timer i{display:block;height:100%;width:62%;background:linear-gradient(90deg,var(--gold),transparent);opacity:.85}
+
+  /* actions */
+  .actions{position:absolute;left:0;right:0;bottom:0;z-index:11;padding:14px 14px 20px;display:flex;gap:9px;align-items:stretch;
+    background:linear-gradient(180deg,transparent,rgba(4,6,10,.9) 42%)}
+  .prim{flex:1.4;border-radius:18px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;
+    background:linear-gradient(135deg,#E85D2F,#c94a20);box-shadow:0 10px 24px rgba(232,93,47,.45),inset 0 1px 0 rgba(255,255,255,.22)}
+  .prim .v{font-family:var(--disp);font-weight:800;font-size:17px;color:#fff}.prim .ic{font-size:18px}
+  .sec{flex:1;border-radius:18px;border:1px solid rgba(255,255,255,.12);background:rgba(12,16,22,.55);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:#cfd6dd;padding:10px 4px}
+  .sec.lotta{background:linear-gradient(135deg,#7B4DB8,#5c3a8c);color:#fff;border:none;box-shadow:0 10px 24px rgba(123,77,184,.4)}
+  .sec .si{font-size:18px}.sec .sl{font-family:var(--body);font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.06em}
+
+  /* top bar */
+  .topbar{position:absolute;top:0;left:0;right:0;z-index:12;display:flex;justify-content:space-between;align-items:center;
+    padding:14px 16px;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.62)}
+  .topbar .lv{display:flex;align-items:center;gap:7px}
+  .topbar .xp{width:54px;height:5px;border-radius:3px;background:rgba(255,255,255,.16);overflow:hidden}
+  .topbar .xp i{display:block;height:100%;width:64%;background:linear-gradient(90deg,var(--gold),#caa24e)}
+  .topbar b{color:var(--gold)}
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>Wild Catch · Battle UI — anteprima con ARTE REALE</h1>
+    <p>Sfondi <b>gpt-image-2</b> (opachi) + ritagli creature trasparenti <b>gpt-image-1.5</b>, composti nei livelli del redesign: scena per-elemento, creatura ritagliata con aura/ombra, atmosfera (particelle, nebbia, VS, fulmini), HUD di vetro. Le creature respirano, fluttuano e combattono.</p>
+    <span class="tag">arte vera · effetto/animazioni reali · nessun dato toccato</span>
+  </div>
+  <div class="controls">
+    <button id="attack">▶ Simula attacco</button>
+    <button id="crit">✦ Simula critico</button>
+  </div>
+
+  <div class="phone"><div class="screen" id="screen">
+    <div class="scene">
+      <div class="half enemy" id="halfEnemy">
+        <img class="bg" src="bg-bosco.png" alt="">
+        <div class="parts" id="spores"></div>
+        <div class="cre enemy" id="creEnemy">
+          <div class="glow"></div>
+          <img class="sprite" src="muschio.png" alt="Muschio">
+          <div class="contact"></div>
+        </div>
+      </div>
+      <div class="half player" id="halfPlayer">
+        <img class="bg" src="bg-terra.png" alt="">
+        <div class="parts" id="dust"></div>
+        <div class="cre player" id="crePlayer">
+          <div class="glow"></div>
+          <img class="sprite" src="miniera.png" alt="Miniera">
+          <div class="contact"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="seam"></div>
+    <div class="vsWrap">
+      <svg class="bolt" viewBox="0 0 280 120" preserveAspectRatio="none">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="rgba(240,206,122,0)"/><stop offset=".5" stop-color="#F7E2A6"/><stop offset="1" stop-color="rgba(240,206,122,0)"/>
+        </linearGradient></defs>
+        <path id="boltL" d="M140 60 L112 54 L96 64 L72 52 L52 60 L30 50 L8 60"/>
+        <path id="boltR" d="M140 60 L168 66 L184 56 L208 68 L228 60 L250 70 L272 60"/>
+      </svg>
+      <div class="vs"><span>VS</span></div>
+    </div>
+
+    <div class="freeze" id="freeze"></div>
+
+    <!-- top bar -->
+    <div class="topbar">
+      <span class="lv">Lv <b>12</b><span class="xp"><i></i></span></span>
+      <span>🪙 <b>2448</b></span>
+      <span>⏱ 43:48</span>
+    </div>
+
+    <!-- enemy card -->
+    <div class="card enemy">
+      <div class="nm">Muschio <span class="pill bosco">Terrestre</span></div>
+      <div class="meta"><span class="stars">★<span class="off">★★★★</span></span><span class="sub">🌿 Bosco</span></div>
+      <div class="hp"><div class="bar"><span class="ghost" id="ghostE" style="width:100%"></span><i id="hpE" style="width:100%;background:var(--hp-good)"></i></div><span class="hpnum" id="numE">30/30</span></div>
+    </div>
+
+    <!-- player card -->
+    <div class="card player">
+      <div class="nm">Miniera <span class="pill terra">Leggendario</span></div>
+      <div class="meta"><span class="sub">⛰ Terra</span><span class="atk">⚔ 102</span></div>
+      <div class="hp"><div class="bar"><span class="ghost" style="width:100%"></span><i style="width:100%;background:var(--hp-good)"></i></div><span class="hpnum">324/324</span></div>
+    </div>
+
+    <!-- squad -->
+    <div class="squad">
+      <div class="port active"><img src="miniera.png" alt=""><div class="hpb"><i style="width:100%"></i></div></div>
+      <div class="port"><span class="ico">🌵</span><div class="hpb"><i style="width:100%"></i></div></div>
+      <div class="port"><span class="ico">🪨</span><div class="hpb"><i style="width:86%"></i></div></div>
+    </div>
+
+    <div class="timer"><i></i></div>
+
+    <!-- actions -->
+    <div class="actions">
+      <button class="prim"><span class="ic">🔍</span><span class="v">CATTURA</span></button>
+      <button class="sec lotta"><span class="si">⚔</span><span class="sl">Lotta</span></button>
+      <button class="sec"><span class="si">🧪</span><span class="sl">Oggetti</span></button>
+      <button class="sec"><span class="si">🏃</span><span class="sl">Fuggi</span></button>
+    </div>
+  </div></div>
+
+<script>
+  // ── particles ───────────────────────────────────────────
+  function spawn(id, cls, n){
+    const host=document.getElementById(id); if(!host) return;
+    for(let i=0;i<n;i++){
+      const p=document.createElement('div'); p.className='p '+cls;
+      const s=2+Math.random()*3.5; p.style.width=s+'px'; p.style.height=s+'px';
+      p.style.left=(Math.random()*100)+'%'; p.style.bottom=(Math.random()*45)+'%';
+      p.style.animationDuration=(4+Math.random()*4)+'s'; p.style.animationDelay=(Math.random()*6)+'s';
+      host.appendChild(p);
+    }
+  }
+  spawn('spores','spore',18); spawn('dust','dust',20);
+
+  // ── lightning strike on entrance, then idle flicker ──────
+  const boltL=document.getElementById('boltL'), boltR=document.getElementById('boltR');
+  function strike(){
+    [boltL,boltR].forEach(b=>{
+      const len=b.getTotalLength(); b.style.transition='none';
+      b.style.strokeDasharray=len; b.style.strokeDashoffset=len; b.getBoundingClientRect();
+      b.style.transition='stroke-dashoffset .28s ease, opacity .3s'; b.style.opacity=1; b.style.strokeDashoffset=0;
+    });
+  }
+  strike();
+  setInterval(()=>{ const o=.6+Math.random()*.4; boltL.style.opacity=o; boltR.style.opacity=o; }, 700);
+
+  // ── combat demo ─────────────────────────────────────────
+  const screen=document.getElementById('screen'), freeze=document.getElementById('freeze');
+  const crePlayer=document.getElementById('crePlayer'), creEnemy=document.getElementById('creEnemy');
+  const hpE=document.getElementById('hpE'), ghostE=document.getElementById('ghostE'), numE=document.getElementById('numE');
+  let enemyHp=30; const enemyMax=30;
+
+  function setEnemyHp(v){
+    enemyHp=Math.max(0,v); const pct=enemyHp/enemyMax*100;
+    hpE.style.width=pct+'%'; ghostE.style.width=pct+'%';
+    hpE.style.background=pct>50?'var(--hp-good)':pct>25?'var(--hp-mid)':'var(--hp-low)';
+    numE.textContent=enemyHp+'/'+enemyMax;
+    document.getElementById('halfEnemy').classList.toggle('hurt', pct<=25);
+  }
+  function burst(amount, crit){
+    const d=document.createElement('div'); d.className='dmg'+(crit?' crit':'');
+    d.innerHTML='<div class="splat"></div><div class="num">−'+amount+'</div>'+(crit?'<div class="lab">Colpo critico! ×1.75</div>':'');
+    screen.appendChild(d); requestAnimationFrame(()=>d.classList.add('show'));
+    setTimeout(()=>d.remove(),900);
+  }
+  function attack(crit){
+    crePlayer.classList.add('lunge');
+    setTimeout(()=>{
+      const dmg=crit?17:5+Math.floor(Math.random()*4);
+      setEnemyHp(enemyHp-dmg<=0?enemyMax:enemyHp-dmg); // loop: refill when it would die
+      creEnemy.classList.add('recoil','flash');
+      burst(dmg, crit); screen.classList.add('shake');
+      if(crit){ freeze.classList.add('on'); setTimeout(()=>freeze.classList.remove('on'),170); }
+      setTimeout(()=>{ creEnemy.classList.remove('recoil','flash'); screen.classList.remove('shake'); },520);
+    },240);
+    setTimeout(()=>crePlayer.classList.remove('lunge'),460);
+  }
+  document.getElementById('attack').onclick=()=>attack(false);
+  document.getElementById('crit').onclick=()=>attack(true);
+  // gentle auto-demo so the scene feels alive
+  let t=0; setInterval(()=>{ t++; attack(t%4===0); }, 4200);
+</script>
+</body>
+</html>
