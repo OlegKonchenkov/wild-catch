@@ -6,11 +6,19 @@
 
 **Architecture:** Layer separation. Today each creature image has its background **baked in** (one square illustration). We split that into reusable layers:
 1. **Background** — one wide scene per element (5) + one neutral arena (duels), served from `/public/backgrounds/battle/`.
-2. **Creature** — transparent PNG cutout (no background), composited on top with the existing aura/contact-shadow treatment.
+2. **Creature** — transparent PNG, **freshly generated** (native transparent output from gpt-image-2 — NOT background-removed from the old art), composited on top with the existing aura/contact-shadow treatment.
 3. **Atmosphere** — seam fog, VS emblem, per-element particles, dynamic reactions (low-HP darken, crit freeze).
 4. **HUD** — light glass info cards, portrait squad bar, hierarchic action bar, hairline timer.
 
 A single `<BattleScene>` compositor renders layers 1–3; a `<BattleHud>` set renders layer 4. Encounter, duel and boss all consume the same primitives so the look is consistent and the combat *logic* (APIs, state machines) is untouched.
+
+**Asset strategy (decided by the product owner):** regenerate **everything** — both the creature sprites (as clean native transparent cutouts) and their element backgrounds — for maximum quality and thematic coherence with the game's world (Italian Adriatic/Apennine mythological bestiary, the cute-but-characterful chibi monster style visible in the current art). We do NOT background-remove the old art (fragile, leaves halos/leftover ground).
+
+**NON-DESTRUCTIVE — this is a hard requirement.** Everything new is additive so the owner can `git revert` and be back to today's app with today's images:
+- New creature art is written to a NEW column `sprite_cutout_url` and a NEW storage path. The existing `image_url` (baked art) and its storage object are **never overwritten or deleted**.
+- Backgrounds are NEW files under `/public/backgrounds/battle/`.
+- The sprite resolver prefers the new cutout but **falls back to the old `image_url`**, so the old assets stay live and usable.
+- Old images get deleted ONLY later, on explicit owner approval, after they confirm they like the result.
 
 **Tech Stack:** Next.js 16 App Router · React · framer-motion (already in repo) · Supabase (DB + Storage) · OpenAI **gpt-image-2** for asset generation (NOT gpt-image-1.5) · TypeScript strict.
 
@@ -34,9 +42,22 @@ Before writing code, read these so you match existing conventions:
 
 ---
 
+## Safety: non-destructive regeneration & rollback (READ BEFORE PHASE A)
+
+The owner wants to be able to throw the whole redesign away and return to the current app with the current images. Honor these rules everywhere:
+
+1. **Never write to `creatures.image_url`** during this work. It holds the current baked art = the rollback safety net. New art goes to `creatures.sprite_cutout_url` only.
+2. **Never overwrite or delete the old storage objects** (`creature-artwork/creatures/${id}.png`). New cutouts go to a **separate** path `creature-artwork/creatures/cutouts/${id}.png`.
+3. **Backgrounds are additive** new files in `/public/backgrounds/battle/`. They don't replace anything.
+4. **The resolver falls back to old art**: `resolveCreatureSprite()` returns `sprite_cutout_url || image_url || ''`. So even mid-migration (some creatures regenerated, some not) the app always has an image.
+5. **Rollback procedure** (document it in the PR description): `git revert` the Phase B–F commits → battle screens return to using `image_url`. The `sprite_cutout_url` column + cutout files can stay (harmless) or be dropped later. No data loss either way.
+6. **Deletion of old assets happens later**, in a SEPARATE follow-up, only after the owner explicitly approves the new look. Do not include any `DELETE`/storage-remove of old art in this plan's commits.
+
+---
+
 ## Phase A — Asset pipeline (gpt-image-2 + cutouts + backgrounds)
 
-> This phase is mostly **yours alone** (CLI/storage/asset gen). Nothing renders differently yet.
+> This phase is mostly **yours alone** (CLI/storage/asset gen). Nothing renders differently yet. **Non-destructive** — see the Safety section above.
 
 ### Task A1: Upgrade artwork route to gpt-image-2 with transparency option
 
@@ -45,10 +66,13 @@ Before writing code, read these so you match existing conventions:
 
 **What to change:**
 1. Model `'gpt-image-1.5'` → `'gpt-image-2'`.
-2. Add request param `transparent?: boolean` (default `true` going forward). When true, pass `background: 'transparent'` and `output_format: 'png'`. When false, keep opaque.
-3. Add param `kind?: 'cutout' | 'scene'` to support generating element backgrounds via the same plumbing (scene = opaque, wide).
-4. For `kind: 'cutout'`, enhance the prompt suffix: `"...isolated subject, NO background, NO ground, NO platform, full transparent background, single centered creature, soft rim light, square."`
-5. Save cutouts to a NEW column (see A2): write the transparent PNG to storage path `creatures/cutouts/${id}.png` and set `creatures.sprite_cutout_url`. Keep `image_url` (the original baked art) untouched as fallback.
+2. Add param `kind?: 'cutout' | 'scene' | 'legacy'` (default `'cutout'` for this work).
+   - `'cutout'` → `background:'transparent'`, `output_format:'png'`, `size:'1024x1024'`. Writes to storage `creatures/cutouts/${id}.png` and sets **`sprite_cutout_url` ONLY**. **Must NOT touch `image_url`.**
+   - `'scene'` → opaque, portrait `1024x1536`, for element backgrounds (used by the background generation step).
+   - `'legacy'` → the current behavior (opaque → `image_url`), kept only for back-compat / manual fixes. Not used by this redesign.
+3. Manual-URL mode: keep it, but route it to `sprite_cutout_url` when `kind:'cutout'` so admins can paste a hand-made cutout without overwriting the baked art.
+4. Cutout prompt suffix: `"...single centered creature, full body, TRANSPARENT BACKGROUND, no ground, no platform, no shadow, no scenery, no text, soft rim light, square."`
+5. **Guardrail:** the only path that writes `image_url` is `kind:'legacy'`. The redesign never calls it. This keeps the rollback net intact.
 
 **Step 1: Read the file and confirm current shape.**
 Run: open `src/app/api/admin/creatures/[id]/artwork/route.ts`.
@@ -134,32 +158,55 @@ git commit -m "feat(assets): per-element battle backgrounds + neutral arena"
 
 ---
 
-### Task A4: Cutout pipeline for EXISTING creatures (batch)
+### Task A4: Regenerate creatures as native transparent sprites (non-destructive, batch)
 
-The existing creatures (e.g. "Muschio", "Miniera") have the creature sitting on a baked ground/ledge. We want **just the creature**. Two acceptable routes — pick per-creature on quality:
+We **regenerate** every creature as a clean native transparent PNG via gpt-image-2 — we do NOT background-remove the old art. This gives crisp edges and lets us upgrade the style to be more on-theme and consistent across the whole bestiary. The old art in `image_url` stays untouched (rollback).
 
-- **Route 1 (preferred, preserves art): background removal.** Add dev script `scripts/cutout-existing.ts` that, for each creature with `image_url` and null `sprite_cutout_url`, downloads the image, runs `@imgly/background-removal-node` (install as devDep), uploads the result to storage `creatures/cutouts/${id}.png`, and sets `sprite_cutout_url`. Manual QA each: if the cutout keeps an ugly ledge or has halos, fall back to Route 2.
-- **Route 2 (regenerate): gpt-image-2 transparent.** Re-run the (now upgraded) artwork route with `kind:'cutout'` using the creature's existing name/description as prompt.
+**Shared style guide (use for EVERY creature so the bestiary feels like one family).** Prefix every creature prompt with this preamble, then append the per-creature subject:
 
-**Files:**
-- Create: `scripts/cutout-existing.ts`
-- Modify: `package.json` (add `"cutout:existing": "tsx scripts/cutout-existing.ts"` + devDep `@imgly/background-removal-node`, `tsx`)
-
-**Step 1:** Write the script (idempotent: skip creatures that already have `sprite_cutout_url`). Log each result with a tiny preview path so you can QA.
-
-**Step 2: Run it.**
-Run: `npm run cutout:existing`
-Expected: each creature gets a cutout; failures logged, not fatal.
-
-**Step 3: QA** a sample of 5 cutouts visually (open the storage URLs). Re-do any with halos/leftover ground via Route 2.
-
-**Step 4: Commit.**
-```bash
-git add scripts/cutout-existing.ts package.json package-lock.json
-git commit -m "feat(assets): batch background-removal cutout pipeline"
+```
+STYLE: Single creature for a mobile creature-catching game set in a mythological
+Italian world (Adriatic coast + Apennine forests). Cute-but-characterful chibi
+monster, big expressive eyes, chunky friendly proportions, hand-painted semi-stylized
+shading, soft rim light, vivid but slightly earthy palette. Centered, full body,
+facing camera 3/4. TRANSPARENT BACKGROUND — no ground, no platform, no shadow baked in,
+no scenery, no text, no UI, no border. Square. Subject:
 ```
 
-**Acceptance for Phase A:** every creature has a clean transparent `sprite_cutout_url`; 6 background webp files exist; artwork route uses gpt-image-2.
+Per-creature subject = build from the creature's existing `name` + `description` + element + rarity (rarer → more ornate/imposing; element → motif: bosco=plants/moss, fiamma=embers/lava, adriatico=water/shells, terra=rock/crystal, armonia=light/runes). Keep the subject faithful to the creature's established identity so players still recognize it (e.g. "Muschio" stays a round moss creature).
+
+gpt-image-2 params: `size:'1024x1024'`, `quality:'high'`, `background:'transparent'`, `output_format:'png'`.
+
+> **Consistency tip:** generations are independent and style can drift. Lock it by (a) keeping the style preamble byte-identical for all, and (b) optionally passing 1–2 approved creatures as style references via the gpt-image-2 *edits/reference* input once you have a couple you like.
+
+**Files:**
+- Create: `scripts/regenerate-creatures.ts`
+- Modify: `package.json` (add `"regen:creatures": "tsx scripts/regenerate-creatures.ts"` + devDep `tsx`)
+
+**Step 1:** Write the script. It must be **idempotent and non-destructive**:
+- For each creature, build the prompt (preamble + subject from name/description/element/rarity).
+- Call gpt-image-2 (transparent). Upload the PNG to `creature-artwork/creatures/cutouts/${id}.png`. Set `creatures.sprite_cutout_url` ONLY. **Never touch `image_url`.**
+- Skip creatures that already have a `sprite_cutout_url` unless a `--force` flag is passed.
+- Support `--only <id>` to regenerate a single creature (for hand-tuning).
+- Log each result with the public cutout URL for QA. Failures are logged, not fatal.
+
+**Step 2: Dry-run a single creature first.**
+Run: `npm run regen:creatures -- --only <some-creature-id>`
+QA the cutout URL: clean transparent edges, recognizable, on-style.
+
+**Step 3:** Once the style is approved, run the full batch.
+Run: `npm run regen:creatures`
+Expected: every creature gets `sprite_cutout_url`; `image_url` unchanged for all.
+
+**Step 4: QA** ~8 cutouts across elements/rarities. Re-tune prompt or re-run `--force --only <id>` for any that miss.
+
+**Step 5: Commit.**
+```bash
+git add scripts/regenerate-creatures.ts package.json package-lock.json
+git commit -m "feat(assets): regenerate creatures as native transparent sprites (non-destructive)"
+```
+
+**Acceptance for Phase A:** every creature has a clean native-transparent `sprite_cutout_url`; `image_url` untouched for all (rollback intact); 6 background webp files exist; artwork route uses gpt-image-2 and writes cutouts to the cutout path only.
 
 ---
 
@@ -479,6 +526,7 @@ Commit each task separately (`polish(battle): entrance choreography`, etc.).
 
 1. Encounter, duel, boss all render the immersive full-scene layout matching `docs/mockups/2026-05-21-battle-immersive.html` + the approved screenshot, with REAL element backgrounds and transparent creature cutouts.
 2. No creature shows a baked rectangular background in battle (cutout-first; baked art only as fallback when a cutout failed).
+2b. **Non-destructive verified:** every creature's `image_url` is byte-identical to before this work; old storage objects still present; reverting Phase B–F restores the current app exactly. No old asset deleted.
 3. Combat logic, APIs, realtime, anti-cheat, timers, switch/heal/item/flee flows are behaviorally unchanged (verify by playing each mode end-to-end).
 4. `npm run typecheck` shows no NEW errors; `npx vitest run` green except the 4 known pre-existing balance failures.
 5. Animations: entrance, attack, crit freeze, catch dissolve, faint, victory/defeat all present and smooth on a mid-tier phone.
@@ -491,9 +539,12 @@ Commit each task separately (`polish(battle): entrance choreography`, etc.).
 - [ ] `npx supabase db push` for migration 044
 - [ ] `npx supabase gen types typescript --linked` to regen DB types
 - [ ] Generate the 6 background webp via gpt-image-2 (needs `OPENAI_API_KEY`)
-- [ ] Run the batch cutout pipeline + QA cutouts in Supabase storage
-- [ ] Confirm storage bucket `creature-artwork` is public and holds `creatures/cutouts/*`
+- [ ] Dry-run regeneration on ONE creature, get owner sign-off on the style, THEN batch
+- [ ] Run the creature regeneration batch (non-destructive: writes `sprite_cutout_url` + cutout path only)
+- [ ] Confirm storage bucket `creature-artwork` is public and holds `creatures/cutouts/*` (old `creatures/*.png` untouched)
+- [ ] Verify NO creature's `image_url` changed (e.g. snapshot before/after)
 - [ ] Verify `OPENAI_API_KEY` present in the env you run against
+- [ ] Do NOT delete any old asset — deletion is a separate, owner-approved follow-up
 
 ## Suggested commit / branch hygiene
 
