@@ -1,0 +1,120 @@
+'use client'
+
+import { AnimatePresence, motion } from 'framer-motion'
+
+interface Props {
+  phase: 'idle' | 'throwing' | 'hit'
+  success?: boolean
+  creatureName?: string
+}
+
+function NetSvg() {
+  return (
+    <motion.svg
+      viewBox="0 0 80 80"
+      width="88"
+      height="88"
+      className="absolute"
+      style={{ filter: 'drop-shadow(0 0 12px rgba(58,188,168,0.95))' }}
+      initial={{ top: '75%', left: '14%', scale: 0.35, opacity: 0, rotate: -28 }}
+      animate={{
+        top: '18%',
+        left: '61%',
+        scale: [0.35, 1.1, 0.96],
+        opacity: [0, 1, 1],
+        rotate: [0, 280, 322],
+      }}
+      exit={{ x: [0, -10, 10, -6, 6, 0], scale: [1, 1.16, 0.88, 1.04, 0.92, 0], opacity: [1, 1, 1, 0.9, 0.35, 0] }}
+      transition={{ duration: 0.62, ease: [0.25, 0.46, 0.45, 0.94] }}
+    >
+      <circle cx="40" cy="40" r="36" fill="rgba(58,188,168,0.07)" stroke="rgba(58,188,168,0.95)" strokeWidth="2.8" />
+      <circle cx="40" cy="40" r="26" fill="none" stroke="rgba(58,188,168,0.62)" strokeWidth="1.4" />
+      <circle cx="40" cy="40" r="16" fill="none" stroke="rgba(58,188,168,0.48)" strokeWidth="1.2" />
+      <circle cx="40" cy="40" r="7" fill="none" stroke="rgba(58,188,168,0.36)" strokeWidth="1" />
+      <line x1="4" y1="40" x2="76" y2="40" stroke="rgba(58,188,168,0.55)" strokeWidth="1.1" />
+      <line x1="40" y1="4" x2="40" y2="76" stroke="rgba(58,188,168,0.55)" strokeWidth="1.1" />
+      <line x1="14.5" y1="14.5" x2="65.5" y2="65.5" stroke="rgba(58,188,168,0.44)" strokeWidth="1" />
+      <line x1="65.5" y1="14.5" x2="14.5" y2="65.5" stroke="rgba(58,188,168,0.44)" strokeWidth="1" />
+      <line x1="4" y1="22" x2="58" y2="76" stroke="rgba(58,188,168,0.22)" strokeWidth="0.8" />
+      <line x1="4" y1="58" x2="58" y2="4" stroke="rgba(58,188,168,0.22)" strokeWidth="0.8" />
+      <line x1="22" y1="4" x2="76" y2="58" stroke="rgba(58,188,168,0.22)" strokeWidth="0.8" />
+      <line x1="76" y1="22" x2="22" y2="76" stroke="rgba(58,188,168,0.22)" strokeWidth="0.8" />
+      <circle cx="40" cy="40" r="3" fill="rgba(58,188,168,0.85)" />
+    </motion.svg>
+  )
+}
+
+export default function CaptureOverlay({ phase, success, creatureName }: Props) {
+  return (
+    <>
+      <AnimatePresence>
+        {phase !== 'idle' && (
+          <motion.div
+            key="capture-net"
+            className="pointer-events-none absolute inset-0 overflow-hidden"
+            style={{ zIndex: 20 }}
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <NetSvg />
+            {phase === 'hit' && (
+              <motion.div
+                className="absolute rounded-full"
+                style={{
+                  top: '23%',
+                  left: '70%',
+                  width: 74,
+                  height: 74,
+                  marginLeft: -37,
+                  marginTop: -37,
+                  background: 'radial-gradient(circle, rgba(58,188,168,.75), transparent 70%)',
+                  filter: 'blur(2px)',
+                }}
+                initial={{ opacity: 0, scale: 0.2 }}
+                animate={{ opacity: [0, 0.95, 0], scale: [0.2, 1.8, 2.4] }}
+                transition={{ duration: 0.45 }}
+              />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {success && (
+          <motion.div
+            className="pointer-events-none absolute inset-0 flex items-center justify-center"
+            style={{ zIndex: 30 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0, y: 20 }}
+              animate={{ scale: [0.5, 1.12, 1], opacity: [0, 1, 1], y: [20, -6, 0] }}
+              exit={{ scale: 0.85, opacity: 0, y: -20 }}
+              transition={{ duration: 0.45, times: [0, 0.55, 1] }}
+              className="flex flex-col items-center gap-1 rounded-3xl px-7 py-4"
+              style={{
+                background: 'rgba(4,18,10,.84)',
+                border: '1.5px solid rgba(52,211,153,.55)',
+                boxShadow: '0 0 40px rgba(52,211,153,.35), 0 8px 32px rgba(0,0,0,.7)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+              }}
+            >
+              <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', color: '#34D399', textShadow: '0 0 20px rgba(52,211,153,.8)' }}>
+                Catturata!
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(52,211,153,.72)' }}>
+                {creatureName ?? 'Creatura'} aggiunta alla squadra
+              </span>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}

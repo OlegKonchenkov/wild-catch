@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const creature = (encounter as any).creatures
 
   // Load squad creatures from player_sessions
-  let squadCreatures: Array<{ pcId: string; id: string; name: string; hp: number; atk: number; element: string; rarity: string; image_url: string | null; attack_sound_url: string | null; attack_sound_duration_ms: number | null }> = []
+  let squadCreatures: Array<{ pcId: string; id: string; name: string; hp: number; atk: number; element: string; rarity: string; image_url: string | null; sprite_url: string | null; attack_sound_url: string | null; attack_sound_duration_ms: number | null }> = []
   const { data: playerSession } = await supabase
     .from('player_sessions')
     .select('squad_ids')
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     // Critical combat data — no sound fields so query never fails pre-migration
     const { data: pcs } = await supabase
       .from('player_creatures')
-      .select('id, creatures(id, name, hp, atk, element, rarity, image_url)')
+      .select('id, creatures(id, name, hp, atk, element, rarity, image_url, sprite_url)')
       .in('id', squadIds)
       .eq('user_id', user.id)
       .eq('session_id', encounter.session_id)
@@ -57,6 +57,7 @@ export async function GET(request: Request) {
           element: pc.creatures.element,
           rarity: pc.creatures.rarity,
           image_url: pc.creatures.image_url ?? null,
+          sprite_url: pc.creatures.sprite_url ?? null,
           attack_sound_url: null,
           attack_sound_duration_ms: null,
           }

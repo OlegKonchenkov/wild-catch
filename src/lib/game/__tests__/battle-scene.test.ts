@@ -8,6 +8,9 @@ describe('resolveCreatureSprite', () => {
   it('falls back to baked art', () => {
     expect(resolveCreatureSprite({ sprite_cutout_url: null, image_url: 'b.png' })).toBe('b.png')
   })
+  it('supports legacy sprite_url as the battle cutout field', () => {
+    expect(resolveCreatureSprite({ sprite_url: 'sprite.png', image_url: 'b.png' })).toBe('sprite.png')
+  })
   it('empty when neither', () => {
     expect(resolveCreatureSprite({})).toBe('')
   })

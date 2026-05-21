@@ -3,6 +3,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
+import ImmersiveBattleLayout, { type ImmersiveDamage, type ImmersiveNotice } from '@/components/battle/ImmersiveBattleLayout'
+import type { BattleAction } from '@/components/battle/ActionBar'
+import type { SquadMember } from '@/components/battle/SquadBar'
+import { IconFlask, IconSword } from '@/components/battle/icons'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import CreatureCard from '@/components/game/boss/CreatureCard'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
@@ -136,9 +140,107 @@ export default function BattleScreen({
 
   const playerTheme = ELEMENT_THEME[activePlayer.element] ?? DEFAULT_THEME
   const selectedItem = battagliaItems.find(it => it.inventoryId === selectedItemId)
+  const renderLegacyBattleUi = process.env.NEXT_PUBLIC_BATTLE_LEGACY_UI === '1'
+  const bossDamage: ImmersiveDamage | null = lastDamage
+    ? {
+        id: lastDamage.id,
+        amount: lastDamage.amount,
+        target: lastDamage.target === 'boss' ? 'enemy' : 'player',
+        kind: lastDamage.isCrit ? 'crit' : 'damage',
+        label: lastDamage.isCrit ? 'CRITICO! x1.75' : undefined,
+      }
+    : null
+  const bossNotice: ImmersiveNotice | null = statusNotice
+    ? { id: `status-${statusNotice.id}`, text: `${statusNotice.emoji} ${statusNotice.text}`, color: statusNotice.color, glow: statusNotice.glow }
+    : critNotice
+      ? { id: `crit-${critNotice.id}`, text: 'CRITICO! x1.75', critical: true, color: '#FB923C', glow: 'rgba(249,115,22,.5)' }
+      : bossAttacking
+        ? { id: 'boss-turn', text: 'Capo Palestra attacca!', color: '#F7C841', glow: 'rgba(247,200,65,.42)' }
+        : switchNotice
+          ? { id: `switch-${switchNotice}`, text: switchNotice, color: '#C084FC', glow: 'rgba(192,132,252,.35)' }
+          : fortuneNotice
+            ? { id: `fortune-${fortuneNotice.id}`, text: fortuneNotice.text, color: '#F0CE7A', glow: 'rgba(240,206,122,.34)' }
+            : log[log.length - 1]
+              ? { id: `log-${log.length}`, text: log[log.length - 1], color: 'rgba(255,255,255,.78)', glow: 'rgba(255,255,255,.16)' }
+              : null
+  const bossSquadMembers: SquadMember[] = [...playerLineup].sort((a, b) => a.slot - b.slot).map(slot => ({
+    id: slot.player_creature_id,
+    name: slot.name,
+    element: slot.element,
+    hp: slot.current_hp,
+    maxHp: slot.max_hp,
+    imageUrl: slot.image_url,
+    active: slot.is_active,
+    fainted: slot.fainted,
+  }))
+  const bossActions: BattleAction[] = [
+    {
+      id: 'items',
+      label: selectedItemId ? 'Boost' : 'Oggetti',
+      icon: <IconFlask size={19} />,
+      tone: selectedItemId ? 'gold' : 'dark',
+      onClick: () => setShowItemsModal(true),
+      disabled: attacking || bossAttacking || (battagliaItems.length === 0 && curaItems.length === 0),
+    },
+    {
+      id: 'attack',
+      label: playerSleeping ? 'Passa' : 'Attacca',
+      icon: <IconSword size={21} />,
+      primary: true,
+      tone: selectedItemId ? 'gold' : 'orange',
+      sub: selectedItem ? `+${selectedItem.effectValue}% ATK` : undefined,
+      onClick: onAttack,
+      disabled: attacking || bossAttacking,
+      loading: attacking,
+    },
+  ]
 
   return (
     <div className="flex flex-col h-full overflow-hidden select-none relative" style={{ background: BOSS_THEME.bg }}>
+      {!renderLegacyBattleUi && (
+      <ImmersiveBattleLayout
+        enemy={{
+          name: activeBoss.name,
+          element: activeBoss.element,
+          rarity: activeBoss.rarity ?? 'leggendario',
+          currentHp: activeBoss.current_hp,
+          maxHp: activeBoss.max_hp,
+          atk: activeBoss.atk,
+          imageUrl: activeBoss.image_url,
+          spriteUrl: activeBoss.sprite_url,
+          animState: bossAnimState,
+          fainting: bossFainting,
+          statusEffect: activeBoss.active_status,
+          statusTurnsLeft: activeBoss.status_turns_left,
+        }}
+        player={{
+          name: activePlayer.name,
+          element: activePlayer.element,
+          rarity: activePlayer.rarity,
+          currentHp: activePlayer.current_hp,
+          maxHp: activePlayer.max_hp,
+          atk: activePlayer.atk,
+          imageUrl: activePlayer.image_url,
+          animState,
+          fainting: playerFainting,
+          statusEffect: activePlayer.active_status,
+          statusTurnsLeft: activePlayer.status_turns_left,
+        }}
+        freeze={!!critNotice || !!lastDamage?.isCrit}
+        bossGold="#F7C841"
+        seamPct={44}
+        notice={bossNotice}
+        damage={bossDamage}
+        attackAnimation={attackAnim}
+        onAttackAnimationComplete={onAttackAnimComplete}
+        squad={bossSquadMembers}
+        onSwitch={setPendingSwitchCreatureId}
+        switchDisabled={attacking || bossAttacking}
+        timerSeconds={!bossAttacking ? turnTimer : undefined}
+        timerTotal={30}
+        actions={bossActions}
+      />
+      )}
       {/* Atmospheric background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-0 w-[65%] h-[55%]" style={{ background: 'radial-gradient(ellipse at 80% 20%, rgba(247,200,65,0.22) 0%, transparent 70%)' }} />
@@ -268,6 +370,8 @@ export default function BattleScreen({
         )}
       </AnimatePresence>
 
+      {renderLegacyBattleUi && (
+        <>
       {/* BATTLE FIELD */}
       <div className="relative flex-1 z-10 overflow-hidden">
         {/* Boss card */}
@@ -649,6 +753,9 @@ export default function BattleScreen({
           )}
         </motion.button>
       </div>
+
+        </>
+      )}
 
       {/* BOSS INTRO OVERLAY */}
       <AnimatePresence>

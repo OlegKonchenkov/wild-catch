@@ -10,6 +10,10 @@ import CreatureSprite from '@/components/creature/CreatureSprite'
 import StatusAura from '@/components/battle/StatusAura'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
+import ImmersiveBattleLayout, { type ImmersiveDamage, type ImmersiveNotice } from '@/components/battle/ImmersiveBattleLayout'
+import type { BattleAction } from '@/components/battle/ActionBar'
+import type { SquadMember } from '@/components/battle/SquadBar'
+import { IconFlee, IconFlask, IconSword } from '@/components/battle/icons'
 import CombatFortuneBadge from '@/components/game/CombatFortuneBadge'
 import { GameBattleSkeleton } from '@/components/game/GameLoading'
 import MissionRewardModal from '@/components/game/MissionRewardModal'
@@ -41,6 +45,7 @@ interface LineupEntry {
       atk: number
       def: number
       image_url: string
+      sprite_url?: string | null
       attack_sound_url?: string | null
       attack_sound_duration_ms?: number | null
     }
@@ -535,7 +540,7 @@ export default function DuelPage() {
 
         const lineupsPromise = supabase
           .from('duel_lineups')
-          .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, attack_sound_url, attack_sound_duration_ms))')
+          .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, sprite_url, attack_sound_url, attack_sound_duration_ms))')
           .eq('duel_id', id)
           .order('slot', { ascending: true })
 
@@ -972,7 +977,7 @@ export default function DuelPage() {
             if (!duelActivatedRef.current) {
               duelActivatedRef.current = true
               supabase.from('duel_lineups')
-                .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, attack_sound_url, attack_sound_duration_ms))')
+                .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, sprite_url, attack_sound_url, attack_sound_duration_ms))')
                 .eq('duel_id', id)
                 .order('slot', { ascending: true })
                 .then(({ data: freshLineups }) => {
@@ -1284,6 +1289,72 @@ export default function DuelPage() {
     if (mySleeping && selectedItemId) setSelectedItemId(null)
   }, [mySleeping, selectedItemId])
 
+  const renderLegacyBattleUi = process.env.NEXT_PUBLIC_BATTLE_LEGACY_UI === '1'
+  const oppElement = (oppActiveCr?.element ?? 'fiamma') as Element
+  const myElement = (myActiveCr?.element ?? 'adriatico') as Element
+  const duelDamage: ImmersiveDamage | null = lastDamage
+    ? {
+        id: lastDamage.id,
+        amount: lastDamage.amount,
+        target: lastDamage.target === 'opp' ? 'enemy' : 'player',
+        kind: lastDamage.isCrit ? 'crit' : lastDamage.tone === 'poison' ? 'poison' : 'damage',
+        label: lastDamage.isCrit ? 'CRITICO! x1.75' : undefined,
+      }
+    : null
+  const duelNotice: ImmersiveNotice | null = statusNotice
+    ? { id: `status-${statusNotice.id}`, text: `${statusNotice.emoji} ${statusNotice.text}`, color: statusNotice.color, glow: statusNotice.glow }
+    : critNotice
+      ? { id: `crit-${critNotice.id}`, text: 'CRITICO! x1.75', critical: true, color: '#FB923C', glow: 'rgba(249,115,22,.5)' }
+      : switchNotice
+        ? { id: `switch-${switchNotice}`, text: switchNotice, color: '#C084FC', glow: 'rgba(192,132,252,.35)' }
+        : fortuneNotice
+          ? { id: `fortune-${fortuneNotice.id}`, text: fortuneNotice.text, color: '#F0CE7A', glow: 'rgba(240,206,122,.34)' }
+          : !waiting && !result
+            ? { id: isMyTurn ? 'my-turn' : 'opp-turn', text: turnLabel, color: turnColor, glow: isMyTurn ? 'rgba(52,211,153,.35)' : 'rgba(100,116,139,.28)' }
+            : null
+  const duelSquadMembers: SquadMember[] = [...myLineup].sort((a, b) => a.slot - b.slot).map(entry => {
+    const cr = entry.player_creatures?.creatures
+    const scaledMax = getScaledLineupStats(entry, playerLevels, equipBonus)?.hp ?? cr?.hp ?? 1
+    return {
+      id: entry.id,
+      name: cr?.name ?? 'Creatura',
+      element: (cr?.element ?? 'adriatico') as Element,
+      hp: entry.current_hp,
+      maxHp: scaledMax,
+      imageUrl: cr?.sprite_url ?? cr?.image_url,
+      active: entry.is_active,
+      fainted: !!entry.fainted_at,
+    }
+  })
+  const duelActions: BattleAction[] = [
+    {
+      id: 'items',
+      label: selectedItemId ? 'Boost' : 'Oggetti',
+      icon: <IconFlask size={19} />,
+      tone: selectedItemId ? 'gold' : 'dark',
+      onClick: () => { if (isMyTurn) setShowItemsModal(true) },
+      disabled: !isMyTurn || (battagliaItems.length === 0 && curaItems.length === 0),
+    },
+    {
+      id: 'attack',
+      label: mySleeping ? 'Passa' : 'Attacca',
+      icon: <IconSword size={21} />,
+      primary: true,
+      tone: selectedItemId ? 'gold' : 'orange',
+      sub: selectedItem ? `+${selectedItem.effectValue}% ATK` : undefined,
+      onClick: handleAttack,
+      disabled: attacking || !isMyTurn,
+      loading: attacking,
+    },
+    {
+      id: 'surrender',
+      label: 'Resa',
+      icon: <IconFlee size={19} />,
+      tone: 'dark',
+      onClick: handleSurrender,
+    },
+  ]
+
   if (loading) {
     return <GameBattleSkeleton />
   }
@@ -1291,6 +1362,50 @@ export default function DuelPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden relative"
       style={{ background: oppTheme.bg }}>
+      {!renderLegacyBattleUi && (
+      <ImmersiveBattleLayout
+        arena
+        enemy={{
+          name: oppActiveCr?.name ?? 'Avversario',
+          element: oppElement,
+          rarity: oppActiveCr?.rarity ?? 'comune',
+          currentHp: oppHp,
+          maxHp: oppHpMax,
+          imageUrl: oppActiveCr?.image_url ?? null,
+          spriteUrl: oppActiveCr?.sprite_url ?? null,
+          animState: oppAnimState,
+          fainting: oppFainting,
+          statusEffect: oppActive?.active_status,
+          statusTurnsLeft: oppActive?.status_turns_left,
+        }}
+        player={{
+          name: myActiveCr?.name ?? 'Tu',
+          element: myElement,
+          rarity: myActiveCr?.rarity ?? 'comune',
+          currentHp: myHp,
+          maxHp: myHpMax,
+          atk: myAtk,
+          imageUrl: myActiveCr?.image_url ?? null,
+          spriteUrl: myActiveCr?.sprite_url ?? null,
+          animState,
+          fainting: myFainting,
+          statusEffect: myActive?.active_status,
+          statusTurnsLeft: myActive?.status_turns_left,
+        }}
+        freeze={!!critNotice || !!lastDamage?.isCrit}
+        seamPct={44}
+        notice={duelNotice}
+        damage={duelDamage}
+        attackAnimation={attackAnim}
+        onAttackAnimationComplete={() => setAttackAnim(null)}
+        squad={duelSquadMembers}
+        onSwitch={setPendingSwitchLineupId}
+        switchDisabled={!isMyTurn || attacking || !!result || waiting}
+        timerSeconds={!result && !waiting && isMyTurn ? turnTimer : undefined}
+        timerTotal={30}
+        actions={!result && !waiting ? duelActions : undefined}
+      />
+      )}
 
       {/* ── Element-themed battle background ── */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -1536,6 +1651,8 @@ export default function DuelPage() {
         )}
       </AnimatePresence>
 
+      {renderLegacyBattleUi && (
+        <>
       {/* ── BATTLE FIELD ── */}
       <div className="relative flex-1 z-10 overflow-hidden">
 
@@ -1872,6 +1989,9 @@ export default function DuelPage() {
             </svg>
           </motion.button>
         </div>
+      )}
+
+        </>
       )}
 
       {/* ── DUEL INTRO OVERLAY (VS flash) ── */}

@@ -23,7 +23,8 @@ export const ARENA_BACKGROUND = '/backgrounds/battle/arena.webp'
  */
 export function resolveCreatureSprite(c: {
   sprite_cutout_url?: string | null
+  sprite_url?: string | null
   image_url?: string | null
 }): string {
-  return c.sprite_cutout_url || c.image_url || ''
+  return c.sprite_cutout_url || c.sprite_url || c.image_url || ''
 }

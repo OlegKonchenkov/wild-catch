@@ -5,6 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import StatusAura from '@/components/battle/StatusAura'
 import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
+import ImmersiveBattleLayout, { type ImmersiveDamage, type ImmersiveNotice } from '@/components/battle/ImmersiveBattleLayout'
+import CaptureOverlay from '@/components/battle/CaptureOverlay'
+import type { BattleAction } from '@/components/battle/ActionBar'
+import type { SquadMember } from '@/components/battle/SquadBar'
+import { IconCapture, IconFlee, IconFlask, IconSwords } from '@/components/battle/icons'
 import TutorialEncounterLesson from '@/components/game/TutorialEncounterLesson'
 import { TUTORIAL_SESSION_ID } from '@/lib/game/tutorial'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
@@ -33,6 +38,7 @@ interface SquadCreature {
   element: string
   rarity: string
   image_url: string | null
+  sprite_url?: string | null
   attack_sound_url?: string | null
   attack_sound_duration_ms?: number | null
 }
@@ -373,7 +379,7 @@ export default function EncounterPage() {
   const [completedMissions, setCompletedMissions]   = useState<Array<{ title: string; rewardGold: number; rewardExp: number; levelUp?: { newLevel: number; goldReward: number } | null }>>([])
   const [missionRewardIdx, setMissionRewardIdx]     = useState(-1)
   const [playerCreature, setPlayerCreature] = useState<{
-    name: string; maxHp: number; atk: number; element: string; rarity: string; imageUrl: string
+    name: string; maxHp: number; atk: number; element: string; rarity: string; imageUrl: string; spriteUrl?: string | null
     soundUrl?: string | null; soundDurationMs?: number | null
   } | null>(null)
   const [playerHp, setPlayerHp] = useState<number | null>(null)
@@ -421,7 +427,7 @@ export default function EncounterPage() {
         setSquadCreatures(squad)
         setSlotHps(squad.map((c: SquadCreature) => c.hp))
         const lead = squad[0]
-        setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
+        setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', spriteUrl: lead.sprite_url ?? null, rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
         setPlayerHp(lead.hp)
       }
       return
@@ -448,7 +454,7 @@ export default function EncounterPage() {
           setSquadCreatures(squad)
           setSlotHps(squad.map(c => c.hp))
           const lead = squad[0]
-          setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
+          setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', spriteUrl: lead.sprite_url ?? null, rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
           setPlayerHp(lead.hp)
         }
       })
@@ -483,7 +489,7 @@ export default function EncounterPage() {
       const hps = squad.map(c => c.hp)
       setSlotHps(hps)
       const lead = squad[0]
-      setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
+      setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', spriteUrl: lead.sprite_url ?? null, rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
       setPlayerHp(lead.hp)
       return
     }
@@ -494,12 +500,12 @@ export default function EncounterPage() {
         if (!enc?.player_creature_id) return
         const { data: pc } = await supabase
           .from('player_creatures')
-          .select('creatures(name, hp, atk, element, image_url, rarity, attack_sound_url, attack_sound_duration_ms)')
+          .select('creatures(name, hp, atk, element, image_url, sprite_url, rarity, attack_sound_url, attack_sound_duration_ms)')
           .eq('id', enc.player_creature_id).single()
         if (pc) {
-          const cr = (pc as any).creatures as { name: string; hp: number; atk: number; element: string; image_url: string; rarity: string; attack_sound_url: string | null; attack_sound_duration_ms: number | null }
+          const cr = (pc as any).creatures as { name: string; hp: number; atk: number; element: string; image_url: string; sprite_url?: string | null; rarity: string; attack_sound_url: string | null; attack_sound_duration_ms: number | null }
           if (cr) {
-            setPlayerCreature({ name: cr.name, maxHp: cr.hp, atk: cr.atk ?? 0, element: cr.element, imageUrl: cr.image_url ?? '', rarity: cr.rarity ?? 'comune', soundUrl: cr.attack_sound_url, soundDurationMs: cr.attack_sound_duration_ms })
+            setPlayerCreature({ name: cr.name, maxHp: cr.hp, atk: cr.atk ?? 0, element: cr.element, imageUrl: cr.image_url ?? '', spriteUrl: cr.sprite_url ?? null, rarity: cr.rarity ?? 'comune', soundUrl: cr.attack_sound_url, soundDurationMs: cr.attack_sound_duration_ms })
             setPlayerHp(cr.hp)
           }
         }
@@ -634,7 +640,7 @@ export default function EncounterPage() {
           setActiveSlot(nextSlot)
           setPlayerCreature({
             name: next.name, maxHp: next.hp, atk: next.atk,
-            element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '',
+            element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '', spriteUrl: next.sprite_url ?? null,
           })
           setPlayerHp(slotHps[nextSlot] ?? next.hp)
           setPlayerStatus(null)
@@ -909,6 +915,7 @@ export default function EncounterPage() {
       element: targetCreature.element,
       rarity: targetCreature.rarity,
       imageUrl: targetCreature.image_url ?? '',
+      spriteUrl: targetCreature.sprite_url ?? null,
       soundUrl: targetCreature.attack_sound_url,
       soundDurationMs: targetCreature.attack_sound_duration_ms,
     })
@@ -966,7 +973,7 @@ export default function EncounterPage() {
         setActiveSlot(nextSlot)
         setPlayerCreature({
           name: next.name, maxHp: next.hp, atk: next.atk,
-          element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '',
+          element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '', spriteUrl: next.sprite_url ?? null,
           soundUrl: next.attack_sound_url, soundDurationMs: next.attack_sound_duration_ms,
         })
         setPlayerHp(slotHps[nextSlot] ?? next.hp)
@@ -1229,7 +1236,7 @@ export default function EncounterPage() {
               setActiveSlot(nextSlot)
               setPlayerCreature({
                 name: next.name, maxHp: next.hp, atk: next.atk,
-                element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '',
+                element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '', spriteUrl: next.sprite_url ?? null,
               })
               setPlayerHp(slotHps[nextSlot] ?? next.hp)
               setPlayerStatus(null)
@@ -1326,8 +1333,131 @@ export default function EncounterPage() {
     selectedReteMult > 1 ? `Rete ×${selectedReteMult}` : null,
   ].filter(Boolean)
 
+  const renderLegacyBattleUi = process.env.NEXT_PUBLIC_BATTLE_LEGACY_UI === '1'
+  const wildElement = (wildElem as Element) ?? 'bosco'
+  const playerElement = (playerElem as Element) ?? 'adriatico'
+  const wildRarity = (state.creature.rarity ?? 'comune') as Rarity
+  const playerRarity = (playerCreature?.rarity ?? 'comune') as Rarity
+  const immersiveDamage: ImmersiveDamage | null = lastDamage
+    ? {
+        id: lastDamage.id,
+        amount: lastDamage.amount,
+        target: lastDamage.target === 'wild' ? 'enemy' : 'player',
+        kind: lastDamage.isCrit ? 'crit' : lastDamage.tone === 'poison' ? 'poison' : 'damage',
+        label: lastDamage.isCrit ? 'Colpo critico!' : undefined,
+      }
+    : null
+  const immersiveNotice: ImmersiveNotice | null = message
+    ? {
+        id: `${message}-${isCritMessage ? 'crit' : 'msg'}`,
+        text: message,
+        critical: isCritMessage,
+        color: isCritMessage ? '#FB923C' : '#F0CE7A',
+        glow: isCritMessage ? 'rgba(249,115,22,.5)' : 'rgba(240,206,122,.34)',
+      }
+    : null
+  const squadMembers: SquadMember[] = squadCreatures.map((cr, idx) => {
+    const hp = slotHps[idx] ?? cr.hp
+    return {
+      id: String(idx),
+      name: cr.name,
+      element: cr.element as Element,
+      hp,
+      maxHp: cr.hp,
+      imageUrl: cr.sprite_url ?? cr.image_url ?? undefined,
+      active: idx === activeSlot,
+      fainted: hp <= 0,
+    }
+  })
+  const immersiveActions: BattleAction[] = [
+    {
+      id: 'catch',
+      label: 'Cattura',
+      icon: <IconCapture size={21} />,
+      primary: true,
+      tone: 'orange',
+      sub: catchInfoParts.length > 0 ? catchInfoParts.join(' / ') : undefined,
+      onClick: handleCatch,
+      disabled: loading,
+      loading: pendingAction === 'catch',
+    },
+    {
+      id: 'fight',
+      label: playerSleeping ? 'Passa' : 'Lotta',
+      icon: <IconSwords size={20} />,
+      tone: 'purple',
+      onClick: handleFight,
+      disabled: loading || state.turns >= 5,
+      loading: pendingAction === 'fight',
+    },
+    {
+      id: 'items',
+      label: activeItemLabel ? 'Attivo' : 'Oggetti',
+      icon: <IconFlask size={19} />,
+      tone: activeItemLabel ? 'gold' : 'dark',
+      onClick: () => setShowItemsModal(true),
+      disabled: loading || !hasItems,
+    },
+    {
+      id: 'flee',
+      label: 'Fuggi',
+      icon: <IconFlee size={19} />,
+      tone: 'dark',
+      onClick: handleFlee,
+      disabled: loading,
+    },
+  ]
+
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
+      {!renderLegacyBattleUi && (
+      <ImmersiveBattleLayout
+        enemy={{
+          name: state.creature.name ?? '?',
+          element: wildElement,
+          rarity: wildRarity,
+          currentHp: state.wildHp,
+          maxHp: state.wildHpMax,
+          imageUrl: state.creature.image_url ?? null,
+          spriteUrl: state.creature.sprite_url ?? null,
+          stars: Math.min(5, CATCH_STARS[state.creature.rarity ?? 'comune'] ?? 1),
+          animState: wildAnim,
+          statusEffect: wildStatus,
+          statusTurnsLeft: wildStatusTurns,
+        }}
+        player={{
+          name: playerCreature?.name ?? '...',
+          element: playerElement,
+          rarity: playerRarity,
+          currentHp: playerHp ?? playerCreature?.maxHp ?? 0,
+          maxHp: playerCreature?.maxHp ?? 100,
+          atk: playerCreature?.atk,
+          imageUrl: playerCreature?.imageUrl ?? null,
+          spriteUrl: playerCreature?.spriteUrl ?? null,
+          animState: playerAnim,
+          fainting: playerFainting,
+          statusEffect: playerStatus,
+          statusTurnsLeft: playerStatusTurns,
+        }}
+        freeze={isCritMessage || !!lastDamage?.isCrit}
+        seamPct={44}
+        notice={immersiveNotice}
+        damage={immersiveDamage}
+        attackAnimation={attackAnim}
+        onAttackAnimationComplete={() => setAttackAnim(null)}
+        squad={squadMembers}
+        onSwitch={(slot) => setPendingSwitchSlot(Number(slot))}
+        switchDisabled={loading || !!result || state.turns >= 5}
+        timerSeconds={!result ? turnTimer : undefined}
+        timerTotal={45}
+        actions={!result ? immersiveActions : undefined}
+      >
+        <CaptureOverlay phase={catchPhase} success={showCatchSuccess} creatureName={state.creature.name ?? undefined} />
+      </ImmersiveBattleLayout>
+      )}
+
+      {renderLegacyBattleUi && (
+        <>
 
       {/* ── THEMATIC BACKGROUND ── */}
       <div className="absolute inset-0 pointer-events-none">
@@ -1741,6 +1871,9 @@ export default function EncounterPage() {
       )}
 
       {/* ── ITEMS MODAL (bottom sheet) ── */}
+        </>
+      )}
+
       <AnimatePresence>
         {showItemsModal && (
           <motion.div
