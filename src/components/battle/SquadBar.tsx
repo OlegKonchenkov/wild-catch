@@ -60,12 +60,12 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
               position: 'relative', flex: 1, minWidth: 0, height: 58, display: 'flex', alignItems: 'center', gap: 7,
               padding: '6px 7px 6px 6px', borderRadius: 13,
               background: m.active
-                ? 'linear-gradient(145deg,rgba(45,33,12,.88),rgba(10,14,17,.78))'
-                : 'linear-gradient(145deg,rgba(12,18,23,.74),rgba(6,9,13,.7))',
-              border: `1px solid ${m.active ? '#FFC857' : `${glow}54`}`,
+                ? 'linear-gradient(145deg,rgba(62,42,12,.94),rgba(15,15,12,.82) 58%,rgba(5,8,11,.82))'
+                : 'linear-gradient(145deg,rgba(12,18,23,.68),rgba(6,9,13,.64))',
+              border: `1px solid ${m.active ? '#FFD66D' : `${glow}42`}`,
               backdropFilter: 'blur(12px) saturate(1.2)', WebkitBackdropFilter: 'blur(12px) saturate(1.2)',
               boxShadow: m.active
-                ? '0 0 18px rgba(255,190,70,.52), inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 16px rgba(255,179,54,.1)'
+                ? '0 0 0 1px rgba(255,214,109,.58), 0 0 22px rgba(255,190,70,.72), 0 0 42px rgba(255,132,30,.22), inset 0 1px 0 rgba(255,255,255,.18), inset 0 0 18px rgba(255,179,54,.2)'
                 : `inset 0 1px 0 rgba(255,255,255,.07), 0 5px 14px rgba(0,0,0,.26), 0 0 10px ${glow}16`,
               cursor: tappable ? 'pointer' : 'default',
               opacity: m.fainted ? 0.6 : 1,
@@ -73,24 +73,60 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
             }}
           >
             {m.active && (
-              <span style={{ position: 'absolute', top: -12, left: 8, fontSize: 14, color: '#FFD76D', textShadow: '0 0 8px rgba(255,196,70,.8), 0 1px 3px rgba(0,0,0,.7)' }}>{'\u265B'}</span>
+              <span
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  inset: 3,
+                  borderRadius: 10,
+                  border: '1px solid rgba(255,238,174,.56)',
+                  boxShadow: 'inset 0 0 12px rgba(255,199,80,.18)',
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+            {m.active && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -14,
+                  left: 8,
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 13,
+                  color: '#3A2307',
+                  background: 'linear-gradient(180deg,#FFE08A,#D99021)',
+                  border: '1px solid rgba(255,246,196,.82)',
+                  boxShadow: '0 0 10px rgba(255,196,70,.9), 0 2px 5px rgba(0,0,0,.55)',
+                }}
+              >
+                {'\u265B'}
+              </span>
             )}
             <span
               style={{
                 position: 'relative', flexShrink: 0, width: 44, height: 44, borderRadius: 10, overflow: 'hidden',
-                background: `radial-gradient(circle at 50% 42%, ${glow}36, rgba(0,0,0,.5) 68%)`,
+                background: m.active
+                  ? `radial-gradient(circle at 50% 42%, rgba(255,213,100,.36), ${glow}22 52%, rgba(0,0,0,.55) 76%)`
+                  : `radial-gradient(circle at 50% 42%, ${glow}36, rgba(0,0,0,.5) 68%)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 filter: m.fainted ? 'grayscale(1)' : 'none',
-                boxShadow: `inset 0 0 0 1px rgba(255,255,255,.08), 0 0 12px ${glow}38`,
+                boxShadow: m.active
+                  ? 'inset 0 0 0 1px rgba(255,242,184,.72), 0 0 14px rgba(255,201,74,.65)'
+                  : `inset 0 0 0 1px rgba(255,255,255,.08), 0 0 12px ${glow}38`,
               }}
             >
               {m.imageUrl
-                ? <Image src={m.imageUrl} alt={m.name} width={44} height={44} style={{ objectFit: 'contain', transform: 'scale(1.18)' }} />
+                ? <Image src={m.imageUrl} alt={m.name} width={44} height={44} style={{ objectFit: 'contain', transform: m.active ? 'scale(1.28)' : 'scale(1.18)' }} />
                 : <span style={{ fontSize: 22, filter: `drop-shadow(0 0 6px ${glow})` }}>{ELEMENT_EMOJI[m.element]}</span>}
               {m.fainted && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#EF4444', fontWeight: 800 }}>{'\u2715'}</span>}
             </span>
             <span style={{ flex: 1, minWidth: 0, height: '100%', display: 'grid', alignContent: 'center', textAlign: 'left' }}>
-              <span style={{ display: 'block', fontWeight: 800, fontSize: 10.5, color: '#F7FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,.7)' }}>{m.name}</span>
+              <span style={{ display: 'block', fontWeight: 900, fontSize: 10.5, color: m.active ? '#FFF5CB' : '#F7FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: m.active ? '0 0 8px rgba(255,196,70,.42), 0 1px 2px rgba(0,0,0,.8)' : '0 1px 2px rgba(0,0,0,.7)' }}>{m.name}</span>
               <span style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5, fontFamily: 'var(--font-mono, monospace)', fontSize: 8.5, fontWeight: 800, color: 'rgba(255,255,255,.78)' }}>{Math.round(m.hp)}/{m.maxHp}</span>
               <span style={{ display: 'block', height: 5, borderRadius: 999, background: 'rgba(255,255,255,.14)', overflow: 'hidden', marginTop: 3, boxShadow: 'inset 0 1px 2px rgba(0,0,0,.45)' }}>
                 <span style={{ display: 'block', height: '100%', width: `${pct * 100}%`, background: `linear-gradient(90deg,${hpColor(pct)},#5CF0B0)`, boxShadow: `0 0 8px ${hpColor(pct)}88`, transition: 'width .35s' }} />
