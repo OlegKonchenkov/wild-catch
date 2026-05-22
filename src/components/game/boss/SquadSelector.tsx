@@ -1,6 +1,7 @@
 'use client'
-import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
+import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
+import CreatureRosterRow from '@/components/game/CreatureRosterRow'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { GameListSkeleton } from '@/components/game/GameLoading'
 import type { BossSlot, SquadCreature } from '@/components/game/boss/types'
@@ -104,47 +105,15 @@ export default function SquadSelector({
           const inLineup = lineup.some(l => l?.playerCreatureId === c.playerCreatureId)
           const scaled = scaleCombatStats({ hp: c.hp, atk: c.atk, def: c.def }, playerLevel)
           return (
-            <button
+            <CreatureRosterRow
               key={c.playerCreatureId}
+              creature={c}
+              hp={scaled.hp}
+              atk={scaled.atk}
+              def={scaled.def}
+              selected={inLineup}
               onClick={() => onToggle(c)}
-              className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 border transition-all"
-              style={{
-                borderColor: inLineup ? 'rgba(58,157,188,0.5)' : 'rgba(255,255,255,0.07)',
-                background:  inLineup ? 'rgba(58,157,188,0.08)' : 'rgba(255,255,255,0.03)',
-              }}
-            >
-              <CreatureDiorama creature={c} size={42} rounded={12} anchor="center" showAura={false} className="w-12 h-12 shrink-0" sizes="96px" style={{ border: `1px solid ${RARITY_COLORS[c.rarity]}33` }} />
-              <div className="flex-1 min-w-0 text-left">
-                <p className="font-bold text-white text-sm truncate">{c.name}</p>
-                <p className="text-xs" style={{ color: RARITY_COLORS[c.rarity] }}>{RARITY_LABELS[c.rarity]}</p>
-              </div>
-              <div className="flex gap-1.5 shrink-0">
-                {([
-                  { label: 'HP',  val: scaled.hp,  color: '#F87171' },
-                  { label: 'ATK', val: scaled.atk, color: '#FB923C' },
-                  { label: 'DEF', val: scaled.def, color: '#60A5FA' },
-                ] as const).map(s => (
-                  <div
-                    key={s.label}
-                    className="flex flex-col items-center rounded-lg px-1.5 py-1 min-w-[32px]"
-                    style={{ background: `${s.color}12`, border: `1px solid ${s.color}22` }}
-                  >
-                    <span className="text-[11px] font-black leading-none" style={{ color: s.color }}>{s.val}</span>
-                    <span className="text-[8px] font-bold text-white/35 leading-none mt-0.5">{s.label}</span>
-                  </div>
-                ))}
-              </div>
-              {inLineup && (
-                <div
-                  className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                  style={{ background: 'rgba(58,157,188,0.2)', border: '1px solid rgba(58,157,188,0.5)' }}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="#3A9DBC" strokeWidth="2.5" strokeLinecap="round" className="w-3 h-3">
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                </div>
-              )}
-            </button>
+            />
           )
         })}
       </div>

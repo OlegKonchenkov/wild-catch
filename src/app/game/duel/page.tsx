@@ -3,9 +3,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
-import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
+import { RARITY_COLORS } from '@/lib/types'
 import type { Rarity, Element } from '@/lib/types'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
+import CreatureRosterRow from '@/components/game/CreatureRosterRow'
 import { motion, AnimatePresence } from 'framer-motion'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { GameToast } from '@/components/game/GameToast'
@@ -608,70 +609,19 @@ export default function DuelLobbyPage() {
               const slotIdx = lineup.findIndex(l => l?.playerCreatureId === cr.playerCreatureId)
               const inLineup = slotIdx !== -1
               const canAdd = !inLineup && filledCount < 3
-              const rarityColor = RARITY_COLORS[cr.rarity]
               const scaled = scaleCombatStats({ hp: cr.hp, atk: cr.atk, def: cr.def }, playerLevel)
               return (
-                <motion.button
+                <CreatureRosterRow
                   key={cr.playerCreatureId}
-                  onClick={() => (canAdd || inLineup) ? toggleCreature(cr) : undefined}
-                  whileTap={canAdd || inLineup ? { scale: 0.97 } : {}}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-left"
-                  style={{
-                    background: inLineup ? `${rarityColor}22` : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${inLineup ? rarityColor + '55' : 'rgba(255,255,255,0.08)'}`,
-                    opacity: canAdd || inLineup ? 1 : 0.35,
-                    cursor: canAdd || inLineup ? 'pointer' : 'default',
-                  }}
-                >
-                  <div
-                    className="shrink-0 rounded-xl overflow-hidden flex items-center justify-center"
-                    style={{
-                      width: 52, height: 52,
-                      background: `radial-gradient(circle at 50% 55%, ${rarityColor}20 0%, ${rarityColor}08 70%, transparent 100%)`,
-                      border: `1.5px solid ${inLineup ? rarityColor + '70' : rarityColor + '25'}`,
-                      boxShadow: inLineup ? `0 0 10px ${rarityColor}35` : 'none',
-                    }}
-                  >
-                    <CreatureDiorama creature={cr} size={40} rounded={11} anchor="center" showAura={false} className="w-full h-full" sizes="80px" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-white truncate">{cr.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px]">{ELEMENT_EMOJI[cr.element]}</span>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {([
-                          { label: 'HP', value: scaled.hp, color: '#F87171' },
-                          { label: 'ATK', value: scaled.atk, color: '#FB923C' },
-                          { label: 'DEF', value: scaled.def, color: '#60A5FA' },
-                        ] as const).map(stat => (
-                          <span
-                            key={stat.label}
-                            className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
-                            style={{
-                              color: stat.color,
-                              background: `${stat.color}14`,
-                              border: `1px solid ${stat.color}22`,
-                            }}
-                          >
-                            {stat.label} {stat.value}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  {inLineup ? (
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold text-white shrink-0"
-                      style={{ background: rarityColor }}
-                    >
-                      {slotIdx + 1}
-                    </div>
-                  ) : canAdd ? (
-                    <div className="w-7 h-7 rounded-full border border-white/15 flex items-center justify-center text-white/25 text-xl shrink-0">
-                      +
-                    </div>
-                  ) : null}
-                </motion.button>
+                  creature={cr}
+                  hp={scaled.hp}
+                  atk={scaled.atk}
+                  def={scaled.def}
+                  selected={inLineup}
+                  selectedBadge={slotIdx + 1}
+                  addable={canAdd}
+                  onClick={() => toggleCreature(cr)}
+                />
               )
             })}
           </div>
