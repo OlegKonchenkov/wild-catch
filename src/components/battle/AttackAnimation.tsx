@@ -1,10 +1,22 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { getAttackAnimation } from './animations/registry'
-import type { AttackAnimationProps } from './animations/types'
+import FiammaAttack from './animations/fiamma'
+import AdriaticoAttack from './animations/adriatico'
+import BoscoAttack from './animations/bosco'
+import TerraAttack from './animations/terra'
+import ArmoniaAttack from './animations/armonia'
+import type { AttackAnimationComponent, AttackAnimationProps } from './animations/types'
 import { playDefaultAttack } from '@/lib/game/sounds/attack-defaults'
 import { isSfxMuted } from '@/lib/audioPrefs'
+
+const ANIMATION_BY_ELEMENT: Record<string, AttackAnimationComponent> = {
+  fiamma: FiammaAttack,
+  adriatico: AdriaticoAttack,
+  bosco: BoscoAttack,
+  terra: TerraAttack,
+  armonia: ArmoniaAttack,
+}
 
 /**
  * Plug-and-play attack animation component.
@@ -49,18 +61,24 @@ export default function AttackAnimation({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const AnimationComponent = getAttackAnimation(element)
+  const AnimationComponent = ANIMATION_BY_ELEMENT[element] ?? ArmoniaAttack
 
   return (
-    <AnimatePresence>
-      <AnimationComponent
-        element={element}
-        rarity={rarity}
-        side={side}
-        onComplete={onComplete}
-        soundUrl={soundUrl}
-        soundDurationMs={soundDurationMs}
-      />
-    </AnimatePresence>
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      style={{ zIndex: 9 }}
+    >
+      <AnimatePresence>
+        <AnimationComponent
+          element={element}
+          rarity={rarity}
+          side={side}
+          onComplete={onComplete}
+          soundUrl={soundUrl}
+          soundDurationMs={soundDurationMs}
+        />
+      </AnimatePresence>
+    </div>
   )
 }

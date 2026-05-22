@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     const adminTimeout = adminFactory()
     const { data: timeoutLineups } = await supabase
       .from('duel_lineups')
-      .select('user_id, slot, player_creatures(creatures(name, element, hp, atk, def, image_url, sprite_url, rarity))')
+      .select('user_id, slot, player_creatures(creatures(name, element, hp, atk, def, image_url, sprite_cutout_url, sprite_url, rarity))')
       .eq('duel_id', duelId)
       .order('slot', { ascending: true })
     const { data: timeoutProfiles } = await adminTimeout.from('profiles').select('user_id, nickname').in('user_id', [userId, oppUserId!])
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
     // Load lineups + profiles for enriched event payload
     const { data: surrenderLineups } = await supabase
       .from('duel_lineups')
-      .select('user_id, slot, player_creatures(creatures(name, element, hp, atk, def, image_url, sprite_url, rarity))')
+      .select('user_id, slot, player_creatures(creatures(name, element, hp, atk, def, image_url, sprite_cutout_url, sprite_url, rarity))')
       .eq('duel_id', duelId)
       .order('slot', { ascending: true })
     const { data: surrenderProfiles } = await adminSurrender.from('profiles').select('user_id, nickname').in('user_id', [userId, oppUserId!])
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
 
     const { data: switchLineups } = await supabase
       .from('duel_lineups')
-      .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_url, rarity))')
+      .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_cutout_url, sprite_url, rarity))')
       .eq('duel_id', duelId)
       .order('slot', { ascending: true })
 
@@ -241,7 +241,7 @@ export async function POST(request: Request) {
 
     const { data: allHealLineups } = await supabase
       .from('duel_lineups')
-      .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_url, rarity, status_effect, status_effect_chance))')
+      .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_cutout_url, sprite_url, rarity, status_effect, status_effect_chance))')
       .eq('duel_id', duelId)
       .order('slot', { ascending: true })
 
@@ -422,7 +422,7 @@ export async function POST(request: Request) {
   // ── Load all lineups ───────────────────────────────────────────────────────
   const { data: allLineups } = await supabase
     .from('duel_lineups')
-    .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_url, rarity, status_effect, status_effect_chance))')
+    .select('*, player_creatures(*, creatures(name, element, hp, atk, def, image_url, sprite_cutout_url, sprite_url, rarity, status_effect, status_effect_chance))')
     .eq('duel_id', duelId)
     .order('slot', { ascending: true })
 
@@ -778,7 +778,7 @@ function buildCreatureSummaries(lineups: any[], userId: string) {
       if (!cr) return null
       return {
         name:      cr.name      ?? null,
-        image_url: cr.sprite_url ?? cr.image_url ?? null,
+        image_url: cr.sprite_cutout_url || cr.sprite_url || cr.image_url || null,
         rarity:    cr.rarity    ?? null,
         element:   cr.element   ?? null,
         hp:        cr.hp        ?? null,

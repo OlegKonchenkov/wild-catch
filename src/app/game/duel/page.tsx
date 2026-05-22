@@ -112,6 +112,8 @@ interface SquadCreature {
   atk: number
   def: number
   image_url: string
+  sprite_cutout_url?: string | null
+  sprite_url?: string | null
 }
 
 export default function DuelLobbyPage() {
@@ -149,7 +151,7 @@ export default function DuelLobbyPage() {
       Promise.all([
         supabase
           .from('player_creatures')
-          .select('id, creatures(name, element, rarity, hp, atk, def, image_url)')
+          .select('id, creatures(name, element, rarity, hp, atk, def, image_url, sprite_cutout_url, sprite_url)')
           .eq('user_id', user.id)
           .eq('session_id', sessionId),
         supabase
@@ -189,6 +191,8 @@ export default function DuelLobbyPage() {
               atk: pc.creatures.atk + b.atk,
               def: (pc.creatures.def ?? 0) + b.def,
               image_url: pc.creatures.image_url,
+              sprite_cutout_url: pc.creatures.sprite_cutout_url ?? null,
+              sprite_url: pc.creatures.sprite_url ?? null,
               }
             })
             .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity))
@@ -547,7 +551,7 @@ export default function DuelLobbyPage() {
                   <div className="flex flex-col items-center py-2 gap-0.5">
                     <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: color + 'aa' }}>#{i + 1}</span>
                     <CreatureSprite
-                      imageUrl={cr.image_url}
+                      imageUrl={cr.sprite_cutout_url || cr.sprite_url || cr.image_url}
                       name={cr.name}
                       animState="idle"
                       size={46}
@@ -636,7 +640,7 @@ export default function DuelLobbyPage() {
                     }}
                   >
                     <CreatureSprite
-                      imageUrl={cr.image_url}
+                      imageUrl={cr.sprite_cutout_url || cr.sprite_url || cr.image_url}
                       name={cr.name}
                       animState="idle"
                       size={44}

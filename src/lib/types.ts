@@ -28,6 +28,7 @@ export interface Creature {
   def: number
   min_level: number
   image_url: string
+  sprite_cutout_url?: string | null
   sprite_url: string
   lottie_url: string | null
   spawn_weight: number

@@ -31,7 +31,7 @@ export async function POST(
   else if (body.kind !== undefined && body.kind !== 'legacy') {
     return NextResponse.json({ error: 'Tipo artwork non valido' }, { status: 400 })
   }
-  const dbColumn = kind === 'cutout' ? 'sprite_url' : 'image_url'
+  const dbColumn = kind === 'cutout' ? 'sprite_cutout_url' : 'image_url'
 
   const admin = createAdminClient()
 
@@ -49,6 +49,7 @@ export async function POST(
     const savedUrl = (data as Record<string, string | null>)[dbColumn]
     return NextResponse.json({
       imageUrl: savedUrl,
+      spriteCutoutUrl: kind === 'cutout' ? savedUrl : undefined,
       spriteUrl: kind === 'cutout' ? savedUrl : undefined,
       kind,
     })
@@ -135,6 +136,7 @@ export async function POST(
   const savedUrl = (data as Record<string, string | null>)[dbColumn]
   return NextResponse.json({
     imageUrl: savedUrl,
+    spriteCutoutUrl: kind === 'cutout' ? savedUrl : undefined,
     spriteUrl: kind === 'cutout' ? savedUrl : undefined,
     generated: true,
     kind,

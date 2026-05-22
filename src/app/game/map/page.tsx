@@ -301,6 +301,7 @@ function MapPageInner() {
       element: string
       rarity: string
       image_url?: string | null
+      sprite_cutout_url?: string | null
       sprite_url?: string | null
     }
   } | null>(null)
@@ -1942,7 +1943,7 @@ function MapPageInner() {
               }}
             >
               <CreatureSprite
-                imageUrl={pendingEncounter.creature.sprite_url || pendingEncounter.creature.image_url || ''}
+                imageUrl={pendingEncounter.creature.sprite_cutout_url || pendingEncounter.creature.sprite_url || pendingEncounter.creature.image_url || ''}
                 name={pendingEncounter.creature.name}
                 size={48}
                 element={pendingEncounter.creature.element}

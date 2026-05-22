@@ -206,6 +206,7 @@ export type Database = {
           session_id: string | null
           spawn_weight: number
           spawnable: boolean
+          sprite_cutout_url: string | null
           sprite_url: string
           status_effect: string | null
           status_effect_chance: number
@@ -235,6 +236,7 @@ export type Database = {
           session_id?: string | null
           spawn_weight?: number
           spawnable?: boolean
+          sprite_cutout_url?: string | null
           sprite_url?: string
           status_effect?: string | null
           status_effect_chance?: number
@@ -264,6 +266,7 @@ export type Database = {
           session_id?: string | null
           spawn_weight?: number
           spawnable?: boolean
+          sprite_cutout_url?: string | null
           sprite_url?: string
           status_effect?: string | null
           status_effect_chance?: number

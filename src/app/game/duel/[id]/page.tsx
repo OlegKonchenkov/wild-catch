@@ -45,6 +45,7 @@ interface LineupEntry {
       atk: number
       def: number
       image_url: string
+      sprite_cutout_url?: string | null
       sprite_url?: string | null
       attack_sound_url?: string | null
       attack_sound_duration_ms?: number | null
@@ -540,7 +541,7 @@ export default function DuelPage() {
 
         const lineupsPromise = supabase
           .from('duel_lineups')
-          .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, sprite_url, attack_sound_url, attack_sound_duration_ms))')
+          .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, sprite_cutout_url, sprite_url, attack_sound_url, attack_sound_duration_ms))')
           .eq('duel_id', id)
           .order('slot', { ascending: true })
 
@@ -977,7 +978,7 @@ export default function DuelPage() {
             if (!duelActivatedRef.current) {
               duelActivatedRef.current = true
               supabase.from('duel_lineups')
-                .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, sprite_url, attack_sound_url, attack_sound_duration_ms))')
+                .select('*, player_creatures(*, creatures(name, element, rarity, hp, atk, def, image_url, sprite_cutout_url, sprite_url, attack_sound_url, attack_sound_duration_ms))')
                 .eq('duel_id', id)
                 .order('slot', { ascending: true })
                 .then(({ data: freshLineups }) => {
@@ -1321,7 +1322,7 @@ export default function DuelPage() {
       element: (cr?.element ?? 'adriatico') as Element,
       hp: entry.current_hp,
       maxHp: scaledMax,
-      imageUrl: cr?.sprite_url ?? cr?.image_url,
+      imageUrl: cr?.sprite_cutout_url || cr?.sprite_url || cr?.image_url,
       active: entry.is_active,
       fainted: !!entry.fainted_at,
     }
@@ -1372,6 +1373,7 @@ export default function DuelPage() {
           currentHp: oppHp,
           maxHp: oppHpMax,
           imageUrl: oppActiveCr?.image_url ?? null,
+          spriteCutoutUrl: oppActiveCr?.sprite_cutout_url ?? null,
           spriteUrl: oppActiveCr?.sprite_url ?? null,
           animState: oppAnimState,
           fainting: oppFainting,
@@ -1386,6 +1388,7 @@ export default function DuelPage() {
           maxHp: myHpMax,
           atk: myAtk,
           imageUrl: myActiveCr?.image_url ?? null,
+          spriteCutoutUrl: myActiveCr?.sprite_cutout_url ?? null,
           spriteUrl: myActiveCr?.sprite_url ?? null,
           animState,
           fainting: myFainting,
@@ -1669,7 +1672,7 @@ export default function DuelPage() {
                   : { duration: 0.28, ease: 'easeOut' }}
               >
                 <CreatureCard
-                  imageUrl={oppActiveCr.image_url}
+                  imageUrl={oppActiveCr.sprite_cutout_url || oppActiveCr.sprite_url || oppActiveCr.image_url}
                   name={oppActiveCr.name}
                   element={oppActiveCr.element}
                   rarity={oppActiveCr.rarity}
@@ -1788,7 +1791,7 @@ export default function DuelPage() {
                   : { duration: 0.28, ease: 'easeOut' }}
               >
                 <CreatureCard
-                  imageUrl={myActiveCr.image_url}
+                  imageUrl={myActiveCr.sprite_cutout_url || myActiveCr.sprite_url || myActiveCr.image_url}
                   name={myActiveCr.name}
                   element={myActiveCr.element}
                   rarity={myActiveCr.rarity}
@@ -1879,8 +1882,8 @@ export default function DuelPage() {
                     opacity: isFainted ? 0.35 : 1,
                     cursor: canSwitch ? 'pointer' : 'default',
                   }}>
-                  {cr.image_url ? (
-                    <img src={cr.image_url} alt={cr.name} className="w-6 h-6 object-contain shrink-0"
+                  {(cr.sprite_cutout_url || cr.sprite_url || cr.image_url) ? (
+                    <img src={cr.sprite_cutout_url || cr.sprite_url || cr.image_url} alt={cr.name} className="w-6 h-6 object-contain shrink-0"
                       style={{ filter: isFainted ? 'grayscale(1)' : 'none' }} />
                   ) : (
                     <span className="text-sm shrink-0 leading-none">{ELEMENT_EMOJI[cr.element as keyof typeof ELEMENT_EMOJI] ?? '✦'}</span>
@@ -2142,8 +2145,8 @@ export default function DuelPage() {
                 onClick={e => e.stopPropagation()}
               >
                 <p className="text-white/60 text-sm text-center mb-3">Cambia creatura?</p>
-                {cr.image_url && (
-                  <img src={cr.image_url} alt={cr.name} className="w-16 h-16 object-contain mx-auto mb-2" />
+                {(cr.sprite_cutout_url || cr.sprite_url || cr.image_url) && (
+                  <img src={cr.sprite_cutout_url || cr.sprite_url || cr.image_url} alt={cr.name} className="w-16 h-16 object-contain mx-auto mb-2" />
                 )}
                 <p className="text-white font-bold text-center text-lg mb-1">{cr.name}</p>
                 <p className="text-white/40 text-xs text-center mb-4">Passerai il turno all&apos;avversario</p>

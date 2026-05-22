@@ -177,10 +177,15 @@ export default function BossFightPage() {
       const art = artById.get(slot.player_creature_id);
       if (!art) return slot;
       const imageUrl = slot.image_url || art.image_url || "";
+      const spriteCutoutUrl = slot.sprite_cutout_url || art.sprite_cutout_url || null;
       const spriteUrl = slot.sprite_url || art.sprite_url || null;
-      if (imageUrl === slot.image_url && spriteUrl === (slot.sprite_url ?? null)) return slot;
+      if (
+        imageUrl === slot.image_url &&
+        spriteCutoutUrl === (slot.sprite_cutout_url ?? null) &&
+        spriteUrl === (slot.sprite_url ?? null)
+      ) return slot;
       changed = true;
-      return { ...slot, image_url: imageUrl, sprite_url: spriteUrl };
+      return { ...slot, image_url: imageUrl, sprite_cutout_url: spriteCutoutUrl, sprite_url: spriteUrl };
     });
     if (changed) setPlayerLineup(next);
   }, [allCreatures, playerLineup]);
@@ -564,7 +569,7 @@ export default function BossFightPage() {
             supabase
               .from("player_creatures")
               .select(
-                "id, creatures(name, element, rarity, hp, atk, def, image_url, sprite_url)",
+                "id, creatures(name, element, rarity, hp, atk, def, image_url, sprite_cutout_url, sprite_url)",
               )
               .eq("user_id", user.id)
               .eq("session_id", sessionId),
@@ -602,6 +607,7 @@ export default function BossFightPage() {
               atk: pc.creatures.atk,
               def: pc.creatures.def ?? 0,
               image_url: pc.creatures.image_url,
+              sprite_cutout_url: pc.creatures.sprite_cutout_url ?? null,
               sprite_url: pc.creatures.sprite_url ?? null,
             }))
             .sort(
@@ -611,12 +617,14 @@ export default function BossFightPage() {
           setAllCreatures(mapped);
 
           // Patch player lineup with current art from creature data (fixes resumed
-          // fights whose JSONB was saved before image_url/sprite_url existed).
+          // fights whose JSONB was saved before image_url/sprite_cutout_url/sprite_url existed).
           if (f.status === "active") {
             const imgById: Record<string, string> = {};
+            const cutoutById: Record<string, string> = {};
             const spriteById: Record<string, string> = {};
             mapped.forEach((c) => {
               if (c.image_url) imgById[c.playerCreatureId] = c.image_url;
+              if (c.sprite_cutout_url) cutoutById[c.playerCreatureId] = c.sprite_cutout_url;
               if (c.sprite_url) spriteById[c.playerCreatureId] = c.sprite_url;
             });
             setPlayerLineup((prev: PlayerSlot[]) =>
@@ -624,6 +632,8 @@ export default function BossFightPage() {
                 ...slot,
                 image_url:
                   slot.image_url || imgById[slot.player_creature_id] || "",
+                sprite_cutout_url:
+                  slot.sprite_cutout_url || cutoutById[slot.player_creature_id] || null,
                 sprite_url:
                   slot.sprite_url || spriteById[slot.player_creature_id] || null,
               })),

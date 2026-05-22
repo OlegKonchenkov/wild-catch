@@ -22,6 +22,7 @@ interface Creature {
   def: number
   evolution_of: string | null
   image_url: string
+  sprite_cutout_url?: string | null
   sprite_url?: string | null
   session_id: string | null
   catch_difficulty: number
@@ -34,6 +35,17 @@ interface Creature {
   status_effect: string | null
   status_effect_chance: number
   enigma_frammento_id: string | null
+}
+
+function creatureCutoutUrl(creature?: Creature | null) {
+  return creature?.sprite_cutout_url || creature?.sprite_url || ''
+}
+
+function creatureArtworkUrl(creature: Creature | null | undefined, kind: ArtworkKind) {
+  if (!creature) return ''
+  return kind === 'cutout'
+    ? creature.sprite_cutout_url || creature.sprite_url || creature.image_url || ''
+    : creature.image_url || ''
 }
 
 const RARITIES: Rarity[] = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
@@ -159,7 +171,7 @@ export default function CreaturesPage() {
       attack_sound_url: c.attack_sound_url ?? '', attack_sound_duration_ms: c.attack_sound_duration_ms ?? '',
       status_effect: c.status_effect ?? '', status_effect_chance: c.status_effect_chance != null ? Math.round(c.status_effect_chance * 100) : 15 } as any)
     setFormError(null); setImageMode('preview')
-    setManualUrl(c.sprite_url ?? ''); setAiPrompt(c.description ?? ''); setArtworkError(null)
+    setManualUrl(creatureCutoutUrl(c)); setAiPrompt(c.description ?? ''); setArtworkError(null)
     setArtworkKind('cutout')
     setSoundError(null); setStatusOpen(!!c.status_effect)
   }
@@ -494,9 +506,9 @@ export default function CreaturesPage() {
                   {/* Image section */}
                   <div className="mb-4">
                     <div className="relative h-36 bg-[#07111B] rounded-xl overflow-hidden mb-2 flex items-center justify-center">
-                      {(artworkKind === 'cutout' ? editingCreature?.sprite_url || editingCreature?.image_url : editingCreature?.image_url) ? (
+                      {creatureArtworkUrl(editingCreature, artworkKind) ? (
                         <Image
-                          src={(artworkKind === 'cutout' ? editingCreature?.sprite_url || editingCreature?.image_url : editingCreature?.image_url) ?? ''}
+                          src={creatureArtworkUrl(editingCreature, artworkKind)}
                           alt={editingCreature?.name ?? 'Creatura'}
                           fill
                           className="object-contain"
@@ -522,7 +534,7 @@ export default function CreaturesPage() {
                           type="button"
                           onClick={() => {
                             setArtworkKind(kind)
-                            setManualUrl(kind === 'cutout' ? editingCreature?.sprite_url ?? '' : editingCreature?.image_url ?? '')
+                            setManualUrl(kind === 'cutout' ? creatureCutoutUrl(editingCreature) : editingCreature?.image_url ?? '')
                             setArtworkError(null)
                           }}
                           className={`flex-1 text-xs py-1.5 rounded-md font-semibold transition-all ${artworkKind === kind ? 'bg-[#F7C841] text-[#180F03]' : 'text-white/45 hover:text-white'}`}

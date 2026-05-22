@@ -2,6 +2,9 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 
+const CAPTURE_ORIGIN = { x: '14%', y: '82%' }
+const CAPTURE_TARGET = { x: '72%', y: '25%' }
+
 interface Props {
   phase: 'idle' | 'throwing' | 'hit'
   success?: boolean
@@ -15,14 +18,14 @@ function NetSvg() {
       width="88"
       height="88"
       className="absolute"
-      style={{ filter: 'drop-shadow(0 0 12px rgba(58,188,168,0.95))' }}
-      initial={{ top: '75%', left: '14%', scale: 0.35, opacity: 0, rotate: -28 }}
+      style={{ filter: 'drop-shadow(0 0 14px rgba(58,188,168,0.96)) drop-shadow(0 0 22px rgba(240,206,122,0.38))' }}
+      initial={{ top: CAPTURE_ORIGIN.y, left: CAPTURE_ORIGIN.x, scale: 0.32, opacity: 0, rotate: -32 }}
       animate={{
-        top: '18%',
-        left: '61%',
-        scale: [0.35, 1.1, 0.96],
+        top: CAPTURE_TARGET.y,
+        left: CAPTURE_TARGET.x,
+        scale: [0.32, 1.14, 0.94],
         opacity: [0, 1, 1],
-        rotate: [0, 280, 322],
+        rotate: [-32, 246, 326],
       }}
       exit={{ x: [0, -10, 10, -6, 6, 0], scale: [1, 1.16, 0.88, 1.04, 0.92, 0], opacity: [1, 1, 1, 0.9, 0.35, 0] }}
       transition={{ duration: 0.62, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -44,6 +47,35 @@ function NetSvg() {
   )
 }
 
+function NetTrail() {
+  return (
+    <>
+      {[0, 1].map(i => (
+        <motion.div
+          key={i}
+          className="absolute pointer-events-none"
+          style={{
+            left: CAPTURE_ORIGIN.x,
+            top: CAPTURE_ORIGIN.y,
+            width: 220,
+            height: i === 0 ? 4 : 1,
+            borderRadius: 999,
+            background: i === 0
+              ? 'linear-gradient(90deg, transparent, rgba(58,188,168,.18), rgba(240,206,122,.72), transparent)'
+              : 'linear-gradient(90deg, transparent, rgba(255,255,255,.82), transparent)',
+            transform: 'rotate(-38deg)',
+            transformOrigin: '0 50%',
+            filter: i === 0 ? 'blur(1.5px)' : 'drop-shadow(0 0 7px rgba(240,206,122,.85))',
+          }}
+          initial={{ scaleX: 0, opacity: 0 }}
+          animate={{ scaleX: [0, 1, 0.2], opacity: [0, i === 0 ? 0.8 : 1, 0] }}
+          transition={{ duration: 0.46, delay: 0.04 + i * 0.03, ease: 'easeOut' }}
+        />
+      ))}
+    </>
+  )
+}
+
 function CaptureParticles() {
   return (
     <div className="absolute inset-0 pointer-events-none">
@@ -58,8 +90,8 @@ function CaptureParticles() {
             key={i}
             className="absolute rounded-full"
             style={{
-              top: '23%',
-              left: '70%',
+              top: CAPTURE_TARGET.y,
+              left: CAPTURE_TARGET.x,
               width: i % 3 === 0 ? 5 : 3,
               height: i % 3 === 0 ? 5 : 3,
               color,
@@ -73,6 +105,50 @@ function CaptureParticles() {
         )
       })}
     </div>
+  )
+}
+
+function CaptureImpact() {
+  return (
+    <>
+      {[0, 0.08, 0.16].map((delay, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            top: CAPTURE_TARGET.y,
+            left: CAPTURE_TARGET.x,
+            width: 86 + i * 22,
+            height: 86 + i * 22,
+            marginLeft: -(86 + i * 22) / 2,
+            marginTop: -(86 + i * 22) / 2,
+            border: `${i === 0 ? 2 : 1}px solid ${i === 0 ? 'rgba(255,246,194,.78)' : 'rgba(58,188,168,.48)'}`,
+            boxShadow: '0 0 18px rgba(58,188,168,.5), inset 0 0 18px rgba(240,206,122,.18)',
+          }}
+          initial={{ scale: 0.25, opacity: 0 }}
+          animate={{ scale: [0.25, 1.25, 1.9], opacity: [0, 0.95, 0] }}
+          transition={{ duration: 0.62, delay, ease: 'easeOut' }}
+        />
+      ))}
+      <motion.div
+        className="absolute pointer-events-none"
+        style={{
+          top: CAPTURE_TARGET.y,
+          left: CAPTURE_TARGET.x,
+          width: 118,
+          height: 118,
+          marginLeft: -59,
+          marginTop: -59,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(58,188,168,.82), rgba(240,206,122,.28) 34%, transparent 72%)',
+          filter: 'blur(2px)',
+          mixBlendMode: 'screen',
+        }}
+        initial={{ opacity: 0, scale: 0.2 }}
+        animate={{ opacity: [0, 0.95, 0], scale: [0.2, 1.7, 2.55] }}
+        transition={{ duration: 0.48 }}
+      />
+    </>
   )
 }
 
@@ -90,25 +166,11 @@ export default function CaptureOverlay({ phase, success, creatureName }: Props) 
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
+            {phase === 'throwing' && <NetTrail />}
             <NetSvg />
             {phase === 'hit' && (
               <>
-                <motion.div
-                  className="absolute rounded-full"
-                  style={{
-                    top: '23%',
-                    left: '70%',
-                    width: 92,
-                    height: 92,
-                    marginLeft: -46,
-                    marginTop: -46,
-                    background: 'radial-gradient(circle, rgba(58,188,168,.82), rgba(240,206,122,.28) 34%, transparent 72%)',
-                    filter: 'blur(2px)',
-                  }}
-                  initial={{ opacity: 0, scale: 0.2 }}
-                  animate={{ opacity: [0, 0.95, 0], scale: [0.2, 1.7, 2.55] }}
-                  transition={{ duration: 0.48 }}
-                />
+                <CaptureImpact />
                 <CaptureParticles />
               </>
             )}

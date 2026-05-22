@@ -38,10 +38,27 @@ interface SquadCreature {
   element: string
   rarity: string
   image_url: string | null
+  sprite_cutout_url?: string | null
   sprite_url?: string | null
   attack_sound_url?: string | null
   attack_sound_duration_ms?: number | null
 }
+
+const battleImageUrl = (c: { sprite_cutout_url?: string | null; sprite_url?: string | null; image_url?: string | null }) =>
+  c.sprite_cutout_url || c.sprite_url || c.image_url || ''
+
+const toPlayerBattleCreature = (c: SquadCreature) => ({
+  name: c.name,
+  maxHp: c.hp,
+  atk: c.atk,
+  element: c.element,
+  rarity: c.rarity,
+  imageUrl: c.image_url ?? '',
+  spriteCutoutUrl: c.sprite_cutout_url ?? null,
+  spriteUrl: c.sprite_url ?? null,
+  soundUrl: c.attack_sound_url,
+  soundDurationMs: c.attack_sound_duration_ms,
+})
 
 interface EncounterState {
   encounterId: string
@@ -379,7 +396,7 @@ export default function EncounterPage() {
   const [completedMissions, setCompletedMissions]   = useState<Array<{ title: string; rewardGold: number; rewardExp: number; levelUp?: { newLevel: number; goldReward: number } | null }>>([])
   const [missionRewardIdx, setMissionRewardIdx]     = useState(-1)
   const [playerCreature, setPlayerCreature] = useState<{
-    name: string; maxHp: number; atk: number; element: string; rarity: string; imageUrl: string; spriteUrl?: string | null
+    name: string; maxHp: number; atk: number; element: string; rarity: string; imageUrl: string; spriteCutoutUrl?: string | null; spriteUrl?: string | null
     soundUrl?: string | null; soundDurationMs?: number | null
   } | null>(null)
   const [playerHp, setPlayerHp] = useState<number | null>(null)
@@ -427,7 +444,7 @@ export default function EncounterPage() {
         setSquadCreatures(squad)
         setSlotHps(squad.map((c: SquadCreature) => c.hp))
         const lead = squad[0]
-        setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', spriteUrl: lead.sprite_url ?? null, rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
+        setPlayerCreature(toPlayerBattleCreature(lead))
         setPlayerHp(lead.hp)
       }
       return
@@ -454,7 +471,7 @@ export default function EncounterPage() {
           setSquadCreatures(squad)
           setSlotHps(squad.map(c => c.hp))
           const lead = squad[0]
-          setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', spriteUrl: lead.sprite_url ?? null, rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
+          setPlayerCreature(toPlayerBattleCreature(lead))
           setPlayerHp(lead.hp)
         }
       })
@@ -489,7 +506,7 @@ export default function EncounterPage() {
       const hps = squad.map(c => c.hp)
       setSlotHps(hps)
       const lead = squad[0]
-      setPlayerCreature({ name: lead.name, maxHp: lead.hp, atk: lead.atk, element: lead.element, imageUrl: lead.image_url ?? '', spriteUrl: lead.sprite_url ?? null, rarity: lead.rarity, soundUrl: lead.attack_sound_url, soundDurationMs: lead.attack_sound_duration_ms })
+      setPlayerCreature(toPlayerBattleCreature(lead))
       setPlayerHp(lead.hp)
       return
     }
@@ -500,12 +517,23 @@ export default function EncounterPage() {
         if (!enc?.player_creature_id) return
         const { data: pc } = await supabase
           .from('player_creatures')
-          .select('creatures(name, hp, atk, element, image_url, sprite_url, rarity, attack_sound_url, attack_sound_duration_ms)')
+          .select('creatures(name, hp, atk, element, image_url, sprite_cutout_url, sprite_url, rarity, attack_sound_url, attack_sound_duration_ms)')
           .eq('id', enc.player_creature_id).single()
         if (pc) {
-          const cr = (pc as any).creatures as { name: string; hp: number; atk: number; element: string; image_url: string; sprite_url?: string | null; rarity: string; attack_sound_url: string | null; attack_sound_duration_ms: number | null }
+          const cr = (pc as any).creatures as { name: string; hp: number; atk: number; element: string; image_url: string; sprite_cutout_url?: string | null; sprite_url?: string | null; rarity: string; attack_sound_url: string | null; attack_sound_duration_ms: number | null }
           if (cr) {
-            setPlayerCreature({ name: cr.name, maxHp: cr.hp, atk: cr.atk ?? 0, element: cr.element, imageUrl: cr.image_url ?? '', spriteUrl: cr.sprite_url ?? null, rarity: cr.rarity ?? 'comune', soundUrl: cr.attack_sound_url, soundDurationMs: cr.attack_sound_duration_ms })
+            setPlayerCreature({
+              name: cr.name,
+              maxHp: cr.hp,
+              atk: cr.atk ?? 0,
+              element: cr.element,
+              imageUrl: cr.image_url ?? '',
+              spriteCutoutUrl: cr.sprite_cutout_url ?? null,
+              spriteUrl: cr.sprite_url ?? null,
+              rarity: cr.rarity ?? 'comune',
+              soundUrl: cr.attack_sound_url,
+              soundDurationMs: cr.attack_sound_duration_ms,
+            })
             setPlayerHp(cr.hp)
           }
         }
@@ -515,20 +543,29 @@ export default function EncounterPage() {
   // ── Timer ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const missingSpriteIds = squadCreatures
-      .filter(c => !c.sprite_url)
+      .filter(c => !c.sprite_cutout_url)
       .map(c => c.id)
     if (missingSpriteIds.length === 0) return
 
     let cancelled = false
     supabase
       .from('creatures')
-      .select('id, sprite_url')
+      .select('id, sprite_cutout_url, sprite_url')
       .in('id', missingSpriteIds)
       .then(({ data }) => {
         if (cancelled || !data) return
-        const spriteById = new Map((data as Array<{ id: string; sprite_url: string | null }>).map(row => [row.id, row.sprite_url ?? null]))
+        const artById = new Map((data as Array<{ id: string; sprite_cutout_url: string | null; sprite_url: string | null }>).map(row => [row.id, {
+          sprite_cutout_url: row.sprite_cutout_url ?? null,
+          sprite_url: row.sprite_url ?? null,
+        }]))
         const applySprites = (squad: SquadCreature[]) => squad.map(c => (
-          !c.sprite_url ? { ...c, sprite_url: spriteById.get(c.id) ?? null } : c
+          !c.sprite_cutout_url
+            ? {
+                ...c,
+                sprite_cutout_url: artById.get(c.id)?.sprite_cutout_url ?? null,
+                sprite_url: artById.get(c.id)?.sprite_url ?? null,
+              }
+            : c
         ))
 
         const nextSquad = applySprites(squadCreatures)
@@ -542,12 +579,46 @@ export default function EncounterPage() {
 
         const active = nextSquad[activeSlot]
         if (active) {
-          setPlayerCreature(prev => prev ? { ...prev, spriteUrl: active.sprite_url || prev.spriteUrl || null } : prev)
+          setPlayerCreature(prev => prev ? {
+            ...prev,
+            spriteCutoutUrl: active.sprite_cutout_url || prev.spriteCutoutUrl || null,
+            spriteUrl: active.sprite_url || prev.spriteUrl || null,
+          } : prev)
         }
       })
 
     return () => { cancelled = true }
   }, [activeSlot, id, squadCreatures, supabase])
+
+  useEffect(() => {
+    const creatureId = state?.creature?.id
+    if (!creatureId || state.creature.sprite_cutout_url) return
+
+    let cancelled = false
+    supabase
+      .from('creatures')
+      .select('id, sprite_cutout_url, sprite_url')
+      .eq('id', creatureId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        setState(prev => {
+          if (!prev?.creature || prev.creature.id !== creatureId) return prev
+          const next = {
+            ...prev,
+            creature: {
+              ...prev.creature,
+              sprite_cutout_url: (data as any).sprite_cutout_url ?? null,
+              sprite_url: (data as any).sprite_url ?? prev.creature.sprite_url ?? null,
+            },
+          }
+          try { sessionStorage.setItem(`encounter_${id}`, JSON.stringify(next)) } catch {}
+          return next
+        })
+      })
+
+    return () => { cancelled = true }
+  }, [id, state?.creature?.id, state?.creature?.sprite_cutout_url, state?.creature?.sprite_url, supabase])
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -674,10 +745,7 @@ export default function EncounterPage() {
         if (nextSlot < squadCreatures.length) {
           const next = squadCreatures[nextSlot]
           setActiveSlot(nextSlot)
-          setPlayerCreature({
-            name: next.name, maxHp: next.hp, atk: next.atk,
-            element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '', spriteUrl: next.sprite_url ?? null,
-          })
+          setPlayerCreature(toPlayerBattleCreature(next))
           setPlayerHp(slotHps[nextSlot] ?? next.hp)
           setPlayerStatus(null)
           setPlayerStatusTurns(0)
@@ -944,17 +1012,7 @@ export default function EncounterPage() {
 
     // Swap the active creature locally
     setActiveSlot(targetSlot)
-    setPlayerCreature({
-      name: targetCreature.name,
-      maxHp: targetCreature.hp,
-      atk: targetCreature.atk,
-      element: targetCreature.element,
-      rarity: targetCreature.rarity,
-      imageUrl: targetCreature.image_url ?? '',
-      spriteUrl: targetCreature.sprite_url ?? null,
-      soundUrl: targetCreature.attack_sound_url,
-      soundDurationMs: targetCreature.attack_sound_duration_ms,
-    })
+    setPlayerCreature(toPlayerBattleCreature(targetCreature))
     setPlayerHp(targetHp)
     setPlayerStatus(null)
     setPlayerStatusTurns(0)
@@ -1007,11 +1065,7 @@ export default function EncounterPage() {
       if (nextSlot !== -1) {
         const next = squadCreatures[nextSlot]
         setActiveSlot(nextSlot)
-        setPlayerCreature({
-          name: next.name, maxHp: next.hp, atk: next.atk,
-          element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '', spriteUrl: next.sprite_url ?? null,
-          soundUrl: next.attack_sound_url, soundDurationMs: next.attack_sound_duration_ms,
-        })
+        setPlayerCreature(toPlayerBattleCreature(next))
         setPlayerHp(slotHps[nextSlot] ?? next.hp)
         setPlayerStatus(null)
         setPlayerStatusTurns(0)
@@ -1179,7 +1233,7 @@ export default function EncounterPage() {
         } catch { /* quota */ }
       }
       supabase.from('creatures')
-        .select('name, hp, atk, def, element, rarity, image_url, description, status_effect, status_effect_chance')
+        .select('name, hp, atk, def, element, rarity, image_url, sprite_cutout_url, sprite_url, description, status_effect, status_effect_chance')
         .eq('id', creatureId).single()
         .then(({ data: cr }) => { if (cr) setCaughtCreatureData(cr) })
       setCaughtExpGain(data.expGain ?? 0)
@@ -1270,10 +1324,7 @@ export default function EncounterPage() {
             if (nextSlot < squadCreatures.length) {
               const next = squadCreatures[nextSlot]
               setActiveSlot(nextSlot)
-              setPlayerCreature({
-                name: next.name, maxHp: next.hp, atk: next.atk,
-                element: next.element, rarity: next.rarity, imageUrl: next.image_url ?? '', spriteUrl: next.sprite_url ?? null,
-              })
+              setPlayerCreature(toPlayerBattleCreature(next))
               setPlayerHp(slotHps[nextSlot] ?? next.hp)
               setPlayerStatus(null)
               setPlayerStatusTurns(0)
@@ -1400,7 +1451,7 @@ export default function EncounterPage() {
       element: cr.element as Element,
       hp,
       maxHp: cr.hp,
-      imageUrl: cr.sprite_url ?? cr.image_url ?? undefined,
+      imageUrl: battleImageUrl(cr) || undefined,
       active: idx === activeSlot,
       fainted: hp <= 0,
     }
@@ -1455,6 +1506,7 @@ export default function EncounterPage() {
           currentHp: state.wildHp,
           maxHp: state.wildHpMax,
           imageUrl: state.creature.image_url ?? null,
+          spriteCutoutUrl: state.creature.sprite_cutout_url ?? null,
           spriteUrl: state.creature.sprite_url ?? null,
           stars: Math.min(5, CATCH_STARS[state.creature.rarity ?? 'comune'] ?? 1),
           animState: wildAnim,
@@ -1469,6 +1521,7 @@ export default function EncounterPage() {
           maxHp: playerCreature?.maxHp ?? 100,
           atk: playerCreature?.atk,
           imageUrl: playerCreature?.imageUrl ?? null,
+          spriteCutoutUrl: playerCreature?.spriteCutoutUrl ?? null,
           spriteUrl: playerCreature?.spriteUrl ?? null,
           animState: playerAnim,
           fainting: playerFainting,
@@ -1523,7 +1576,7 @@ export default function EncounterPage() {
             transition={{ type: 'spring', stiffness: 80, damping: 14, delay: 1.5 }}
           >
             <CreatureCard
-              imageUrl={state.creature.sprite_url ?? state.creature.image_url ?? ''}
+              imageUrl={battleImageUrl(state.creature)}
               name={state.creature.name ?? '?'}
               element={wildElem}
               rarity={state.creature.rarity ?? 'comune'}
@@ -2064,9 +2117,9 @@ export default function EncounterPage() {
               onClick={e => e.stopPropagation()}
             >
               <div className="flex flex-col items-center text-center gap-3">
-                {(squadCreatures[pendingSwitchSlot].sprite_url || squadCreatures[pendingSwitchSlot].image_url) && (
+                {battleImageUrl(squadCreatures[pendingSwitchSlot]) && (
                   <img
-                    src={squadCreatures[pendingSwitchSlot].sprite_url ?? squadCreatures[pendingSwitchSlot].image_url ?? ''}
+                    src={battleImageUrl(squadCreatures[pendingSwitchSlot])}
                     alt={squadCreatures[pendingSwitchSlot].name}
                     className="w-16 h-16 object-contain"
                   />
@@ -2210,7 +2263,7 @@ export default function EncounterPage() {
                       transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.2 }}
                     >
                       <CreatureSprite
-                        imageUrl={cr?.sprite_url ?? cr?.image_url ?? state.creature.sprite_url ?? state.creature.image_url ?? ''}
+                        imageUrl={cr ? battleImageUrl(cr) : battleImageUrl(state.creature)}
                         name={cr?.name ?? state.creature.name ?? ''}
                         animState="idle"
                         size={160}

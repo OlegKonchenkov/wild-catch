@@ -135,7 +135,7 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
           </button>
         )
       })}
-      <style>{`.squad-card:active:not(:disabled){transform:scale(.98)}.squad-card:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}`}</style>
+      <style>{`.squad-card:active:not(:disabled){transform:scale(.98)}.squad-card:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}.squad-card:focus-visible{outline:2px solid rgba(255,232,170,.9);outline-offset:3px}`}</style>
     </div>
   )
 }

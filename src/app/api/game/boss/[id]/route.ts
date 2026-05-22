@@ -12,6 +12,9 @@ type Params = { params: Promise<{ id: string }> }
 
 type BossLineupSlot = {
   creature_id?: string
+  image_url?: string | null
+  sprite_cutout_url?: string | null
+  sprite_url?: string | null
   status_effect?: StatusEffect | null
   status_effect_chance?: number | null
   active_status?: StatusEffect | null
@@ -29,7 +32,8 @@ async function hydrateBossLineupStatusFields(
       slot.status_effect === undefined ||
       slot.status_effect_chance === undefined ||
       slot.active_status === undefined ||
-      slot.status_turns_left === undefined
+      slot.status_turns_left === undefined ||
+      slot.sprite_cutout_url === undefined
     ),
   )
 
@@ -43,15 +47,18 @@ async function hydrateBossLineupStatusFields(
   const { data: creatureRows } = creatureIds.length > 0
     ? await admin
         .from('creatures')
-        .select('id, status_effect, status_effect_chance')
+        .select('id, image_url, sprite_cutout_url, sprite_url, status_effect, status_effect_chance')
         .in('id', creatureIds)
     : { data: [] }
 
-  const creatureMap: Record<string, { status_effect: StatusEffect | null; status_effect_chance: number | null }> =
+  const creatureMap: Record<string, { image_url: string | null; sprite_cutout_url: string | null; sprite_url: string | null; status_effect: StatusEffect | null; status_effect_chance: number | null }> =
     Object.fromEntries(
       (creatureRows ?? []).map((row: any) => [
         row.id,
         {
+          image_url: row.image_url ?? null,
+          sprite_cutout_url: row.sprite_cutout_url ?? null,
+          sprite_url: row.sprite_url ?? null,
           status_effect: (row.status_effect as StatusEffect | null) ?? null,
           status_effect_chance: row.status_effect_chance ?? 0.15,
         },
@@ -63,6 +70,9 @@ async function hydrateBossLineupStatusFields(
 
     return {
       ...slot,
+      image_url: slot.image_url ?? creatureStatus?.image_url ?? null,
+      sprite_cutout_url: slot.sprite_cutout_url || creatureStatus?.sprite_cutout_url || null,
+      sprite_url: slot.sprite_url || creatureStatus?.sprite_url || null,
       status_effect: slot.status_effect ?? creatureStatus?.status_effect ?? null,
       status_effect_chance: slot.status_effect_chance ?? creatureStatus?.status_effect_chance ?? 0.15,
       active_status: slot.active_status ?? null,
@@ -207,7 +217,7 @@ async function grantBossFightRewards({
   if (reward?.creature_id) {
     const { data: rewardCreature } = await admin
       .from('creatures')
-      .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def')
+      .select('id, name, rarity, element, image_url, sprite_cutout_url, sprite_url, hp, atk, def')
       .eq('id', reward.creature_id)
       .single()
 
@@ -344,7 +354,7 @@ export async function POST(request: Request, { params }: Params) {
     const pcIds = lineup.map((e: any) => e.playerCreatureId)
     const { data: pcs } = await supabase
       .from('player_creatures')
-      .select('id, creatures(id, name, element, rarity, hp, atk, def, image_url, sprite_url, status_effect, status_effect_chance)')
+      .select('id, creatures(id, name, element, rarity, hp, atk, def, image_url, sprite_cutout_url, sprite_url, status_effect, status_effect_chance)')
       .in('id', pcIds)
       .eq('user_id', user.id)
 
@@ -394,6 +404,7 @@ export async function POST(request: Request, { params }: Params) {
         fainted: false,
         is_active: i === 0,
         image_url: cr?.image_url ?? '',
+        sprite_cutout_url: cr?.sprite_cutout_url ?? null,
         sprite_url: cr?.sprite_url ?? null,
         attack_sound_url: crId ? (soundMap[crId]?.url ?? null) : null,
         attack_sound_duration_ms: crId ? (soundMap[crId]?.ms ?? null) : null,

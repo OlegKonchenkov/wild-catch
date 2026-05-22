@@ -25,6 +25,7 @@ interface BossReward {
     rarity: string
     element: string
     image_url?: string | null
+    sprite_cutout_url?: string | null
     sprite_url?: string | null
   }
 }
@@ -193,10 +194,10 @@ export default function ResultScreen({
                 Creatura catturata!
               </p>
               <div className="flex items-center gap-3 px-3 pb-3">
-                {(reward.creature.sprite_url || reward.creature.image_url) && (
+                {(reward.creature.sprite_cutout_url || reward.creature.sprite_url || reward.creature.image_url) && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={reward.creature.sprite_url ?? reward.creature.image_url ?? ''}
+                    src={reward.creature.sprite_cutout_url || reward.creature.sprite_url || reward.creature.image_url || ''}
                     alt={reward.creature.name}
                     className="w-14 h-14 rounded-xl object-cover"
                     style={{ border: '1px solid rgba(255,255,255,0.1)' }}

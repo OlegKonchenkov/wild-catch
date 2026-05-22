@@ -21,6 +21,7 @@ export interface BossSlot {
   current_hp: number
   fainted: boolean
   image_url: string
+  sprite_cutout_url?: string | null
   sprite_url: string
   active_status?: StatusEffect | null
   status_turns_left?: number
@@ -42,6 +43,7 @@ export interface PlayerSlot {
   fainted: boolean
   is_active: boolean
   image_url: string
+  sprite_cutout_url?: string | null
   sprite_url?: string | null
   attack_sound_url?: string | null
   attack_sound_duration_ms?: number | null
@@ -60,6 +62,7 @@ export interface SquadCreature {
   atk: number
   def: number
   image_url: string
+  sprite_cutout_url?: string | null
   sprite_url?: string | null
 }
 
