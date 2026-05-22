@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import CreatureSprite from '@/components/creature/CreatureSprite'
+import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { playEggHatch } from '@/lib/game/sounds/hatch'
 
 const RARITY_COLOR: Record<string, string> = {
@@ -127,14 +127,13 @@ export default function EggHatchModal({
                 transform: cardVisible ? 'scale(1)' : 'scale(0.5)',
                 transition: 'opacity 0.35s 0.1s, transform 0.45s 0.1s cubic-bezier(0.34,1.56,0.64,1)',
               }}>
-                <CreatureSprite
-                  imageUrl={creature.image_url ?? ''}
-                  name={creature.name}
-                  animState="idle"
-                  size={160}
-                  element={creature.element as any}
-                  rarity={creature.rarity as any}
-                  showAura
+                <CreatureDiorama
+                  creature={creature}
+                  size={158}
+                  anchor="center"
+                  rounded={20}
+                  className="w-full"
+                  style={{ aspectRatio: '5 / 4', maxWidth: 300 }}
                 />
               </div>
             </div>

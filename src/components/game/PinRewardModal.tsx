@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import CreatureSprite from '@/components/creature/CreatureSprite'
+import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { playMissionComplete } from '@/lib/game/sounds/events'
 
 const RARITY_COLOR: Record<string, string> = {
@@ -128,7 +128,7 @@ export default function PinRewardModal({ reward, onDone }: { reward: PinRewardDa
             return (
               <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${rarityColor}40`, background: `linear-gradient(135deg, ${glow}12 0%, transparent 100%)` }}>
                 <div className="flex flex-col items-center py-5 px-4">
-                  <CreatureSprite imageUrl={c.image_url ?? ''} name={c.name} animState="idle" size={140} element={c.element as any} rarity={c.rarity as any} showAura />
+                  <CreatureDiorama creature={c} size={140} anchor="center" rounded={18} className="w-full" style={{ aspectRatio: '5 / 4', maxWidth: 280 }} />
                   <p className="text-white font-bold text-xl mt-3">{c.name}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-sm">{elemEmoji}</span>
@@ -189,7 +189,7 @@ export default function PinRewardModal({ reward, onDone }: { reward: PinRewardDa
                 {rType === 'creatura' && c && (
                   <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${enigmaRarityColor}40`, background: `linear-gradient(135deg, ${enigmaGlow}12 0%, transparent 100%)` }}>
                     <div className="flex flex-col items-center py-5 px-4">
-                      <CreatureSprite imageUrl={c.image_url ?? ''} name={c.name} animState="idle" size={140} element={c.element as any} rarity={c.rarity as any} showAura />
+                      <CreatureDiorama creature={c} size={140} anchor="center" rounded={18} className="w-full" style={{ aspectRatio: '5 / 4', maxWidth: 280 }} />
                       <p className="text-white font-bold text-xl mt-3">{c.name}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-sm">{elemEmoji}</span>

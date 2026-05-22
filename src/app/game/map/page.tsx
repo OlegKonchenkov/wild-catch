@@ -16,7 +16,7 @@ import {
 import { haversineDistance } from '@/lib/game/anti-cheat'
 import useTweenedInteger from '@/hooks/useTweenedInteger'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
-import CreatureSprite from '@/components/creature/CreatureSprite'
+import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import EggHatchModal from '@/components/game/EggHatchModal'
 import Coachmark, { type CoachmarkStep } from '@/components/game/Coachmark'
 import NextObjectiveWidget from '@/components/game/NextObjectiveWidget'
@@ -1933,30 +1933,20 @@ function MapPageInner() {
       {/* Encounter popup */}
       {showEncounterPopup && pendingEncounter && (
         <div className="absolute inset-x-4 bottom-16 bg-[#0F1F2E] border border-[#3A9DBC] rounded-2xl p-4 z-[1000] shadow-xl">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center overflow-hidden"
-              style={{
-                background: 'radial-gradient(circle at 30% 30%, rgba(58,157,188,0.18), rgba(255,255,255,0.04))',
-                border: '1px solid rgba(58,157,188,0.28)',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-              }}
-            >
-              <CreatureSprite
-                imageUrl={pendingEncounter.creature.sprite_cutout_url || pendingEncounter.creature.sprite_url || pendingEncounter.creature.image_url || ''}
-                name={pendingEncounter.creature.name}
-                size={48}
-                element={pendingEncounter.creature.element}
-                rarity={pendingEncounter.creature.rarity}
-              />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35">Creatura selvatica</p>
-              <p className="font-bold text-white truncate">{pendingEncounter.creature.name}</p>
-              <p className="text-sm text-[#3A9DBC]">
-                {pendingEncounter.creature.element} · {RARITY_LABELS[pendingEncounter.creature.rarity as keyof typeof RARITY_LABELS]}
-              </p>
-            </div>
+          <CreatureDiorama
+            creature={pendingEncounter.creature}
+            size={120}
+            anchor="center"
+            rounded={16}
+            className="w-full mb-3"
+            style={{ aspectRatio: '2 / 1', border: '1px solid rgba(58,157,188,0.32)' }}
+          />
+          <div className="px-0.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35">Creatura selvatica</p>
+            <p className="font-bold text-white truncate text-lg leading-tight">{pendingEncounter.creature.name}</p>
+            <p className="text-sm text-[#3A9DBC]">
+              {pendingEncounter.creature.element} · {RARITY_LABELS[pendingEncounter.creature.rarity as keyof typeof RARITY_LABELS]}
+            </p>
           </div>
           <div className="flex gap-2 mt-3">
             <button
