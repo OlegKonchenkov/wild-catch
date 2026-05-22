@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import CreatureSprite from '@/components/creature/CreatureSprite'
+import CreatureDiorama from '@/components/creature/CreatureDiorama'
 
 const RARITY_COLOR: Record<string, string> = {
   comune:      '#9CA3AF',
@@ -94,17 +94,13 @@ export default function StarterSelect({
                   boxShadow: isSelected ? `0 0 18px ${cGlow}40` : 'none',
                 }}
               >
-                <div className="w-24 h-24 flex items-center justify-center">
-                  <CreatureSprite
-                    imageUrl={c.image_url ?? ''}
-                    name={c.name}
-                    animState="idle"
-                    size={88}
-                    element={c.element as any}
-                    rarity={c.rarity as any}
-                    showAura={isSelected}
-                  />
-                </div>
+                <CreatureDiorama
+                  creature={c}
+                  size={86}
+                  rounded={16}
+                  showAura={isSelected}
+                  className="w-24 h-24"
+                />
                 <p className="text-sm font-bold text-white text-center leading-tight">{c.name}</p>
                 <div
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
@@ -150,14 +146,13 @@ export default function StarterSelect({
               style={{ background: `linear-gradient(180deg, ${glow}18 0%, transparent 100%)` }}
             >
               <div className="flex items-center gap-4">
-                <CreatureSprite
-                  imageUrl={selected.image_url ?? ''}
-                  name={selected.name}
-                  animState="idle"
-                  size={96}
-                  element={selected.element as any}
-                  rarity={selected.rarity as any}
-                  showAura
+                <CreatureDiorama
+                  creature={selected}
+                  size={92}
+                  rounded={16}
+                  anchor="center"
+                  className="shrink-0"
+                  style={{ width: 104, height: 104 }}
                 />
                 <div className="flex-1 min-w-0">
                   <h2 className="text-xl font-black text-white leading-tight">{selected.name}</h2>

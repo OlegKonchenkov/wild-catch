@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import StatusAura from '@/components/battle/StatusAura'
 import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
 import ImmersiveBattleLayout, { type ImmersiveDamage, type ImmersiveNotice } from '@/components/battle/ImmersiveBattleLayout'
@@ -2273,14 +2274,12 @@ export default function EncounterPage() {
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.2 }}
                     >
-                      <CreatureSprite
-                        imageUrl={cr ? battleImageUrl(cr) : battleImageUrl(state.creature)}
-                        name={cr?.name ?? state.creature.name ?? ''}
-                        animState="idle"
-                        size={160}
-                        element={crElem as Element}
-                        rarity={crRarity as Rarity}
-                        showAura
+                      <CreatureDiorama
+                        creature={{ element: crElem, name: cr?.name ?? state.creature.name ?? '', rarity: crRarity, sprite_cutout_url: cr?.sprite_cutout_url ?? null, sprite_url: (cr as any)?.sprite_url ?? null, image_url: cr?.image_url ?? state.creature.image_url ?? null }}
+                        size={158}
+                        anchor="center"
+                        rounded={20}
+                        style={{ width: 'min(82vw, 300px)', aspectRatio: '5 / 4' }}
                       />
                     </motion.div>
                   </div>
