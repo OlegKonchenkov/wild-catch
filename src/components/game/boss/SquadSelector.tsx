@@ -1,5 +1,6 @@
 'use client'
 import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
+import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { GameListSkeleton } from '@/components/game/GameLoading'
 import type { BossSlot, SquadCreature } from '@/components/game/boss/types'
@@ -51,16 +52,7 @@ export default function SquadSelector({
               className="flex-1 flex items-center gap-2 rounded-xl px-2 py-1.5"
               style={{ background: 'rgba(247,200,65,0.06)', border: '1px solid rgba(247,200,65,0.2)' }}
             >
-              <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0" style={{ background: 'rgba(247,200,65,0.1)' }}>
-                {bc.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={bc.image_url} alt={bc.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-base">
-                    {ELEMENT_EMOJI[bc.element] ?? '?'}
-                  </div>
-                )}
-              </div>
+              <CreatureDiorama creature={bc} size={30} rounded={8} anchor="center" showAura={false} className="w-8 h-8 shrink-0" sizes="64px" />
               <div className="min-w-0">
                 <p className="text-[10px] font-bold text-white/80 truncate">{bc.name}</p>
                 <p className="text-[9px] text-white/35">{ELEMENT_EMOJI[bc.element]}</p>
@@ -90,16 +82,7 @@ export default function SquadSelector({
             >
               {c ? (
                 <div className="flex items-center gap-1.5 h-full px-2">
-                  <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0" style={{ background: `${RARITY_COLORS[c.rarity]}18` }}>
-                    {c.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.image_url} alt={c.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-base">
-                        {ELEMENT_EMOJI[c.element]}
-                      </div>
-                    )}
-                  </div>
+                  <CreatureDiorama creature={c} size={34} rounded={10} anchor="center" showAura={false} className="w-9 h-9 shrink-0" sizes="80px" />
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold text-white truncate">{c.name}</p>
                     <p className="text-[9px]" style={{ color: RARITY_COLORS[c.rarity] }}>{c.rarity}</p>
@@ -130,16 +113,7 @@ export default function SquadSelector({
                 background:  inLineup ? 'rgba(58,157,188,0.08)' : 'rgba(255,255,255,0.03)',
               }}
             >
-              <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0" style={{ background: `${RARITY_COLORS[c.rarity]}18` }}>
-                {c.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.image_url} alt={c.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xl">
-                    {ELEMENT_EMOJI[c.element]}
-                  </div>
-                )}
-              </div>
+              <CreatureDiorama creature={c} size={42} rounded={12} anchor="center" showAura={false} className="w-12 h-12 shrink-0" sizes="96px" style={{ border: `1px solid ${RARITY_COLORS[c.rarity]}33` }} />
               <div className="flex-1 min-w-0 text-left">
                 <p className="font-bold text-white text-sm truncate">{c.name}</p>
                 <p className="text-xs" style={{ color: RARITY_COLORS[c.rarity] }}>{RARITY_LABELS[c.rarity]}</p>

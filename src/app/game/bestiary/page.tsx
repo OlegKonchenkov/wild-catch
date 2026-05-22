@@ -1230,7 +1230,12 @@ export default function BestiaryPage() {
 
                       {/* Squad assignment */}
                       <div>
-                        <p className="text-[11px] font-bold text-white/35 uppercase tracking-widest mb-2.5">Squadra da battaglia</p>
+                        <div className="flex items-baseline justify-between mb-2.5">
+                          <p className="text-[11px] font-bold text-white/35 uppercase tracking-widest">Squadra da battaglia</p>
+                          <p className="text-[10px] font-semibold" style={{ color: squad.includes(pc.id) ? 'rgba(58,188,168,0.9)' : 'rgba(255,255,255,0.4)' }}>
+                            {squad.includes(pc.id) ? '✓ in squadra · tocca per togliere' : 'tocca uno slot per schierare'}
+                          </p>
+                        </div>
                         <div className="flex gap-2">
                           {[0, 1, 2].map(slotIdx => {
                             const inSlot = squad[slotIdx] === pc.id
@@ -1240,8 +1245,10 @@ export default function BestiaryPage() {
                             const occupantCr = occupantPc ? creatures.find(c => c.id === occupantPc.creature_id) : null
                             const isLead = slotIdx === 0
                             return (
-                              <button
+                              <motion.button
                                 key={slotIdx}
+                                layout
+                                whileTap={{ scale: 0.93 }}
                                 disabled={squadSaving}
                                 onClick={() => inSlot ? handleSquadSlot(-1, pc.id) : handleSquadSlot(slotIdx, pc.id)}
                                 className="flex-1 relative rounded-xl overflow-hidden transition-all disabled:opacity-50"
@@ -1319,7 +1326,10 @@ export default function BestiaryPage() {
                                   <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black"
                                     style={{ background: isLead ? '#3ABCA8' : 'rgba(255,255,255,0.75)', color: '#0A1520' }}>✓</span>
                                 )}
-                              </button>
+                                {slotTaken && (
+                                  <span className="absolute top-1 right-1 text-[9px] font-black px-1.5 py-0.5 rounded-md leading-none" style={{ background: 'rgba(58,188,168,0.9)', color: '#06121a' }} title="Sostituisci">↔</span>
+                                )}
+                              </motion.button>
                             )
                           })}
                         </div>
