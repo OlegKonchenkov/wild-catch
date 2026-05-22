@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   // Find evolved form
   const { data: evolvedForm } = await supabase
     .from('creatures')
-    .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def, description')
+    .select('id, name, rarity, element, image_url, sprite_cutout_url, sprite_url, hp, atk, def, description')
     .eq('evolution_of', pc.creature_id)
     .maybeSingle()
 
@@ -82,6 +82,7 @@ export async function POST(request: Request) {
       rarity: evolvedForm.rarity,
       element: evolvedForm.element,
       image_url: evolvedForm.image_url,
+      sprite_cutout_url: evolvedForm.sprite_cutout_url,
       sprite_url: evolvedForm.sprite_url,
       hp: evolvedForm.hp,
       atk: evolvedForm.atk,

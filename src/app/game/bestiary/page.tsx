@@ -11,6 +11,7 @@ import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import { resolveCreatureSprite, ELEMENT_BACKGROUND } from '@/lib/game/battle-scene'
+import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { GameGridSkeleton } from '@/components/game/GameLoading'
 import EquipmentManager from '@/components/game/EquipmentManager'
 import EnigmaFragmentPanel from '@/components/game/EnigmaFragmentPanel'
@@ -64,7 +65,7 @@ export default function BestiaryPage() {
   const [squad, setSquad]                   = useState<string[]>([]) // array of player_creatures.id (up to 3)
   const [squadSaving, setSquadSaving]       = useState(false)
   // Reveal card after manual evolution
-  const [evolveReveal, setEvolveReveal]     = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null; copiesRemaining: number } | null>(null)
+  const [evolveReveal, setEvolveReveal]     = useState<{ name: string; rarity: string; element: string; image_url: string | null; sprite_cutout_url: string | null; sprite_url: string | null; hp: number; atk: number; def: number; description: string | null; copiesRemaining: number } | null>(null)
   const [evolvePhase, setEvolvePhase]       = useState<'charge' | 'flash' | 'reveal'>('charge')
   const [evolveCardVisible, setEvolveCardVisible] = useState(false)
   const supabase   = useMemo(() => createClient(), [])
@@ -278,6 +279,7 @@ export default function BestiaryPage() {
       setEvolveReveal({
         name: cr.name, rarity: cr.rarity, element: cr.element,
         image_url: cr.image_url ?? null,
+        sprite_cutout_url: cr.sprite_cutout_url ?? null, sprite_url: cr.sprite_url ?? null,
         hp: cr.hp, atk: cr.atk, def: cr.def, description: cr.description ?? null,
         copiesRemaining: data.copiesRemaining,
       })
@@ -1478,14 +1480,13 @@ export default function BestiaryPage() {
                       transform: evolveCardVisible ? 'scale(1)' : 'scale(0.5)',
                       transition: 'opacity 0.35s 0.1s, transform 0.45s 0.1s cubic-bezier(0.34,1.56,0.64,1)',
                     }}>
-                      <CreatureSprite
-                        imageUrl={cr.image_url ?? ''}
-                        name={cr.name}
-                        animState="idle"
-                        size={160}
-                        element={cr.element as any}
-                        rarity={cr.rarity as any}
-                        showAura
+                      <CreatureDiorama
+                        creature={cr}
+                        size={158}
+                        anchor="center"
+                        rounded={20}
+                        className="w-full"
+                        style={{ aspectRatio: '5 / 4', maxWidth: 300 }}
                       />
                     </div>
                   </div>
