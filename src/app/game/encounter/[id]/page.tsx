@@ -7,6 +7,7 @@ import StatusAura from '@/components/battle/StatusAura'
 import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
 import ImmersiveBattleLayout, { type ImmersiveDamage, type ImmersiveNotice } from '@/components/battle/ImmersiveBattleLayout'
 import CaptureOverlay from '@/components/battle/CaptureOverlay'
+import EvolutionFx, { type EvoPhase } from '@/components/battle/EvolutionFx'
 import type { BattleAction } from '@/components/battle/ActionBar'
 import type { SquadMember } from '@/components/battle/SquadBar'
 import { IconCapture, IconFlee, IconFlask, IconSwords } from '@/components/battle/icons'
@@ -390,6 +391,7 @@ export default function EncounterPage() {
   // Slot index awaiting the user's "Cambia creatura" confirmation. null when no prompt is open.
   const [pendingSwitchSlot, setPendingSwitchSlot] = useState<number | null>(null)
   const [result, setResult]     = useState<'caught' | 'fled' | 'evolved' | 'ko' | 'lost' | null>(null)
+  const [evoFx, setEvoFx]       = useState<EvoPhase>('idle')
   const [caughtCreatureData, setCaughtCreatureData] = useState<any>(null)
   const [caughtExpGain, setCaughtExpGain]           = useState(0)
   const [caughtGoldGain, setCaughtGoldGain]         = useState(0)
@@ -1239,6 +1241,14 @@ export default function EncounterPage() {
       setCaughtExpGain(data.expGain ?? 0)
       setCaughtGoldGain(data.goldGain ?? 0)
       if (data.completedMissions?.length) setCompletedMissions(data.completedMissions)
+      if (data.evolved) {
+        // Dramatic evolution beat (charge → flash) before the evolved reveal.
+        setEvoFx('charge')
+        await new Promise(r => setTimeout(r, 1400))
+        setEvoFx('flash')
+        await new Promise(r => setTimeout(r, 480))
+        setEvoFx('idle')
+      }
       setResult(data.evolved ? 'evolved' : 'caught')
       {
         const sid = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null
@@ -1542,6 +1552,7 @@ export default function EncounterPage() {
         actions={!result ? immersiveActions : undefined}
       >
         <CaptureOverlay phase={catchPhase} success={showCatchSuccess} creatureName={state.creature.name ?? undefined} />
+        <EvolutionFx phase={evoFx} element={(caughtCreatureData?.element ?? state.creature?.element ?? 'armonia') as string} />
       </ImmersiveBattleLayout>
       )}
 

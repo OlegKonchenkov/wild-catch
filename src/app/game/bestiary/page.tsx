@@ -10,6 +10,7 @@ import type { Creature, PlayerCreature, Element } from '@/lib/types'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import CreatureSprite from '@/components/creature/CreatureSprite'
+import { resolveCreatureSprite, ELEMENT_BACKGROUND } from '@/lib/game/battle-scene'
 import { GameGridSkeleton } from '@/components/game/GameLoading'
 import EquipmentManager from '@/components/game/EquipmentManager'
 import EnigmaFragmentPanel from '@/components/game/EnigmaFragmentPanel'
@@ -750,45 +751,32 @@ export default function BestiaryPage() {
                 <div className="h-[3px]" style={{ background: canEvolve ? '#F7C841' : caught ? rarityColor : 'rgba(255,255,255,0.04)' }} />
 
                 {/* Image area */}
-                <div className="relative aspect-square overflow-hidden flex items-center justify-center p-2">
-                  {/* Stage: rarity-tinted backlight + contact shadow so
-                      the creature reads as a curated portrait, not a
-                      flat square asset. Muted for uncaught (mystery). */}
-                  {creature.image_url && (
+                <div className="relative aspect-square overflow-hidden flex items-center justify-center">
+                  {/* Caught + cutout → mini diorama (element bg + transparent
+                      cutout). Uncaught / legacy art → muted portrait + mystery. */}
+                  {caught && creature.sprite_cutout_url ? (
                     <>
-                      <div
-                        className="absolute pointer-events-none"
-                        style={{
-                          inset: '10%', borderRadius: '50%',
-                          background: caught
-                            ? `radial-gradient(circle at 50% 44%, ${rarityColor}33 0%, ${rarityColor}14 44%, transparent 70%)`
-                            : 'radial-gradient(circle at 50% 44%, rgba(255,255,255,0.05) 0%, transparent 68%)',
-                        }}
-                      />
-                      <div
-                        className="absolute pointer-events-none"
-                        style={{
-                          bottom: '11%', left: '50%', width: '52%', height: '8%',
-                          transform: 'translateX(-50%)', borderRadius: '50%',
-                          background: 'rgba(0,0,0,0.42)', filter: 'blur(4px)',
-                        }}
+                      <Image src={ELEMENT_BACKGROUND[creature.element]} alt="" fill sizes="140px" className="object-cover" />
+                      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(115% 92% at 50% 30%, transparent 40%, rgba(4,6,10,0.62) 100%)' }} />
+                      <Image
+                        src={resolveCreatureSprite(creature)}
+                        alt={creature.name}
+                        width={80} height={80}
+                        className="relative w-full h-full object-contain p-1.5"
+                        style={{ filter: 'drop-shadow(0 5px 7px rgba(0,0,0,0.55))' }}
                       />
                     </>
-                  )}
-                  {creature.image_url ? (
-                    <>
-                      <Image
-                        src={creature.image_url}
-                        alt={caught ? creature.name : '???'}
-                        width={80} height={80}
-                        className={`relative w-full h-full object-contain transition-all ${caught ? '' : 'silhouette'}`}
-                      />
+                  ) : creature.image_url ? (
+                    <div className="relative w-full h-full flex items-center justify-center p-2">
+                      <div className="absolute pointer-events-none" style={{ inset: '10%', borderRadius: '50%', background: caught ? `radial-gradient(circle at 50% 44%, ${rarityColor}33 0%, ${rarityColor}14 44%, transparent 70%)` : 'radial-gradient(circle at 50% 44%, rgba(255,255,255,0.05) 0%, transparent 68%)' }} />
+                      <div className="absolute pointer-events-none" style={{ bottom: '11%', left: '50%', width: '52%', height: '8%', transform: 'translateX(-50%)', borderRadius: '50%', background: 'rgba(0,0,0,0.42)', filter: 'blur(4px)' }} />
+                      <Image src={creature.image_url} alt={caught ? creature.name : '???'} width={80} height={80} className={`relative w-full h-full object-contain transition-all ${caught ? '' : 'silhouette'}`} />
                       {!caught && (
                         <div className="absolute inset-0 flex items-center justify-center bg-[#0A1520]/40 rounded-lg">
                           <span className="text-white/30 text-lg font-black">?</span>
                         </div>
                       )}
-                    </>
+                    </div>
                   ) : (
                     <div className={`text-3xl ${caught ? '' : 'opacity-10'}`}>
                       {caught ? ELEMENT_EMOJI[creature.element] : '?'}
@@ -894,7 +882,7 @@ export default function BestiaryPage() {
                       creature, intensity scaled by rarity (subtle for
                       comune, dramatic for leggendario/mitologico). Sits
                       under the sprite; decorative only. */}
-                  {caught && (() => {
+                  {caught && !creature.sprite_cutout_url && (() => {
                     const RAY_ALPHA: Record<string, number> = {
                       comune: 0.05, non_comune: 0.08, raro: 0.13,
                       epico: 0.20, leggendario: 0.30, mitologico: 0.42,
@@ -919,23 +907,34 @@ export default function BestiaryPage() {
 
                   {/* Creature image */}
                   <div className="relative flex justify-center pt-7 pb-5">
-                    {caught ? (
-                      <div
-                        className={creature.image_url ? 'cursor-zoom-in' : undefined}
-                        onClick={() => creature.image_url && window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: creature.image_url }))}
-                        title={creature.image_url ? 'Tocca per ingrandire' : undefined}
-                      >
-                        <CreatureSprite
-                          imageUrl={creature.image_url ?? ''}
-                          name={creature.name}
-                          animState="idle"
-                          size={180}
-                          element={creature.element}
-                          rarity={creature.rarity}
-                          showAura
-                        />
-                      </div>
-                    ) : (
+                    {caught ? (() => {
+                      const sprite = resolveCreatureSprite(creature)
+                      if (!creature.sprite_cutout_url) {
+                        return (
+                          <div
+                            className={creature.image_url ? 'cursor-zoom-in' : undefined}
+                            onClick={() => creature.image_url && window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: creature.image_url }))}
+                            title={creature.image_url ? 'Tocca per ingrandire' : undefined}
+                          >
+                            <CreatureSprite imageUrl={sprite} name={creature.name} animState="idle" size={180} element={creature.element} rarity={creature.rarity} showAura />
+                          </div>
+                        )
+                      }
+                      return (
+                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: '4 / 3', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <Image src={ELEMENT_BACKGROUND[creature.element]} alt="" fill priority sizes="(max-width:480px) 92vw, 420px" className="object-cover" />
+                          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 95% at 50% 28%, transparent 42%, rgba(4,6,10,0.58) 100%)' }} />
+                          <div className="absolute inset-x-0 bottom-0 h-2/5 pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(4,6,10,0.72), transparent)' }} />
+                          <div
+                            className={`absolute inset-0 flex items-end justify-center pb-1 ${sprite ? 'cursor-zoom-in' : ''}`}
+                            onClick={() => sprite && window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: sprite }))}
+                            title={sprite ? 'Tocca per ingrandire' : undefined}
+                          >
+                            <CreatureSprite imageUrl={sprite} name={creature.name} animState="idle" size={188} element={creature.element} rarity={creature.rarity} showAura />
+                          </div>
+                        </div>
+                      )
+                    })() : (
                       <div className="relative w-40 h-40 flex items-center justify-center">
                         {creature.image_url ? (
                           <>

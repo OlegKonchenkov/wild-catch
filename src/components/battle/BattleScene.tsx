@@ -139,7 +139,7 @@ function CreatureStage({
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0"
-            style={{ zIndex: 3, overflow: 'visible' }}
+            style={{ zIndex: 20, overflow: 'visible' }}
           >
             <StatusAura status={c.statusEffect} size={size} />
           </div>
