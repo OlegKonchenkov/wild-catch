@@ -28,6 +28,10 @@ interface Props {
   animState?: AnimState
   /** 0..1 extra darken over the background. */
   dim?: number
+  /** Force the scene photo on/off. By default the photo is used only when the
+   *  tile is large enough (a detailed scene turns muddy below ~56px → crisp
+   *  element gradient instead). */
+  scene?: boolean
   /** next/image sizes hint for the background. */
   sizes?: string
   className?: string
@@ -43,6 +47,9 @@ const ELEMENT_FALLBACK: Record<string, string> = {
   terra:     'linear-gradient(180deg,#221805,#120d02)',
   armonia:   'linear-gradient(180deg,#180a2a,#0c0518)',
 }
+const ELEMENT_TINT: Record<string, string> = {
+  bosco: '#2ECC6A', fiamma: '#FF5520', adriatico: '#00C4E8', terra: '#D4A060', armonia: '#B060F8',
+}
 
 /**
  * A creature composited inside its element environment: per-element background
@@ -55,23 +62,29 @@ const ELEMENT_FALLBACK: Record<string, string> = {
  */
 export default function CreatureDiorama({
   creature, size = 150, aspect = '1 / 1', rounded = 20, anchor = 'bottom',
-  showAura = true, animState = 'idle', dim = 0, sizes = '(max-width:520px) 96vw, 480px', className, style,
+  showAura = true, animState = 'idle', dim = 0, scene = true, sizes = '(max-width:520px) 96vw, 480px', className, style,
 }: Props) {
   const sprite = resolveCreatureSprite(creature)
   const hasCutout = !!creature.sprite_cutout_url
   const bg = ELEMENT_BACKGROUND[creature.element as keyof typeof ELEMENT_BACKGROUND]
+  // A detailed scene photo turns muddy at small sizes — only use it when the
+  // tile is large enough; otherwise a crisp element-tinted gradient.
+  const useScene = scene && hasCutout && !!bg && size >= 56
+  const tint = ELEMENT_TINT[creature.element] ?? '#3A9DBC'
 
   return (
     <div
       className={className}
       style={{ position: 'relative', overflow: 'hidden', borderRadius: rounded, aspectRatio: aspect, background: ELEMENT_FALLBACK[creature.element] ?? '#0a0f16', ...style }}
     >
-      {hasCutout && bg && (
+      {useScene ? (
         <>
-          <Image src={bg} alt="" fill sizes={sizes} className="object-cover" />
+          <Image src={bg!} alt="" fill sizes={sizes} quality={85} className="object-cover" />
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 92% at 50% 28%, transparent 40%, rgba(4,6,10,0.52) 100%)' }} />
           {dim > 0 && <div className="absolute inset-0 pointer-events-none" style={{ background: `rgba(3,5,9,${Math.min(0.7, dim)})` }} />}
         </>
+      ) : (
+        <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at 50% 38%, ${tint}33, transparent 72%)` }} />
       )}
       <div className={`absolute inset-0 flex justify-center ${anchor === 'bottom' ? 'items-end pb-1' : 'items-center'}`}>
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
