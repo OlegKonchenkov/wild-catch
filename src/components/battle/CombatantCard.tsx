@@ -2,6 +2,8 @@
 import { type CSSProperties, useEffect, useState } from 'react'
 import type { Element, Rarity } from '@/lib/types'
 import { RARITY_LABELS, RARITY_COLORS } from '@/lib/types'
+import type { StatusEffect } from '@/lib/game/combat'
+import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import { IconSword } from './icons'
 
 const ELEMENT_EMOJI: Record<Element, string> = {
@@ -23,6 +25,8 @@ interface Props {
   atk?: number
   /** Catch-difficulty 1–5 → star row (enemy card). */
   stars?: number
+  statusEffect?: StatusEffect | null
+  statusTurnsLeft?: number | null
   side: 'enemy' | 'player'
   className?: string
   style?: CSSProperties
@@ -35,7 +39,7 @@ interface Props {
  * scene's z-order (the creature wins any overlap).
  */
 export default function CombatantCard({
-  name, element, rarity, currentHp, maxHp, atk, stars, side, className, style,
+  name, element, rarity, currentHp, maxHp, atk, stars, statusEffect, statusTurnsLeft, side, className, style,
 }: Props) {
   const pct = maxHp > 0 ? Math.max(0, Math.min(1, currentHp / maxHp)) : 0
   const [ghost, setGhost] = useState(pct)
@@ -47,6 +51,7 @@ export default function CombatantCard({
   const glow = ELEMENT_GLOW[element]
   const rc = RARITY_COLORS[rarity]
   const clampStars = typeof stars === 'number' ? Math.max(0, Math.min(5, stars)) : null
+  const statusMeta = statusEffect ? STATUS_EFFECT_META[statusEffect] : null
 
   return (
     <div
@@ -69,8 +74,35 @@ export default function CombatantCard({
       </div>
 
       {/* meta row — rarity + (stars | ATK) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 8, flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 800, fontSize: 10, padding: '3px 8px', borderRadius: 999, color: rc, background: `${rc}1f`, border: `1px solid ${rc}99`, whiteSpace: 'nowrap' }}>{RARITY_LABELS[rarity]}</span>
+        {statusMeta && (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              minHeight: 20,
+              padding: '3px 7px',
+              borderRadius: 999,
+              color: statusMeta.color,
+              background: `${statusMeta.color}1f`,
+              border: `1px solid ${statusMeta.color}80`,
+              boxShadow: `0 0 12px ${statusMeta.glow}, inset 0 1px 0 rgba(255,255,255,.08)`,
+              fontSize: 10,
+              fontWeight: 900,
+              lineHeight: 1,
+              whiteSpace: 'nowrap',
+            }}
+            title={statusMeta.label}
+          >
+            <span>{statusMeta.emoji}</span>
+            <span>{statusMeta.label}</span>
+            {statusTurnsLeft != null && statusTurnsLeft > 0 && (
+              <span style={{ opacity: 0.62, fontVariantNumeric: 'tabular-nums' }}>x{statusTurnsLeft}</span>
+            )}
+          </span>
+        )}
         {clampStars !== null && (
           <span style={{ fontSize: 12, letterSpacing: 1.5, color: '#F4D27A', textShadow: '0 1px 2px rgba(0,0,0,.5)' }}>
             {'★'.repeat(clampStars)}<span style={{ color: 'rgba(255,255,255,.2)' }}>{'★'.repeat(5 - clampStars)}</span>

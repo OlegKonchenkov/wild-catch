@@ -4,7 +4,6 @@ import { type CSSProperties, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Element, Rarity } from '@/lib/types'
 import type { StatusEffect } from '@/lib/game/combat'
-import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { AttackAnimationProps } from '@/components/battle/animations/types'
 import { resolveCreatureSprite } from '@/lib/game/battle-scene'
 import BattleScene, { type BattleAnimState } from './BattleScene'
@@ -14,7 +13,6 @@ import SquadBar, { type SquadMember } from './SquadBar'
 import TurnTimer from './TurnTimer'
 import ActionBar, { type BattleAction } from './ActionBar'
 import AttackAnimation from './AttackAnimation'
-import StatusAura from './StatusAura'
 
 export interface ImmersiveCombatant {
   name: string
@@ -81,40 +79,6 @@ const spriteFor = (c: ImmersiveCombatant) => resolveCreatureSprite({
   sprite_url: c.spriteUrl,
   image_url: c.imageUrl,
 })
-
-function StatusLayer({ combatant, target }: { combatant: ImmersiveCombatant; target: 'enemy' | 'player' }) {
-  const status = combatant.statusEffect ?? null
-  if (!status) return null
-  const meta = STATUS_EFFECT_META[status]
-  const style: CSSProperties = target === 'enemy'
-    ? { top: '23%', right: '18%', width: 148, height: 148 }
-    : { top: '58%', left: '12%', width: 176, height: 176 }
-
-  return (
-    <div className="pointer-events-none absolute" style={{ ...style, zIndex: 9 }}>
-      <StatusAura status={status} size={target === 'enemy' ? 148 : 176} />
-      {meta && (
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute left-1/2 top-full -translate-x-1/2 rounded-full px-2.5 py-1 text-[10px] font-extrabold"
-          style={{
-            color: meta.color,
-            background: `${meta.color}22`,
-            border: `1px solid ${meta.color}70`,
-            boxShadow: `0 0 14px ${meta.glow}`,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {meta.emoji} {meta.label}
-          {combatant.statusTurnsLeft != null && combatant.statusTurnsLeft > 0 && (
-            <span style={{ opacity: 0.58, marginLeft: 3 }}>x{combatant.statusTurnsLeft}</span>
-          )}
-        </motion.div>
-      )}
-    </div>
-  )
-}
 
 function CenterNotice({ notice, seamPct = 44 }: { notice?: ImmersiveNotice | null; seamPct?: number }) {
   if (!notice) return null
@@ -207,8 +171,8 @@ export default function ImmersiveBattleLayout({
       style={{ background: '#030610', zIndex: 1, ['--font-mono' as string]: 'var(--font-geist-mono)' } as CSSProperties}
     >
       <BattleScene
-        enemy={{ element: enemy.element, spriteUrl: spriteFor(enemy), name: enemy.name, rarity: enemy.rarity, animState: enemy.animState, fainting: enemy.fainting, hpPct: enemyHpPct }}
-        player={{ element: player.element, spriteUrl: spriteFor(player), name: player.name, rarity: player.rarity, animState: player.animState, fainting: player.fainting, hpPct: playerHpPct }}
+        enemy={{ element: enemy.element, spriteUrl: spriteFor(enemy), name: enemy.name, rarity: enemy.rarity, animState: enemy.animState, fainting: enemy.fainting, statusEffect: enemy.statusEffect, hpPct: enemyHpPct }}
+        player={{ element: player.element, spriteUrl: spriteFor(player), name: player.name, rarity: player.rarity, animState: player.animState, fainting: player.fainting, statusEffect: player.statusEffect, hpPct: playerHpPct }}
         arena={arena}
         freeze={sceneFreeze}
         bossGold={bossGold}
@@ -222,6 +186,8 @@ export default function ImmersiveBattleLayout({
           currentHp={enemy.currentHp}
           maxHp={enemy.maxHp}
           stars={enemy.stars}
+          statusEffect={enemy.statusEffect}
+          statusTurnsLeft={enemy.statusTurnsLeft}
           style={{ top: 12, left: 10, ...enemyCardStyle }}
         />
         <CombatantCard
@@ -232,11 +198,10 @@ export default function ImmersiveBattleLayout({
           currentHp={player.currentHp}
           maxHp={player.maxHp}
           atk={player.atk}
+          statusEffect={player.statusEffect}
+          statusTurnsLeft={player.statusTurnsLeft}
           style={{ top: `calc(${seamPct}% + 38px)`, right: 10, ...playerCardStyle }}
         />
-
-        <StatusLayer combatant={enemy} target="enemy" />
-        <StatusLayer combatant={player} target="player" />
 
         <CenterNotice notice={notice} seamPct={seamPct} />
 

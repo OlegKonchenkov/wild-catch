@@ -2,8 +2,10 @@
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Element, Rarity } from '@/lib/types'
+import type { StatusEffect } from '@/lib/game/combat'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import ElementBackdrop from './ElementBackdrop'
+import StatusAura from './StatusAura'
 import VsEmblem from './VsEmblem'
 
 export type BattleAnimState = 'idle' | 'attack' | 'damage' | 'catch' | 'flee' | 'victory'
@@ -16,6 +18,7 @@ export interface BattleCombatant {
   rarity: Rarity
   animState?: BattleAnimState
   fainting?: boolean
+  statusEffect?: StatusEffect | null
   /** 0..1, drives low-HP darken + danger vignette. */
   hpPct: number
 }
@@ -111,12 +114,17 @@ function CreatureStage({
         }}
       />
       <motion.div
+        key={c.name}
         initial={{ x: slideFrom, opacity: 0 }}
         animate={c.fainting
-          ? { x: 0, opacity: 0.5, y: 20, scale: 0.9, filter: 'grayscale(1) brightness(.55)' }
-          : { x: 0, opacity: 1, y: 0, scale: 1, filter: 'grayscale(0) brightness(1)' }}
-        transition={{ x: { type: 'spring', stiffness: 180, damping: 20, delay: 0.15 }, opacity: { duration: 0.5 }, default: { duration: 0.5 } }}
-        style={{ display: 'flex', alignItems: 'flex-end', position: 'relative', zIndex: 1 }}
+          ? { x: 0, opacity: [1, 0.74, 0.36], y: [0, 12, 38], scale: [1, 0.94, 0.82], rotate: [0, -2.5, -6], filter: 'grayscale(1) brightness(.55) saturate(.45)' }
+          : { x: 0, opacity: 1, y: 0, scale: 1, rotate: 0, filter: 'grayscale(0) brightness(1) saturate(1)' }}
+        transition={{
+          x: { type: 'spring', stiffness: 180, damping: 20, delay: 0.15 },
+          opacity: { duration: c.fainting ? 0.72 : 0.5, ease: 'easeOut' },
+          default: { duration: c.fainting ? 0.72 : 0.5, ease: 'easeOut' },
+        }}
+        style={{ display: 'flex', alignItems: 'flex-end', position: 'relative', zIndex: 1, transformOrigin: '50% 100%' }}
       >
         <CreatureSprite
           imageUrl={c.spriteUrl}
@@ -127,7 +135,37 @@ function CreatureStage({
           animState={c.animState ?? 'idle'}
           showAura
         />
+        {c.statusEffect && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{ zIndex: 3, overflow: 'visible' }}
+          >
+            <StatusAura status={c.statusEffect} size={size} />
+          </div>
+        )}
       </motion.div>
+      {c.fainting && (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute"
+          style={{
+            left: '50%',
+            bottom: plateLift - Math.max(4, Math.round(size * 0.02)),
+            width: Math.round(size * 0.94),
+            height: Math.max(18, Math.round(size * 0.14)),
+            marginLeft: -Math.round(size * 0.94) / 2,
+            borderRadius: '50%',
+            zIndex: 0,
+            background: `radial-gradient(ellipse at center, ${glow}66 0%, rgba(255,255,255,.16) 28%, transparent 72%)`,
+            filter: `blur(${Math.max(6, Math.round(size * 0.045))}px)`,
+            mixBlendMode: 'screen',
+          }}
+          initial={{ opacity: 0, scale: 0.35 }}
+          animate={{ opacity: [0, 0.65, 0], scale: [0.35, 1.28, 1.7] }}
+          transition={{ duration: 0.58, ease: 'easeOut' }}
+        />
+      )}
     </div>
   )
 }

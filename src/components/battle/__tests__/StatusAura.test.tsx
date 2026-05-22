@@ -15,34 +15,35 @@ describe('<StatusAura>', () => {
     expect(container.textContent).toBe('')
   })
 
-  it('renders ⚡ sparks for paralisi', () => {
+  it('renders premium paralysis particles', () => {
     const { container } = render(<StatusAura status="paralisi" />)
-    expect(container.textContent).toContain('⚡')
+    expect(container.querySelector('[data-status-aura="paralisi"]')).toBeTruthy()
+    expect(container.querySelectorAll('.absolute').length).toBeGreaterThanOrEqual(4)
   })
 
-  it('renders 💫 stars for confusione', () => {
+  it('renders premium confusion particles', () => {
     const { container } = render(<StatusAura status="confusione" />)
-    expect(container.textContent).toContain('💫')
+    expect(container.querySelector('[data-status-aura="confusione"]')).toBeTruthy()
+    expect(container.querySelectorAll('.absolute').length).toBeGreaterThanOrEqual(5)
   })
 
-  it('renders Z letters for sonno', () => {
+  it('renders Z letters for sleep', () => {
     const { container } = render(<StatusAura status="sonno" />)
+    expect(container.querySelector('[data-status-aura="sonno"]')).toBeTruthy()
     expect(container.textContent).toContain('Z')
   })
 
-  it('renders bubbles for veleno (no emoji — DOM-only)', () => {
+  it('renders poison mist and bubbles', () => {
     const { container } = render(<StatusAura status="veleno" />)
-    // veleno uses bubble divs, no text → just check render did emit
-    // something (the absolute-positioned wrapper).
-    expect(container.querySelector('.absolute')).toBeTruthy()
+    expect(container.querySelector('[data-status-aura="veleno"]')).toBeTruthy()
+    expect(container.querySelectorAll('.rounded-full').length).toBeGreaterThanOrEqual(4)
   })
 
-  it('respects the size prop (scales positions)', () => {
-    // Just smoke-test: no crash with different sizes.
+  it('respects the size prop without crashing', () => {
     const { container: small } = render(<StatusAura status="paralisi" size={60} />)
-    expect(small.textContent).toContain('⚡')
+    expect(small.querySelector('[data-status-aura="paralisi"]')).toBeTruthy()
     cleanup()
     const { container: big } = render(<StatusAura status="paralisi" size={240} />)
-    expect(big.textContent).toContain('⚡')
+    expect(big.querySelector('[data-status-aura="paralisi"]')).toBeTruthy()
   })
 })
