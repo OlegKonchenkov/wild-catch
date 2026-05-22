@@ -223,7 +223,19 @@ function MapPageInner() {
   const declinedEnigmaPinIdsRef = useRef<Set<string>>(new Set())
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
-  const [hatchQueue, setHatchQueue] = useState<{ name: string; rarity: string; element: string; image_url: string | null; hp?: number; atk?: number; def?: number; description?: string | null; isStarter?: boolean }[]>([])
+  const [hatchQueue, setHatchQueue] = useState<{
+    name: string
+    rarity: string
+    element: string
+    image_url: string | null
+    sprite_cutout_url?: string | null
+    sprite_url?: string | null
+    hp?: number
+    atk?: number
+    def?: number
+    description?: string | null
+    isStarter?: boolean
+  }[]>([])
   const [missionQueue, setMissionQueue] = useState<CompletedMissionInfo[]>([])
   const [showStarterSelect, setShowStarterSelect] = useState(false)
   const [starters, setStarters] = useState<StarterCreature[]>([])
@@ -843,11 +855,12 @@ function MapPageInner() {
             setHasSelectedCreatureCheck(data?.selected_creature_id ? 'has' : 'missing')
             if (data?.selected_creature_id) {
               supabase.from('player_creatures')
-                .select('creatures(image_url)')
+                .select('creatures(image_url, sprite_cutout_url, sprite_url)')
                 .eq('id', data.selected_creature_id)
                 .single()
                 .then(({ data: pc }) => {
-                  const url = (pc?.creatures as any)?.image_url
+                  const cr = pc?.creatures as any
+                  const url = cr?.sprite_cutout_url || cr?.sprite_url || cr?.image_url
                   if (url) setCreatureImageUrl(url)
                 })
             }
@@ -1748,13 +1761,15 @@ function MapPageInner() {
             if (res.ok) {
               setStarterPicked(creature)
               setShowStarterSelect(false)
-              setCreatureImageUrl(creature.image_url)
+              setCreatureImageUrl(creature.sprite_cutout_url || creature.sprite_url || creature.image_url)
               // Show the reveal card via the hatch queue (same bottom-sheet UI)
               setHatchQueue(prev => [{
                 name: creature.name,
                 rarity: creature.rarity,
                 element: creature.element,
                 image_url: creature.image_url,
+                sprite_cutout_url: creature.sprite_cutout_url ?? null,
+                sprite_url: creature.sprite_url ?? null,
                 hp: creature.hp,
                 atk: creature.atk,
                 def: creature.def,

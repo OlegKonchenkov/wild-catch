@@ -9,6 +9,7 @@ import type { StatusEffect } from '@/lib/game/combat'
 import { GameListSkeleton } from '@/components/game/GameLoading'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
+import CreatureDiorama from '@/components/creature/CreatureDiorama'
 
 const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
 
@@ -81,6 +82,7 @@ interface HatchResult {
   rarity: string
   element: string
   image_url: string | null
+  sprite_cutout_url?: string | null
   sprite_url: string | null
   status_effect?: string | null
   status_effect_chance?: number | null
@@ -132,11 +134,15 @@ function HatchingAnimation({
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
             className="flex flex-col items-center gap-4 px-8 w-full max-w-xs">
             <div className="text-4xl mb-1">✨</div>
-            {result.image_url ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={result.image_url} alt={result.name}
-                className="w-32 h-32 object-contain rounded-2xl"
-                style={{ filter: `drop-shadow(0 0 16px ${rarityColor})` }} />
+            {(result.sprite_cutout_url || result.sprite_url || result.image_url) ? (
+              <CreatureDiorama
+                creature={result}
+                size={138}
+                anchor="center"
+                rounded={20}
+                className="w-40"
+                style={{ aspectRatio: '5 / 4' }}
+              />
             ) : (
               <div className="w-32 h-32 rounded-2xl flex items-center justify-center text-6xl"
                 style={{ background: `${rarityColor}22` }}>

@@ -38,6 +38,7 @@ export interface StarterCreature {
   rarity: string
   element: string
   image_url: string | null
+  sprite_cutout_url?: string | null
   sprite_url: string | null
   hp: number
   atk: number

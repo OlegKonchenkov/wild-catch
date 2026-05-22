@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   // Verify the creature is a valid comune starter
   const { data: creature } = await supabase
     .from('creatures')
-    .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def, description')
+    .select('id, name, rarity, element, image_url, sprite_cutout_url, sprite_url, hp, atk, def, description')
     .eq('id', creatureId)
     .eq('rarity', 'comune')
     .eq('spawnable', true)
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       element:       creature.element,
       evolved:       false,
       starter:       true,
-      image_url:     (creature as any).image_url ?? (creature as any).sprite_url ?? null,
+      image_url:     (creature as any).sprite_cutout_url || (creature as any).sprite_url || (creature as any).image_url || null,
       hp:  (creature as any).hp  ?? null,
       atk: (creature as any).atk ?? null,
       def: (creature as any).def ?? null,

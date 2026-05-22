@@ -15,6 +15,7 @@ import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { haptics } from '@/lib/haptics'
 import { playQrScan } from '@/lib/game/sounds/ui'
+import CreatureDiorama from '@/components/creature/CreatureDiorama'
 
 const QrScanner = dynamic(() => import('@/components/QrScanner'), { ssr: false })
 
@@ -243,15 +244,16 @@ function MissionDetailModal({
           </div>
         )}
 
-        {mission.type === 'cattura' && creaturePreview?.image_url && (
+        {mission.type === 'cattura' && creaturePreview && (
           <div className="mb-4 rounded-2xl overflow-hidden border border-white/10 relative" style={{ background: 'rgba(255,255,255,0.03)' }}>
             {/* Hero image */}
             <div className="relative w-full h-36 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={creaturePreview.image_url}
-                alt={mission.target ?? ''}
-                className="w-full h-full object-contain scale-110"
+              <CreatureDiorama
+                creature={creaturePreview}
+                size={150}
+                anchor="center"
+                rounded={0}
+                className="w-full h-full"
                 style={isCaught ? undefined : {
                   filter: 'blur(5px) brightness(0.55) saturate(0.3)',
                 }}
@@ -386,8 +388,22 @@ function ProgressRing({ pct, color, size = 36 }: { pct: number; color: string; s
 }
 
 /* ── Page ────────────────────────────────────── */
-interface CreaturePreview { image_url: string | null; rarity: string }
-interface CreaturePreviewRow { name: string; image_url: string | null; rarity: string }
+interface CreaturePreview {
+  name: string
+  element: string
+  image_url: string | null
+  sprite_cutout_url: string | null
+  sprite_url: string | null
+  rarity: string
+}
+interface CreaturePreviewRow {
+  name: string
+  element: string
+  image_url: string | null
+  sprite_cutout_url: string | null
+  sprite_url: string | null
+  rarity: string
+}
 interface PlayerCreatureNameRow { creatures?: { name?: string | null } | Array<{ name?: string | null }> | null }
 
 export default function MissionsPage() {
@@ -461,7 +477,7 @@ export default function MissionsPage() {
         )]
         if (captureTargets.length > 0) {
           const [crRes, pcRes] = await Promise.all([
-            supabase.from('creatures').select('name, image_url, rarity').in('name', captureTargets),
+            supabase.from('creatures').select('name, element, image_url, sprite_cutout_url, sprite_url, rarity').in('name', captureTargets),
             sessionId
               ? supabase.from('player_creatures')
                   .select('creatures(name)')
@@ -471,7 +487,14 @@ export default function MissionsPage() {
           ])
           const previews: Record<string, CreaturePreview> = {}
           for (const c of (crRes.data ?? []) as CreaturePreviewRow[]) {
-            previews[c.name] = { image_url: c.image_url, rarity: c.rarity }
+            previews[c.name] = {
+              name: c.name,
+              element: c.element,
+              image_url: c.image_url,
+              sprite_cutout_url: c.sprite_cutout_url,
+              sprite_url: c.sprite_url,
+              rarity: c.rarity,
+            }
           }
           setCreaturePreviews(previews)
           const caught = new Set<string>(
@@ -652,14 +675,16 @@ export default function MissionsPage() {
                 }}
               >
                 {/* Progress ring OR creature thumbnail for cattura missions */}
-                {mission.type === 'cattura' && mission.target && creaturePreviews[mission.target]?.image_url ? (
-                  <div className="relative shrink-0 w-12 h-12 rounded-xl overflow-hidden"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={creaturePreviews[mission.target].image_url!}
-                      alt={mission.target}
-                      className="w-full h-full object-contain"
+                {mission.type === 'cattura' && mission.target && creaturePreviews[mission.target] ? (
+                  <div className="relative shrink-0 w-14 h-14 rounded-xl overflow-hidden"
+                    style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <CreatureDiorama
+                      creature={creaturePreviews[mission.target]}
+                      size={58}
+                      anchor="center"
+                      rounded={12}
+                      showAura={false}
+                      className="w-full h-full"
                       style={caughtNames.has(mission.target) ? undefined : {
                         filter: locked ? 'blur(4px) brightness(0.38) saturate(0.1)' : 'blur(3px) brightness(0.5) saturate(0.2)',
                       }}

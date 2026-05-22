@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   // Return all comune spawnable creatures
   const { data: creatures } = await supabase
     .from('creatures')
-    .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def, description')
+    .select('id, name, rarity, element, image_url, sprite_cutout_url, sprite_url, hp, atk, def, description')
     .eq('rarity', 'comune')
     .eq('spawnable', true)
     .order('name')

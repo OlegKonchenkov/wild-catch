@@ -72,7 +72,7 @@ export async function POST(
   let pool: any[] = []
   const { data: candidates } = await supabase
     .from('creatures')
-    .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def, description, status_effect, status_effect_chance')
+    .select('id, name, rarity, element, image_url, sprite_cutout_url, sprite_url, hp, atk, def, description, status_effect, status_effect_chance')
     .eq('rarity', targetRarity)
     .limit(100)
   if (candidates?.length) {
@@ -81,7 +81,7 @@ export async function POST(
     // Fallback to comune if targeted rarity has no creatures
     const { data: fallback } = await supabase
       .from('creatures')
-      .select('id, name, rarity, element, image_url, sprite_url, hp, atk, def, description, status_effect, status_effect_chance')
+      .select('id, name, rarity, element, image_url, sprite_cutout_url, sprite_url, hp, atk, def, description, status_effect, status_effect_chance')
       .eq('rarity', 'comune')
       .limit(50)
     if (!fallback?.length) {
@@ -148,7 +148,7 @@ export async function POST(
       evolved:       false,
       via_egg:       true,
       egg_rarity:    (egg as any).egg_rarity,
-      image_url:     picked.image_url ?? picked.sprite_url ?? null,
+      image_url:     picked.sprite_cutout_url || picked.sprite_url || picked.image_url || null,
       hp:  picked.hp  ?? null,
       atk: picked.atk ?? null,
       def: picked.def ?? null,
@@ -163,6 +163,7 @@ export async function POST(
       rarity: picked.rarity,
       element: picked.element,
       image_url: picked.image_url,
+      sprite_cutout_url: picked.sprite_cutout_url,
       sprite_url: picked.sprite_url,
       hp: picked.hp,
       atk: picked.atk,

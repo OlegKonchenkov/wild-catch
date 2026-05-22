@@ -32,7 +32,8 @@ describe('<MissionRewardModal>', () => {
       onDone={onDone}
     />)
     expect(screen.getByText('Cattura prima')).toBeTruthy()
-    expect(screen.getByText('+50 EXP')).toBeTruthy()
+    expect(screen.getByText('EXP ricompensa')).toBeTruthy()
+    expect(screen.getByText(/\+50/)).toBeTruthy()
     expect(screen.getByText(/100/)).toBeTruthy()
   })
 

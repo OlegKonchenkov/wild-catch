@@ -150,7 +150,7 @@ export async function POST(request: Request) {
   // credited something. A flush POST may carry a client total that
   // crosses a threshold even though this single segment's distance was
   // tiny; we still want the egg to hatch / mission to complete now.
-  let eggsHatched: Array<{ name: string; rarity: string; element: string }> = []
+  let eggsHatched: Array<{ name: string; rarity: string; element: string; image_url?: string | null; sprite_cutout_url?: string | null; sprite_url?: string | null }> = []
   let completedMissions: Array<{ title: string; rewardGold: number; rewardExp: number }> = []
   if (stepsAdvanced && session.status === 'active') {
     const [missions, hatched] = await Promise.all([
@@ -355,9 +355,9 @@ async function checkAndHatchEggs(
   userId: string,
   stepsWalked: number,
   supabase: SupabaseLike,
-): Promise<Array<{ name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null }>> {
+): Promise<Array<{ name: string; rarity: string; element: string; image_url: string | null; sprite_cutout_url: string | null; sprite_url: string | null; hp: number; atk: number; def: number; description: string | null }>> {
   type EggRow = { id: string; egg_rarity: string; steps_required: number; steps_at_pickup: number }
-  type HatchedCreatureRow = { id: string; name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null }
+  type HatchedCreatureRow = { id: string; name: string; rarity: string; element: string; image_url: string | null; sprite_cutout_url: string | null; sprite_url: string | null; hp: number; atk: number; def: number; description: string | null }
   const { data: eggs } = await supabase
     .from('player_eggs')
     .select('id, egg_rarity, steps_required, steps_at_pickup')
@@ -372,7 +372,7 @@ async function checkAndHatchEggs(
   )
   if (!readyEggs.length) return []
 
-  const hatched: Array<{ name: string; rarity: string; element: string; image_url: string | null; hp: number; atk: number; def: number; description: string | null }> = []
+  const hatched: Array<{ name: string; rarity: string; element: string; image_url: string | null; sprite_cutout_url: string | null; sprite_url: string | null; hp: number; atk: number; def: number; description: string | null }> = []
 
   for (const egg of readyEggs) {
     // Atomically claim this egg: only one concurrent request can win.
@@ -391,14 +391,14 @@ async function checkAndHatchEggs(
 
     const { data: candidates } = await supabase
       .from('creatures')
-      .select('id, name, rarity, element, image_url, hp, atk, def, description')
+      .select('id, name, rarity, element, image_url, sprite_cutout_url, sprite_url, hp, atk, def, description')
       .eq('rarity', targetRarity)
       .limit(100)
 
     let pool: HatchedCreatureRow[] = (candidates ?? []) as HatchedCreatureRow[]
     if (!pool.length) {
       const { data: fallback } = await supabase
-        .from('creatures').select('id, name, rarity, element, image_url, hp, atk, def, description').eq('rarity', 'comune').limit(50)
+        .from('creatures').select('id, name, rarity, element, image_url, sprite_cutout_url, sprite_url, hp, atk, def, description').eq('rarity', 'comune').limit(50)
       pool = (fallback ?? []) as HatchedCreatureRow[]
     }
     if (!pool.length) continue
@@ -434,7 +434,18 @@ async function checkAndHatchEggs(
       .update({ hatched_creature_id: picked.id })
       .eq('id', egg.id)
 
-    hatched.push({ name: picked.name, rarity: picked.rarity, element: picked.element, image_url: picked.image_url ?? null, hp: picked.hp, atk: picked.atk, def: picked.def, description: picked.description ?? null })
+    hatched.push({
+      name: picked.name,
+      rarity: picked.rarity,
+      element: picked.element,
+      image_url: picked.image_url ?? null,
+      sprite_cutout_url: picked.sprite_cutout_url ?? null,
+      sprite_url: picked.sprite_url ?? null,
+      hp: picked.hp,
+      atk: picked.atk,
+      def: picked.def,
+      description: picked.description ?? null,
+    })
   }
 
   return hatched
