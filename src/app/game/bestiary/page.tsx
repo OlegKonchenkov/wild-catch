@@ -927,13 +927,14 @@ export default function BestiaryPage() {
                         )
                       }
                       const diff = Math.max(1, Math.min(5, (creature as any).catch_difficulty ?? 1))
+                      const catchPct = Math.round((RARITY_CATCH_RATES[creature.rarity] ?? 0.5) * 100)
                       const inSquad = pc != null && squad.includes(pc.id)
                       const isCap = pc != null && squad[0] === pc.id
                       return (
                         <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: '1 / 1', maxHeight: 360, border: `1px solid ${rarityColor}44`, boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}>
                           <Image src={ELEMENT_BACKGROUND[creature.element]} alt="" fill priority sizes="(max-width:480px) 92vw, 440px" className="object-cover" />
                           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 90% at 50% 26%, transparent 38%, rgba(4,6,10,0.5) 100%)' }} />
-                          <div className="absolute inset-x-0 bottom-0 pointer-events-none" style={{ height: '60%', background: 'linear-gradient(to top, rgba(5,8,14,0.97) 6%, rgba(5,8,14,0.62) 44%, transparent)' }} />
+                          <div className="absolute inset-x-0 bottom-0 pointer-events-none" style={{ height: '64%', background: 'linear-gradient(to top, rgba(5,8,14,0.9) 0%, rgba(5,8,14,0.46) 42%, transparent 78%)' }} />
                           {/* creature — larger, grounded above the info plate */}
                           <div
                             className={`absolute inset-x-0 top-0 flex items-end justify-center pb-1 ${sprite ? 'cursor-zoom-in' : ''}`}
@@ -944,7 +945,7 @@ export default function BestiaryPage() {
                             <CreatureSprite imageUrl={sprite} name={creature.name} animState="idle" size={210} element={creature.element} rarity={creature.rarity} showAura />
                           </div>
                           {/* overlaid info plate */}
-                          <div className="absolute inset-x-0 bottom-0 px-4 pb-3.5">
+                          <div className="absolute inset-x-0 bottom-0 px-4 pb-4">
                             <div className="flex items-center gap-2">
                               <h3 className="text-[24px] font-black text-white leading-none tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.75)' }}>{creature.name}</h3>
                               {inSquad && (
@@ -963,8 +964,11 @@ export default function BestiaryPage() {
                               {pc != null && pc.duplicates_count > 1 && (
                                 <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold" style={{ background: 'rgba(0,0,0,0.42)', color: '#60CDDD', border: '1px solid rgba(96,205,221,0.4)', backdropFilter: 'blur(4px)' }}>×{pc.duplicates_count}</span>
                               )}
-                              <span className="ml-auto text-[13px] tracking-[1px]" style={{ color: '#F4D27A', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }} title="Difficoltà di cattura">
-                                {'★'.repeat(diff)}<span style={{ color: 'rgba(255,255,255,0.28)' }}>{'★'.repeat(5 - diff)}</span>
+                              <span className="ml-auto flex flex-col items-end gap-0.5" title="Difficoltà di cattura · catturabilità base">
+                                <span className="text-[13px] tracking-[1px]" style={{ color: '#F4D27A', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+                                  {'★'.repeat(diff)}<span style={{ color: 'rgba(255,255,255,0.28)' }}>{'★'.repeat(5 - diff)}</span>
+                                </span>
+                                <span className="text-[9px] font-extrabold leading-none" style={{ color: '#7FE0A0', textShadow: '0 1px 2px rgba(0,0,0,0.85)' }}>{catchPct}% base</span>
                               </span>
                             </div>
                           </div>
@@ -1110,18 +1114,13 @@ export default function BestiaryPage() {
                             </div>
                             <div className="grid grid-cols-3 gap-2">
                               {stats.map(s => (
-                                <div key={s.label} className="rounded-xl p-3 text-center"
-                                  style={{ background: `${s.color}10`, border: `1px solid ${s.color}25` }}>
-                                  <p className="text-xl font-black" style={{ color: s.color }}>{s.scaled}</p>
-                                  <p className="text-[10px] font-bold text-white/50 mt-0.5">{s.label}</p>
-                                  {lv > 1 && (
-                                    <>
-                                      <div className="my-1.5 mx-1" style={{ height: '1px', background: `${s.color}20` }} />
-                                      <p className="text-[10px] text-white/40 leading-none">
-                                        <span className="text-white/25">base </span>
-                                        <span className="font-semibold">{s.base}</span>
-                                      </p>
-                                    </>
+                                <div key={s.label} className="relative rounded-2xl px-2 py-2.5 text-center overflow-hidden"
+                                  style={{ background: `linear-gradient(160deg, ${s.color}1f, ${s.color}08)`, border: `1px solid ${s.color}33`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+                                  <span className="absolute inset-x-0 top-0 h-[2px]" style={{ background: s.color, opacity: 0.7 }} />
+                                  <p className="text-[22px] font-black leading-none" style={{ color: s.color, textShadow: `0 0 14px ${s.color}55` }}>{s.scaled}</p>
+                                  <p className="text-[9px] font-bold text-white/55 mt-1 tracking-wider uppercase">{s.label}</p>
+                                  {lv > 1 && s.scaled !== s.base && (
+                                    <p className="text-[9px] text-white/35 mt-1 leading-none">base <span className="font-semibold text-white/55">{s.base}</span></p>
                                   )}
                                 </div>
                               ))}
@@ -1213,32 +1212,7 @@ export default function BestiaryPage() {
                         )
                       })()}
 
-                      {/* Catch difficulty */}
-                      {(() => {
-                        const diff = (creature as any).catch_difficulty ?? 1
-                        const diffLabel = ['Molto facile','Facile','Normale','Difficile','Molto difficile'][diff - 1]
-                        const catchPct = Math.round((RARITY_CATCH_RATES[creature.rarity] ?? 0.5) * 100)
-                        return (
-                          <div className="flex items-center justify-between rounded-xl px-4 py-3"
-                            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xl">🎯</span>
-                              <div>
-                                <p className="text-xs font-bold text-white/75 leading-tight">{diffLabel}</p>
-                                <p className="text-[10px] text-white/35 mt-0.5">difficoltà di cattura</p>
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-1.5">
-                              <div className="flex gap-0.5">
-                                {[1,2,3,4,5].map(n => (
-                                  <span key={n} className={`text-sm leading-none ${n <= diff ? 'opacity-90' : 'opacity-15'}`}>⭐</span>
-                                ))}
-                              </div>
-                              <span className="text-[11px] font-bold leading-none" style={{ color: '#34D399' }}>{catchPct}% base</span>
-                            </div>
-                          </div>
-                        )
-                      })()}
+                      {/* Catch difficulty + base rate now live on the hero plate (no duplicate block) */}
 
                       {/* Evolution callout */}
                       {pc.duplicates_count >= 3 && evolvableIds.has(pc.creature_id) && (
