@@ -613,7 +613,13 @@ export default function BestiaryPage() {
                   >
                     {pc && cr ? (
                       <>
-                        {cr.image_url ? (
+                        {cr.sprite_cutout_url ? (
+                          <>
+                            <Image src={ELEMENT_BACKGROUND[cr.element]} alt="" fill sizes="120px" className="object-cover" />
+                            <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(4,6,10,0.7), rgba(4,6,10,0.12))' }} />
+                            <Image src={resolveCreatureSprite(cr)} alt={cr.name} width={64} height={64} className="absolute inset-0 w-full h-full object-contain p-1" style={{ filter: 'drop-shadow(0 3px 5px rgba(0,0,0,0.55))' }} />
+                          </>
+                        ) : cr.image_url ? (
                           <img src={cr.image_url} alt={cr.name} className="absolute inset-0 w-full h-full object-contain p-1" />
                         ) : (
                           <span className="absolute inset-0 flex items-center justify-center text-2xl">{ELEMENT_EMOJI[cr.element]}</span>
@@ -920,17 +926,47 @@ export default function BestiaryPage() {
                           </div>
                         )
                       }
+                      const diff = Math.max(1, Math.min(5, (creature as any).catch_difficulty ?? 1))
+                      const inSquad = pc != null && squad.includes(pc.id)
+                      const isCap = pc != null && squad[0] === pc.id
                       return (
-                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: '4 / 3', border: '1px solid rgba(255,255,255,0.1)' }}>
-                          <Image src={ELEMENT_BACKGROUND[creature.element]} alt="" fill priority sizes="(max-width:480px) 92vw, 420px" className="object-cover" />
-                          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 95% at 50% 28%, transparent 42%, rgba(4,6,10,0.58) 100%)' }} />
-                          <div className="absolute inset-x-0 bottom-0 h-2/5 pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(4,6,10,0.72), transparent)' }} />
+                        <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: '1 / 1', maxHeight: 360, border: `1px solid ${rarityColor}44`, boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}>
+                          <Image src={ELEMENT_BACKGROUND[creature.element]} alt="" fill priority sizes="(max-width:480px) 92vw, 440px" className="object-cover" />
+                          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 90% at 50% 26%, transparent 38%, rgba(4,6,10,0.5) 100%)' }} />
+                          <div className="absolute inset-x-0 bottom-0 pointer-events-none" style={{ height: '60%', background: 'linear-gradient(to top, rgba(5,8,14,0.97) 6%, rgba(5,8,14,0.62) 44%, transparent)' }} />
+                          {/* creature — larger, grounded above the info plate */}
                           <div
-                            className={`absolute inset-0 flex items-end justify-center pb-1 ${sprite ? 'cursor-zoom-in' : ''}`}
+                            className={`absolute inset-x-0 top-0 flex items-end justify-center pb-1 ${sprite ? 'cursor-zoom-in' : ''}`}
+                            style={{ bottom: 84 }}
                             onClick={() => sprite && window.dispatchEvent(new CustomEvent('wc:zoom-image', { detail: sprite }))}
                             title={sprite ? 'Tocca per ingrandire' : undefined}
                           >
-                            <CreatureSprite imageUrl={sprite} name={creature.name} animState="idle" size={188} element={creature.element} rarity={creature.rarity} showAura />
+                            <CreatureSprite imageUrl={sprite} name={creature.name} animState="idle" size={210} element={creature.element} rarity={creature.rarity} showAura />
+                          </div>
+                          {/* overlaid info plate */}
+                          <div className="absolute inset-x-0 bottom-0 px-4 pb-3.5">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-[24px] font-black text-white leading-none tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.75)' }}>{creature.name}</h3>
+                              {inSquad && (
+                                <span className="shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black" style={{ background: isCap ? 'rgba(58,188,168,0.92)' : 'rgba(255,255,255,0.18)', color: isCap ? '#06121a' : '#fff' }}>
+                                  {isCap ? '⚔ CAP' : `· ${squad.indexOf(pc!.id) + 1}`}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                              <span className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-semibold" style={{ background: 'rgba(0,0,0,0.42)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(4px)' }}>
+                                {ELEMENT_EMOJI[creature.element]}<span className="capitalize">{creature.element}</span>
+                              </span>
+                              <span className="text-[11px] px-2.5 py-1 rounded-full font-bold" style={{ background: `${rarityColor}2e`, color: '#fff', border: `1px solid ${rarityColor}`, backdropFilter: 'blur(4px)' }}>
+                                {RARITY_LABELS[creature.rarity]}
+                              </span>
+                              {pc != null && pc.duplicates_count > 1 && (
+                                <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold" style={{ background: 'rgba(0,0,0,0.42)', color: '#60CDDD', border: '1px solid rgba(96,205,221,0.4)', backdropFilter: 'blur(4px)' }}>×{pc.duplicates_count}</span>
+                              )}
+                              <span className="ml-auto text-[13px] tracking-[1px]" style={{ color: '#F4D27A', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }} title="Difficoltà di cattura">
+                                {'★'.repeat(diff)}<span style={{ color: 'rgba(255,255,255,0.28)' }}>{'★'.repeat(5 - diff)}</span>
+                              </span>
+                            </div>
                           </div>
                         </div>
                       )
@@ -949,7 +985,8 @@ export default function BestiaryPage() {
                     )}
                   </div>
 
-                  {/* Name + squad badge + pills */}
+                  {/* Name + squad badge + pills — only when the hero diorama isn't carrying the info */}
+                  {!(caught && creature.sprite_cutout_url) && (
                   <div className="px-5 pb-5">
                     <div className="flex items-start gap-2 mb-2">
                       <h3 className="text-[22px] font-black text-white leading-tight flex-1 tracking-tight">
@@ -992,6 +1029,7 @@ export default function BestiaryPage() {
                       <p className="text-xs text-white/30 italic">{hint}</p>
                     )}
                   </div>
+                  )}
                 </div>
 
                 {/* ── Content ── */}
@@ -1255,11 +1293,22 @@ export default function BestiaryPage() {
                                 }}
                               >
                                 {inSlot ? (
-                                  creature.image_url
+                                  creature.sprite_cutout_url ? (
+                                    <>
+                                      <Image src={ELEMENT_BACKGROUND[creature.element]} alt="" fill sizes="120px" className="object-cover" />
+                                      <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(4,6,10,0.62), rgba(4,6,10,0.12))' }} />
+                                      <Image src={resolveCreatureSprite(creature)} alt={creature.name} width={68} height={68} className="absolute inset-0 w-full h-full object-contain p-1.5" style={{ filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.55))' }} />
+                                    </>
+                                  ) : creature.image_url
                                     ? <img src={creature.image_url} alt={creature.name} className="absolute inset-0 w-full h-full object-contain p-2" />
                                     : <span className="absolute inset-0 flex items-center justify-center text-3xl">{ELEMENT_EMOJI[creature.element]}</span>
                                 ) : occupantCr ? (
-                                  occupantCr.image_url
+                                  occupantCr.sprite_cutout_url ? (
+                                    <div className="absolute inset-0 opacity-45">
+                                      <Image src={ELEMENT_BACKGROUND[occupantCr.element]} alt="" fill sizes="120px" className="object-cover" />
+                                      <Image src={resolveCreatureSprite(occupantCr)} alt={occupantCr.name} width={68} height={68} className="absolute inset-0 w-full h-full object-contain p-2" />
+                                    </div>
+                                  ) : occupantCr.image_url
                                     ? <img src={occupantCr.image_url} alt={occupantCr.name} className="absolute inset-0 w-full h-full object-contain p-2 opacity-40" />
                                     : <span className="absolute inset-0 flex items-center justify-center text-3xl opacity-30">{ELEMENT_EMOJI[occupantCr.element]}</span>
                                 ) : (
