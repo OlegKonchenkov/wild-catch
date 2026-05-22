@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
 import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
 import type { Rarity, Element } from '@/lib/types'
-import CreatureSprite from '@/components/creature/CreatureSprite'
+import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { motion, AnimatePresence } from 'framer-motion'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { GameToast } from '@/components/game/GameToast'
@@ -550,14 +550,7 @@ export default function DuelLobbyPage() {
                 {cr ? (
                   <div className="flex flex-col items-center py-2 gap-0.5">
                     <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: color + 'aa' }}>#{i + 1}</span>
-                    <CreatureSprite
-                      imageUrl={cr.sprite_cutout_url || cr.sprite_url || cr.image_url}
-                      name={cr.name}
-                      animState="idle"
-                      size={46}
-                      element={cr.element}
-                      rarity={cr.rarity}
-                    />
+                    <CreatureDiorama creature={cr} size={48} rounded={12} anchor="center" showAura={false} className="w-14 h-14" sizes="96px" />
                     <span className="text-[9px] text-white/75 truncate w-full text-center px-1 leading-tight font-semibold">{cr.name}</span>
                     {scaled && (
                       <div className="flex items-center gap-1 mt-0.5">
@@ -639,14 +632,7 @@ export default function DuelLobbyPage() {
                       boxShadow: inLineup ? `0 0 10px ${rarityColor}35` : 'none',
                     }}
                   >
-                    <CreatureSprite
-                      imageUrl={cr.sprite_cutout_url || cr.sprite_url || cr.image_url}
-                      name={cr.name}
-                      animState="idle"
-                      size={44}
-                      element={cr.element}
-                      rarity={cr.rarity}
-                    />
+                    <CreatureDiorama creature={cr} size={40} rounded={11} anchor="center" showAura={false} className="w-full h-full" sizes="80px" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-white truncate">{cr.name}</p>
