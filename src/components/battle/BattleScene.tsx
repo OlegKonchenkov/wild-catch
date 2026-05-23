@@ -40,6 +40,11 @@ interface BattleSceneProps {
    * space. Tune per screen.
    */
   seamPct?: number
+  /** Seconds to hold the creatures + VS off-stage behind the intro wipe, so the
+   *  background reveals first, then the creatures slide in. 0 = no intro. */
+  entranceDelay?: number
+  /** Bump (e.g. on duel going live) to re-trigger the creature slide-in. */
+  entranceKey?: string | number
   children?: ReactNode
 }
 
@@ -56,7 +61,7 @@ const ELEMENT_STAGE_GLOW: Record<Element, string> = {
 // Creatures sit ABOVE the info cards on purpose — they're the focal point, so a
 // card never occludes a creature.
 function CreatureStage({
-  c, maxSize, slideFrom, band, plateScale = 1.18, plateLift = 0,
+  c, maxSize, slideFrom, band, plateScale = 1.18, plateLift = 0, entranceDelay = 0, entranceKey,
 }: {
   c: BattleCombatant
   maxSize: number
@@ -64,10 +69,16 @@ function CreatureStage({
   band: CSSProperties
   plateScale?: number
   plateLift?: number
+  /** Hold the creature off-stage until this many seconds (intro reveal). */
+  entranceDelay?: number
+  /** Bumping this re-triggers the slide-in (e.g. duel goes live). */
+  entranceKey?: string | number
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState(maxSize)
   const glow = ELEMENT_STAGE_GLOW[c.element] ?? '#F0CE7A'
+  // No entrance delay while fainting (that's a mid-battle KO, not the intro).
+  const ed = c.fainting ? 0 : entranceDelay
   useEffect(() => {
     const el = ref.current
     if (!el || typeof ResizeObserver === 'undefined') return
@@ -114,15 +125,17 @@ function CreatureStage({
         }}
       />
       <motion.div
-        key={c.name}
+        key={entranceKey != null ? `${entranceKey}-${c.name}` : c.name}
         initial={{ x: slideFrom, opacity: 0 }}
         animate={c.fainting
           ? { x: 0, opacity: [1, 0.74, 0.36], y: [0, 12, 38], scale: [1, 0.94, 0.82], rotate: [0, -2.5, -6], filter: 'grayscale(1) brightness(.55) saturate(.45)' }
           : { x: 0, opacity: 1, y: 0, scale: 1, rotate: 0, filter: 'grayscale(0) brightness(1) saturate(1)' }}
         transition={{
-          x: { type: 'spring', stiffness: 180, damping: 20, delay: 0.15 },
-          opacity: { duration: c.fainting ? 0.72 : 0.5, ease: 'easeOut' },
-          default: { duration: c.fainting ? 0.72 : 0.5, ease: 'easeOut' },
+          // entranceDelay holds the creature off-stage behind the intro wipe so
+          // the background is revealed FIRST, then the creature slides in.
+          x: { type: 'spring', stiffness: 180, damping: 20, delay: 0.15 + ed },
+          opacity: { duration: c.fainting ? 0.72 : 0.5, ease: 'easeOut', delay: ed },
+          default: { duration: c.fainting ? 0.72 : 0.5, ease: 'easeOut', delay: ed },
         }}
         style={{ display: 'flex', alignItems: 'flex-end', position: 'relative', zIndex: 1, transformOrigin: '50% 100%' }}
       >
@@ -191,7 +204,7 @@ function DangerVignette({ top, height, anchor }: { top: string; height: string; 
  * them. HUD overlays are passed as children and float on top.
  */
 export default function BattleScene({
-  enemy, player, arena = false, freeze = false, vsStruck = true, bossGold, seamPct = 46, children,
+  enemy, player, arena = false, freeze = false, vsStruck = true, bossGold, seamPct = 46, entranceDelay = 0, entranceKey, children,
 }: BattleSceneProps) {
   const enemyDim = Math.min(0.32, 0.3 * (1 - clamp01(enemy.hpPct))) + (freeze ? 0.1 : 0)
   const playerDim = Math.min(0.32, 0.3 * (1 - clamp01(player.hpPct))) + (freeze ? 0.1 : 0)
@@ -222,10 +235,10 @@ export default function BattleScene({
       {enemy.hpPct < 0.25 && <DangerVignette top="0" height={`${seamPct}%`} anchor="30%" />}
       {player.hpPct < 0.25 && <DangerVignette top={`${seamPct}%`} height={`${100 - seamPct}%`} anchor="70%" />}
 
-      <CreatureStage c={enemy} maxSize={236} slideFrom={120} band={enemyBand} plateScale={1.15} plateLift={-3} />
-      <CreatureStage c={player} maxSize={276} slideFrom={-120} band={playerBand} plateScale={1.22} plateLift={-6} />
+      <CreatureStage c={enemy} maxSize={236} slideFrom={120} band={enemyBand} plateScale={1.15} plateLift={-3} entranceDelay={entranceDelay} entranceKey={entranceKey} />
+      <CreatureStage c={player} maxSize={276} slideFrom={-120} band={playerBand} plateScale={1.22} plateLift={-6} entranceDelay={entranceDelay} entranceKey={entranceKey} />
 
-      <VsEmblem struck={vsStruck} gold={bossGold} topPct={seamPct} />
+      <VsEmblem key={entranceKey} struck={vsStruck} gold={bossGold} topPct={seamPct} delay={entranceDelay > 0 ? entranceDelay + 0.35 : 0} />
 
       {freeze && (
         <div

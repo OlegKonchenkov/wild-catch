@@ -422,7 +422,9 @@ export default function EncounterPage() {
   const [selectedBattagliaId, setSelectedBattagliaId] = useState<string | null>(null)
   const [selectedPozioneId, setSelectedPozioneId] = useState<string | null>(null)
   const [showItemsModal, setShowItemsModal] = useState(false)
-  const [showIntro, setShowIntro] = useState(false)
+  // Start TRUE so the intro wipe covers the battle scene on the very first
+  // painted frame (no flash of the combat screen before the intro).
+  const [showIntro, setShowIntro] = useState(true)
   const [introActive, setIntroActive] = useState(false)
   const stopEncounterLoopRef = useRef<(() => void) | null>(null)
   const [turnTimer, setTurnTimer] = useState(45)
@@ -1541,6 +1543,7 @@ export default function EncounterPage() {
         }}
         freeze={isCritMessage || !!lastDamage?.isCrit}
         seamPct={44}
+        entranceDelay={showIntro ? 1.6 : 0}
         notice={immersiveNotice}
         damage={immersiveDamage}
         attackAnimation={attackAnim}

@@ -8,6 +8,9 @@ interface Props {
   gold?: string
   /** Vertical position (% of scene) - sits on the seam between the two halves. */
   topPct?: number
+  /** Seconds to wait before the strike-in (so VS lands after the creatures
+   *  have entered behind the intro wipe). Only applies when `struck`. */
+  delay?: number
 }
 
 const BOLTS: Array<{ d: string; kind: 'main' | 'branch' | 'hair' }> = [
@@ -34,7 +37,7 @@ const SPARKS = [
   { cx: 446, cy: 57, r: 0.9 },
 ]
 
-export default function VsEmblem({ struck = true, gold = '#F7C841', topPct = 50 }: Props) {
+export default function VsEmblem({ struck = true, gold = '#F7C841', topPct = 50, delay = 0 }: Props) {
   const widthFor = (kind: 'main' | 'branch' | 'hair', layer: 'aura' | 'amber' | 'core') => {
     if (layer === 'aura') return kind === 'main' ? 9 : kind === 'branch' ? 4.2 : 2
     if (layer === 'amber') return kind === 'main' ? 2.7 : kind === 'branch' ? 1.25 : 0.75
@@ -48,7 +51,7 @@ export default function VsEmblem({ struck = true, gold = '#F7C841', topPct = 50 
   const boltAnim = (i: number) => ({
     initial: { pathLength: struck ? 0 : 1, opacity: struck ? 0 : 1 },
     animate: { pathLength: 1, opacity: 1 },
-    transition: { duration: 0.5, delay: struck ? 0.02 + i * 0.018 : 0, ease: 'easeOut' as const },
+    transition: { duration: 0.5, delay: struck ? delay + 0.02 + i * 0.018 : 0, ease: 'easeOut' as const },
   })
 
   return (
@@ -133,7 +136,7 @@ export default function VsEmblem({ struck = true, gold = '#F7C841', topPct = 50 
             fill="#FFF1B8"
             initial={{ opacity: struck ? 0 : 0.7, scale: struck ? 0.4 : 1 }}
             animate={{ opacity: [0.18, 0.9, 0.25, 0.7, 0.18], scale: [0.7, 1.45, 0.8, 1.1, 0.7] }}
-            transition={{ duration: 1.4 + i * 0.07, repeat: Infinity, ease: 'easeInOut', delay: struck ? 0.18 + i * 0.04 : i * 0.04 }}
+            transition={{ duration: 1.4 + i * 0.07, repeat: Infinity, ease: 'easeInOut', delay: struck ? delay + 0.18 + i * 0.04 : i * 0.04 }}
             style={{ filter: `drop-shadow(0 0 ${Math.max(5, Math.round(s.r * 5))}px ${gold})` }}
           />
         ))}
@@ -198,7 +201,7 @@ export default function VsEmblem({ struck = true, gold = '#F7C841', topPct = 50 
           }}
           initial={{ scale: struck ? 0.62 : 1, opacity: struck ? 0 : 1 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: struck ? 0.08 : 0, type: 'spring', stiffness: 300, damping: 16 }}
+          transition={{ delay: struck ? delay + 0.08 : 0, type: 'spring', stiffness: 300, damping: 16 }}
         >
           VS
         </motion.span>

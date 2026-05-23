@@ -232,6 +232,7 @@ export default function BattleScreen({
         freeze={!!critNotice || !!lastDamage?.isCrit}
         bossGold="#F7C841"
         seamPct={44}
+        entranceDelay={showBossIntro ? 3.2 : 0}
         notice={bossNotice}
         damage={bossDamage}
         attackAnimation={attackAnim}

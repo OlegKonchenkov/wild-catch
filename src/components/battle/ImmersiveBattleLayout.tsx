@@ -54,6 +54,11 @@ interface Props {
   freeze?: boolean
   bossGold?: string
   seamPct?: number
+  /** Seconds to hold creatures + VS off-stage behind the intro wipe (reveal the
+   *  background first, then slide the creatures in). 0 = no intro choreography. */
+  entranceDelay?: number
+  /** Bump to re-trigger the creature entrance (e.g. duel goes live). */
+  entranceKey?: string | number
   notice?: ImmersiveNotice | null
   damage?: ImmersiveDamage | null
   attackAnimation?: (AttackAnimationProps & { key: string | number }) | null
@@ -147,6 +152,8 @@ export default function ImmersiveBattleLayout({
   freeze,
   bossGold,
   seamPct = 44,
+  entranceDelay = 0,
+  entranceKey,
   notice,
   damage,
   attackAnimation,
@@ -177,6 +184,8 @@ export default function ImmersiveBattleLayout({
         freeze={sceneFreeze}
         bossGold={bossGold}
         seamPct={seamPct}
+        entranceDelay={entranceDelay}
+        entranceKey={entranceKey}
       >
         <CombatantCard
           side="enemy"

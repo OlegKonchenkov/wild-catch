@@ -320,7 +320,10 @@ export default function DuelPage() {
   const [completedMissions, setCompletedMissions] = useState<CompletedMissionInfo[]>([])
   const [showMissionModal, setShowMissionModal] = useState(false)
   const [pendingSwitchLineupId, setPendingSwitchLineupId] = useState<string | null>(null)
-  const [showDuelIntro, setShowDuelIntro] = useState(false)
+  // Derived (below) so the intro overlay is present on the SAME frame the duel
+  // goes live — no flash of the battle scene before the wipe. `duelIntroDone`
+  // is flipped when the wipe finishes.
+  const [duelIntroDone, setDuelIntroDone] = useState(false)
   const duelIntroFiredRef = useRef(false)
   const stopDuelLoopRef   = useRef<(() => void) | null>(null)
 
@@ -1112,7 +1115,6 @@ export default function DuelPage() {
   useEffect(() => {
     if (!waiting && !duelIntroFiredRef.current) {
       duelIntroFiredRef.current = true
-      setShowDuelIntro(true)
       playBattleSound()
       stopDuelLoopRef.current = startDuelLoop()
     }
@@ -1356,6 +1358,9 @@ export default function DuelPage() {
     },
   ]
 
+  // Intro wipe is on whenever the duel is live and the wipe hasn't finished yet.
+  const showDuelIntro = !waiting && !duelIntroDone
+
   if (loading) {
     return <GameBattleSkeleton />
   }
@@ -1397,6 +1402,8 @@ export default function DuelPage() {
         }}
         freeze={!!critNotice || !!lastDamage?.isCrit}
         seamPct={44}
+        entranceDelay={showDuelIntro ? 3.0 : 0}
+        entranceKey={waiting ? 'wait' : 'live'}
         notice={duelNotice}
         damage={duelDamage}
         attackAnimation={attackAnim}
@@ -2005,7 +2012,7 @@ export default function DuelPage() {
             initial={{ opacity: 1 }}
             animate={{ opacity: [1, 1, 1, 1, 0] }}
             transition={{ duration: 3.8, times: [0, 0.42, 0.68, 0.80, 1.0] }}
-            onAnimationComplete={() => setShowDuelIntro(false)}
+            onAnimationComplete={() => setDuelIntroDone(true)}
             style={{ background: '#08010A' }}
           >
             {/* Pre-glow: soft battle-red pulse */}
