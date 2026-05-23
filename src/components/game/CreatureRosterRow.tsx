@@ -21,8 +21,9 @@ const STATS = [
 /**
  * Shared roster row for picking a creature into a lineup — used by both the
  * duel "Crea Sfida" picker and the boss (Capo Palestra) SquadSelector so the
- * two stay identical. A bigger element diorama thumbnail + name + rarity/element
- * + stat chips + a clear add/selected affordance.
+ * two stay identical. A large element *diorama* (the real per-element scene,
+ * not a flat tint) + name with inline rarity/element + compact stat chips and
+ * a clear add/selected affordance.
  */
 export default function CreatureRosterRow({
   creature, hp, atk, def, selected = false, selectedBadge, addable = true, accent, onClick,
@@ -50,7 +51,7 @@ export default function CreatureRosterRow({
       type="button"
       onClick={interactive ? onClick : undefined}
       disabled={!interactive}
-      className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 border text-left transition-all active:scale-[0.985]"
+      className="w-full flex items-center gap-3 rounded-2xl p-2 pr-3 border text-left transition-all active:scale-[0.985]"
       style={{
         background: selected ? `${ac}1c` : 'rgba(255,255,255,0.035)',
         borderColor: selected ? `${ac}85` : 'rgba(255,255,255,0.08)',
@@ -58,28 +59,32 @@ export default function CreatureRosterRow({
         opacity: interactive ? 1 : 0.4,
       }}
     >
+      {/* Real element diorama — bigger sprite, crisp (low glow + large sizes) */}
       <CreatureDiorama
         creature={creature}
-        size={52}
+        size={70}
         anchor="bottom"
         showAura={false}
+        glow={0.5}
         rounded={14}
-        sizes="140px"
+        sizes="240px"
         className="shrink-0"
-        style={{ width: 62, height: 62, border: `1px solid ${rc}3a` }}
+        style={{ width: 78, height: 74, border: `1px solid ${rc}3a` }}
       />
 
       <div className="flex-1 min-w-0">
-        <p className="font-extrabold text-white text-[15px] leading-tight truncate">{creature.name}</p>
-        <div className="flex items-center gap-1.5 mt-1">
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ color: rc, background: `${rc}1f`, border: `1px solid ${rc}55` }}>
+        {/* Name + rarity + element on one line — uses the horizontal space */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="font-extrabold text-white text-[15px] leading-tight truncate">{creature.name}</p>
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0" style={{ color: rc, background: `${rc}1f`, border: `1px solid ${rc}55` }}>
             {RARITY_LABELS[creature.rarity as keyof typeof RARITY_LABELS]}
           </span>
-          <span className="text-[12px] leading-none">{ELEMENT_EMOJI[creature.element as keyof typeof ELEMENT_EMOJI]}</span>
+          <span className="text-[13px] leading-none shrink-0">{ELEMENT_EMOJI[creature.element as keyof typeof ELEMENT_EMOJI]}</span>
         </div>
-        <div className="flex items-center gap-1 mt-1.5">
+        {/* Compact stat chips */}
+        <div className="flex items-center gap-1 mt-2">
           {STATS.map(s => (
-            <span key={s.key} className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md" style={{ color: s.color, background: `${s.color}14`, border: `1px solid ${s.color}26` }}>
+            <span key={s.key} className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-md leading-none" style={{ color: s.color, background: `${s.color}14`, border: `1px solid ${s.color}26` }}>
               {s.label} {vals[s.key]}
             </span>
           ))}

@@ -1,7 +1,8 @@
 'use client'
-import { ELEMENT_EMOJI, RARITY_COLORS } from '@/lib/types'
+import { ELEMENT_EMOJI } from '@/lib/types'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import CreatureRosterRow from '@/components/game/CreatureRosterRow'
+import CreatureLineupSlot from '@/components/game/CreatureLineupSlot'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { GameListSkeleton } from '@/components/game/GameLoading'
 import type { BossSlot, SquadCreature } from '@/components/game/boss/types'
@@ -69,33 +70,20 @@ export default function SquadSelector({
           La tua squadra ({filledCount}/3)
         </p>
         <div className="flex gap-2">
-          {lineup.map((c, i) => (
-            <button
-              key={i}
-              onClick={() => c && onRemoveSlot(i)}
-              className="flex-1 rounded-xl border-2 transition-all overflow-hidden"
-              style={{
-                height: 64,
-                borderColor: c ? 'rgba(58,157,188,0.6)' : 'rgba(255,255,255,0.12)',
-                borderStyle: c ? 'solid' : 'dashed',
-                background: c ? 'rgba(58,157,188,0.08)' : 'rgba(255,255,255,0.02)',
-              }}
-            >
-              {c ? (
-                <div className="flex items-center gap-1.5 h-full px-2">
-                  <CreatureDiorama creature={c} size={34} rounded={10} anchor="center" showAura={false} className="w-9 h-9 shrink-0" sizes="80px" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-white truncate">{c.name}</p>
-                    <p className="text-[9px]" style={{ color: RARITY_COLORS[c.rarity] }}>{c.rarity}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <span className="text-white/20 text-2xl font-light">+</span>
-                </div>
-              )}
-            </button>
-          ))}
+          {lineup.map((c, i) => {
+            const scaled = c ? scaleCombatStats({ hp: c.hp, atk: c.atk, def: c.def }, playerLevel) : null
+            return (
+              <CreatureLineupSlot
+                key={i}
+                creature={c}
+                index={i + 1}
+                hp={scaled?.hp}
+                atk={scaled?.atk}
+                def={scaled?.def}
+                onRemove={() => c && onRemoveSlot(i)}
+              />
+            )
+          })}
         </div>
       </div>
 

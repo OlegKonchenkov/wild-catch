@@ -1,5 +1,5 @@
 'use client'
-import { type CSSProperties } from 'react'
+import { type CSSProperties, useState } from 'react'
 import Image from 'next/image'
 import CreatureSprite from './CreatureSprite'
 import { resolveCreatureSprite, ELEMENT_BACKGROUND } from '@/lib/game/battle-scene'
@@ -34,6 +34,9 @@ interface Props {
   scene?: boolean
   /** next/image sizes hint for the background. */
   sizes?: string
+  /** 0..1 multiplier for the creature's element glow. Lower = crisper cutout
+   *  on a real scene (pickers); default 1 keeps the full bloom. */
+  glow?: number
   className?: string
   style?: CSSProperties
 }
@@ -62,14 +65,16 @@ const ELEMENT_TINT: Record<string, string> = {
  */
 export default function CreatureDiorama({
   creature, size = 150, aspect = '1 / 1', rounded = 20, anchor = 'bottom',
-  showAura = true, animState = 'idle', dim = 0, scene = true, sizes = '(max-width:520px) 96vw, 480px', className, style,
+  showAura = true, animState = 'idle', dim = 0, scene = true, sizes = '(max-width:520px) 96vw, 480px', glow = 1, className, style,
 }: Props) {
+  const [bgOk, setBgOk] = useState(true)
   const sprite = resolveCreatureSprite(creature)
   const hasCutout = !!creature.sprite_cutout_url
   const bg = ELEMENT_BACKGROUND[creature.element as keyof typeof ELEMENT_BACKGROUND]
   // A detailed scene photo turns muddy at small sizes — only use it when the
-  // tile is large enough; otherwise a crisp element-tinted gradient.
-  const useScene = scene && hasCutout && !!bg && size >= 56
+  // tile is large enough; otherwise a crisp element-tinted gradient. If the
+  // webp 404s mid-rollout we fall back to the gradient too (never a blank tile).
+  const useScene = scene && hasCutout && !!bg && size >= 56 && bgOk
   const tint = ELEMENT_TINT[creature.element] ?? '#3A9DBC'
 
   return (
@@ -79,7 +84,7 @@ export default function CreatureDiorama({
     >
       {useScene ? (
         <>
-          <Image src={bg!} alt="" fill sizes={sizes} quality={85} className="object-cover" />
+          <Image src={bg!} alt="" fill sizes={sizes} quality={85} className="object-cover" onError={() => setBgOk(false)} />
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 92% at 50% 28%, transparent 40%, rgba(4,6,10,0.52) 100%)' }} />
           {dim > 0 && <div className="absolute inset-0 pointer-events-none" style={{ background: `rgba(3,5,9,${Math.min(0.7, dim)})` }} />}
         </>
@@ -88,7 +93,7 @@ export default function CreatureDiorama({
       )}
       <div className={`absolute inset-0 flex justify-center ${anchor === 'bottom' ? 'items-end pb-1' : 'items-center'}`}>
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        <CreatureSprite imageUrl={sprite} name={creature.name ?? ''} size={size} element={creature.element as any} rarity={creature.rarity as any} animState={animState} showAura={showAura} />
+        <CreatureSprite imageUrl={sprite} name={creature.name ?? ''} size={size} element={creature.element as any} rarity={creature.rarity as any} animState={animState} showAura={showAura} glow={glow} />
       </div>
     </div>
   )

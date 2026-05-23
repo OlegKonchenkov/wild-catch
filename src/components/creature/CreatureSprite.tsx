@@ -15,6 +15,10 @@ interface Props {
   rarity?: string
   /** Show atmospheric aura + floor shadow (large display contexts) */
   showAura?: boolean
+  /** 0..1 multiplier for the element glow (drop-shadow halo + backlight).
+   *  1 = full dramatic glow (battle/bestiary); lower = crisper, less haze
+   *  when the creature already sits on a real scene (pickers). */
+  glow?: number
 }
 
 // Vivid accent color per element (used for drop-shadow + aura)
@@ -112,19 +116,25 @@ function idleVariant(size: number): TargetAndTransition {
 }
 
 export default function CreatureSprite({
-  imageUrl, name, animState = 'idle', size = 200, element, rarity, showAura,
+  imageUrl, name, animState = 'idle', size = 200, element, rarity, showAura, glow = 1,
 }: Props) {
   const glowColor = element ? (ELEMENT_GLOW[element] ?? '#3A9DBC') : null
   const auraAlpha = rarity ? (RARITY_ALPHA[rarity] ?? 0.25) : 0.25
   // idle is size-aware (see idleVariant); transient states stay fixed.
   const currentVariant = animState === 'idle' ? idleVariant(size) : ANIM_VARIANTS[animState]
 
-  // CSS drop-shadow: element-tinted when element known, generic dark otherwise
+  // CSS drop-shadow: element-tinted when element known, generic dark otherwise.
+  // The halo's blur radius + alpha scale with `glow` — a high glow reads as a
+  // dramatic bloom (battle), a low glow stays tight + faint so the cutout looks
+  // crisp on a real scene (pickers). A neutral dark shadow grounds it when the
+  // colored glow is dialled down.
+  const haloBlur = Math.round(size * (glow >= 0.85 ? 0.12 : 0.06))
   const dropShadow = glowColor
     ? [
-        `drop-shadow(0 ${Math.round(size * 0.055)}px ${Math.round(size * 0.12)}px ${glowColor}99)`,
-        `drop-shadow(0 0 ${Math.round(size * 0.08)}px ${glowColor}66)`,
-      ].join(' ')
+        `drop-shadow(0 ${Math.round(size * 0.055)}px ${haloBlur}px ${glowColor}${toHex2(0x99 * glow)})`,
+        glow > 0.04 ? `drop-shadow(0 0 ${Math.round(size * 0.08)}px ${glowColor}${toHex2(0x66 * glow)})` : '',
+        glow < 0.85 ? 'drop-shadow(0 3px 7px rgba(0,0,0,0.55))' : '',
+      ].filter(Boolean).join(' ')
     : 'drop-shadow(0 4px 16px rgba(0,0,0,0.75))'
 
   const spriteNode = imageUrl ? (
@@ -235,13 +245,13 @@ export default function CreatureSprite({
       className="relative flex items-center justify-center"
       style={{ width: size, height: size }}
     >
-      {/* Backlight glow */}
+      {/* Backlight glow — scales with `glow` so a picker sprite stays crisp */}
       <div
         className="absolute pointer-events-none"
         style={{
           inset: '6%',
           borderRadius: '50%',
-          background: `radial-gradient(circle at 50% 46%, ${stageColor}2e 0%, ${stageColor}12 42%, transparent 68%)`,
+          background: `radial-gradient(circle at 50% 46%, ${stageColor}${toHex2(0x2e * glow)} 0%, ${stageColor}${toHex2(0x12 * glow)} 42%, transparent 68%)`,
         }}
       />
       {/* Contact shadow — grounds the creature */}

@@ -3,9 +3,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
-import { RARITY_COLORS } from '@/lib/types'
 import type { Rarity, Element } from '@/lib/types'
-import CreatureDiorama from '@/components/creature/CreatureDiorama'
+import CreatureLineupSlot from '@/components/game/CreatureLineupSlot'
 import CreatureRosterRow from '@/components/game/CreatureRosterRow'
 import { motion, AnimatePresence } from 'framer-motion'
 import { scaleCombatStats } from '@/lib/game/combat'
@@ -531,57 +530,17 @@ export default function DuelLobbyPage() {
       <div className="flex-none px-4 pb-3">
         <div className="flex gap-2">
           {lineup.map((cr, i) => {
-            const color = cr ? RARITY_COLORS[cr.rarity] : null
             const scaled = cr ? scaleCombatStats({ hp: cr.hp, atk: cr.atk, def: cr.def }, playerLevel) : null
             return (
-              <motion.button
+              <CreatureLineupSlot
                 key={i}
-                onClick={() => cr && removeSlot(i)}
-                whileTap={cr ? { scale: 0.95 } : {}}
-                className="flex-1 rounded-2xl transition-all overflow-hidden relative"
-                style={{
-                  background: color
-                    ? `radial-gradient(circle at 50% 40%, ${color}28 0%, ${color}0e 60%, transparent 100%)`
-                    : 'rgba(255,255,255,0.04)',
-                  border: `2px solid ${color ? color + '70' : 'rgba(255,255,255,0.08)'}`,
-                  boxShadow: color ? `0 0 20px ${color}30, inset 0 0 12px ${color}10` : 'none',
-                  minHeight: 88,
-                }}
-              >
-                {cr ? (
-                  <div className="flex flex-col items-center py-2 gap-0.5">
-                    <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: color + 'aa' }}>#{i + 1}</span>
-                    <CreatureDiorama creature={cr} size={48} rounded={12} anchor="center" showAura={false} className="w-14 h-14" sizes="96px" />
-                    <span className="text-[9px] text-white/75 truncate w-full text-center px-1 leading-tight font-semibold">{cr.name}</span>
-                    {scaled && (
-                      <div className="flex items-center gap-1 mt-0.5">
-                        {([
-                          { label: 'HP', value: scaled.hp, color: '#F87171' },
-                          { label: 'ATK', value: scaled.atk, color: '#FB923C' },
-                          { label: 'DEF', value: scaled.def, color: '#60A5FA' },
-                        ] as const).map(stat => (
-                          <span
-                            key={stat.label}
-                            className="text-[8px] font-bold px-1 py-0.5 rounded-md"
-                            style={{
-                              color: stat.color,
-                              background: `${stat.color}14`,
-                              border: `1px solid ${stat.color}22`,
-                            }}
-                          >
-                            {stat.label} {stat.value}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-[88px] gap-1">
-                    <span className="text-2xl text-white/10">+</span>
-                    <span className="text-[9px] text-white/20">Slot {i + 1}</span>
-                  </div>
-                )}
-              </motion.button>
+                creature={cr}
+                index={i + 1}
+                hp={scaled?.hp}
+                atk={scaled?.atk}
+                def={scaled?.def}
+                onRemove={() => cr && removeSlot(i)}
+              />
             )
           })}
         </div>
