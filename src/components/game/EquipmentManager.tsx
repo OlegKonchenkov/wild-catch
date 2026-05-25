@@ -7,6 +7,20 @@ import { EQUIPMENT_SLOTS, EQUIPMENT_SLOT_META } from '@/lib/game/equipment'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { EquipmentSlot, Rarity } from '@/lib/types'
+import { type IconType } from 'react-icons'
+import { GiBroadsword, GiBreastplate, GiHelmet, GiRing } from 'react-icons/gi'
+
+const SLOT_ICON: Record<EquipmentSlot, IconType> = {
+  arma: GiBroadsword,
+  corazza: GiBreastplate,
+  elmo: GiHelmet,
+  accessorio: GiRing,
+}
+
+function SlotGlyph({ slot, size }: { slot: EquipmentSlot; size: number }) {
+  const Icon = SLOT_ICON[slot]
+  return <Icon size={size} color={EQUIPMENT_SLOT_META[slot].color} style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.4))' }} />
+}
 
 interface EquipItemInfo {
   id: string
@@ -162,7 +176,7 @@ export default function EquipmentManager({
                 style={{ background: `${meta.color}14` }}>
                 {it?.image_url
                   ? <img src={it.image_url} alt="" className="w-full h-full object-contain p-1" />
-                  : <span className="text-xl">{meta.emoji}</span>}
+                  : <SlotGlyph slot={slot} size={22} />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-bold text-white/35 uppercase tracking-wider">{meta.label}</p>
@@ -220,8 +234,8 @@ export default function EquipmentManager({
               initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-white text-sm">
-                  {EQUIPMENT_SLOT_META[pickerSlot].emoji} Scegli — {EQUIPMENT_SLOT_META[pickerSlot].label}
+                <h3 className="font-bold text-white text-sm inline-flex items-center gap-1.5">
+                  <SlotGlyph slot={pickerSlot} size={16} /> Scegli — {EQUIPMENT_SLOT_META[pickerSlot].label}
                 </h3>
                 <button onClick={() => setPickerSlot(null)} className="text-white/40 hover:text-white text-xl leading-none">✕</button>
               </div>
@@ -243,7 +257,7 @@ export default function EquipmentManager({
                           <div className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center overflow-hidden bg-white/5">
                             {it.image_url
                               ? <img src={it.image_url} alt="" className="w-full h-full object-contain p-1" />
-                              : <span className="text-lg">{EQUIPMENT_SLOT_META[pickerSlot].emoji}</span>}
+                              : <SlotGlyph slot={pickerSlot} size={18} />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">

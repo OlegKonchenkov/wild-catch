@@ -15,6 +15,8 @@ import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { GameGridSkeleton } from '@/components/game/GameLoading'
 import EquipmentManager from '@/components/game/EquipmentManager'
 import EnigmaFragmentPanel from '@/components/game/EnigmaFragmentPanel'
+import { GiSpellBook, GiOpenBook, GiBreastplate, GiPuzzle } from 'react-icons/gi'
+import ElementIcon from '@/components/ui/ElementIcon'
 
 const RARITY_ORDER = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico']
 const MYSTERY_HINTS: Record<string, string> = {
@@ -330,7 +332,7 @@ export default function BestiaryPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto" style={{ background: 'radial-gradient(120% 65% at 50% 0%, #122c3e 0%, #0a1a26 45%, #060f17 100%)' }}>
       {/* Modale debolezze elementali */}
       <AnimatePresence>
         {showWeakness && (
@@ -350,18 +352,18 @@ export default function BestiaryPage() {
                 <div className="space-y-2">
                   {Object.entries(ELEM_TABLE).map(([el, { strong, weak }]) => (
                     <div key={el} className="bg-white/5 rounded-xl px-3 py-2.5 flex items-center gap-3">
-                      <span className="text-xl w-8 text-center">{ELEM_META[el].emoji}</span>
+                      <span className="w-8 flex justify-center"><ElementIcon element={el} size={20} /></span>
                       <div className="flex-1">
                         <p className="text-xs text-white/60 font-semibold">{ELEM_META[el].label}</p>
                         <div className="flex gap-1 mt-0.5 flex-wrap">
                           {strong.map(s => (
-                            <span key={s} className="text-[10px] bg-[#34D399]/15 text-[#34D399] px-1.5 py-0.5 rounded">
-                              ↑ {ELEM_META[s].emoji}
+                            <span key={s} className="text-[10px] bg-[#34D399]/15 text-[#34D399] px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
+                              ↑ <ElementIcon element={s} size={11} />
                             </span>
                           ))}
                           {weak.map(w => (
-                            <span key={w} className="text-[10px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded">
-                              ↓ {ELEM_META[w].emoji}
+                            <span key={w} className="text-[10px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
+                              ↓ <ElementIcon element={w} size={11} />
                             </span>
                           ))}
                         </div>
@@ -417,12 +419,13 @@ export default function BestiaryPage() {
       `}</style>
 
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#0A1520]/96 backdrop-blur-md px-4 pt-3 pb-2.5 border-b border-white/5">
+      <div className="sticky top-0 z-10 px-4 pt-3 pb-2.5" style={{ background: 'rgba(12,29,44,0.78)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(247,200,65,0.16)' }}>
 
         {/* Row 1: title + progress */}
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-white tracking-tight">DaimonDex</h1>
+            <GiSpellBook size={20} color="#B98BF0" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />
+            <h1 className="wc-display wc-gold-text" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '0.02em' }}>DaimonDex</h1>
             <button
               onClick={() => setShowWeakness(true)}
               aria-label="Forze e debolezze"
@@ -432,15 +435,15 @@ export default function BestiaryPage() {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <p className="text-xs text-white/40">
-              <span className="text-[#3A9DBC] font-bold">{caughtCount}</span>
-              <span className="text-white/25">/{creatures.length}</span>
+            <p className="text-xs">
+              <span className="wc-display font-bold" style={{ color: '#5FD0E0', fontSize: 14 }}>{caughtCount}</span>
+              <span className="text-white/30">/{creatures.length}</span>
             </p>
-            {/* Mini progress ring-style bar */}
-            <div className="w-16 h-1 bg-white/8 rounded-full overflow-hidden">
+            {/* Mini progress bar */}
+            <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 1px rgba(0,0,0,0.3)' }}>
               <motion.div
                 className="h-full rounded-full"
-                style={{ background: 'linear-gradient(90deg, #3A9DBC, #34D399)' }}
+                style={{ background: 'linear-gradient(90deg, #46BAD8, #34D399)', boxShadow: '0 0 8px rgba(70,186,216,0.6)' }}
                 initial={{ width: 0 }}
                 animate={{ width: `${creatures.length ? (caughtCount / creatures.length) * 100 : 0}%` }}
                 transition={{ duration: 0.8, ease: 'easeOut' }}
@@ -525,10 +528,9 @@ export default function BestiaryPage() {
                   {([['all', 'Tutti'], ['caught', 'Catturati'], ['missing', 'Mancanti']] as const).map(([v, l]) => (
                     <button key={v} onClick={() => setFilter(v)}
                       className="flex-1 text-xs py-1.5 rounded-lg font-semibold transition-all cursor-pointer"
-                      style={{
-                        background: filter === v ? '#3A9DBC' : 'rgba(255,255,255,0.05)',
-                        color: filter === v ? 'white' : 'rgba(255,255,255,0.38)',
-                      }}>
+                      style={filter === v
+                        ? { background: 'linear-gradient(180deg, #56C8E0, #2a7d98)', color: 'white', boxShadow: '0 0 10px rgba(70,186,216,0.4)' }
+                        : { background: 'rgba(255,255,255,0.05)', color: 'var(--wc-ink-dim)' }}>
                       {l}
                     </button>
                   ))}
@@ -557,16 +559,15 @@ export default function BestiaryPage() {
                 <div className="flex gap-1.5">
                   {(['all', 'fiamma', 'adriatico', 'bosco', 'terra', 'armonia'] as const).map(el => {
                     const active = elementFilter === el
-                    const emoji = el !== 'all' ? ELEM_META[el]?.emoji : null
                     return (
                       <button key={el} onClick={() => setElementFilter(el)}
-                        className="flex-1 text-[10px] py-1 rounded-lg font-semibold transition-all cursor-pointer"
+                        className="flex-1 flex items-center justify-center text-[10px] py-1.5 rounded-lg font-semibold transition-all cursor-pointer"
                         style={{
                           background: active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
-                          color: active ? 'white' : 'rgba(255,255,255,0.28)',
+                          color: active ? 'white' : 'rgba(255,255,255,0.4)',
                           border: `1px solid ${active ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.06)'}`,
                         }}>
-                        {el === 'all' ? 'Elem.' : emoji}
+                        {el === 'all' ? 'Elem.' : <ElementIcon element={el} size={15} />}
                       </button>
                     )
                   })}
@@ -624,7 +625,7 @@ export default function BestiaryPage() {
                         ) : cr.image_url ? (
                           <img src={cr.image_url} alt={cr.name} className="absolute inset-0 w-full h-full object-contain p-1" />
                         ) : (
-                          <span className="absolute inset-0 flex items-center justify-center text-2xl">{ELEMENT_EMOJI[cr.element]}</span>
+                          <span className="absolute inset-0 flex items-center justify-center"><ElementIcon element={cr.element} size={26} /></span>
                         )}
                         {/* Bottom gradient + name */}
                         <div className="absolute bottom-0 left-0 right-0 px-1 pb-0.5 pt-3"
@@ -837,7 +838,7 @@ export default function BestiaryPage() {
                     <p className="text-[11px] font-bold truncate flex-1 leading-tight" style={{ color: caught ? 'white' : '#666' }}>
                       {caught ? creature.name : '???'}
                     </p>
-                    {caught && <span className="text-[10px] shrink-0 leading-none">{ELEMENT_EMOJI[creature.element]}</span>}
+                    {caught && <ElementIcon element={creature.element} size={12} className="shrink-0" />}
                   </div>
                   {caught && (
                     <p className="text-[8px] font-semibold mt-0.5 leading-none capitalize truncate" style={{ color: canEvolve ? '#F7C841' : rarityColor }}>
@@ -949,7 +950,7 @@ export default function BestiaryPage() {
                           {/* overlaid info plate */}
                           <div className="absolute inset-x-0 bottom-0 px-4 pb-4">
                             <div className="flex items-center gap-2">
-                              <h3 className="text-[24px] font-black text-white leading-none tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.75)' }}>{creature.name}</h3>
+                              <h3 className="wc-display text-[24px] font-bold text-white leading-none tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.75)' }}>{creature.name}</h3>
                               {inSquad && (
                                 <span className="shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black" style={{ background: isCap ? 'rgba(58,188,168,0.92)' : 'rgba(255,255,255,0.18)', color: isCap ? '#06121a' : '#fff' }}>
                                   {isCap ? '⚔ CAP' : `· ${squad.indexOf(pc!.id) + 1}`}
@@ -958,7 +959,7 @@ export default function BestiaryPage() {
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 mt-2">
                               <span className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-semibold" style={{ background: 'rgba(0,0,0,0.42)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(4px)' }}>
-                                {ELEMENT_EMOJI[creature.element]}<span className="capitalize">{creature.element}</span>
+                                <ElementIcon element={creature.element} size={13} /><span className="capitalize">{creature.element}</span>
                               </span>
                               <span className="text-[11px] px-2.5 py-1 rounded-full font-bold" style={{ background: `${rarityColor}2e`, color: '#fff', border: `1px solid ${rarityColor}`, backdropFilter: 'blur(4px)' }}>
                                 {RARITY_LABELS[creature.rarity]}
@@ -966,11 +967,11 @@ export default function BestiaryPage() {
                               {pc != null && pc.duplicates_count > 1 && (
                                 <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold" style={{ background: 'rgba(0,0,0,0.42)', color: '#60CDDD', border: '1px solid rgba(96,205,221,0.4)', backdropFilter: 'blur(4px)' }}>×{pc.duplicates_count}</span>
                               )}
-                              <span className="ml-auto flex flex-col items-end gap-0.5" title="Difficoltà di cattura · catturabilità base">
-                                <span className="text-[13px] tracking-[1px]" style={{ color: '#F4D27A', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-                                  {'★'.repeat(diff)}<span style={{ color: 'rgba(255,255,255,0.28)' }}>{'★'.repeat(5 - diff)}</span>
+                              <span className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.42)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(4px)' }} title="Difficoltà di cattura · catturabilità base">
+                                <span className="text-[12px] tracking-[0.5px] leading-none" style={{ color: '#F4D27A' }}>
+                                  {'★'.repeat(diff)}<span style={{ color: 'rgba(255,255,255,0.26)' }}>{'★'.repeat(5 - diff)}</span>
                                 </span>
-                                <span className="text-[9px] font-extrabold leading-none" style={{ color: '#7FE0A0', textShadow: '0 1px 2px rgba(0,0,0,0.85)' }}>{catchPct}% base</span>
+                                <span className="text-[10px] font-extrabold leading-none" style={{ color: '#7FE0A0' }}>{catchPct}%</span>
                               </span>
                             </div>
                           </div>
@@ -995,7 +996,7 @@ export default function BestiaryPage() {
                   {!(caught && creature.sprite_cutout_url) && (
                   <div className="px-5 pb-5">
                     <div className="flex items-start gap-2 mb-2">
-                      <h3 className="text-[22px] font-black text-white leading-tight flex-1 tracking-tight">
+                      <h3 className="wc-display text-[22px] font-bold text-white leading-tight flex-1 tracking-tight">
                         {caught ? creature.name : '? ? ?'}
                       </h3>
                       {caught && squad.includes(pc.id) && (
@@ -1015,7 +1016,7 @@ export default function BestiaryPage() {
                         {/* Element */}
                         <span className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-semibold"
                           style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                          {ELEMENT_EMOJI[creature.element]}
+                          <ElementIcon element={creature.element} size={13} />
                           <span className="capitalize">{creature.element}</span>
                         </span>
                         {/* Rarity */}
@@ -1045,9 +1046,9 @@ export default function BestiaryPage() {
                       {/* Tab bar */}
                       <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
                         {([
-                          { id: 'panoramica' as const, label: 'Info',   icon: '📖', accent: '58,188,168',  fg: '#3ABCA8' },
-                          { id: 'equip'      as const, label: 'Equip',  icon: '🛡️', accent: '58,188,168',  fg: '#3ABCA8' },
-                          { id: 'enigma'     as const, label: 'Enigma', icon: '🧩', accent: '123,77,184',  fg: '#C084FC' },
+                          { id: 'panoramica' as const, label: 'Info',   Icon: GiOpenBook,    accent: '58,188,168',  fg: '#3ABCA8' },
+                          { id: 'equip'      as const, label: 'Equip',  Icon: GiBreastplate, accent: '58,188,168',  fg: '#3ABCA8' },
+                          { id: 'enigma'     as const, label: 'Enigma', Icon: GiPuzzle,      accent: '123,77,184',  fg: '#C084FC' },
                         ]).map(t => {
                           const active = detailTab === t.id
                           return (
@@ -1057,7 +1058,7 @@ export default function BestiaryPage() {
                               style={active
                                 ? { background: `rgba(${t.accent},0.18)`, color: t.fg, border: `1px solid rgba(${t.accent},0.4)` }
                                 : { color: 'rgba(255,255,255,0.4)', border: '1px solid transparent' }}>
-                              <span className="text-sm leading-none">{t.icon}</span>{t.label}
+                              <t.Icon size={15} />{t.label}
                             </button>
                           )
                         })}
