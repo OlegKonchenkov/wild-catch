@@ -7,6 +7,8 @@ import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
 import { createClient } from '@/lib/supabase/client'
 import { TUTORIAL_SESSION_ID } from '@/lib/game/tutorial'
+import { type IconType } from 'react-icons'
+import { GiRoundStar, GiUpgrade, GiTrophyCup, GiPawPrint, GiTwoCoins, GiCrossedSwords } from 'react-icons/gi'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,13 +47,13 @@ const MEDAL: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
 
 // ─── StatBox ──────────────────────────────────────────────────────────────────
 
-function StatBox({ label, value, color, icon }: {
-  label: string; value: string | number; color: string; icon: string
+function StatBox({ label, value, color, Icon }: {
+  label: string; value: string | number; color: string; Icon: IconType
 }) {
   return (
     <div className="flex flex-col items-center justify-center bg-black/25 rounded-xl py-2.5 px-1.5 text-center">
-      <p className="font-extrabold text-base leading-none" style={{ color }}>{value}</p>
-      <p className="text-[10px] text-white/35 mt-1 leading-tight">{icon} {label}</p>
+      <p className="wc-display font-extrabold text-base leading-none" style={{ color }}>{value}</p>
+      <p className="inline-flex items-center justify-center gap-1 text-[10px] text-white/35 mt-1 leading-tight"><Icon size={11} color={color} /> {label}</p>
     </div>
   )
 }
@@ -185,12 +187,12 @@ function ProfileContent() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full overflow-y-auto pb-8 relative">
+    <div className="h-full overflow-y-auto pb-8 relative" style={{ background: 'radial-gradient(120% 80% at 50% 0%, #122c3e 0%, #0a1a26 45%, #060f17 100%)' }}>
 
       {/* Session-ended banner */}
       {sessionEnded && (
         <div className="bg-[#7B4DB8]/20 border-b border-[#7B4DB8]/40 px-4 py-3 text-center">
-          <p className="text-lg font-bold text-white">🏆 Evento Terminato!</p>
+          <p className="inline-flex items-center gap-2 text-lg font-bold text-white"><GiTrophyCup size={20} color="#FBBF24" /> Evento Terminato!</p>
           <p className="text-white/50 text-xs mt-0.5">La classifica finale è stata generata</p>
         </div>
       )}
@@ -256,21 +258,21 @@ function ProfileContent() {
               Le tue statistiche
             </p>
             <div className="grid grid-cols-3 gap-2">
-              <StatBox label="EXP"     value={session.exp.toLocaleString('it-IT')}  color="#F7C841" icon="✨" />
-              <StatBox label="Livello" value={session.level}                         color="#3A9DBC" icon="⬆️" />
+              <StatBox label="EXP"     value={session.exp.toLocaleString('it-IT')}  color="#F7C841" Icon={GiRoundStar} />
+              <StatBox label="Livello" value={session.level}                         color="#3A9DBC" Icon={GiUpgrade} />
               <StatBox
                 label="Classifica"
                 value={loadingBoard ? '…' : myRank ? (MEDAL[myRank] ?? `#${myRank}`) : '—'}
-                color="#C084FC" icon="🏆"
+                color="#C084FC" Icon={GiTrophyCup}
               />
-              <StatBox label="Creature"  value={session.creatures_caught}            color="#34D399" icon="🐾" />
-              <StatBox label="Oro"       value={session.gold.toLocaleString('it-IT')} color="#D4A96A" icon="🪙" />
+              <StatBox label="Creature"  value={session.creatures_caught}            color="#34D399" Icon={GiPawPrint} />
+              <StatBox label="Oro"       value={session.gold.toLocaleString('it-IT')} color="#D4A96A" Icon={GiTwoCoins} />
               <StatBox
                 label={`Duelli ${session.duel_wins}/${session.duel_total}`}
                 value={session.duel_total > 0
                   ? `${Math.round((session.duel_wins / session.duel_total) * 100)}%`
                   : '—'}
-                color="#E85D2F" icon="⚔️"
+                color="#E85D2F" Icon={GiCrossedSwords}
               />
             </div>
           </div>

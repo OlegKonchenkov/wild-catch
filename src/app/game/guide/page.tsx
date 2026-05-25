@@ -2,6 +2,9 @@
 import { useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
+import { type IconType } from 'react-icons'
+import { GiCompass, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower, GiStandingPotion, GiHealthPotion } from 'react-icons/gi'
+import ElementIcon from '@/components/ui/ElementIcon'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -156,7 +159,7 @@ function ElementChart() {
       {ELEMENTS.map(el => (
         <div key={el.name} className="rounded-xl border border-white/10 bg-white/4 px-3 py-2.5">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-base">{el.icon}</span>
+            <ElementIcon element={el.name.toLowerCase()} size={18} />
             <span className="font-bold text-sm" style={{ color: el.color }}>{el.name}</span>
           </div>
           <div className="flex flex-wrap gap-1.5 text-[11px]">
@@ -192,13 +195,13 @@ function ElementChart() {
 
 // ─── Items grid ───────────────────────────────────────────────────────────────
 
-const ITEMS = [
-  { icon: '🎯', name: 'Rete',       color: '#3A9DBC', where: 'Negozio / Kit iniziale', how: 'Automatica durante incontro', desc: 'Aumenta la probabilità di cattura. Usata in automatico durante ogni incontro. Più è rara, più sarà efficace.' },
-  { icon: '🍖', name: 'Esca',       color: '#34D399', where: 'Negozio / QR',           how: 'Zaino → "Usa"',            desc: 'Attira creature più rare nelle vicinanze per 10 minuti. Comparirà una notifica nell\'app quando è attiva.' },
-  { icon: '🥚', name: 'Uovo',       color: '#C084FC', where: 'QR code fisici',         how: 'Zaino → sezione Uova',     desc: 'Si schiude dopo aver percorso un certo numero di passi (o subito se non richiede passi). Contiene una creatura a sorpresa.' },
-  { icon: '⚔️', name: 'Battaglia',  color: '#FBBF24', where: 'Negozio',               how: 'Automatica in duello/boss', desc: 'Potenzia l\'ATK della tua creatura durante duelli PvP e boss fight. Usata automaticamente al momento dello scontro.' },
-  { icon: '🧪', name: 'Pozione',    color: '#F472B6', where: 'Negozio',               how: 'Automatica in duello',      desc: 'Neutralizza la debolezza elementale — la tua creatura non subisce il malus ×0.5 contro gli elementi avversi.' },
-  { icon: '💊', name: 'Cura',       color: '#34D399', where: 'Negozio',               how: 'Automatica in duello',      desc: 'Ripristina una quota di HP alla tua creatura all\'inizio di ogni turno di battaglia.' },
+const ITEMS: { Icon: IconType; name: string; color: string; where: string; how: string; desc: string }[] = [
+  { Icon: GiFishingNet,     name: 'Rete',       color: '#3A9DBC', where: 'Negozio / Kit iniziale', how: 'Automatica durante incontro', desc: 'Aumenta la probabilità di cattura. Usata in automatico durante ogni incontro. Più è rara, più sarà efficace.' },
+  { Icon: GiFishingLure,    name: 'Esca',       color: '#34D399', where: 'Negozio / QR',           how: 'Zaino → "Usa"',            desc: 'Attira creature più rare nelle vicinanze per 10 minuti. Comparirà una notifica nell\'app quando è attiva.' },
+  { Icon: GiEggClutch,      name: 'Uovo',       color: '#C084FC', where: 'QR code fisici',         how: 'Zaino → sezione Uova',     desc: 'Si schiude dopo aver percorso un certo numero di passi (o subito se non richiede passi). Contiene una creatura a sorpresa.' },
+  { Icon: GiSwordsPower,    name: 'Battaglia',  color: '#FBBF24', where: 'Negozio',               how: 'Automatica in duello/boss', desc: 'Potenzia l\'ATK della tua creatura durante duelli PvP e boss fight. Usata automaticamente al momento dello scontro.' },
+  { Icon: GiStandingPotion, name: 'Pozione',    color: '#F472B6', where: 'Negozio',               how: 'Automatica in duello',      desc: 'Neutralizza la debolezza elementale — la tua creatura non subisce il malus ×0.5 contro gli elementi avversi.' },
+  { Icon: GiHealthPotion,   name: 'Cura',       color: '#34D399', where: 'Negozio',               how: 'Automatica in duello',      desc: 'Ripristina una quota di HP alla tua creatura all\'inizio di ogni turno di battaglia.' },
 ]
 
 function ItemsGrid() {
@@ -208,7 +211,7 @@ function ItemsGrid() {
         <div key={item.name} className="rounded-xl border px-3 py-2.5"
           style={{ borderColor: item.color + '30', background: item.color + '0a' }}>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xl">{item.icon}</span>
+            <item.Icon size={20} color={item.color} />
             <span className="font-bold text-sm text-white">{item.name}</span>
             <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-md font-bold"
               style={{ background: item.color + '22', color: item.color }}>
@@ -975,14 +978,14 @@ export default function GuidePage() {
   }
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto bg-[#0F1F2E]">
+    <div ref={containerRef} className="h-full overflow-y-auto" style={{ background: 'radial-gradient(120% 70% at 50% 0%, #122c3e 0%, #0a1a26 45%, #060f17 100%)' }}>
       <div className="sticky top-0 z-20 bg-[#0F1F2E]/95 backdrop-blur-md border-b border-white/8">
         <div className="px-4 py-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#3A9DBC]/20 border border-[#3A9DBC]/40 flex items-center justify-center text-lg flex-shrink-0">
-            📖
+          <div className="w-9 h-9 rounded-xl bg-[#3A9DBC]/20 border border-[#3A9DBC]/40 flex items-center justify-center flex-shrink-0">
+            <GiCompass size={20} color="#46bad8" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />
           </div>
           <div className="flex-1">
-            <h1 className="text-base font-bold text-white leading-tight">Guida Giocatore</h1>
+            <h1 className="wc-display wc-gold-text text-lg font-bold leading-tight" style={{ letterSpacing: '0.01em' }}>Guida Giocatore</h1>
             <p className="text-xs text-[#3A9DBC]/80">Come funziona Daimon</p>
           </div>
           {/* Search toggle icon */}

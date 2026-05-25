@@ -7,6 +7,7 @@ import type { Rarity, Element } from '@/lib/types'
 import CreatureLineupSlot from '@/components/game/CreatureLineupSlot'
 import CreatureRosterRow from '@/components/game/CreatureRosterRow'
 import { motion, AnimatePresence } from 'framer-motion'
+import { GiCrossedSwords, GiCrown, GiScrollUnfurled } from 'react-icons/gi'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
@@ -75,7 +76,7 @@ function useHistory(supabase: ReturnType<typeof createClient>) {
           type: 'duel',
           date: d.ended_at ?? d.started_at ?? '',
           result: isCancelled ? 'unknown' : (d.winner_id === user.id ? 'won' : 'lost'),
-          label: oppNick ? `⚔️ vs ${oppNick}` : `Duello · ${d.room_code ?? '—'}`,
+          label: oppNick ? `vs ${oppNick}` : `Duello · ${d.room_code ?? '—'}`,
           detail: isCancelled ? 'Annullato' : d.winner_id === user.id ? 'Vittoria' : 'Sconfitta',
         }
       })
@@ -87,7 +88,7 @@ function useHistory(supabase: ReturnType<typeof createClient>) {
           type: 'boss',
           date: b.ended_at ?? b.started_at ?? '',
           result: b.status === 'won' ? 'won' : 'lost',
-          label: `👑 ${bossName}`,
+          label: `${bossName}`,
           detail: b.status === 'won' ? 'Vittoria' : 'Sconfitta',
         }
       })
@@ -301,7 +302,7 @@ export default function DuelLobbyPage() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden relative">
+    <div className="flex flex-col h-full overflow-hidden relative" style={{ background: 'radial-gradient(120% 70% at 50% 0%, #2a1410 0%, #150a12 45%, #0a0710 100%)' }}>
       {/* Toast — fixed above everything */}
       <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
         <div className="pointer-events-auto">
@@ -311,8 +312,9 @@ export default function DuelLobbyPage() {
 
       {/* Header + tabs — single compact row */}
       <div className="flex-none px-4 pt-3 pb-2 flex items-center gap-3">
-        <h1 className="text-base font-extrabold text-white shrink-0 flex items-center gap-1.5">
-          <span className="text-[#E85D2F]">⚔️</span> Duelli
+        <h1 className="shrink-0 flex items-center gap-1.5">
+          <GiCrossedSwords size={20} color="#E85D2F" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />
+          <span className="wc-display wc-gold-text text-lg font-bold">Duelli</span>
         </h1>
         <div className="flex flex-1 gap-1 bg-white/5 rounded-xl p-1">
           {(['arena', 'storico'] as const).map(tab => (
@@ -325,7 +327,11 @@ export default function DuelLobbyPage() {
                 color: activeTab === tab ? 'white' : 'rgba(255,255,255,0.4)',
               }}
             >
-              {tab === 'arena' ? '⚔️ Arena' : '📜 Storico'}
+              <span className="inline-flex items-center justify-center gap-1.5">
+                {tab === 'arena'
+                  ? <><GiCrossedSwords size={13} /> Arena</>
+                  : <><GiScrollUnfurled size={13} /> Storico</>}
+              </span>
             </button>
           ))}
         </div>
@@ -378,7 +384,7 @@ export default function DuelLobbyPage() {
                       className="w-full flex items-center gap-3 px-3 py-3 text-left active:bg-white/5 transition-colors"
                       style={{ background: isWon ? 'rgba(52,211,153,0.08)' : isLost ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)' }}
                     >
-                      <span className="text-2xl shrink-0">{isBoss ? '👑' : '⚔️'}</span>
+                      <span className="shrink-0">{isBoss ? <GiCrown size={24} color="#FBBF24" /> : <GiCrossedSwords size={24} color="#E85D2F" />}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-white truncate">{entry.label}</p>
                         <p className="text-[11px] text-white/40 mt-0.5">{time}</p>
@@ -484,7 +490,7 @@ export default function DuelLobbyPage() {
             style={{ background: 'rgba(232,93,47,0.12)', border: '1px solid rgba(232,93,47,0.35)' }}
           >
             <div className="flex items-center gap-3 px-4 py-3">
-              <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }} className="text-xl shrink-0">⚔️</motion.div>
+              <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }} className="shrink-0"><GiCrossedSwords size={22} color="#E85D2F" /></motion.div>
               <button onClick={() => router.push(`/game/duel/${activeDuel.id}`)} className="flex-1 text-left min-w-0">
                 <p className="text-sm font-extrabold text-[#E85D2F]">Duello in corso</p>
                 <p className="text-xs text-white/50 truncate">{activeDuel.roomCode ? `Stanza ${activeDuel.roomCode}` : 'Tocca per rientrare'}</p>
@@ -516,7 +522,7 @@ export default function DuelLobbyPage() {
 
       {noCreatures ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-2 mx-auto text-4xl">⚔️</div>
+          <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-2 mx-auto"><GiCrossedSwords size={40} color="#E85D2F" /></div>
           <p className="text-white font-bold text-lg">Nessuna creatura disponibile</p>
           <p className="text-white/50 text-sm leading-relaxed">Cattura almeno una creatura prima di sfidare qualcuno.</p>
           <button onClick={() => router.push('/game/map')}
@@ -602,7 +608,7 @@ export default function DuelLobbyPage() {
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
           ) : (
             <span className="flex items-center justify-center gap-2">
-              ⚔️ {filledCount < 3 && filledCount > 0 ? `Crea Sfida (${filledCount}/3)` : 'Crea Sfida'}
+              <GiCrossedSwords size={17} color="#fff" /> {filledCount < 3 && filledCount > 0 ? `Crea Sfida (${filledCount}/3)` : 'Crea Sfida'}
             </span>
           )}
         </button>
