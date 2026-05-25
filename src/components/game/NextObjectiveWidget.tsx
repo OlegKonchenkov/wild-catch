@@ -2,6 +2,8 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
+import { type IconType } from 'react-icons'
+import { GiPawPrint, GiCrossedSwords, GiMagnifyingGlass, GiFootprint, GiKnapsack, GiBullseye } from 'react-icons/gi'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
 import useTweenedInteger from '@/hooks/useTweenedInteger'
@@ -18,12 +20,12 @@ export interface NextObjective {
   chapter_order: number | null
 }
 
-const TYPE_META: Record<string, { icon: string; verb: string }> = {
-  cattura:  { icon: '🐾', verb: 'Cattura' },
-  duel:     { icon: '⚔️', verb: 'Vinci'   },
-  qr:       { icon: '📷', verb: 'Scansiona' },
-  walk:     { icon: '🚶', verb: 'Cammina'  },
-  collect:  { icon: '🎒', verb: 'Raccogli' },
+const TYPE_META: Record<string, { Icon: IconType; verb: string }> = {
+  cattura:  { Icon: GiPawPrint,        verb: 'Cattura' },
+  duel:     { Icon: GiCrossedSwords,   verb: 'Vinci'   },
+  qr:       { Icon: GiMagnifyingGlass, verb: 'Scansiona' },
+  walk:     { Icon: GiFootprint,       verb: 'Cammina'  },
+  collect:  { Icon: GiKnapsack,        verb: 'Raccogli' },
 }
 
 /**
@@ -187,7 +189,8 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
 
   if (!loaded || !objective) return null
 
-  const meta = TYPE_META[objective.type] ?? { icon: '🎯', verb: 'Completa' }
+  const meta = TYPE_META[objective.type] ?? { Icon: GiBullseye, verb: 'Completa' }
+  const TileIcon = meta.Icon
   const pct = target > 0 ? Math.min(100, (tweenedProgress / target) * 100) : 0
   // Variable kept for the JSX below — `progress` is shown alongside the
   // bar (e.g. "12/50 m"). Use the tweened value so the number and bar
@@ -217,10 +220,10 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
         data-testid="next-objective-widget"
       >
         <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
+          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
           style={{ background: 'rgba(58,188,168,0.15)', border: '1px solid rgba(58,188,168,0.3)' }}
         >
-          {meta.icon}
+          <TileIcon size={18} color="#5FD0BF" style={{ filter: 'drop-shadow(0 0 4px rgba(58,188,168,0.4))' }} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">

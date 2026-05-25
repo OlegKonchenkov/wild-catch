@@ -18,6 +18,7 @@ import { haversineDistance } from '@/lib/game/anti-cheat'
 import useTweenedInteger from '@/hooks/useTweenedInteger'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
+import ElementIcon from '@/components/ui/ElementIcon'
 import EggHatchModal from '@/components/game/EggHatchModal'
 import Coachmark, { type CoachmarkStep } from '@/components/game/Coachmark'
 import NextObjectiveWidget from '@/components/game/NextObjectiveWidget'
@@ -1956,9 +1957,12 @@ function MapPageInner() {
           />
           <div className="px-0.5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35">Creatura selvatica</p>
-            <p className="font-bold text-white truncate text-lg leading-tight">{pendingEncounter.creature.name}</p>
-            <p className="text-sm text-[#3A9DBC]">
-              {pendingEncounter.creature.element} · {RARITY_LABELS[pendingEncounter.creature.rarity as keyof typeof RARITY_LABELS]}
+            <p className="wc-display font-bold text-white truncate text-lg leading-tight">{pendingEncounter.creature.name}</p>
+            <p className="text-sm text-[#3A9DBC] flex items-center gap-1.5">
+              <ElementIcon element={pendingEncounter.creature.element} size={14} />
+              <span className="capitalize">{pendingEncounter.creature.element}</span>
+              <span className="text-white/30">·</span>
+              {RARITY_LABELS[pendingEncounter.creature.rarity as keyof typeof RARITY_LABELS]}
             </p>
           </div>
           <div className="flex gap-2 mt-3">
@@ -1979,7 +1983,8 @@ function MapPageInner() {
                 sessionStorage.removeItem('wc:pending_popup')
                 router.push(`/game/encounter/${pendingEncounter.encounterId}`)
               }}
-              className="flex-1 bg-[#E85D2F] text-white font-bold py-3 rounded-xl"
+              className="flex-1 text-white font-extrabold py-3 rounded-xl transition-all active:scale-[0.98]"
+              style={{ background: 'linear-gradient(135deg, #E85D2F 0%, #c94a20 100%)', boxShadow: '0 4px 18px rgba(232,93,47,0.4)' }}
             >
               AFFRONTA
             </button>

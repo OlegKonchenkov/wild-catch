@@ -517,21 +517,27 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
       {playerPosition && (
         <button
           onClick={handleRecenter}
-          className="absolute bottom-20 right-4 z-[500] w-11 h-11 rounded-full shadow-lg flex items-center justify-center transition-colors"
+          className="absolute bottom-20 right-4 z-[500] w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-95"
           style={{
-            background: following ? '#3A9DBC' : 'rgba(15,31,46,0.92)',
-            border: following ? '2px solid #3A9DBC' : '2px solid rgba(255,255,255,0.2)',
+            background: following
+              ? 'linear-gradient(135deg, #3A9DBC 0%, #2a7a99 100%)'
+              : 'rgba(10,20,35,0.82)',
+            border: following ? '1.5px solid rgba(58,157,188,0.7)' : '1.5px solid rgba(58,157,188,0.55)',
+            backdropFilter: 'blur(10px)',
+            boxShadow: following
+              ? '0 0 20px rgba(58,157,188,0.5), 0 4px 14px rgba(0,0,0,0.5)'
+              : '0 0 14px rgba(58,157,188,0.16), 0 4px 14px rgba(0,0,0,0.5)',
           }}
           title={following ? 'Segue la tua posizione' : 'Centra su di me'}
         >
           {following ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' }}>
               <circle cx="12" cy="12" r="3" fill="white" stroke="none"/>
               <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
               <circle cx="12" cy="12" r="8" strokeDasharray="2 4"/>
             </svg>
           ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#46bad8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"/>
               <line x1="12" y1="2" x2="12" y2="6"/>
               <line x1="12" y1="18" x2="12" y2="22"/>

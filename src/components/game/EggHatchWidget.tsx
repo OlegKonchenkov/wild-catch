@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { GiEggClutch } from 'react-icons/gi'
 import useTweenedInteger from '@/hooks/useTweenedInteger'
 
 /**
@@ -139,7 +140,7 @@ export default function EggHatchWidget({ sessionId }: { sessionId: string | null
         }}
         data-testid="egg-hatch-widget"
       >
-        <span className="text-base leading-none shrink-0">🥚</span>
+        <span className="leading-none shrink-0 flex"><GiEggClutch size={17} color={color} style={{ filter: `drop-shadow(0 0 4px ${color}66)` }} /></span>
         <div className="flex-1 min-w-0">
           <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.10)' }}>
             <motion.div
