@@ -10,6 +10,9 @@ import {
   TUTORIAL_SESSION_ID,
 } from '@/lib/game/tutorial'
 import type { TutorialMoment } from '@/lib/game/tutorial'
+import {
+  GiPuzzle, GiJigsawPiece, GiLightBulb, GiPadlock, GiCheckMark, GiWorld, GiScrollUnfurled, GiKey,
+} from 'react-icons/gi'
 
 const DIFFICULTY_COLOR: Record<EnigmaDifficulty, string> = {
   facile: '#34D399',
@@ -99,12 +102,12 @@ function FrammentoCard({ frammento, index }: { frammento: EnigmaFrammentoView; i
   if (!frammento.collected) {
     return (
       <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/3 border border-white/8">
-        <span className="text-xl opacity-30">🧩</span>
+        <GiJigsawPiece size={20} color="rgba(255,255,255,0.28)" />
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-white/30">Frammento {index + 1}</p>
           <p className="text-[11px] text-white/20">Non ancora trovato</p>
         </div>
-        <span className="text-xs text-white/20">🔒</span>
+        <GiPadlock size={13} color="rgba(255,255,255,0.25)" />
       </div>
     )
   }
@@ -115,7 +118,7 @@ function FrammentoCard({ frammento, index }: { frammento: EnigmaFrammentoView; i
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center gap-3 px-3 py-2.5 text-left"
       >
-        <span className="text-xl">🧩</span>
+        <GiJigsawPiece size={20} color="#C084FC" style={{ flexShrink: 0, filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.4))' }} />
         <div className="flex-1 min-w-0">
           <p className="text-xs font-bold text-[#C084FC] truncate">{frammento.title}</p>
           {frammento.description && (
@@ -180,12 +183,12 @@ function SuggerimentoCard({ suggerimento, index }: { suggerimento: EnigmaSuggeri
   if (!suggerimento.collected) {
     return (
       <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/3 border border-white/8">
-        <span className="text-xl opacity-30">💡</span>
+        <GiLightBulb size={20} color="rgba(255,255,255,0.28)" />
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-white/30">Suggerimento {index + 1}</p>
           <p className="text-[11px] text-white/20">Non ancora trovato</p>
         </div>
-        <span className="text-xs text-white/20">🔒</span>
+        <GiPadlock size={13} color="rgba(255,255,255,0.25)" />
       </div>
     )
   }
@@ -199,7 +202,7 @@ function SuggerimentoCard({ suggerimento, index }: { suggerimento: EnigmaSuggeri
         onClick={() => hasMore && setExpanded(v => !v)}
         className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${hasMore ? '' : 'cursor-default'}`}
       >
-        <span className="text-xl">💡</span>
+        <GiLightBulb size={20} color="#38BDF8" style={{ flexShrink: 0, filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.4))' }} />
         <div className="flex-1 min-w-0">
           <p className={`text-xs font-bold text-[#38BDF8] ${hasMore ? 'truncate' : 'whitespace-pre-wrap break-words'}`}>
             {suggerimento.text}
@@ -306,7 +309,7 @@ function SolvePanel({ enigma, onCorrect }: {
   if (enigma.solved) {
     return (
       <div className="rounded-xl border border-[#34D399]/40 bg-[#34D399]/10 px-3 py-2.5 flex items-center gap-2">
-        <span className="text-lg">✅</span>
+        <GiCheckMark size={17} color="#34D399" />
         <p className="text-sm font-bold text-[#34D399]">Enigma risolto</p>
       </div>
     )
@@ -314,8 +317,8 @@ function SolvePanel({ enigma, onCorrect }: {
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-      <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider">
-        🔓 La tua risposta
+      <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider inline-flex items-center gap-1.5">
+        <GiKey size={13} color="#46BAD8" /> La tua risposta
       </p>
       <div className="flex gap-2">
         <input
@@ -351,15 +354,14 @@ function SolvePanel({ enigma, onCorrect }: {
 function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: SolveSuccess) => void }) {
   const [open, setOpen] = useState(false)
   const diffColor = DIFFICULTY_COLOR[enigma.difficulty]
-  const hasActivity = enigma.frammenti_collected > 0 || enigma.suggerimenti_collected > 0
   const isGlobal = !enigma.session_id
 
   return (
     <div
-      className="rounded-2xl border overflow-hidden"
+      className="overflow-hidden wc-panel"
       style={{
-        borderColor: hasActivity ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.07)',
-        background: hasActivity ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
+        borderRadius: 18,
+        borderLeft: `3px solid ${enigma.solved ? '#44d08a' : diffColor}`,
       }}
     >
       {/* Card header */}
@@ -369,7 +371,7 @@ function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: 
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
-            <p className="font-bold text-white text-sm">{enigma.title}</p>
+            <p className="wc-display font-bold text-white text-[15px]">{enigma.title}</p>
             <span
               className="text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0"
               style={{ backgroundColor: diffColor + '22', color: diffColor }}
@@ -377,13 +379,13 @@ function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: 
               {DIFFICULTY_LABEL[enigma.difficulty]}
             </span>
             {enigma.solved && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 bg-[#34D399]/20 text-[#34D399]">
-                ✅ Risolto
+              <span className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold shrink-0 bg-[#34D399]/20 text-[#34D399]">
+                <GiCheckMark size={10} /> Risolto
               </span>
             )}
             {isGlobal && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 bg-[#7B4DB8]/20 text-[#C084FC]">
-                🌍 Globale
+              <span className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold shrink-0 bg-[#7B4DB8]/20 text-[#C084FC]">
+                <GiWorld size={10} /> Globale
               </span>
             )}
           </div>
@@ -394,7 +396,7 @@ function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: 
           <div className="flex items-center gap-4">
             {enigma.frammenti_total > 0 && (
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-[11px] text-white/40 shrink-0">🧩 {enigma.frammenti_collected}/{enigma.frammenti_total}</span>
+                <span className="text-[11px] shrink-0 inline-flex items-center gap-1" style={{ color: '#C084FC' }}><GiJigsawPiece size={12} /> {enigma.frammenti_collected}/{enigma.frammenti_total}</span>
                 <div className="w-16">
                   <ProgressBar value={enigma.frammenti_collected} max={enigma.frammenti_total} color="#C084FC" />
                 </div>
@@ -402,7 +404,7 @@ function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: 
             )}
             {enigma.suggerimenti_total > 0 && (
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-[11px] text-white/40 shrink-0">💡 {enigma.suggerimenti_collected}/{enigma.suggerimenti_total}</span>
+                <span className="text-[11px] shrink-0 inline-flex items-center gap-1" style={{ color: '#38BDF8' }}><GiLightBulb size={12} /> {enigma.suggerimenti_collected}/{enigma.suggerimenti_total}</span>
                 <div className="w-16">
                   <ProgressBar value={enigma.suggerimenti_collected} max={enigma.suggerimenti_total} color="#38BDF8" />
                 </div>
@@ -441,7 +443,7 @@ function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: 
                   className="rounded-xl px-3 py-2.5"
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                 >
-                  <p className="text-[10px] font-bold tracking-widest uppercase text-white/35 mb-1">📜 Enigma</p>
+                  <p className="text-[10px] font-bold tracking-widest uppercase text-white/35 mb-1 inline-flex items-center gap-1.5"><GiScrollUnfurled size={13} color="#C0A0F0" /> Enigma</p>
                   <p className="text-sm text-white/80 leading-relaxed whitespace-pre-wrap">
                     {enigma.description}
                   </p>
@@ -451,8 +453,8 @@ function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: 
               {/* Frammenti */}
               {enigma.frammenti_total > 0 && (
                 <div className="space-y-2">
-                  <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider">
-                    🧩 Frammenti ({enigma.frammenti_collected}/{enigma.frammenti_total})
+                  <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider inline-flex items-center gap-1.5">
+                    <GiJigsawPiece size={13} color="#C084FC" /> Frammenti ({enigma.frammenti_collected}/{enigma.frammenti_total})
                   </p>
                   <p className="text-[11px] text-white/25 -mt-1">
                     Si ottengono catturando le creature associate
@@ -468,8 +470,8 @@ function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: 
               {/* Suggerimenti */}
               {enigma.suggerimenti_total > 0 && (
                 <div className="space-y-2">
-                  <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider">
-                    💡 Suggerimenti ({enigma.suggerimenti_collected}/{enigma.suggerimenti_total})
+                  <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider inline-flex items-center gap-1.5">
+                    <GiLightBulb size={13} color="#38BDF8" /> Suggerimenti ({enigma.suggerimenti_collected}/{enigma.suggerimenti_total})
                   </p>
                   <p className="text-[11px] text-white/25 -mt-1">
                     Si ottengono scansionando QR code o riscattando pin sulla mappa
@@ -565,13 +567,17 @@ export default function EnigmiPage() {
   )
 
   return (
-    <div className="h-full overflow-y-auto bg-[#0F1F2E]">
+    <div className="h-full overflow-y-auto" style={{ background: 'radial-gradient(120% 70% at 50% 0%, #1c2545 0%, #0e1626 45%, #070d17 100%)' }}>
       <div className="max-w-lg mx-auto px-4 py-4 pb-6">
         {/* Header */}
-        <div className="mb-5">
-          <h1 className="text-2xl font-black text-white mb-0.5">🧩 Enigmi</h1>
+        <div className="relative mb-5 pb-3">
+          <span aria-hidden className="absolute inset-x-0 bottom-0 h-px pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(176,108,240,0.45), transparent)' }} />
+          <h1 className="flex items-center gap-2 mb-0.5">
+            <GiPuzzle size={26} color="#B06CF0" style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }} />
+            <span className="wc-display wc-gold-text" style={{ fontSize: 26, fontWeight: 700, letterSpacing: '0.02em' }}>Enigmi</span>
+          </h1>
           {!loading && enigmi.length > 0 && (
-            <p className="text-sm text-white/40">
+            <p className="text-sm text-white/45">
               {enigmi.length} {enigmi.length === 1 ? 'enigma' : 'enigmi'} · {collectedCount} indizi raccolti
             </p>
           )}
