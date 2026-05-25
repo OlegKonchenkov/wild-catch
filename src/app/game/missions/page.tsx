@@ -16,21 +16,27 @@ import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { haptics } from '@/lib/haptics'
 import { playQrScan } from '@/lib/game/sounds/ui'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
+import { motion } from 'framer-motion'
+import { type IconType } from 'react-icons'
+import {
+  GiBullseye, GiMagnifyingGlass, GiTwoCoins, GiSparkles, GiPawPrint,
+  GiCrossedSwords, GiFootprint, GiKnapsack, GiPuzzle, GiPadlock, GiCheckMark,
+} from 'react-icons/gi'
 
 const QrScanner = dynamic(() => import('@/components/QrScanner'), { ssr: false })
 
 /* ── Mission type metadata ───────────────────── */
-const TYPE_META: Record<string, { icon: string; label: string; hint: string; color: string }> = {
-  cattura:  { icon: '🐾', label: 'Cattura',  hint: 'Cattura la creatura indicata',      color: '#3A9DBC' },
-  duel:     { icon: '⚔️', label: 'Duello',   hint: 'Vinci un duello contro un altro giocatore', color: '#FBBF24' },
-  qr:       { icon: '📷', label: 'Scansione', hint: 'Scansiona il QR richiesto oppure QR diversi, se la missione non ne specifica uno',   color: '#34D399' },
-  walk:     { icon: '🚶', label: 'Cammino',  hint: 'Percorri la distanza indicata (m)', color: '#C084FC' },
-  collect:  { icon: '🎒', label: 'Raccolta', hint: 'Raccogli gli oggetti indicati',     color: '#F97316' },
-  enigma:   { icon: '🧩', label: 'Enigma',   hint: 'Risolvi l’enigma indicato dalla sezione Enigmi (icona \u{1F9E9} nel menu)', color: '#A855F7' },
+const TYPE_META: Record<string, { icon: string; Icon: IconType; label: string; hint: string; color: string }> = {
+  cattura:  { icon: '🐾', Icon: GiPawPrint,       label: 'Cattura',  hint: 'Cattura la creatura indicata',      color: '#3A9DBC' },
+  duel:     { icon: '⚔️', Icon: GiCrossedSwords,  label: 'Duello',   hint: 'Vinci un duello contro un altro giocatore', color: '#FBBF24' },
+  qr:       { icon: '📷', Icon: GiMagnifyingGlass, label: 'Scansione', hint: 'Scansiona il QR richiesto oppure QR diversi, se la missione non ne specifica uno',   color: '#34D399' },
+  walk:     { icon: '🚶', Icon: GiFootprint,      label: 'Cammino',  hint: 'Percorri la distanza indicata (m)', color: '#C084FC' },
+  collect:  { icon: '🎒', Icon: GiKnapsack,       label: 'Raccolta', hint: 'Raccogli gli oggetti indicati',     color: '#F97316' },
+  enigma:   { icon: '🧩', Icon: GiPuzzle,         label: 'Enigma',   hint: 'Risolvi l’enigma indicato dalla sezione Enigmi (icona \u{1F9E9} nel menu)', color: '#A855F7' },
 }
 
 function typeMeta(type: string) {
-  return TYPE_META[type] ?? { icon: '🎯', label: type, hint: '', color: '#9CA3AF' }
+  return TYPE_META[type] ?? { icon: '🎯', Icon: GiBullseye, label: type, hint: '', color: '#9CA3AF' }
 }
 
 /* ── QR scan result display ─────────────────── */
@@ -195,9 +201,9 @@ function MissionDetailModal({
 
         {/* Header */}
         <div className="flex items-start gap-4 mb-5">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0"
-            style={{ background: `${meta.color}18`, border: `1.5px solid ${meta.color}30` }}>
-            {meta.icon}
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+            style={{ background: `linear-gradient(180deg, ${meta.color}30, ${meta.color}10)`, border: `1px solid ${meta.color}3a`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.14)' }}>
+            <meta.Icon size={30} color={meta.color} style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.45))' }} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -211,17 +217,17 @@ function MissionDetailModal({
                 {meta.label}
               </span>
               {completed && (
-                <span className="text-xs bg-[#34D399]/15 text-[#34D399] border border-[#34D399]/25 px-2 py-0.5 rounded-md font-semibold">
-                  ✅ Completata
+                <span className="text-xs inline-flex items-center gap-1 bg-[#34D399]/15 text-[#34D399] border border-[#34D399]/25 px-2 py-0.5 rounded-md font-semibold">
+                  <GiCheckMark size={11} /> Completata
                 </span>
               )}
               {locked && (
-                <span className="text-xs bg-white/8 text-white/45 border border-white/15 px-2 py-0.5 rounded-md font-semibold">
-                  🔒 Bloccata
+                <span className="text-xs inline-flex items-center gap-1 bg-white/8 text-white/45 border border-white/15 px-2 py-0.5 rounded-md font-semibold">
+                  <GiPadlock size={11} /> Bloccata
                 </span>
               )}
             </div>
-            <h2 className="text-white font-extrabold text-base leading-tight">
+            <h2 className="wc-display text-white font-bold text-lg leading-tight">
               #{mission.chapter_order} {mission.title}
             </h2>
           </div>
@@ -292,7 +298,7 @@ function MissionDetailModal({
         <div className={`mb-4 ${locked ? 'opacity-45' : ''}`}>
           <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Come completare</p>
           <div className="flex items-start gap-3 bg-white/4 border border-white/8 rounded-xl px-4 py-3">
-            <span className="text-xl mt-0.5">{meta.icon}</span>
+            <meta.Icon size={20} color={meta.color} style={{ marginTop: 2, flexShrink: 0 }} />
             <div>
               <p className="text-white/80 text-sm">{meta.hint}</p>
               {/* For enigma missions `mission.target` is the enigma's UUID,
@@ -339,17 +345,17 @@ function MissionDetailModal({
         <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Ricompense</p>
         <div className="grid grid-cols-2 gap-2 mb-5">
           <div className="flex items-center gap-2 bg-[#F7C841]/8 border border-[#F7C841]/20 rounded-xl px-3 py-2.5">
-            <span className="text-lg">🪙</span>
+            <GiTwoCoins size={20} color="#F7C841" />
             <div>
-              <p className="text-[#F7C841] font-extrabold text-sm">{mission.reward_gold}</p>
-              <p className="text-white/30 text-xs">Oro</p>
+              <p className="wc-display text-[#F7C841] font-bold text-base leading-none">{mission.reward_gold}</p>
+              <p className="text-white/30 text-xs mt-0.5">Oro</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-[#3A9DBC]/8 border border-[#3A9DBC]/20 rounded-xl px-3 py-2.5">
-            <span className="text-lg">✨</span>
+          <div className="flex items-center gap-2 bg-[#46BAD8]/8 border border-[#46BAD8]/20 rounded-xl px-3 py-2.5">
+            <GiSparkles size={20} color="#46BAD8" />
             <div>
-              <p className="text-[#3A9DBC] font-extrabold text-sm">{mission.reward_exp}</p>
-              <p className="text-white/30 text-xs">EXP</p>
+              <p className="wc-display text-[#46BAD8] font-bold text-base leading-none">{mission.reward_exp}</p>
+              <p className="text-white/30 text-xs mt-0.5">EXP</p>
             </div>
           </div>
         </div>
@@ -358,9 +364,10 @@ function MissionDetailModal({
         {mission.type === 'qr' && !completed && !locked && (
           <button
             onClick={() => { onClose(); onScanQR() }}
-            className="w-full bg-[#34D399] text-[#0a1520] font-extrabold py-3.5 rounded-xl text-sm mb-3 flex items-center justify-center gap-2"
+            className="w-full font-extrabold py-3.5 rounded-xl text-sm mb-3 flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(180deg, #4ee0a0, #1f9e6e)', color: '#062017', border: '1px solid rgba(120,255,200,0.35)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)' }}
           >
-            <span className="text-lg">📷</span> Scansiona QR ora
+            <GiMagnifyingGlass size={18} /> Scansiona QR ora
           </button>
         )}
 
@@ -584,7 +591,7 @@ export default function MissionsPage() {
   const totalCount = missions.length
 
   return (
-    <div className="h-full flex flex-col overflow-hidden relative">
+    <div className="h-full flex flex-col overflow-hidden relative" style={{ background: 'radial-gradient(120% 80% at 50% 0%, #122c3e 0%, #0a1a26 45%, #060f17 100%)' }}>
       {/* Toast overlay */}
       <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
         <div className="pointer-events-auto">
@@ -593,12 +600,16 @@ export default function MissionsPage() {
       </div>
 
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-white/10 bg-[#0A1520]/80 shrink-0">
+      <div className="relative px-4 pt-4 pb-3 shrink-0">
+        <span aria-hidden className="absolute inset-x-0 bottom-0 h-px pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(247,200,65,0.4), transparent)' }} />
         <div className="flex items-center justify-between mb-3">
-          <div>
-            <h1 className="text-lg font-extrabold tracking-tight">🎯 Missioni</h1>
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2">
+              <GiBullseye size={22} color="#F0A93C" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />
+              <span className="wc-display wc-gold-text" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }}>Missioni</span>
+            </h1>
             {totalCount > 0 && (
-              <p className="text-xs text-white/35 mt-0.5">
+              <p className="text-xs text-white/40 mt-0.5">
                 {doneCount}/{unlockedCount || totalCount} completate
                 {lockedCount > 0 && <span className="text-white/25"> · {lockedCount} bloccate</span>}
               </p>
@@ -607,39 +618,47 @@ export default function MissionsPage() {
           <button
             onClick={() => setShowScanner(true)}
             disabled={scanning}
-            className="flex items-center gap-1.5 bg-[#34D399] text-[#0a1520] font-extrabold px-4 py-2 rounded-xl text-sm disabled:opacity-50 transition-all active:scale-95"
+            className="flex items-center gap-1.5 font-extrabold px-4 py-2 rounded-xl text-sm disabled:opacity-50 transition-all active:scale-95 shrink-0"
+            style={{ background: 'linear-gradient(180deg, #4ee0a0, #1f9e6e)', color: '#062017', border: '1px solid rgba(120,255,200,0.35)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35), 0 3px 10px -3px rgba(52,211,153,0.5)' }}
           >
             {scanning
-              ? <span className="w-4 h-4 border-2 border-[#0a1520]/40 border-t-[#0a1520] rounded-full animate-spin" />
-              : <span>📷</span>
+              ? <span className="w-4 h-4 border-2 border-[#062017]/40 border-t-[#062017] rounded-full animate-spin" />
+              : <GiMagnifyingGlass size={16} />
             }
             {scanning ? 'Lettura...' : 'Scansiona QR'}
           </button>
         </div>
 
         {/* Progress bar */}
-        {totalCount > 0 && (
-          <div className="h-1.5 bg-white/8 rounded-full overflow-hidden mb-3">
-            <div
-              className="h-full bg-[#34D399] rounded-full transition-all"
-              style={{ width: `${Math.round((doneCount / Math.max(1, unlockedCount)) * 100)}%` }}
-            />
-          </div>
-        )}
+        {totalCount > 0 && (() => {
+          const pct = Math.round((doneCount / Math.max(1, unlockedCount)) * 100)
+          return (
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 1px rgba(0,0,0,0.35)' }}>
+                <motion.div className="h-full rounded-full" style={{ background: 'linear-gradient(180deg, #5ee6a6, #1f9e6e)', boxShadow: '0 0 8px rgba(52,211,153,0.7)' }} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6, ease: 'easeOut' }} />
+              </div>
+              <span className="wc-display tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: '#5ee6a6' }}>{pct}%</span>
+            </div>
+          )
+        })()}
 
         {/* Filter pills */}
         <div className="flex gap-1.5">
-          {(['all', 'todo', 'done'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${
-                filter === f ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/50 hover:text-white'
-              }`}
-            >
-              {f === 'all' ? 'Tutte' : f === 'todo' ? 'Da fare' : 'Completate'}
-            </button>
-          ))}
+          {(['all', 'todo', 'done'] as const).map(f => {
+            const on = filter === f
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-semibold transition-all"
+                style={on
+                  ? { background: 'linear-gradient(180deg, #56C8E0, #2a7d98)', color: '#fff', boxShadow: '0 0 10px rgba(70,186,216,0.4)' }
+                  : { background: 'rgba(255,255,255,0.05)', color: 'var(--wc-ink-dim)' }}
+              >
+                {f === 'all' ? 'Tutte' : f === 'todo' ? 'Da fare' : 'Completate'}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -655,7 +674,7 @@ export default function MissionsPage() {
             </p>
           </div>
         ) : (
-          filtered.map(mission => {
+          filtered.map((mission, idx) => {
             const meta = typeMeta(mission.type)
             const pm = pmMap[mission.id]
             const progress = pm?.progress ?? 0
@@ -665,13 +684,16 @@ export default function MissionsPage() {
             const pct = Math.min(100, Math.round((progress / Math.max(1, mission.target_count)) * 100))
 
             return (
-              <button
+              <motion.button
                 key={mission.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: locked ? 0.72 : 1, y: 0 }}
+                transition={{ duration: 0.26, ease: 'easeOut', delay: Math.min(idx * 0.035, 0.32) }}
                 onClick={() => setDetailMission(mission)}
-                className={`w-full text-left flex items-center gap-3 rounded-2xl p-3.5 border transition-all active:scale-[0.98] ${locked ? 'opacity-70' : ''}`}
+                className="w-full text-left flex items-center gap-3 p-3.5 active:scale-[0.98] wc-panel"
                 style={{
-                  background: locked ? 'rgba(255,255,255,0.035)' : completed ? `${meta.color}07` : `${meta.color}0a`,
-                  borderColor: locked ? 'rgba(255,255,255,0.10)' : completed ? `${meta.color}25` : `${meta.color}28`,
+                  borderRadius: 18,
+                  borderLeft: `3px solid ${locked ? 'rgba(255,255,255,0.14)' : completed ? '#44d08a' : meta.color}`,
                 }}
               >
                 {/* Progress ring OR creature thumbnail for cattura missions */}
@@ -690,14 +712,16 @@ export default function MissionsPage() {
                       }}
                     />
                     {completed && (
-                      <span className="absolute -top-1 -right-1 text-xs leading-none">✅</span>
+                      <span className="absolute -top-1 -right-1 rounded-full flex items-center justify-center" style={{ background: '#0a1a26', padding: 2 }}>
+                        <GiCheckMark size={11} color="#44d08a" />
+                      </span>
                     )}
                   </div>
                 ) : (
                   <div className="relative shrink-0">
                     <ProgressRing pct={pct} color={locked ? 'rgba(255,255,255,0.35)' : completed ? '#34D399' : meta.color} />
-                    <span className="absolute inset-0 flex items-center justify-center text-base">
-                      {completed ? '✅' : locked ? '🔒' : meta.icon}
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      {completed ? <GiCheckMark size={17} color="#44d08a" /> : locked ? <GiPadlock size={15} color="rgba(255,255,255,0.45)" /> : <meta.Icon size={18} color={meta.color} />}
                     </span>
                   </div>
                 )}
@@ -743,14 +767,14 @@ export default function MissionsPage() {
                       {progress}/{mission.target_count}
                     </span>
                     <span className="text-white/15">·</span>
-                    <span className="text-xs text-[#F7C841]/60">🪙 {mission.reward_gold}</span>
-                    <span className="text-xs text-white/35">✨ {mission.reward_exp}</span>
+                    <span className="text-xs flex items-center gap-0.5" style={{ color: 'rgba(247,200,65,0.85)' }}><GiTwoCoins size={12} color="#F7C841" /> {mission.reward_gold}</span>
+                    <span className="text-xs flex items-center gap-0.5" style={{ color: 'rgba(70,186,216,0.85)' }}><GiSparkles size={12} color="#46BAD8" /> {mission.reward_exp}</span>
                   </div>
                 </div>
 
                 {/* Chevron */}
                 <span className="text-white/20 text-sm shrink-0">›</span>
-              </button>
+              </motion.button>
             )
           })
         )}
