@@ -1,5 +1,6 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion'
+import { GiRoundStar, GiTwoCoins } from 'react-icons/gi'
 
 export interface LevelUpInfo {
   newLevel: number
@@ -47,19 +48,19 @@ export default function LevelUpModal({
             style={{ boxShadow: '0 0 60px rgba(247,200,65,0.25), 0 20px 60px rgba(0,0,0,0.6)' }}
           >
             <motion.div
-              className="text-6xl mb-3"
+              className="mb-3 flex justify-center"
               animate={{ rotate: [0, -8, 8, -4, 4, 0], scale: [1, 1.15, 1] }}
               transition={{ duration: 0.6, delay: 0.25 }}
             >
-              ⭐
+              <GiRoundStar size={64} color="#F7C841" style={{ filter: 'drop-shadow(0 0 20px rgba(247,200,65,0.6))' }} />
             </motion.div>
 
-            <p className="text-[#F7C841]/80 text-xs font-bold tracking-[0.25em] uppercase mb-1">
+            <p className="wc-display text-[#F7C841]/80 text-xs font-bold tracking-[0.25em] uppercase mb-1">
               Livello
             </p>
 
             <motion.p
-              className="font-black text-white leading-none"
+              className="wc-display font-black text-white leading-none"
               style={{ fontSize: '5.5rem' }}
               initial={{ scale: 0.5 }}
               animate={{ scale: 1 }}
@@ -75,7 +76,7 @@ export default function LevelUpModal({
                 transition={{ delay: 0.45 }}
                 className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#D4A96A]/15 border border-[#D4A96A]/30"
               >
-                <span className="text-lg">💰</span>
+                <GiTwoCoins size={20} color="#D4A96A" />
                 <span className="text-[#D4A96A] font-bold text-lg">+{info.goldReward}</span>
               </motion.div>
             )}

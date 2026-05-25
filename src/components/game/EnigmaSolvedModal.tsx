@@ -1,5 +1,6 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion'
+import { GiPuzzle, GiRoundStar, GiTwoCoins } from 'react-icons/gi'
 
 /**
  * Celebration modal shown when the player correctly solves an enigma.
@@ -76,12 +77,12 @@ export default function EnigmaSolvedModal({ enigmaTitle, solution, reward, fresh
 
         {/* Badge */}
         <motion.div
-          className="relative text-6xl mb-3"
+          className="relative mb-3"
           initial={{ scale: 0, rotate: -15 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ delay: 0.15, type: 'spring', stiffness: 220, damping: 16 }}
         >
-          🧩
+          <GiPuzzle size={66} color="#C084FC" style={{ filter: 'drop-shadow(0 0 22px rgba(192,132,252,0.6))' }} />
         </motion.div>
 
         {/* Label */}
@@ -120,14 +121,14 @@ export default function EnigmaSolvedModal({ enigmaTitle, solution, reward, fresh
               <div className="flex items-center justify-between rounded-2xl px-5 py-3"
                 style={{ background: 'rgba(52,211,153,0.10)', border: '1px solid rgba(52,211,153,0.22)' }}>
                 <span className="text-sm text-white/55">EXP</span>
-                <span className="font-extrabold text-[#34D399] text-base">+{reward.exp} ⭐</span>
+                <span className="inline-flex items-center gap-1.5 font-extrabold text-[#34D399] text-base">+{reward.exp} <GiRoundStar size={14} color="#34D399" /></span>
               </div>
             )}
             {!!reward.gold && reward.gold > 0 && (
               <div className="flex items-center justify-between rounded-2xl px-5 py-3"
                 style={{ background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.22)' }}>
                 <span className="text-sm text-white/55">Oro</span>
-                <span className="font-extrabold text-[#FBBF24] text-base">+{reward.gold} 🪙</span>
+                <span className="inline-flex items-center gap-1.5 font-extrabold text-[#FBBF24] text-base">+{reward.gold} <GiTwoCoins size={15} color="#FBBF24" /></span>
               </div>
             )}
           </motion.div>

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { GiTrophyCup, GiRoundStar, GiTwoCoins, GiPuzzle } from 'react-icons/gi'
 import { playMissionComplete } from '@/lib/game/sounds/events'
 import { playFrammento } from '@/lib/game/sounds/ui'
 
@@ -77,12 +78,12 @@ export default function MissionRewardModal({ missions, onDone }: MissionRewardMo
 
         {/* Badge */}
         <motion.div
-          className="relative text-5xl mb-4"
+          className="relative mb-4"
           initial={{ scale: 0, rotate: -15 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 18 }}
         >
-          🏆
+          <GiTrophyCup size={60} color="#FBBF24" style={{ filter: 'drop-shadow(0 0 18px rgba(251,191,36,0.55))' }} />
         </motion.div>
 
         {/* Label */}
@@ -111,14 +112,14 @@ export default function MissionRewardModal({ missions, onDone }: MissionRewardMo
             <div className="flex items-center justify-between rounded-2xl px-5 py-3"
               style={{ background: 'rgba(52,211,153,0.10)', border: '1px solid rgba(52,211,153,0.22)' }}>
               <span className="text-sm text-white/50">EXP ricompensa</span>
-              <span className="font-extrabold text-[#34D399] text-base">+{mission.rewardExp} ⭐</span>
+              <span className="inline-flex items-center gap-1.5 font-extrabold text-[#34D399] text-base">+{mission.rewardExp} <GiRoundStar size={14} color="#34D399" /></span>
             </div>
           )}
           {mission.rewardGold > 0 && (
             <div className="flex items-center justify-between rounded-2xl px-5 py-3"
               style={{ background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.22)' }}>
               <span className="text-sm text-white/50">Oro ricompensa</span>
-              <span className="font-extrabold text-[#FBBF24] text-base">+{mission.rewardGold} 🪙</span>
+              <span className="inline-flex items-center gap-1.5 font-extrabold text-[#FBBF24] text-base">+{mission.rewardGold} <GiTwoCoins size={15} color="#FBBF24" /></span>
             </div>
           )}
           {mission.levelUp && (
@@ -131,7 +132,7 @@ export default function MissionRewardModal({ missions, onDone }: MissionRewardMo
           {mission.tutorialFrammentoGranted && (
             <div className="flex items-center gap-3 rounded-2xl px-5 py-3"
               style={{ background: 'rgba(192,132,252,0.12)', border: '1px solid rgba(192,132,252,0.30)' }}>
-              <span className="text-2xl">🧩</span>
+              <GiPuzzle size={24} color="#C084FC" style={{ filter: 'drop-shadow(0 0 8px rgba(192,132,252,0.5))' }} />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-white/50 uppercase tracking-wider">Frammento d&apos;enigma sbloccato</p>
                 <p className="font-bold text-[#C084FC] text-sm truncate">{mission.tutorialFrammentoGranted.title}</p>

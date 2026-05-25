@@ -1,6 +1,8 @@
 'use client'
 import { motion } from 'framer-motion'
-import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
+import { GiTrophyCup, GiDeathSkull, GiTwoCoins, GiRoundStar } from 'react-icons/gi'
+import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
+import ElementIcon from '@/components/ui/ElementIcon'
 
 // Boss victory confetti — emitted from the trophy in a starburst pattern.
 const CONFETTI_PIECES = Array.from({ length: 16 }).map((_, i) => {
@@ -113,12 +115,14 @@ export default function ResultScreen({
             duration: won ? 0.8 : undefined,
             times: won ? [0, 0.6, 1] : undefined,
           }}
-          className="text-7xl relative z-10"
+          className="relative z-10 flex items-center justify-center"
           style={{
             filter: won ? 'drop-shadow(0 0 24px rgba(251,191,36,0.6))' : undefined,
           }}
         >
-          {won ? '🏆' : '💀'}
+          {won
+            ? <GiTrophyCup size={86} color="#FBBF24" />
+            : <GiDeathSkull size={82} color="#9CA3AF" />}
         </motion.div>
       </div>
 
@@ -128,7 +132,7 @@ export default function ResultScreen({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: won ? 0.5 : 0.2, duration: 0.4 }}
       >
-        <h2 className="text-2xl font-extrabold text-white mb-1">
+        <h2 className="wc-display text-2xl font-extrabold text-white mb-1" style={won ? { color: '#FBBF24' } : undefined}>
           {won ? 'Vittoria!' : 'Sconfitta'}
         </h2>
         <p className="text-white/50 text-sm">
@@ -151,7 +155,7 @@ export default function ResultScreen({
                 className="flex items-center gap-2 rounded-xl px-3 py-2.5"
                 style={{ background: 'rgba(247,200,65,0.08)', border: '1px solid rgba(247,200,65,0.2)' }}
               >
-                <span className="text-lg">🪙</span>
+                <GiTwoCoins size={20} color="#F7C841" />
                 <div>
                   <p className="font-extrabold text-sm" style={{ color: '#F7C841' }}>{reward.gold}</p>
                   <p className="text-white/30 text-xs">Oro</p>
@@ -163,7 +167,7 @@ export default function ResultScreen({
                 className="flex items-center gap-2 rounded-xl px-3 py-2.5"
                 style={{ background: 'rgba(58,157,188,0.08)', border: '1px solid rgba(58,157,188,0.2)' }}
               >
-                <span className="text-lg">✨</span>
+                <GiRoundStar size={18} color="#3A9DBC" />
                 <div>
                   <p className="font-extrabold text-sm" style={{ color: '#3A9DBC' }}>{reward.exp}</p>
                   <p className="text-white/30 text-xs">EXP</p>
@@ -215,8 +219,11 @@ export default function ResultScreen({
                     ) : (
                       reward.creature.rarity
                     )}
-                    {reward.creature.element &&
-                      ` · ${ELEMENT_EMOJI[reward.creature.element as keyof typeof ELEMENT_EMOJI] ?? ''} ${reward.creature.element}`}
+                    {reward.creature.element && (
+                      <span className="inline-flex items-center gap-1 align-middle">
+                        {' · '}<ElementIcon element={reward.creature.element} size={12} /> {reward.creature.element}
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -225,8 +232,8 @@ export default function ResultScreen({
 
           {levelUp && (
             <div className="text-center">
-              <span className="text-sm font-bold" style={{ color: '#F7C841' }}>
-                ⭐ Level Up! Livello {levelUp.newLevel}
+              <span className="inline-flex items-center gap-1.5 text-sm font-bold" style={{ color: '#F7C841' }}>
+                <GiRoundStar size={14} color="#F7C841" /> Level Up! Livello {levelUp.newLevel}
               </span>
             </div>
           )}

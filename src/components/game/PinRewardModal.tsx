@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
+import ElementIcon from '@/components/ui/ElementIcon'
+import { GiTwoCoins, GiRoundStar } from 'react-icons/gi'
 import { playMissionComplete } from '@/lib/game/sounds/events'
 
 const RARITY_COLOR: Record<string, string> = {
@@ -124,14 +126,13 @@ export default function PinRewardModal({ reward, onDone }: { reward: PinRewardDa
 
           {type === 'creatura' && reward.creature && (() => {
             const c = reward.creature!
-            const elemEmoji = ({ fiamma:'🔥', adriatico:'🌊', bosco:'🌿', terra:'⚡', armonia:'✨' } as Record<string,string>)[c.element] ?? '✦'
             return (
               <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${rarityColor}40`, background: `linear-gradient(135deg, ${glow}12 0%, transparent 100%)` }}>
                 <div className="flex flex-col items-center py-5 px-4">
                   <CreatureDiorama creature={c} size={140} anchor="center" rounded={18} className="w-full" style={{ aspectRatio: '5 / 4', maxWidth: 280 }} />
                   <p className="text-white font-bold text-xl mt-3">{c.name}</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm">{elemEmoji}</span>
+                    <ElementIcon element={c.element} size={14} />
                     <span className="text-xs capitalize text-white/40">{c.element}</span>
                     <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: `${rarityColor}22`, color: rarityColor }}>{c.rarity}</span>
                   </div>
@@ -176,7 +177,6 @@ export default function PinRewardModal({ reward, onDone }: { reward: PinRewardDa
           {type === 'enigma' && (() => {
             const rType = reward.rewardType
             const c     = reward.creature
-            const elemEmoji = ({ fiamma:'🔥', adriatico:'🌊', bosco:'🌿', terra:'⚡', armonia:'✨' } as Record<string,string>)[c?.element ?? ''] ?? '✦'
             const enigmaRarityColor = RARITY_COLOR[c?.rarity ?? ''] ?? '#A78BFA'
             const enigmaGlow        = ELEMENT_GLOW[c?.element ?? ''] ?? enigmaRarityColor
             return (
@@ -192,7 +192,7 @@ export default function PinRewardModal({ reward, onDone }: { reward: PinRewardDa
                       <CreatureDiorama creature={c} size={140} anchor="center" rounded={18} className="w-full" style={{ aspectRatio: '5 / 4', maxWidth: 280 }} />
                       <p className="text-white font-bold text-xl mt-3">{c.name}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-sm">{elemEmoji}</span>
+                        <ElementIcon element={c.element} size={14} />
                         <span className="text-xs capitalize text-white/40">{c.element}</span>
                         <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: `${enigmaRarityColor}22`, color: enigmaRarityColor }}>{c.rarity}</span>
                       </div>
@@ -210,7 +210,11 @@ export default function PinRewardModal({ reward, onDone }: { reward: PinRewardDa
 
                 {(rType === 'exp' || rType === 'gold') && reward.amount != null && (
                   <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
-                    <p className="text-4xl mb-2">{rType === 'exp' ? '⭐' : '💰'}</p>
+                    <div className="flex justify-center mb-2">
+                      {rType === 'exp'
+                        ? <GiRoundStar size={38} color="#34D399" style={{ filter: 'drop-shadow(0 0 10px rgba(52,211,153,0.5))' }} />
+                        : <GiTwoCoins size={38} color="#F7C841" style={{ filter: 'drop-shadow(0 0 10px rgba(247,200,65,0.5))' }} />}
+                    </div>
                     <p className="text-white font-bold text-2xl">+{reward.amount}</p>
                     <p className="text-white/50 text-sm mt-1">{rType === 'exp' ? 'Punti esperienza' : 'Monete'}</p>
                   </div>
