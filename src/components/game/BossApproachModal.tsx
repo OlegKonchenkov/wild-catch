@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { GiDeathSkull, GiCrossedSwords } from 'react-icons/gi'
 import type { MapPin } from '@/components/map/GameMap'
 import type { PinRewardData } from '@/components/game/PinRewardModal'
 
@@ -75,8 +76,10 @@ export default function BossApproachModal({
             </div>
           </div>
           <div className="bg-red-950/40 border border-red-500/30 rounded-2xl p-5 text-center">
-            <p className="text-5xl mb-3">💀</p>
-            <p className="text-white font-extrabold text-lg">Capo Palestra</p>
+            <div className="flex justify-center mb-3">
+              <GiDeathSkull size={56} color="#FF5A45" style={{ filter: 'drop-shadow(0 0 16px rgba(232,93,47,0.6))' }} />
+            </div>
+            <p className="wc-display text-white font-extrabold text-lg">Capo Palestra</p>
             <p className="text-red-300/70 text-sm mt-1">Un boss ti sfida in battaglia!</p>
             <p className="text-white/35 text-xs mt-2">Sei pronto ad affrontarlo?</p>
           </div>
@@ -102,7 +105,7 @@ export default function BossApproachModal({
                 boxShadow: '0 4px 20px rgba(232,93,47,0.4)',
               }}
             >
-              {claiming ? 'Avvio...' : '⚔️ Affronta ora!'}
+              {claiming ? 'Avvio...' : <span className="inline-flex items-center gap-1.5"><GiCrossedSwords size={16} color="#fff" /> Affronta ora!</span>}
             </button>
           </div>
         </div>

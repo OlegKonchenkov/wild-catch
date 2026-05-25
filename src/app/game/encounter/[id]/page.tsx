@@ -27,6 +27,7 @@ import { haptics } from '@/lib/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import ElementIcon from '@/components/ui/ElementIcon'
+import { GiRoundStar, GiTwoCoins, GiTrophyCup } from 'react-icons/gi'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
@@ -2384,14 +2385,14 @@ export default function EncounterPage() {
                       {caughtExpGain > 0 && (
                         <div className="flex items-center justify-between rounded-xl px-4 py-3"
                           style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
-                          <span className="text-sm text-white/50">⭐ EXP</span>
+                          <span className="inline-flex items-center gap-1.5 text-sm text-white/50"><GiRoundStar size={13} color="#34D399" /> EXP</span>
                           <span className="font-extrabold text-[#34D399]">+{caughtExpGain}</span>
                         </div>
                       )}
                       {caughtGoldGain > 0 && (
                         <div className="flex items-center justify-between rounded-xl px-4 py-3"
                           style={{ background: 'rgba(247,200,65,0.08)', border: '1px solid rgba(247,200,65,0.2)' }}>
-                          <span className="text-sm text-white/50">🪙 Oro</span>
+                          <span className="inline-flex items-center gap-1.5 text-sm text-white/50"><GiTwoCoins size={14} color="#F7C841" /> Oro</span>
                           <span className="font-extrabold" style={{ color: '#F7C841' }}>+{caughtGoldGain}</span>
                         </div>
                       )}
@@ -2449,12 +2450,12 @@ export default function EncounterPage() {
 
               {/* Badge */}
               <motion.div
-                className="relative text-5xl mb-4"
+                className="relative mb-4"
                 initial={{ scale: 0, rotate: -15 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 18 }}
               >
-                🏆
+                <GiTrophyCup size={56} color="#FBBF24" style={{ filter: 'drop-shadow(0 0 18px rgba(251,191,36,0.55))' }} />
               </motion.div>
 
               {/* Header label */}
@@ -2483,14 +2484,14 @@ export default function EncounterPage() {
                   <div className="flex items-center justify-between rounded-2xl px-5 py-3"
                     style={{ background: 'rgba(52,211,153,0.10)', border: '1px solid rgba(52,211,153,0.22)' }}>
                     <span className="text-sm text-white/50">EXP ricompensa</span>
-                    <span className="font-extrabold text-[#34D399] text-base">+{mission.rewardExp} EXP</span>
+                    <span className="inline-flex items-center gap-1.5 font-extrabold text-[#34D399] text-base">+{mission.rewardExp} <GiRoundStar size={14} color="#34D399" /></span>
                   </div>
                 )}
                 {mission.rewardGold > 0 && (
                   <div className="flex items-center justify-between rounded-2xl px-5 py-3"
                     style={{ background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.22)' }}>
                     <span className="text-sm text-white/50">Oro ricompensa</span>
-                    <span className="font-extrabold text-[#FBBF24] text-base">+{mission.rewardGold} 🪙</span>
+                    <span className="inline-flex items-center gap-1.5 font-extrabold text-[#FBBF24] text-base">+{mission.rewardGold} <GiTwoCoins size={15} color="#FBBF24" /></span>
                   </div>
                 )}
                 {mission.levelUp && (
