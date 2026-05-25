@@ -19,7 +19,8 @@ import MissionRewardModal from "@/components/game/MissionRewardModal";
 import type { CompletedMissionInfo } from "@/components/game/MissionRewardModal";
 import TutorialElementsModal from "@/components/game/TutorialElementsModal";
 import { TUTORIAL_SESSION_ID } from "@/lib/game/tutorial";
-import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from "@/lib/types";
+import { RARITY_COLORS, RARITY_LABELS } from "@/lib/types";
+import { GiDeathSkull } from "react-icons/gi";
 import type { Element, Rarity } from "@/lib/types";
 import { playBossSound } from "@/lib/game/battle-sounds";
 import { startBossLoop } from "@/lib/game/sounds/battle-loop";
@@ -1595,10 +1596,10 @@ export default function BossFightPage() {
           ← Indietro
         </button>
         <span
-          className="text-sm font-bold"
-          style={{ color: "rgba(247,200,65,0.7)" }}
+          className="wc-display text-sm font-bold inline-flex items-center gap-1.5"
+          style={{ color: "rgba(247,200,65,0.85)" }}
         >
-          💀 Capo Palestra
+          <GiDeathSkull size={15} color="#FF5A45" /> Capo Palestra
         </span>
         {fight?.status === "active" && (
           <button onClick={handleSurrender} className="text-red-400/50 text-xs">

@@ -1,4 +1,5 @@
 'use client'
+import { GiDeathSkull, GiCrossedSwords } from 'react-icons/gi'
 import ElementIcon from '@/components/ui/ElementIcon'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import CreatureRosterRow from '@/components/game/CreatureRosterRow'
@@ -39,10 +40,10 @@ export default function SquadSelector({
             className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
             style={{ background: 'rgba(247,200,65,0.12)', border: '1px solid rgba(247,200,65,0.3)' }}
           >
-            <span className="text-xl">💀</span>
+            <GiDeathSkull size={22} color="#FF5A45" style={{ filter: 'drop-shadow(0 0 8px rgba(232,93,47,0.5))' }} />
           </div>
           <div>
-            <h1 className="text-lg font-extrabold tracking-tight">Capo Palestra</h1>
+            <h1 className="wc-display wc-gold-text text-lg font-bold tracking-tight">Capo Palestra</h1>
             <p className="text-white/40 text-xs">{bossName} ti sfida! Scegli la tua squadra</p>
           </div>
         </div>
@@ -123,7 +124,7 @@ export default function SquadSelector({
             ? 'Inizio battaglia...'
             : filledCount < 1
               ? 'Seleziona almeno 1 creatura'
-              : '⚔️ Inizia la battaglia!'}
+              : <span className="inline-flex items-center justify-center gap-2"><GiCrossedSwords size={16} color="#fff" /> Inizia la battaglia!</span>}
         </button>
       </div>
     </div>
