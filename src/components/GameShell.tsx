@@ -10,26 +10,27 @@ import { haptics } from '@/lib/haptics'
 import LevelUpModal, { type LevelUpInfo } from '@/components/game/LevelUpModal'
 import NotifPopupComponent, { type NotifPopupData } from '@/components/game/NotifPopup'
 import PushOptIn from '@/components/game/PushOptIn'
-import CountUp from '@/components/game/CountUp'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import GameTopBar from '@/components/ui/GameTopBar'
+import { NAV_ICON } from '@/components/ui/NavIcons'
 import { getExpProgress } from '@/lib/game/leveling'
 import { ELEMENT_EMOJI } from '@/lib/types'
 import { playLevelUp } from '@/lib/game/sounds/events'
 import { getSharedAC } from '@/lib/game/sounds/shared-ac'
 import { hydrateAudioOverrides } from '@/lib/game/audio-overrides'
 
-const NAV_ITEMS: Array<{ href: string; icon: string; label: string; coachmark?: string }> = [
-  { href: '/game/map',      icon: '🗺️', label: 'Mappa'                                       },
-  { href: '/game/bestiary', icon: '📖', label: 'DaimonDex', coachmark: 'nav-bestiary'      },
-  { href: '/game/duel',     icon: '⚔️', label: 'Duelli',    coachmark: 'nav-duelli'        },
-  { href: '/game/missions', icon: '🎯', label: 'Missioni',  coachmark: 'nav-missioni'      },
-  { href: '/game/enigmi',   icon: '🧩', label: 'Enigmi',    coachmark: 'nav-enigmi'        },
-  { href: '/game/shop',     icon: '🛒', label: 'Shop',      coachmark: 'nav-shop'          },
-  { href: '/game/backpack', icon: '🎒', label: 'Zaino',     coachmark: 'nav-zaino'         },
-  { href: '/game/profile',  icon: '🏆', label: 'Classifica', coachmark: 'nav-classifica'   },
-  { href: '/game/guide',    icon: '❓', label: 'Guida',     coachmark: 'nav-guida'         },
-  { href: '/home',          icon: '🏠', label: 'Profilo'                                    },
+const NAV_ITEMS: Array<{ href: string; key: string; label: string; coachmark?: string }> = [
+  { href: '/game/map',      key: 'map',      label: 'Mappa'                                  },
+  { href: '/game/bestiary', key: 'bestiary', label: 'DaimonDex', coachmark: 'nav-bestiary'   },
+  { href: '/game/duel',     key: 'duel',     label: 'Duelli',    coachmark: 'nav-duelli'     },
+  { href: '/game/missions', key: 'missions', label: 'Missioni',  coachmark: 'nav-missioni'   },
+  { href: '/game/enigmi',   key: 'enigmi',   label: 'Enigmi',    coachmark: 'nav-enigmi'     },
+  { href: '/game/shop',     key: 'shop',     label: 'Shop',      coachmark: 'nav-shop'       },
+  { href: '/game/backpack', key: 'backpack', label: 'Zaino',     coachmark: 'nav-zaino'      },
+  { href: '/game/profile',  key: 'trophy',   label: 'Classifica', coachmark: 'nav-classifica' },
+  { href: '/game/guide',    key: 'guide',    label: 'Guida',     coachmark: 'nav-guida'      },
+  { href: '/home',          key: 'home',     label: 'Profilo'                                },
 ]
 
 function xpProgress(exp: number, level: number): number {
@@ -654,89 +655,18 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Header */}
-      <header className="relative flex items-center justify-between px-4 py-2 bg-[#0F1F2E]/95 border-b border-white/10 z-10">
-        {/* Level + XP bar */}
-        <div className="flex flex-col gap-0.5 min-w-[52px]">
-          {statsLoading
-            ? <div className="w-10 h-4 rounded bg-white/10 animate-pulse" />
-            : <span className="text-sm font-bold text-[#F7C841]">Lv {level ?? 1}</span>
-          }
-          {/* XP progress bar */}
-          <div className="w-12 h-1 rounded-full bg-white/10 overflow-hidden">
-            <motion.div
-              className="h-full rounded-full bg-[#F7C841]"
-              initial={{ width: 0 }}
-              animate={{ width: `${xpPct}%` }}
-              transition={{ duration: 0.6, ease: 'easeOut' }}
-            />
-          </div>
-        </div>
-
-        {/* Gold */}
-        <div className="flex items-center gap-1 text-[#D4A96A]">
-          {statsLoading
-            ? <div className="w-12 h-4 rounded bg-white/10 animate-pulse" />
-            : <>
-                <span className="text-sm">💰</span>
-                <CountUp
-                  value={gold ?? 0}
-                  durationMs={650}
-                  formatter={n => n.toLocaleString('it-IT')}
-                  className="text-sm font-bold tabular-nums"
-                />
-              </>
-          }
-        </div>
-
-        {/* Timer + bell */}
-        <div className="flex items-center gap-2">
-          <div className={`text-sm font-mono ${
-            timer.isCritical ? 'text-red-400 animate-pulse' :
-            timer.isWarning  ? 'text-amber-400' : 'text-[#E85D2F]'
-          }`}>
-            ⏱ {timer.formatted || '--:--'}
-          </div>
-          <button
-            onClick={openNotifPanel}
-            className="relative p-1 text-white/50 hover:text-white transition-colors"
-            aria-label="Notifiche"
-          >
-            {/* Pulse aura when unread events exist — draws the eye without
-                being aggressive. Disabled when count is 0 so it doesn't
-                animate forever. */}
-            {unreadCount > 0 && (
-              <span
-                aria-hidden
-                className="absolute inset-0 rounded-full pointer-events-none"
-                style={{
-                  background: 'radial-gradient(circle, rgba(239,68,68,0.55) 0%, transparent 65%)',
-                  animation: 'wc-bell-pulse 1.6s ease-in-out infinite',
-                }}
-              />
-            )}
-            <motion.span
-              animate={unreadCount > 0 ? { rotate: [0, -10, 10, -8, 8, 0] } : { rotate: 0 }}
-              transition={{ duration: 0.8, repeat: unreadCount > 0 ? Infinity : 0, repeatDelay: 2.4, ease: 'easeInOut' }}
-              className="text-xl relative inline-block"
-              style={{ transformOrigin: '50% 12%' }}
-            >
-              🔔
-            </motion.span>
-            {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
-          <style jsx global>{`
-            @keyframes wc-bell-pulse {
-              0%, 100% { opacity: 0; transform: scale(0.6); }
-              50%      { opacity: 0.6; transform: scale(1.4); }
-            }
-          `}</style>
-        </div>
-      </header>
+      {/* Header — premium prototype */}
+      <GameTopBar
+        level={level}
+        xpPct={xpPct}
+        gold={gold}
+        timerFormatted={timer.formatted || ''}
+        timerCritical={timer.isCritical}
+        timerWarning={timer.isWarning}
+        statsLoading={statsLoading}
+        unreadCount={unreadCount}
+        onBell={openNotifPanel}
+      />
 
       {/* Main content */}
       <main className="flex-1 overflow-hidden relative">
@@ -757,11 +687,16 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         </motion.div>
       </main>
 
-      {/* Bottom navigation */}
+      {/* Bottom navigation — Gilded Relic rail */}
       <nav
         ref={navRef}
-        className="nav-scrollable relative flex border-t border-white/10 bg-[#0F1F2E]/95 flex-shrink-0"
-        style={{ overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 'env(safe-area-inset-bottom)' } as React.CSSProperties}
+        className="nav-scrollable relative flex flex-shrink-0"
+        style={{
+          background: 'radial-gradient(120% 180% at 50% 130%, #1a3142 0%, #0c1c2b 55%, #081420 100%)',
+          borderTop: '1px solid rgba(247,200,65,0.42)',
+          boxShadow: 'inset 0 1px 0 rgba(255,236,150,0.14), inset 0 10px 24px -12px rgba(0,0,0,0.6)',
+          overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 'env(safe-area-inset-bottom)',
+        } as React.CSSProperties}
       >
         {(() => {
           const inEncounter = pathname.startsWith('/game/encounter/')
@@ -777,36 +712,52 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
             return (
               <>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span className="text-[10px] text-white/25 tracking-widest uppercase">{battleMsg}</span>
+                  <span className="text-[10px] tracking-widest uppercase" style={{ color: 'rgba(247,200,65,0.4)' }}>{battleMsg}</span>
                 </div>
-                {NAV_ITEMS.map(({ href, icon, label }) => (
-                  <span
-                    key={href}
-                    className="flex-shrink-0 flex flex-col items-center py-2 gap-0.5 text-xs text-white/15 cursor-not-allowed select-none"
-                    style={{ minWidth: 56, width: `${100 / NAV_ITEMS.length}%` }}
-                  >
-                    <span className="text-xl">{icon}</span>
-                    <span className="truncate w-full text-center px-0.5">{label}</span>
-                  </span>
-                ))}
+                {NAV_ITEMS.map(({ href, key, label }) => {
+                  const Icon = NAV_ICON[key]
+                  return (
+                    <span
+                      key={href}
+                      className="flex-shrink-0 flex flex-col items-center pt-1.5 pb-1 gap-0.5 cursor-not-allowed select-none"
+                      style={{ minWidth: 56, width: `${100 / NAV_ITEMS.length}%`, opacity: 0.22 }}
+                    >
+                      {Icon && <Icon size={26} />}
+                      <span className="truncate w-full text-center px-0.5 text-[10px]" style={{ color: 'var(--wc-ink-faint)' }}>{label}</span>
+                    </span>
+                  )
+                })}
               </>
             )
           }
-          return NAV_ITEMS.map(({ href, icon, label, coachmark }) => (
-            <Link
-              key={href}
-              href={href}
-              data-active={pathname === href ? 'true' : 'false'}
-              data-coachmark={coachmark}
-              className={`flex-shrink-0 flex flex-col items-center py-2 gap-0.5 text-xs transition-colors ${
-                pathname === href ? 'text-[#3A9DBC]' : 'text-white/50 hover:text-white/80'
-              }`}
-              style={{ minWidth: 56, width: `${100 / NAV_ITEMS.length}%` }}
-            >
-              <span className="text-xl">{icon}</span>
-              <span className="truncate w-full text-center px-0.5">{label}</span>
-            </Link>
-          ))
+          return NAV_ITEMS.map(({ href, key, label, coachmark }) => {
+            const Icon = NAV_ICON[key]
+            const active = pathname === href
+            return (
+              <Link
+                key={href}
+                href={href}
+                data-active={active ? 'true' : 'false'}
+                data-coachmark={coachmark}
+                className="relative flex-shrink-0 flex flex-col items-center pt-1.5 pb-1 gap-0.5 transition-all"
+                style={{ minWidth: 56, width: `${100 / NAV_ITEMS.length}%` }}
+              >
+                {active && (
+                  <span aria-hidden className="absolute top-0 rounded-full"
+                    style={{ width: 24, height: 2.5, background: 'linear-gradient(90deg, #7FE6FF, #46BAD8)', boxShadow: '0 0 10px rgba(70,186,216,0.9)' }} />
+                )}
+                <motion.span
+                  animate={{ scale: active ? 1.14 : 1, y: active ? -1 : 0 }}
+                  transition={{ type: 'spring', stiffness: 360, damping: 22 }}
+                  style={{ opacity: active ? 1 : 0.82 }}
+                >
+                  {Icon && <Icon size={27} active={active} />}
+                </motion.span>
+                <span className="truncate w-full text-center px-0.5 text-[10px] font-semibold"
+                  style={{ color: active ? '#7FE6FF' : 'var(--wc-ink-faint)' }}>{label}</span>
+              </Link>
+            )
+          })
         })()}
       </nav>
 

@@ -4,13 +4,54 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* ──────────────────────────────────────────────────────────────
+     Wild Catch / Daimon — "Gilded Relic" theme tokens.
+     Dark teal-navy plates, gilded gold rims, arcane cyan, ember,
+     mystic violet. Drives the shared chrome + UI primitives. Legacy
+     hardcoded hex stays untouched (additive only).
+     ────────────────────────────────────────────────────────────── */
+  --wc-bg-0: #07121c;   /* app void */
+  --wc-bg-1: #0c1d2c;   /* panel base */
+  --wc-bg-2: #122a3c;   /* raised panel */
+  --wc-ink: #eef5f9;
+  --wc-ink-dim: rgba(238, 245, 249, 0.58);
+  --wc-ink-faint: rgba(238, 245, 249, 0.34);
+
+  /* accents */
+  --wc-gold: #f7c841;
+  --wc-gold-soft: #ffe08a;
+  --wc-gold-deep: #b5841e;
+  --wc-cyan: #46bad8;
+  --wc-ember: #f0703a;
+  --wc-violet: #b06cf0;
+  --wc-green: #44d08a;
+  --wc-red: #f0556a;
+
+  /* gradients */
+  --wc-grad-gold: linear-gradient(180deg, #ffeea8 0%, #f3c233 50%, #a9741a 100%);
+  --wc-grad-plate: radial-gradient(120% 160% at 50% -30%, #1a3142 0%, #0c1c2b 55%, #081420 100%);
+  --wc-grad-panel: linear-gradient(165deg, rgba(28, 56, 78, 0.55) 0%, rgba(10, 24, 38, 0.82) 100%);
+
+  /* gilded rim + depth */
+  --wc-rim: 1px solid rgba(247, 200, 65, 0.5);
+  --wc-rim-soft: 1px solid rgba(247, 200, 65, 0.18);
+  --wc-emboss: inset 0 1px 0 rgba(255, 236, 150, 0.18), inset 0 -10px 24px -10px rgba(0, 0, 0, 0.6);
+  --wc-shadow: 0 14px 40px -18px rgba(0, 0, 0, 0.85);
+
+  /* radii */
+  --wc-r-sm: 10px;
+  --wc-r-md: 16px;
+  --wc-r-lg: 22px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* DM Sans = body face, Cinzel = engraved display/headings/numbers. */
+  --font-sans: var(--font-dm-sans), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-cinzel), Georgia, "Times New Roman", serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,13 +62,69 @@
 }
 
 body {
-  background: #0A1520;
+  background: #0a1520;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* was Arial — now the refined DM Sans body face */
+  font-family: var(--font-dm-sans), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Premium UI primitives (opt-in via className) ────────────────── */
+
+/* Engraved display face for epic titles, wordmarks, big numbers. */
+.wc-display {
+  font-family: var(--font-cinzel), Georgia, "Times New Roman", serif;
+  letter-spacing: 0.01em;
+}
+
+/* Gilded gradient text. */
+.wc-gold-text {
+  background: var(--wc-grad-gold);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glass panel — atmospheric, lightweight, no heavy border. */
+.wc-panel {
+  background: var(--wc-grad-panel);
+  border: 1px solid rgba(125, 185, 215, 0.12);
+  border-radius: var(--wc-r-md);
+  box-shadow: var(--wc-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Ornate gilded plate (top bar / nav rail / hero panels). */
+.wc-plate {
+  background: var(--wc-grad-plate);
+  box-shadow: var(--wc-emboss);
+}
+
+/* Glows */
+.wc-glow-gold { box-shadow: 0 0 18px -2px rgba(247, 200, 65, 0.45); }
+.wc-glow-cyan { box-shadow: 0 0 18px -2px rgba(70, 186, 216, 0.5); }
+
+/* Soft gilded sheen sweep for hero elements. */
+@keyframes wc-sheen {
+  0% { background-position: -180% 0; }
+  60%, 100% { background-position: 180% 0; }
+}
+.wc-sheen {
+  background-image: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.16) 50%, transparent 70%);
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: wc-sheen 5.5s ease-in-out infinite;
 }
 
 /* Hide scrollbar on nav overflow while keeping scrollability */
 .nav-scrollable::-webkit-scrollbar { display: none; }
+
+/* Reusable: hide scrollbar but keep scrolling (e.g. filter pill rows). */
+.scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 /* Leaflet attribution — required by license, styled to be unobtrusive */
 .leaflet-control-attribution {
