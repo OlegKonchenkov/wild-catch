@@ -10,20 +10,25 @@ import { GameListSkeleton } from '@/components/game/GameLoading'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
+import { type IconType } from 'react-icons'
+import {
+  GiKnapsack, GiTwoCoins, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower,
+  GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing,
+} from 'react-icons/gi'
 
 const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
 
-const TYPE_META: Record<ItemType, { icon: string; label: string; hint: string; color: string }> = {
-  rete:      { icon: '🎯', label: 'Rete',      hint: 'Aumenta la probabilità di cattura',    color: '#3A9DBC' },
-  esca:      { icon: '🍖', label: 'Esca',       hint: 'Attira creature rare nelle vicinanze', color: '#34D399' },
-  uovo:      { icon: '🥚', label: 'Uovo',       hint: 'Incuba una nuova creatura casuale',    color: '#C084FC' },
-  battaglia: { icon: '⚔️', label: 'Battaglia', hint: 'Potenzia ATK in duello',               color: '#FBBF24' },
-  pozione:   { icon: '🧪', label: 'Pozione',   hint: 'Neutralizza debolezza elementale',     color: '#F472B6' },
-  cura:      { icon: '💊', label: 'Cura',       hint: 'Ripristina HP creatura in battaglia',  color: '#34D399' },
-  arma:      { icon: '🗡️', label: 'Arma',       hint: 'Equipaggia dalla DaimonDex (+ATK)',     color: '#FB7185' },
-  corazza:   { icon: '🛡️', label: 'Corazza',   hint: 'Equipaggia dalla DaimonDex (+HP/DEF)',  color: '#60A5FA' },
-  elmo:      { icon: '⛑️', label: 'Elmo',       hint: 'Equipaggia dalla DaimonDex (+HP/DEF)',  color: '#FBBF24' },
-  accessorio:{ icon: '💍', label: 'Accessorio', hint: 'Equipaggia dalla DaimonDex (bonus misti)', color: '#C084FC' },
+const TYPE_META: Record<ItemType, { Icon: IconType; label: string; hint: string; color: string }> = {
+  rete:      { Icon: GiFishingNet,    label: 'Rete',      hint: 'Aumenta la probabilità di cattura',    color: '#3A9DBC' },
+  esca:      { Icon: GiFishingLure,   label: 'Esca',       hint: 'Attira creature rare nelle vicinanze', color: '#34D399' },
+  uovo:      { Icon: GiEggClutch,     label: 'Uovo',       hint: 'Incuba una nuova creatura casuale',    color: '#C084FC' },
+  battaglia: { Icon: GiSwordsPower,   label: 'Battaglia', hint: 'Potenzia ATK in duello',               color: '#FBBF24' },
+  pozione:   { Icon: GiStandingPotion, label: 'Pozione',   hint: 'Neutralizza debolezza elementale',     color: '#F472B6' },
+  cura:      { Icon: GiHealthPotion,  label: 'Cura',       hint: 'Ripristina HP creatura in battaglia',  color: '#34D399' },
+  arma:      { Icon: GiBroadsword,    label: 'Arma',       hint: 'Equipaggia dalla DaimonDex (+ATK)',     color: '#FB7185' },
+  corazza:   { Icon: GiBreastplate,   label: 'Corazza',   hint: 'Equipaggia dalla DaimonDex (+HP/DEF)',  color: '#60A5FA' },
+  elmo:      { Icon: GiHelmet,        label: 'Elmo',       hint: 'Equipaggia dalla DaimonDex (+HP/DEF)',  color: '#FBBF24' },
+  accessorio:{ Icon: GiRing,          label: 'Accessorio', hint: 'Equipaggia dalla DaimonDex (bonus misti)', color: '#C084FC' },
 }
 
 const RARITY_COLOR: Record<string, string> = {
@@ -416,7 +421,7 @@ export default function BackpackPage() {
   const totalItems = inventory.reduce((s, r) => s + r.quantity, 0)
 
   return (
-    <div className="h-full flex flex-col overflow-hidden relative">
+    <div className="h-full flex flex-col overflow-hidden relative" style={{ background: 'radial-gradient(120% 80% at 50% 0%, #122c3e 0%, #0a1a26 45%, #060f17 100%)' }}>
       {/* Hatching overlay */}
       <AnimatePresence>
         {hatchResult && (
@@ -435,11 +440,15 @@ export default function BackpackPage() {
       </div>
 
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-white/10 bg-[#0A1520]/80">
+      <div className="relative px-4 pt-4 pb-3">
+        <span aria-hidden className="absolute inset-x-0 bottom-0 h-px pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(247,200,65,0.4), transparent)' }} />
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-extrabold tracking-tight">🎒 Zaino</h1>
+          <h1 className="flex items-center gap-2">
+            <GiKnapsack size={22} color="#F0843C" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />
+            <span className="wc-display wc-gold-text" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }}>Zaino</span>
+          </h1>
           {totalItems > 0 && (
-            <span className="text-xs text-white/40 bg-white/5 border border-white/10 rounded-full px-2.5 py-1">
+            <span className="text-xs rounded-full px-2.5 py-1" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--wc-line)', color: 'var(--wc-ink-dim)' }}>
               {totalItems} oggetti
             </span>
           )}
@@ -447,27 +456,36 @@ export default function BackpackPage() {
 
         {/* Type filter pills */}
         {types.length > 0 && (
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
+          <div
+            className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide"
+            style={{ WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)', maskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)' }}
+          >
             <button
               onClick={() => setFilter('all')}
-              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${
-                filter === 'all' ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/50 hover:text-white'
-              }`}
+              className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-semibold transition-all"
+              style={filter === 'all'
+                ? { background: 'linear-gradient(180deg, #56C8E0, #2a7d98)', color: '#fff', boxShadow: '0 0 10px rgba(70,186,216,0.4)' }
+                : { background: 'rgba(255,255,255,0.05)', color: 'var(--wc-ink-dim)' }}
             >
               Tutti
             </button>
-            {types.map(t => (
-              <button
-                key={t}
-                onClick={() => setFilter(t)}
-                className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${
-                  filter === t ? 'text-white' : 'bg-white/5 text-white/50 hover:text-white'
-                }`}
-                style={filter === t ? { backgroundColor: TYPE_META[t].color } : undefined}
-              >
-                {TYPE_META[t].icon} {TYPE_META[t].label}
-              </button>
-            ))}
+            {types.map(t => {
+              const m = TYPE_META[t]
+              const TIcon = m.Icon
+              const on = filter === t
+              return (
+                <button
+                  key={t}
+                  onClick={() => setFilter(t)}
+                  className="flex-shrink-0 inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full font-semibold transition-all"
+                  style={on
+                    ? { background: `linear-gradient(180deg, ${m.color}, ${m.color}bb)`, color: '#fff', boxShadow: `0 0 10px ${m.color}55` }
+                    : { background: 'rgba(255,255,255,0.05)', color: 'var(--wc-ink-dim)' }}
+                >
+                  <TIcon size={14} color={on ? '#fff' : m.color} /> {m.label}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -530,7 +548,8 @@ export default function BackpackPage() {
                 {filtered.map(row => {
                   const item = row.items
                   if (!item) return null
-                  const meta = TYPE_META[item.type] ?? { icon: '📦', label: item.type, hint: '', color: '#9CA3AF' }
+                  const meta = TYPE_META[item.type] ?? { Icon: GiKnapsack, label: item.type, hint: '', color: '#9CA3AF' }
+                  const ItemIcon = meta.Icon
                   const usable = USABLE_FROM_BACKPACK.includes(item.type as ItemType)
                   const isUsing = usingId === row.id
 
@@ -546,10 +565,10 @@ export default function BackpackPage() {
                       {/* Left: icon + info */}
                       <div className="flex items-center gap-3 p-3 flex-1 min-w-0">
                         <div
-                          className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
-                          style={{ background: `${meta.color}18` }}
+                          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                          style={{ background: `${meta.color}18`, border: `1px solid ${meta.color}22` }}
                         >
-                          {meta.icon}
+                          <ItemIcon size={26} color={meta.color} style={{ filter: `drop-shadow(0 1px 2px ${meta.color}55)` }} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
@@ -570,8 +589,8 @@ export default function BackpackPage() {
                             </p>
                           )}
                           {(['arma', 'corazza', 'elmo', 'accessorio'] as ItemType[]).includes(item.type as ItemType) && (
-                            <p className="text-xs mt-0.5" style={{ color: meta.color }}>
-                              🛡️ Equipaggia dalla DaimonDex
+                            <p className="inline-flex items-center gap-1 text-xs mt-0.5" style={{ color: meta.color }}>
+                              <GiBreastplate size={12} color={meta.color} /> Equipaggia dalla DaimonDex
                             </p>
                           )}
                         </div>
@@ -617,7 +636,9 @@ export default function BackpackPage() {
                             ×{row.quantity}
                           </div>
                           {item.shop_price > 0 && (
-                            <p className="text-xs text-white/25">💰{item.shop_price}</p>
+                            <p className="inline-flex items-center gap-0.5 text-xs text-white/25">
+                              <GiTwoCoins size={11} color="#F7C841" /> {item.shop_price}
+                            </p>
                           )}
                         </div>
                       )}
