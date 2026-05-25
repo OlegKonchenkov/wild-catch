@@ -1,5 +1,6 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion'
+import { GiBootPrints, GiFishingLure, GiCompass, GiLightBulb } from 'react-icons/gi'
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
@@ -186,9 +187,6 @@ const ELEMENT_GLOW: Record<string, string> = {
   armonia:   '#F9A8D4',
 }
 
-const ELEMENT_EMOJI: Record<string, string> = {
-  fiamma: '🔥', adriatico: '🌊', bosco: '🌿', terra: '⚡', armonia: '✨',
-}
 
 
 
@@ -1580,7 +1578,7 @@ function MapPageInner() {
       {showPinHint && tutorialBonusPin && (
         <div className="absolute z-[855] top-20 left-1/2 -translate-x-1/2 max-w-[320px] w-[88%] px-4 py-3 rounded-2xl bg-[#7B4DB8]/95 text-white shadow-xl backdrop-blur-sm border border-[#C084FC]/40">
           <div className="flex items-start gap-2.5">
-            <span className="text-2xl shrink-0 leading-none">💡</span>
+            <span className="shrink-0 leading-none flex"><GiLightBulb size={24} color="#FBBF24" /></span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold leading-snug">Il maestro ha tracciato la rotta finale</p>
               <p className="text-[12px] text-white/80 leading-snug mt-0.5">
@@ -1704,7 +1702,7 @@ function MapPageInner() {
           transition={{ duration: 0.7, ease: 'easeOut' }}
           key={stepsWalked}
         >
-          <span className="text-sm">👟</span>
+          <GiBootPrints size={16} color="#46bad8" />
           <div className="flex flex-col items-start leading-none">
             <span className="text-white font-bold text-sm leading-tight tabular-nums">{displayedSteps.toLocaleString('it-IT')} m</span>
             {/* GPS accuracy folded in here as the subtitle (replaces the
@@ -1735,7 +1733,7 @@ function MapPageInner() {
               boxShadow: '0 0 12px rgba(52,211,153,0.35), 0 2px 8px rgba(0,0,0,0.4)',
             }}
           >
-            <span className="text-base leading-none" style={{ filter: 'drop-shadow(0 0 4px rgba(52,211,153,0.8))' }}>🪱</span>
+            <span className="leading-none flex" style={{ filter: 'drop-shadow(0 0 4px rgba(52,211,153,0.8))' }}><GiFishingLure size={17} color="#34D399" /></span>
             <div className="flex flex-col leading-tight">
               <span className="text-[10px] font-extrabold text-[#34D399] uppercase tracking-wider">Esca attiva</span>
               <span className="text-[11px] font-mono font-bold text-white">
@@ -1820,7 +1818,7 @@ function MapPageInner() {
             boxShadow: '0 4px 18px rgba(0,0,0,0.45), 0 0 0 1px rgba(58,188,168,0.12)',
           }}
         >
-          <span className="text-lg leading-none shrink-0">🧭</span>
+          <span className="leading-none shrink-0 flex"><GiCompass size={20} color="#3ABCA8" /></span>
           <p className="text-[12px] leading-snug text-white/80 flex-1">
             Inizia a <strong className="text-[#3ABCA8]">camminare</strong>: le creature
             compaiono mentre ti muovi.
