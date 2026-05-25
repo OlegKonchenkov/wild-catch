@@ -698,13 +698,13 @@ export default function MissionsPage() {
               >
                 {/* Progress ring OR creature thumbnail for cattura missions */}
                 {mission.type === 'cattura' && mission.target && creaturePreviews[mission.target] ? (
-                  <div className="relative shrink-0 w-14 h-14 rounded-xl overflow-hidden"
-                    style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div className="relative shrink-0 w-16 h-16 rounded-2xl overflow-hidden"
+                    style={{ border: `1px solid ${completed ? 'rgba(68,208,138,0.6)' : 'rgba(255,255,255,0.1)'}`, boxShadow: completed ? '0 0 14px -3px rgba(68,208,138,0.55)' : undefined }}>
                     <CreatureDiorama
                       creature={creaturePreviews[mission.target]}
-                      size={58}
+                      size={70}
                       anchor="center"
-                      rounded={12}
+                      rounded={14}
                       showAura={false}
                       className="w-full h-full"
                       style={caughtNames.has(mission.target) ? undefined : {
@@ -712,16 +712,16 @@ export default function MissionsPage() {
                       }}
                     />
                     {completed && (
-                      <span className="absolute -top-1 -right-1 rounded-full flex items-center justify-center" style={{ background: '#0a1a26', padding: 2 }}>
-                        <GiCheckMark size={11} color="#44d08a" />
+                      <span className="absolute -top-1 -right-1 rounded-full flex items-center justify-center" style={{ background: '#0a1a26', padding: 2, boxShadow: '0 0 6px rgba(68,208,138,0.6)' }}>
+                        <GiCheckMark size={12} color="#44d08a" />
                       </span>
                     )}
                   </div>
                 ) : (
-                  <div className="relative shrink-0">
-                    <ProgressRing pct={pct} color={locked ? 'rgba(255,255,255,0.35)' : completed ? '#34D399' : meta.color} />
+                  <div className="relative shrink-0 w-16 h-16 flex items-center justify-center">
+                    <ProgressRing pct={pct} size={50} color={locked ? 'rgba(255,255,255,0.35)' : completed ? '#34D399' : meta.color} />
                     <span className="absolute inset-0 flex items-center justify-center">
-                      {completed ? <GiCheckMark size={17} color="#44d08a" /> : locked ? <GiPadlock size={15} color="rgba(255,255,255,0.45)" /> : <meta.Icon size={18} color={meta.color} />}
+                      {completed ? <GiCheckMark size={20} color="#44d08a" /> : locked ? <GiPadlock size={18} color="rgba(255,255,255,0.45)" /> : <meta.Icon size={22} color={meta.color} />}
                     </span>
                   </div>
                 )}
@@ -745,7 +745,7 @@ export default function MissionsPage() {
                       <span className="text-xs text-white/45 shrink-0 font-semibold">🔒 Bloccata</span>
                     )}
                   </div>
-                  <p className="font-bold text-white text-sm leading-tight truncate">
+                  <p className="font-bold text-white text-[15px] leading-tight truncate">
                     {mission.title}
                   </p>
                   {locked ? (
