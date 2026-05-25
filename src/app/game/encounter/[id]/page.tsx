@@ -25,7 +25,8 @@ import { getCurrentUser } from '@/lib/supabase/client-user'
 import { track } from '@/lib/analytics'
 import { haptics } from '@/lib/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
-import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
+import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
+import ElementIcon from '@/components/ui/ElementIcon'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
@@ -143,7 +144,6 @@ function formatCatchMultiplier(multiplier: number): string {
 
 function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, catchMultiplier, isWild, animState = 'idle', fainting, side, statusEffect, statusTurnsLeft }: CardProps) {
   const rarityColor = RARITY_COLORS[rarity as Rarity] ?? '#64748b'
-  const elemEmoji   = ELEMENT_EMOJI[element as keyof typeof ELEMENT_EMOJI] ?? '✦'
   const hpPct       = Math.max(0, Math.min(100, (currentHp / maxHp) * 100))
   const hpColor     = hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444'
   const stars       = CATCH_STARS[rarity] ?? 1
@@ -265,7 +265,7 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
             >
               {RARITY_LABELS[rarity as Rarity]}
             </span>
-            <span className="text-[13px] leading-none">{elemEmoji}</span>
+            <ElementIcon element={element} size={14} />
             <span className="text-[10px] text-white/35 capitalize">{element}</span>
           </div>
           {statusEffect && STATUS_EFFECT_META[statusEffect] && (() => {
@@ -1853,7 +1853,7 @@ export default function EncounterPage() {
                       style={{ filter: isFainted ? 'grayscale(1)' : 'none' }}
                     />
                   ) : (
-                    <span className="text-sm shrink-0 leading-none">{ELEMENT_EMOJI[cr.element as keyof typeof ELEMENT_EMOJI] ?? '✦'}</span>
+                    <ElementIcon element={cr.element} size={15} className="shrink-0" />
                   )}
                   {/* HP bar */}
                   <div className="flex-1 min-w-0">
@@ -2218,7 +2218,6 @@ export default function EncounterPage() {
           const crRarity = cr?.rarity  ?? (state.creature.rarity ?? 'comune')
           const crTheme  = ELEMENT_THEME[crElem] ?? ELEMENT_THEME.bosco
           const crRarityColor = RARITY_COLORS[crRarity as Rarity] ?? '#64748b'
-          const crElemEmoji   = ELEMENT_EMOJI[crElem as keyof typeof ELEMENT_EMOJI] ?? '✦'
           const isEvolved = result === 'evolved'
 
           return (
@@ -2296,7 +2295,7 @@ export default function EncounterPage() {
                       {cr?.name ?? state.creature.name}
                     </h3>
                     <div className="flex items-center justify-center gap-2">
-                      <span className="text-base">{crElemEmoji}</span>
+                      <span className="flex"><ElementIcon element={crElem} size={16} /></span>
                       <span className="text-xs capitalize text-white/40">{crElem}</span>
                       <span className="text-xs px-2 py-0.5 rounded-full font-bold"
                         style={{ background: `${crRarityColor}22`, color: crRarityColor, border: `1px solid ${crRarityColor}55` }}>

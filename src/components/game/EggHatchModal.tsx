@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { playEggHatch } from '@/lib/game/sounds/hatch'
+import ElementIcon from '@/components/ui/ElementIcon'
 
 const RARITY_COLOR: Record<string, string> = {
   comune:      '#9CA3AF',
@@ -29,9 +30,6 @@ const ELEMENT_GLOW: Record<string, string> = {
   armonia:   '#F9A8D4',
 }
 
-const ELEMENT_EMOJI: Record<string, string> = {
-  fiamma: '🔥', adriatico: '🌊', bosco: '🌿', terra: '⚡', armonia: '✨',
-}
 
 export interface HatchedCreature {
   name: string
@@ -73,7 +71,6 @@ export default function EggHatchModal({
 
   const rarityColor = RARITY_COLOR[creature.rarity] ?? '#9CA3AF'
   const glow = ELEMENT_GLOW[creature.element] ?? rarityColor
-  const elemEmoji = ELEMENT_EMOJI[creature.element] ?? '✦'
 
   return (
     <div className="fixed inset-0 z-[1200] flex flex-col items-center justify-center bg-black/88 backdrop-blur-sm">
@@ -147,7 +144,7 @@ export default function EggHatchModal({
               }}>
                 <h3 className="text-2xl font-bold text-white mb-1">{creature.name}</h3>
                 <div className="flex items-center justify-center gap-2">
-                  <span className="text-base">{elemEmoji}</span>
+                  <ElementIcon element={creature.element} size={16} />
                   <span className="text-xs capitalize text-white/40">{creature.element}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full font-bold"
                     style={{ background: `${rarityColor}22`, color: rarityColor, border: `1px solid ${rarityColor}55` }}>

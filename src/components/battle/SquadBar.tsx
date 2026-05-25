@@ -1,14 +1,8 @@
 'use client'
 import Image from 'next/image'
 import type { Element } from '@/lib/types'
+import ElementIcon from '@/components/ui/ElementIcon'
 
-const ELEMENT_EMOJI: Record<Element, string> = {
-  bosco: '\uD83C\uDF3F',
-  fiamma: '\uD83D\uDD25',
-  adriatico: '\uD83C\uDF0A',
-  terra: '\u26F0\uFE0F',
-  armonia: '\uD83C\uDFB5',
-}
 const ELEMENT_GLOW: Record<Element, string> = {
   bosco: '#48D76F',
   fiamma: '#FF6938',
@@ -122,7 +116,7 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
             >
               {m.imageUrl
                 ? <Image src={m.imageUrl} alt={m.name} width={44} height={44} style={{ objectFit: 'contain', transform: m.active ? 'scale(1.28)' : 'scale(1.18)' }} />
-                : <span style={{ fontSize: 22, filter: `drop-shadow(0 0 6px ${glow})` }}>{ELEMENT_EMOJI[m.element]}</span>}
+                : <span style={{ filter: `drop-shadow(0 0 6px ${glow})`, display: 'flex' }}><ElementIcon element={m.element} size={22} /></span>}
               {m.fainted && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#EF4444', fontWeight: 800 }}>{'\u2715'}</span>}
             </span>
             <span style={{ flex: 1, minWidth: 0, height: '100%', display: 'grid', alignContent: 'center', textAlign: 'left' }}>

@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
+import ElementIcon from '@/components/ui/ElementIcon'
 
 const RARITY_COLOR: Record<string, string> = {
   comune:      '#9CA3AF',
@@ -26,10 +27,6 @@ const ELEMENT_GLOW: Record<string, string> = {
   bosco:     '#34D399',
   terra:     '#A78BFA',
   armonia:   '#F9A8D4',
-}
-
-const ELEMENT_EMOJI: Record<string, string> = {
-  fiamma: '🔥', adriatico: '🌊', bosco: '🌿', terra: '⚡', armonia: '✨',
 }
 
 export interface StarterCreature {
@@ -107,7 +104,7 @@ export default function StarterSelect({
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
                   style={{ background: `${cGlow}22`, color: cGlow }}
                 >
-                  {ELEMENT_EMOJI[c.element] ?? '✦'} {c.element}
+                  <ElementIcon element={c.element} size={12} /> {c.element}
                 </div>
                 {isSelected && (
                   <div
@@ -165,10 +162,10 @@ export default function StarterSelect({
                       {RARITY_LABEL[selected.rarity] ?? selected.rarity}
                     </span>
                     <span
-                      className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                      className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold"
                       style={{ background: `${glow}22`, color: glow }}
                     >
-                      {ELEMENT_EMOJI[selected.element] ?? '✦'} {selected.element}
+                      <ElementIcon element={selected.element} size={12} /> {selected.element}
                     </span>
                   </div>
                   <div className="flex gap-2 mt-2">

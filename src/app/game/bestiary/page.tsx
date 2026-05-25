@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/supabase/client-user'
 import { swr } from '@/lib/cache'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
-import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
+import { RARITY_COLORS, RARITY_LABELS, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
 import type { Creature, PlayerCreature, Element } from '@/lib/types'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
@@ -787,8 +787,8 @@ export default function BestiaryPage() {
                       )}
                     </div>
                   ) : (
-                    <div className={`text-3xl ${caught ? '' : 'opacity-10'}`}>
-                      {caught ? ELEMENT_EMOJI[creature.element] : '?'}
+                    <div className={`flex items-center justify-center ${caught ? '' : 'text-3xl opacity-10'}`}>
+                      {caught ? <ElementIcon element={creature.element} size={30} /> : '?'}
                     </div>
                   )}
 
@@ -1285,7 +1285,7 @@ export default function BestiaryPage() {
                                     </>
                                   ) : creature.image_url
                                     ? <img src={creature.image_url} alt={creature.name} className="absolute inset-0 w-full h-full object-contain p-2" />
-                                    : <span className="absolute inset-0 flex items-center justify-center text-3xl">{ELEMENT_EMOJI[creature.element]}</span>
+                                    : <span className="absolute inset-0 flex items-center justify-center"><ElementIcon element={creature.element} size={30} /></span>
                                 ) : occupantCr ? (
                                   occupantCr.sprite_cutout_url ? (
                                     <div className="absolute inset-0 opacity-45">
@@ -1294,7 +1294,7 @@ export default function BestiaryPage() {
                                     </div>
                                   ) : occupantCr.image_url
                                     ? <img src={occupantCr.image_url} alt={occupantCr.name} className="absolute inset-0 w-full h-full object-contain p-2 opacity-40" />
-                                    : <span className="absolute inset-0 flex items-center justify-center text-3xl opacity-30">{ELEMENT_EMOJI[occupantCr.element]}</span>
+                                    : <span className="absolute inset-0 flex items-center justify-center opacity-30"><ElementIcon element={occupantCr.element} size={30} /></span>
                                 ) : (
                                   /* Empty slot — visible call-to-action */
                                   <span className="absolute inset-0 flex flex-col items-center justify-center gap-1">
@@ -1364,7 +1364,7 @@ export default function BestiaryPage() {
 
                       <div className="rounded-xl p-4 text-center"
                         style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                        <p className="text-3xl mb-1">{ELEMENT_EMOJI[creature.element]}</p>
+                        <p className="mb-1.5 flex justify-center"><ElementIcon element={creature.element} size={30} /></p>
                         <p className="text-xs text-white/30">Elemento rilevato</p>
                       </div>
 
@@ -1384,7 +1384,6 @@ export default function BestiaryPage() {
       {evolveReveal && (() => {
         const cr = evolveReveal
         const rarityColor = RARITY_COLORS[cr.rarity as keyof typeof RARITY_COLORS] ?? '#9CA3AF'
-        const elemEmoji = ELEMENT_EMOJI[cr.element as keyof typeof ELEMENT_EMOJI] ?? '✦'
         const elemGlow: Record<string, string> = {
           fiamma: '#FF6B35', adriatico: '#3A9DBC', bosco: '#34D399', terra: '#A78BFA', armonia: '#F9A8D4',
         }
@@ -1499,7 +1498,7 @@ export default function BestiaryPage() {
                     }}>
                       <h3 className="text-2xl font-bold text-white mb-1">{cr.name}</h3>
                       <div className="flex items-center justify-center gap-2">
-                        <span className="text-base">{elemEmoji}</span>
+                        <span className="flex"><ElementIcon element={cr.element} size={16} /></span>
                         <span className="text-xs capitalize text-white/40">{cr.element}</span>
                         <span className="text-xs px-2 py-0.5 rounded-full font-bold"
                           style={{ background: `${rarityColor}22`, color: rarityColor, border: `1px solid ${rarityColor}55` }}>

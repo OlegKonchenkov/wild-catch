@@ -1,7 +1,8 @@
 'use client'
 import { type ReactNode } from 'react'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
-import { RARITY_COLORS, RARITY_LABELS, ELEMENT_EMOJI } from '@/lib/types'
+import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
+import ElementIcon from '@/components/ui/ElementIcon'
 
 interface CreatureLike {
   element: string
@@ -79,7 +80,7 @@ export default function CreatureRosterRow({
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0" style={{ color: rc, background: `${rc}1f`, border: `1px solid ${rc}55` }}>
             {RARITY_LABELS[creature.rarity as keyof typeof RARITY_LABELS]}
           </span>
-          <span className="text-[13px] leading-none shrink-0">{ELEMENT_EMOJI[creature.element as keyof typeof ELEMENT_EMOJI]}</span>
+          <ElementIcon element={creature.element} size={14} className="shrink-0" />
         </div>
         {/* Compact stat chips */}
         <div className="flex items-center gap-1 mt-2">

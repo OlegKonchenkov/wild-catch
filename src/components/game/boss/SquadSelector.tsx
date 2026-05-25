@@ -1,5 +1,5 @@
 'use client'
-import { ELEMENT_EMOJI } from '@/lib/types'
+import ElementIcon from '@/components/ui/ElementIcon'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import CreatureRosterRow from '@/components/game/CreatureRosterRow'
 import CreatureLineupSlot from '@/components/game/CreatureLineupSlot'
@@ -57,7 +57,7 @@ export default function SquadSelector({
               <CreatureDiorama creature={bc} size={30} rounded={8} anchor="center" showAura={false} className="w-8 h-8 shrink-0" sizes="64px" />
               <div className="min-w-0">
                 <p className="text-[10px] font-bold text-white/80 truncate">{bc.name}</p>
-                <p className="text-[9px] text-white/35">{ELEMENT_EMOJI[bc.element]}</p>
+                <ElementIcon element={bc.element} size={11} />
               </div>
             </div>
           ))}

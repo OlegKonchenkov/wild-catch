@@ -5,10 +5,8 @@ import { RARITY_LABELS, RARITY_COLORS } from '@/lib/types'
 import type { StatusEffect } from '@/lib/game/combat'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import { IconSword } from './icons'
+import ElementIcon from '@/components/ui/ElementIcon'
 
-const ELEMENT_EMOJI: Record<Element, string> = {
-  bosco: '🌿', fiamma: '🔥', adriatico: '🌊', terra: '⛰', armonia: '🎵',
-}
 const ELEMENT_GLOW: Record<Element, string> = {
   bosco: '#2ECC6A', fiamma: '#FF5520', adriatico: '#00C4E8', terra: '#D4A060', armonia: '#B060F8',
 }
@@ -67,8 +65,8 @@ export default function CombatantCard({
     >
       {/* name row — element chip is the single element indicator */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ width: 28, height: 28, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, background: `${glow}26`, border: `1px solid ${glow}66`, boxShadow: `inset 0 0 9px ${glow}33` }}>
-          {ELEMENT_EMOJI[element]}
+        <span style={{ width: 28, height: 28, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${glow}26`, border: `1px solid ${glow}66`, boxShadow: `inset 0 0 9px ${glow}33` }}>
+          <ElementIcon element={element} size={16} />
         </span>
         <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em', lineHeight: 1 }}>{name}</span>
       </div>
