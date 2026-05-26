@@ -1701,36 +1701,65 @@ function MapPageInner() {
       <div className="absolute top-2 right-2 z-[900] flex flex-col items-end gap-1.5">
         <motion.div
           data-coachmark="step-counter"
-          className="bg-[#0F1F2E]/85 border border-white/10 backdrop-blur-sm rounded-xl px-3 py-2 flex items-center gap-2 relative overflow-hidden"
+          className="relative flex items-center gap-1.5 overflow-hidden rounded-xl px-2.5 py-1.5"
           // Subtle glow pulse when a credit fires — keyed off stepsWalked
           // (server-confirmed) so we don't fire on pending interpolation.
           animate={{ boxShadow: stepsWalked > 0 ? [
-            '0 0 0 0 rgba(58,157,188,0)',
-            '0 0 0 6px rgba(58,157,188,0.18)',
-            '0 0 0 0 rgba(58,157,188,0)',
-          ] : '0 0 0 0 rgba(58,157,188,0)' }}
+            '0 0 14px rgba(30,161,255,0.24), 0 5px 14px rgba(0,0,0,0.46), inset 0 0 12px rgba(30,161,255,0.08), inset 0 1px 0 rgba(143,232,255,0.18)',
+            '0 0 22px rgba(85,224,255,0.42), 0 5px 14px rgba(0,0,0,0.46), inset 0 0 16px rgba(30,161,255,0.14), inset 0 1px 0 rgba(143,232,255,0.30)',
+            '0 0 14px rgba(30,161,255,0.24), 0 5px 14px rgba(0,0,0,0.46), inset 0 0 12px rgba(30,161,255,0.08), inset 0 1px 0 rgba(143,232,255,0.18)',
+          ] : '0 0 14px rgba(30,161,255,0.24), 0 5px 14px rgba(0,0,0,0.46), inset 0 0 12px rgba(30,161,255,0.08), inset 0 1px 0 rgba(143,232,255,0.18)' }}
           transition={{ duration: 0.7, ease: 'easeOut' }}
           key={stepsWalked}
+          style={{
+            background:
+              'radial-gradient(circle at 28% 18%, rgba(98,230,255,0.18), transparent 34%), ' +
+              'linear-gradient(148deg, rgba(8,42,67,0.94) 0%, rgba(5,18,35,0.96) 100%)',
+            border: '1.5px solid rgba(41,165,255,0.72)',
+            backdropFilter: 'blur(10px) saturate(1.18)',
+          }}
         >
-          <GiBootPrints size={16} color="#46bad8" />
-          <div className="flex flex-col items-start leading-none">
-            <span className="text-white font-bold text-sm leading-tight tabular-nums">{displayedSteps.toLocaleString('it-IT')} m</span>
+          <span
+            className="pointer-events-none absolute inset-x-5 top-0 h-px"
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(117,232,255,0.82), transparent)' }}
+          />
+          <span
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+            style={{
+              background: 'radial-gradient(circle, rgba(29,169,255,0.20) 0%, rgba(13,53,91,0.42) 72%, rgba(9,21,37,0.72) 100%)',
+              border: '1.5px solid rgba(38,168,255,0.78)',
+              boxShadow: '0 0 14px rgba(31,161,255,0.30), inset 0 0 10px rgba(41,184,255,0.16)',
+            }}
+          >
+            <GiBootPrints size={16} color="#35C8FF" style={{ filter: 'drop-shadow(0 0 4px rgba(53,200,255,0.72))' }} />
+          </span>
+          <div className="flex min-w-0 flex-col items-start leading-none">
+            <span
+              className="whitespace-nowrap font-black leading-none text-white tabular-nums"
+              style={{
+                fontSize: displayedSteps >= 100000 ? 12 : displayedSteps >= 10000 ? 14 : 18,
+                textShadow: '0 0 7px rgba(255,255,255,0.22)',
+              }}
+            >
+              {displayedSteps.toLocaleString('it-IT')} m
+            </span>
             {/* GPS accuracy folded in here as the subtitle (replaces the
                 old "Distanza percorsa" label + a separate pill). One
                 element instead of two — same info, less UI clutter. The
                 shrinking ±Nm during warm-up is still the "acquiring GPS"
                 feedback the counter logic relies on. */}
             <span
-              className="text-[9px] uppercase tracking-wide mt-0.5 font-medium"
+              className="mt-0.5 text-[9px] font-semibold leading-none tabular-nums"
               style={{
                 color: gpsAccuracy === null
-                  ? 'rgba(255,255,255,0.30)'
-                  : gpsAccuracy <= 20  ? '#34D399'
+                  ? 'rgba(154,188,222,0.58)'
+                  : gpsAccuracy <= 20  ? '#7FE6FF'
                   : gpsAccuracy <= 100 ? '#F7C841'
-                  :                      '#E85D2F',
+                  :                      '#FF7A55',
+                textShadow: '0 0 7px rgba(70,186,216,0.18)',
               }}
             >
-              {gpsAccuracy === null ? 'GPS in cerca…' : `GPS ±${gpsAccuracy}m`}
+              {gpsAccuracy === null ? 'GPS in cerca...' : `GPS +/-${gpsAccuracy} m`}
             </span>
           </div>
         </motion.div>
@@ -1846,27 +1875,44 @@ function MapPageInner() {
         </motion.div>
       )}
 
-      {/* QR scan button — dark glass, game-themed */}
+      {/* QR scan button — glowing cyan glass (matches the reference mockup) */}
       <button
+        type="button"
         onClick={() => router.push('/game/missions?qr=1')}
-        className="absolute bottom-4 right-4 z-[900] flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl transition-all active:scale-95"
+        className="absolute bottom-4 right-4 z-[900] flex h-14 w-14 flex-col items-center justify-center gap-0.5 rounded-2xl transition-all active:scale-95"
         style={{
-          background: 'rgba(10, 20, 35, 0.82)',
-          border: '1.5px solid rgba(58,157,188,0.55)',
-          backdropFilter: 'blur(10px)',
-          boxShadow: '0 0 18px rgba(58,157,188,0.18), 0 4px 14px rgba(0,0,0,0.5)',
+          background:
+            'radial-gradient(circle at 30% 18%, rgba(108,242,255,0.24), transparent 34%), ' +
+            'linear-gradient(158deg, rgba(11,58,72,0.94) 0%, rgba(5,18,31,0.97) 100%)',
+          border: '1.5px solid rgba(61,225,241,0.86)',
+          backdropFilter: 'blur(10px) saturate(1.2)',
+          boxShadow: '0 0 18px rgba(39,221,241,0.36), 0 4px 14px rgba(0,0,0,0.5), inset 0 0 14px rgba(39,221,241,0.14), inset 0 1px 0 rgba(164,249,255,0.34)',
         }}
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="3" width="8" height="8" rx="1.5" stroke="#3A9DBC" strokeWidth="1.8"/>
-          <rect x="5.5" y="5.5" width="3" height="3" rx="0.5" fill="#3A9DBC"/>
-          <rect x="13" y="3" width="8" height="8" rx="1.5" stroke="#3A9DBC" strokeWidth="1.8"/>
-          <rect x="15.5" y="5.5" width="3" height="3" rx="0.5" fill="#3A9DBC"/>
-          <rect x="3" y="13" width="8" height="8" rx="1.5" stroke="#3A9DBC" strokeWidth="1.8"/>
-          <rect x="5.5" y="15.5" width="3" height="3" rx="0.5" fill="#3A9DBC"/>
-          <path d="M13 13h2.5M13 16h2.5M13 19h2.5M16.5 13h4M16.5 16h4M16.5 19h4" stroke="#3A9DBC" strokeWidth="1.8" strokeLinecap="round"/>
+        <span
+          className="pointer-events-none absolute inset-x-4 top-0 h-px"
+          style={{ background: 'linear-gradient(90deg, transparent, rgba(156,249,255,0.92), transparent)' }}
+        />
+        <svg width="25" height="25" viewBox="0 0 28 28" fill="none" style={{ filter: 'drop-shadow(0 0 5px rgba(103,239,255,0.74))' }}>
+          {/* scan-frame corner brackets */}
+          <path d="M4 9 V6 a2 2 0 0 1 2-2 h3"      stroke="#83F7FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M19 4 h3 a2 2 0 0 1 2 2 v3"     stroke="#83F7FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M24 19 v3 a2 2 0 0 1 -2 2 h-3"  stroke="#83F7FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M9 24 h-3 a2 2 0 0 1 -2 -2 v-3" stroke="#83F7FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          {/* QR finder squares + data dots */}
+          <rect x="9"  y="9"  width="4" height="4" rx="0.7" fill="#83F7FF"/>
+          <rect x="15" y="9"  width="4" height="4" rx="0.7" fill="#83F7FF"/>
+          <rect x="9"  y="15" width="4" height="4" rx="0.7" fill="#83F7FF"/>
+          <rect x="15.2" y="15.2" width="1.9" height="1.9" rx="0.35" fill="#83F7FF"/>
+          <rect x="18.1" y="17.8" width="1.9" height="1.9" rx="0.35" fill="#83F7FF"/>
+          <rect x="15.2" y="19.4" width="1.9" height="1.9" rx="0.35" fill="#83F7FF"/>
         </svg>
-        <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: '#3A9DBC' }}>SCAN</span>
+        <span
+          className="pl-[0.2em] text-[9px] font-black leading-none tracking-[0.2em] uppercase"
+          style={{ color: '#83F7FF', textShadow: '0 0 8px rgba(103,239,255,0.76)' }}
+        >
+          SCAN
+        </span>
       </button>
 
       {/* Walk mission reward modal */}

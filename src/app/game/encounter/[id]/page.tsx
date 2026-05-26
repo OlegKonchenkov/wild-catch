@@ -1433,6 +1433,12 @@ export default function EncounterPage() {
     state.catchMultiplier > 1.0 ? `+${Math.round((state.catchMultiplier - 1) * 100)}% cattura` : null,
     selectedReteMult > 1 ? `Rete ×${selectedReteMult}` : null,
   ].filter(Boolean)
+  // Compact variant for the CATTURA action button's sub line — must fit on
+  // one short line inside the (narrow) button without overflowing.
+  const catchSub = [
+    state.catchMultiplier > 1.0 ? `+${Math.round((state.catchMultiplier - 1) * 100)}%` : null,
+    selectedReteMult > 1 ? `×${selectedReteMult}` : null,
+  ].filter(Boolean).join(' · ')
 
   const renderLegacyBattleUi = process.env.NEXT_PUBLIC_BATTLE_LEGACY_UI === '1'
   const wildElement = (wildElem as Element) ?? 'bosco'
@@ -1477,7 +1483,7 @@ export default function EncounterPage() {
       icon: <IconCapture size={32} />,
       primary: true,
       tone: 'orange',
-      sub: catchInfoParts.length > 0 ? catchInfoParts.join(' / ') : undefined,
+      sub: catchSub || undefined,
       onClick: handleCatch,
       disabled: loading,
       loading: pendingAction === 'catch',

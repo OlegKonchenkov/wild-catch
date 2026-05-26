@@ -210,24 +210,38 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.25 }}
-        className="text-left rounded-xl backdrop-blur-sm px-3 py-2 flex items-center gap-2.5 shadow-lg active:scale-[0.98]"
+        className="relative overflow-hidden text-left rounded-xl px-3 py-2 flex items-center gap-2.5 active:scale-[0.98]"
         style={{
-          background: 'rgba(15,31,46,0.88)',
-          border: '1px solid rgba(58,188,168,0.35)',
-          boxShadow: '0 6px 18px rgba(0,0,0,0.4), 0 0 0 1px rgba(58,188,168,0.12)',
-          maxWidth: 280,
+          background:
+            'radial-gradient(circle at 24% 16%, rgba(91,241,229,0.18), transparent 32%), ' +
+            'linear-gradient(150deg, rgba(8,50,53,0.92) 0%, rgba(5,21,28,0.96) 100%)',
+          border: '1.5px solid rgba(61,225,207,0.62)',
+          backdropFilter: 'blur(10px) saturate(1.18)',
+          boxShadow: '0 0 15px rgba(58,188,168,0.26), 0 6px 18px rgba(0,0,0,0.42), inset 0 0 14px rgba(58,188,168,0.10), inset 0 1px 0 rgba(154,255,238,0.24)',
+          width: 146,
         }}
         data-testid="next-objective-widget"
       >
+        <span
+          className="pointer-events-none absolute inset-x-4 top-0 h-px"
+          style={{ background: 'linear-gradient(90deg, transparent, rgba(148,255,239,0.82), transparent)' }}
+        />
         <div
           className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: 'rgba(58,188,168,0.15)', border: '1px solid rgba(58,188,168,0.3)' }}
+          style={{
+            background: 'radial-gradient(circle, rgba(58,188,168,0.24) 0%, rgba(12,58,60,0.56) 100%)',
+            border: '1px solid rgba(91,241,229,0.52)',
+            boxShadow: '0 0 12px rgba(58,188,168,0.28), inset 0 0 10px rgba(91,241,229,0.12)',
+          }}
         >
-          <TileIcon size={18} color="#5FD0BF" style={{ filter: 'drop-shadow(0 0 4px rgba(58,188,168,0.4))' }} />
+          <TileIcon size={18} color="#7DF7E8" style={{ filter: 'drop-shadow(0 0 5px rgba(91,241,229,0.66))' }} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#3ABCA8]">
+            <span
+              className="text-[9px] font-black uppercase tracking-[0.14em]"
+              style={{ color: '#62EEDD', textShadow: '0 0 7px rgba(58,188,168,0.44)' }}
+            >
               Prossimo
             </span>
             {objective.chapter_order != null && (
@@ -236,12 +250,18 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
           </div>
           <p className="text-white font-bold text-xs leading-tight truncate">{objective.title}</p>
           <div className="flex items-center gap-1.5 mt-1">
-            <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+            <div
+              className="flex-1 h-1 rounded-full overflow-hidden"
+              style={{ background: 'rgba(125,247,232,0.13)', boxShadow: 'inset 0 0 5px rgba(0,0,0,0.32)' }}
+            >
               <motion.div
                 className="h-full"
                 animate={{ width: `${pct}%` }}
                 transition={{ duration: 0.4 }}
-                style={{ background: 'linear-gradient(90deg, #3ABCA8 0%, #34D399 100%)' }}
+                style={{
+                  background: 'linear-gradient(90deg, #51D9CB 0%, #83F7FF 100%)',
+                  boxShadow: '0 0 8px rgba(91,241,229,0.72)',
+                }}
               />
             </div>
             <span className="text-[10px] text-white/55 font-mono tabular-nums shrink-0">

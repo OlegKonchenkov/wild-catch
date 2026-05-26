@@ -516,33 +516,38 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
       {/* Re-center / follow button */}
       {playerPosition && (
         <button
+          type="button"
           onClick={handleRecenter}
-          className="absolute bottom-20 right-4 z-[500] w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-95"
+          className="absolute bottom-20 right-4 z-[500] flex h-12 w-12 items-center justify-center rounded-2xl transition-all active:scale-95"
           style={{
             background: following
-              ? 'linear-gradient(135deg, #3A9DBC 0%, #2a7a99 100%)'
-              : 'rgba(10,20,35,0.82)',
-            border: following ? '1.5px solid rgba(58,157,188,0.7)' : '1.5px solid rgba(58,157,188,0.55)',
-            backdropFilter: 'blur(10px)',
+              ? 'radial-gradient(circle at 30% 18%, rgba(112,247,255,0.24), transparent 34%), linear-gradient(158deg, rgba(11,68,78,0.95) 0%, rgba(5,23,33,0.97) 100%)'
+              : 'radial-gradient(circle at 30% 18%, rgba(103,239,255,0.12), transparent 34%), linear-gradient(158deg, rgba(8,35,50,0.92) 0%, rgba(5,15,27,0.96) 100%)',
+            border: following ? '1.5px solid rgba(61,225,241,0.9)' : '1.5px solid rgba(61,225,241,0.58)',
+            backdropFilter: 'blur(10px) saturate(1.2)',
             boxShadow: following
-              ? '0 0 20px rgba(58,157,188,0.5), 0 4px 14px rgba(0,0,0,0.5)'
-              : '0 0 14px rgba(58,157,188,0.16), 0 4px 14px rgba(0,0,0,0.5)',
+              ? '0 0 18px rgba(39,221,241,0.42), 0 4px 14px rgba(0,0,0,0.5), inset 0 0 14px rgba(39,221,241,0.14), inset 0 1px 0 rgba(164,249,255,0.34)'
+              : '0 0 14px rgba(39,221,241,0.20), 0 4px 14px rgba(0,0,0,0.5), inset 0 0 12px rgba(39,221,241,0.08), inset 0 1px 0 rgba(164,249,255,0.18)',
           }}
           title={following ? 'Segue la tua posizione' : 'Centra su di me'}
         >
+          <span
+            className="pointer-events-none absolute inset-x-4 top-0 h-px"
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(156,249,255,0.92), transparent)' }}
+          />
           {following ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' }}>
-              <circle cx="12" cy="12" r="3" fill="white" stroke="none"/>
-              <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-              <circle cx="12" cy="12" r="8" strokeDasharray="2 4"/>
+            <svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke="#A9FBFF" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 6px rgba(103,239,255,0.82))' }}>
+              <circle cx="24" cy="24" r="13.5" />
+              <circle cx="24" cy="24" r="4.5" fill="#83F7FF" stroke="none" />
+              <path d="M24 4v10M24 34v10M4 24h10M34 24h10" />
+              <path d="M24 4l-5 8h10z" fill="#A9FBFF" stroke="none" />
             </svg>
           ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#46bad8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3"/>
-              <line x1="12" y1="2" x2="12" y2="6"/>
-              <line x1="12" y1="18" x2="12" y2="22"/>
-              <line x1="2" y1="12" x2="6" y2="12"/>
-              <line x1="18" y1="12" x2="22" y2="12"/>
+            <svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke="#83F7FF" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 5px rgba(103,239,255,0.58))' }}>
+              <circle cx="24" cy="24" r="13.5" />
+              <circle cx="24" cy="24" r="4.5" fill="#83F7FF" stroke="none" />
+              <path d="M24 4v10M24 34v10M4 24h10M34 24h10" />
+              <path d="M24 4l-5 8h10z" fill="#83F7FF" stroke="none" opacity="0.72" />
             </svg>
           )}
         </button>

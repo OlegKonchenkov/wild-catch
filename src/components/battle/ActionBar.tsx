@@ -60,9 +60,9 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
             disabled={disabled}
             onClick={a.onClick}
             style={{
-              flex: 1, minWidth: 0, height: 82,
+              flex: 1, minWidth: 0, minHeight: 82,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: 7, padding: '8px 6px', position: 'relative', overflow: 'hidden',
+              gap: a.sub ? 5 : 7, padding: '8px 6px', position: 'relative', overflow: 'hidden',
               borderRadius: 20, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1,
               color: filled ? '#fff' : '#c4ccd6',
               border: filled ? `1.5px solid ${f!.ring}` : '1px solid rgba(255,255,255,.1)',
@@ -96,7 +96,13 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
               {a.label}
             </span>
             {a.sub && (
-              <span style={{ position: 'relative', zIndex: 1, fontFamily: 'var(--font-mono, monospace)', fontSize: 9, fontWeight: 700, opacity: 0.95, padding: '1px 7px', borderRadius: 999, background: 'rgba(0,0,0,.25)' }}>{a.sub}</span>
+              <span style={{
+                position: 'relative', zIndex: 1, fontFamily: 'var(--font-mono, monospace)',
+                fontSize: 8.5, fontWeight: 700, opacity: 0.95, lineHeight: 1.1,
+                padding: '1px 6px', borderRadius: 999, background: 'rgba(0,0,0,.28)',
+                // Stay inside the button — never spill past its rounded edge.
+                maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>{a.sub}</span>
             )}
           </button>
         )
