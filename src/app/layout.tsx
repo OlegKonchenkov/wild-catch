@@ -48,6 +48,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      // Browser extensions (e.g. Bitdefender's TrafficLight/Wallet) inject
+      // attributes like `bis_skin_checked`, `bis_register` and
+      // `__processed_<uuid>__` onto <html>/<body> BEFORE React hydrates,
+      // which otherwise trips a hydration-mismatch warning that isn't our
+      // bug. Suppressing on these two elements is the Next.js-sanctioned fix.
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${dmSans.variable} h-full antialiased`}
     >
       <head>
@@ -62,7 +68,7 @@ export default function RootLayout({
         {/* Android */}
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body suppressHydrationWarning className="min-h-full flex flex-col">
         {children}
         <Script
           id="sw-registration"
