@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import ElementIcon from '@/components/ui/ElementIcon'
+import { GiRoundStar } from 'react-icons/gi'
 
 const RARITY_COLOR: Record<string, string> = {
   comune:      '#9CA3AF',
@@ -63,12 +64,12 @@ export default function StarterSelect({
     >
       <div className="shrink-0 px-5 pt-10 pb-4 text-center">
         <div
-          className="inline-block text-4xl mb-3"
+          className="inline-flex justify-center mb-3"
           style={{ animation: 'starterFloat 3s ease-in-out infinite' }}
         >
-          🌟
+          <GiRoundStar size={40} color="#F7C841" style={{ filter: 'drop-shadow(0 0 14px rgba(247,200,65,0.55))' }} />
         </div>
-        <h1 className="text-2xl font-black text-white tracking-tight">Scegli il tuo Starter!</h1>
+        <h1 className="wc-display wc-gold-text text-2xl font-black tracking-tight">Scegli il tuo Starter!</h1>
         <p className="text-sm text-white/45 mt-1">La tua prima creatura compagna di avventura</p>
       </div>
 
