@@ -330,6 +330,7 @@ export default function DuelPage() {
   const [turnTimer, setTurnTimer] = useState(30)
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoFightRef = useRef(false)
+  const autoFightActionRef = useRef<() => void>(() => {})
   const attackStartedAtRef = useRef(0)
   const attackFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const attackReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1092,7 +1093,10 @@ export default function DuelPage() {
     timerRef.current = setInterval(() => {
       setTurnTimer(prev => {
         if (prev <= 1) {
-          if (!autoFightRef.current) { autoFightRef.current = true; document.getElementById('wc-duel-atk-btn')?.click() }
+          if (!autoFightRef.current) {
+            autoFightRef.current = true
+            autoFightActionRef.current()
+          }
           return 0
         }
         return prev - 1
@@ -1196,6 +1200,8 @@ export default function DuelPage() {
       setShowItemsModal(false)
     }
   }
+
+  autoFightActionRef.current = handleAttack
 
   async function handleHeal(itemId: string) {
     if (attackingRef.current || !isMyTurn) return

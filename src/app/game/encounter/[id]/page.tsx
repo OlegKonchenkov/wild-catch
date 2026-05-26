@@ -431,6 +431,7 @@ export default function EncounterPage() {
   const [turnTimer, setTurnTimer] = useState(45)
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoFightRef = useRef(false)
+  const autoFightActionRef = useRef<() => void>(() => {})
   const clearPlayerStatusRef = useRef(false) // set true after creature faint+switch
   const damageFloatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -633,7 +634,10 @@ export default function EncounterPage() {
     timerRef.current = setInterval(() => {
       setTurnTimer(prev => {
         if (prev <= 1) {
-          if (!autoFightRef.current) { autoFightRef.current = true; document.getElementById('wc-fight-btn')?.click() }
+          if (!autoFightRef.current) {
+            autoFightRef.current = true
+            autoFightActionRef.current()
+          }
           return 0
         }
         return prev - 1
@@ -988,6 +992,8 @@ export default function EncounterPage() {
     window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
     finishPendingAction()
   }
+
+  autoFightActionRef.current = handleFight
 
   // ── Handle creature switch (replaces this turn's attack) ───────────────────
   // Player picks a different non-fainted squad slot; the wild gets a free
