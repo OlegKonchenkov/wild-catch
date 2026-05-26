@@ -1,5 +1,6 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion'
+import { GiLightBulb, GiPuzzle } from 'react-icons/gi'
 
 /**
  * Reward modal shown after the player walks to the tutorial "Maestro" pin
@@ -36,12 +37,12 @@ export default function TutorialPinClaimModal({ alreadyClaimed, onClose }: Props
 
         {/* Badge */}
         <motion.div
-          className="relative text-5xl mb-4"
+          className="relative mb-4"
           initial={{ scale: 0, rotate: -15 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 18 }}
         >
-          💡
+          <GiLightBulb size={52} color="#38BDF8" style={{ filter: 'drop-shadow(0 0 18px rgba(56,189,248,0.55))' }} />
         </motion.div>
 
         {/* Label */}
@@ -55,7 +56,7 @@ export default function TutorialPinClaimModal({ alreadyClaimed, onClose }: Props
 
         {/* Title */}
         <motion.h2
-          className="text-center font-extrabold text-white text-xl mb-2 leading-snug"
+          className="wc-display text-center font-extrabold text-white text-xl mb-2 leading-snug"
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
         >
           {alreadyClaimed
@@ -70,7 +71,7 @@ export default function TutorialPinClaimModal({ alreadyClaimed, onClose }: Props
         >
           {alreadyClaimed
             ? 'Questo suggerimento è già nella tua sezione Enigmi.'
-            : 'Hai raggiunto il punto del Maestro e raccolto un nuovo suggerimento. Lo trovi nella sezione Enigmi (icona 🧩 nel menu).'}
+            : 'Hai raggiunto il punto del Maestro e raccolto un nuovo suggerimento. Lo trovi nella sezione Enigmi del menu.'}
         </motion.p>
 
         {/* Reward row */}
@@ -79,7 +80,7 @@ export default function TutorialPinClaimModal({ alreadyClaimed, onClose }: Props
           style={{ background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)' }}
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
         >
-          <span className="text-2xl">🧩</span>
+          <GiPuzzle size={24} color="#38BDF8" style={{ filter: 'drop-shadow(0 0 8px rgba(56,189,248,0.5))' }} />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] text-white/50 uppercase tracking-wider">Suggerimento</p>
             <p className="font-bold text-[#38BDF8] text-sm">Indizio Bonus del Maestro</p>

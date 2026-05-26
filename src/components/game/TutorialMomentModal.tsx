@@ -1,5 +1,6 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion'
+import { GiTreasureMap, GiHouse } from 'react-icons/gi'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { TutorialMoment } from '@/lib/game/tutorial'
@@ -173,7 +174,7 @@ export default function TutorialMomentModal({ moment, onClose }: Props) {
                   boxShadow: '0 6px 32px rgba(251,191,36,0.45)',
                 }}
               >
-                🗺️  Continua ad esplorare
+                <span className="inline-flex items-center justify-center gap-2"><GiTreasureMap size={18} /> Continua ad esplorare</span>
               </motion.button>
               <motion.button
                 onClick={onCta}
@@ -185,7 +186,7 @@ export default function TutorialMomentModal({ moment, onClose }: Props) {
                   color: 'rgba(255,255,255,0.85)',
                 }}
               >
-                🏠  {moment.cta?.label ?? 'Torna alla home'}
+                <span className="inline-flex items-center justify-center gap-2"><GiHouse size={16} /> {moment.cta?.label ?? 'Torna alla home'}</span>
               </motion.button>
             </>
           ) : (

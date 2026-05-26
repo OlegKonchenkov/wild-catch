@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { GiPuzzle, GiPadlockOpen } from 'react-icons/gi'
 
 function getVideoEmbed(url: string): { type: 'iframe' | 'video'; src: string } | null {
   try {
@@ -63,10 +64,10 @@ export default function EnigmaFragmentPanel({
         style={{ background: 'rgba(123,77,184,0.05)', border: '1px dashed rgba(123,77,184,0.28)' }}
       >
         <div
-          className="w-16 h-16 rounded-full flex items-center justify-center text-2xl mb-4"
+          className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
           style={{ background: 'rgba(123,77,184,0.12)', border: '1.5px dashed rgba(192,132,252,0.45)' }}
         >
-          🧩
+          <GiPuzzle size={28} color="#C084FC" />
         </div>
         <p className="text-sm font-bold text-white/55">Nessun frammento</p>
         <p className="text-xs text-white/30 mt-1.5 max-w-[15rem] leading-relaxed">
@@ -109,7 +110,7 @@ export default function EnigmaFragmentPanel({
             <span className="text-[10px] px-2.5 py-1 rounded-full font-semibold shrink-0 max-w-[55%] truncate"
               style={{ background: 'rgba(123,77,184,0.22)', color: VIOLET, border: '1px solid rgba(123,77,184,0.4)' }}
               title={`Sblocca: ${enigmaTitle}`}>
-              🔓 {enigmaTitle}
+              <span className="inline-flex items-center gap-1 align-middle"><GiPadlockOpen size={11} /> {enigmaTitle}</span>
             </span>
           )}
         </motion.div>

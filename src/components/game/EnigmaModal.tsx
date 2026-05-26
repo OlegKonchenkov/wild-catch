@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { GiPadlock, GiPadlockOpen, GiPuzzle, GiLightBulb, GiKey } from 'react-icons/gi'
 import { playEnigmaSolve } from '@/lib/game/sounds/enigma'
 import type { MapPin } from '@/components/map/GameMap'
 import type { PinRewardData } from '@/components/game/PinRewardModal'
@@ -17,7 +18,7 @@ function FrammentoEnigmaCard({ frammento }: {
         className="flex items-center gap-3 rounded-xl px-3 py-2.5"
         style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', opacity: 0.45 }}
       >
-        <span className="text-base shrink-0">☐</span>
+        <GiPadlock size={16} color="rgba(255,255,255,0.5)" className="shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold leading-tight text-white/60">— frammento mancante —</p>
           <p className="text-[10px] text-white/35 mt-0.5">Trova la creatura per sbloccare</p>
@@ -35,7 +36,7 @@ function FrammentoEnigmaCard({ frammento }: {
         onClick={() => hasContent && setExpanded(v => !v)}
         className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${hasContent ? '' : 'cursor-default'}`}
       >
-        <span className="text-base shrink-0">🧩</span>
+        <GiPuzzle size={17} color="#C084FC" className="shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-white leading-tight truncate">{frammento.title}</p>
           {frammento.description && !expanded && (
@@ -264,14 +265,14 @@ export default function EnigmaModal({
                   boxShadow: '0 0 38px rgba(247,200,65,0.45), 0 0 72px rgba(247,200,65,0.14)',
                 }}
               >
-                <span className="text-5xl leading-none select-none">🔓</span>
+                <GiPadlockOpen size={48} color="#F7C841" style={{ filter: 'drop-shadow(0 0 12px rgba(247,200,65,0.6))' }} />
               </motion.div>
 
               <motion.p
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.22, duration: 0.42 }}
-                className="text-xl font-extrabold uppercase tracking-widest mb-1.5"
+                className="wc-display text-xl font-extrabold uppercase tracking-widest mb-1.5"
                 style={{ color: '#F7C841', textShadow: '0 0 18px rgba(247,200,65,0.65)' }}
               >
                 Enigma Risolto!
@@ -300,7 +301,7 @@ export default function EnigmaModal({
               className="flex items-center gap-3 rounded-2xl p-3"
               style={{ background: 'rgba(247,200,65,0.08)', border: '1px solid rgba(247,200,65,0.2)' }}
             >
-              <span className="text-2xl leading-none">🔐</span>
+              <GiPadlock size={22} color="#F7C841" />
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#F7C841' }}>
                   Enigma
@@ -373,7 +374,7 @@ export default function EnigmaModal({
                           }}
                         >
                           <div className="flex items-start gap-2">
-                            <span className="text-sm shrink-0 mt-0.5">{s.player_has ? '💡' : '🔒'}</span>
+                            <span className="shrink-0 mt-0.5">{s.player_has ? <GiLightBulb size={15} color="#FBBF24" /> : <GiPadlock size={15} color="rgba(255,255,255,0.4)" />}</span>
                             {s.player_has ? (
                               <div className="flex-1 min-w-0">
                                 {s.text && (
@@ -451,7 +452,7 @@ export default function EnigmaModal({
                   letterSpacing: '0.08em',
                 }}
               >
-                {submitting ? 'Verifica…' : '🔓 RISOLVI ENIGMA'}
+                {submitting ? 'Verifica…' : <span className="inline-flex items-center justify-center gap-2"><GiKey size={16} /> RISOLVI ENIGMA</span>}
               </button>
             </div>
           </div>

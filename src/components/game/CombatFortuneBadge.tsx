@@ -1,3 +1,5 @@
+import { GiRollingDices } from 'react-icons/gi'
+
 interface CombatFortuneBadgeProps {
   text: string
   tone: 'lucky' | 'rough' | 'steady'
@@ -29,7 +31,7 @@ export default function CombatFortuneBadge({ text, tone }: CombatFortuneBadgePro
       className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold"
       style={theme}
     >
-      <span aria-hidden="true">🎲</span>
+      <GiRollingDices size={13} color={theme.color} aria-hidden="true" />
       <span>{text}</span>
     </div>
   )

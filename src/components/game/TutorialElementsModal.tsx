@@ -1,5 +1,7 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion'
+import { GiCrossedSwords, GiBroadsword, GiHealthPotion, GiCycle } from 'react-icons/gi'
+import ElementIcon from '@/components/ui/ElementIcon'
 
 /**
  * One-time tooltip the first time the player enters a boss combat in
@@ -15,11 +17,11 @@ interface Props {
 }
 
 const ELEMENTS = [
-  { emoji: '🔥', name: 'Fiamma',    strong: 'Bosco',    weak: 'Adriatico' },
-  { emoji: '🌊', name: 'Adriatico', strong: 'Fiamma',   weak: 'Bosco' },
-  { emoji: '🌿', name: 'Bosco',     strong: 'Adriatico',weak: 'Fiamma' },
-  { emoji: '⛰️', name: 'Terra',     strong: '—',        weak: '—' },
-  { emoji: '✨', name: 'Armonia',   strong: 'Tutti',    weak: 'Nessuno' },
+  { element: 'fiamma',    name: 'Fiamma',    strong: 'Bosco',    weak: 'Adriatico' },
+  { element: 'adriatico', name: 'Adriatico', strong: 'Fiamma',   weak: 'Bosco' },
+  { element: 'bosco',     name: 'Bosco',     strong: 'Adriatico',weak: 'Fiamma' },
+  { element: 'terra',     name: 'Terra',     strong: '—',        weak: '—' },
+  { element: 'armonia',   name: 'Armonia',   strong: 'Tutti',    weak: 'Nessuno' },
 ]
 
 export default function TutorialElementsModal({ open, onClose }: Props) {
@@ -41,12 +43,12 @@ export default function TutorialElementsModal({ open, onClose }: Props) {
             transition={{ delay: 0.05, duration: 0.3 }}
           >
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-3xl">⚔️</span>
+              <GiCrossedSwords size={30} color="#E85D2F" style={{ filter: 'drop-shadow(0 0 8px rgba(232,93,47,0.5))' }} />
               <div>
                 <p className="text-[10px] tracking-widest uppercase font-bold text-[#FBBF24]/80">
                   Lezione del maestro
                 </p>
-                <h2 className="text-lg font-extrabold text-white leading-tight">
+                <h2 className="wc-display text-lg font-extrabold text-white leading-tight">
                   Elementi e duello
                 </h2>
               </div>
@@ -67,7 +69,7 @@ export default function TutorialElementsModal({ open, onClose }: Props) {
               {ELEMENTS.map(e => (
                 <div key={e.name} className="grid grid-cols-3 items-center px-3 py-1.5 border-b border-white/5 last:border-0 text-xs">
                   <span className="flex items-center gap-1.5 text-white font-semibold">
-                    <span>{e.emoji}</span>{e.name}
+                    <ElementIcon element={e.element} size={15} />{e.name}
                   </span>
                   <span className="text-[#34D399]">{e.strong}</span>
                   <span className="text-[#F87171]">{e.weak}</span>
@@ -76,9 +78,9 @@ export default function TutorialElementsModal({ open, onClose }: Props) {
             </div>
 
             <div className="space-y-1.5 mb-5 text-[12px] text-white/65 leading-relaxed">
-              <p><span className="text-white font-bold">⚔️ Attacca</span> — danno basato su ATK − DEF avversario, +modificatore elemento.</p>
-              <p><span className="text-white font-bold">💊 Cura</span> — usa una pozione per ripristinare HP della creatura attiva.</p>
-              <p><span className="text-white font-bold">🔄 Cambia</span> — sostituisci la creatura attiva con un&apos;altra della tua squadra.</p>
+              <p><span className="inline-flex items-center gap-1 text-white font-bold align-middle"><GiBroadsword size={14} color="#E85D2F" /> Attacca</span> — danno basato su ATK − DEF avversario, +modificatore elemento.</p>
+              <p><span className="inline-flex items-center gap-1 text-white font-bold align-middle"><GiHealthPotion size={14} color="#34D399" /> Cura</span> — usa una pozione per ripristinare HP della creatura attiva.</p>
+              <p><span className="inline-flex items-center gap-1 text-white font-bold align-middle"><GiCycle size={14} color="#3A9DBC" /> Cambia</span> — sostituisci la creatura attiva con un&apos;altra della tua squadra.</p>
               <p className="text-white/40 italic pt-1">Il boss del tutorial è di tipo <span className="font-bold text-[#C084FC]">Armonia</span> — nessun elemento è in svantaggio. Battaglia equa.</p>
             </div>
 
