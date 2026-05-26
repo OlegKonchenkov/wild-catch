@@ -3,14 +3,21 @@ import { useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { type IconType } from 'react-icons'
-import { GiCompass, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower, GiStandingPotion, GiHealthPotion } from 'react-icons/gi'
+import {
+  GiCompass, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower, GiStandingPotion, GiHealthPotion,
+  GiWorld, GiTreasureMap, GiCrossedSwords, GiFireRing, GiLightningArc, GiSpellBook, GiBattleGear,
+  GiPuzzle, GiSparkles, GiSwapBag, GiBullseye, GiMagnifyingGlass, GiDeathSkull, GiTrophyCup, GiLightBulb,
+  GiPawPrint, GiFootprint, GiPositionMarker, GiKnapsack, GiCycle, GiCancel, GiTwoCoins, GiScrollUnfurled,
+  GiPadlock, GiSandsOfTime, GiNightSleep, GiPresent, GiGraduateCap, GiCardPickup, GiProgression,
+  GiPodiumWinner, GiSeahorse, GiEagleEmblem, GiWolfHead, GiLizardman, GiSeaDragon,
+} from 'react-icons/gi'
 import ElementIcon from '@/components/ui/ElementIcon'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Section {
   id: string
-  icon: string
+  Icon: IconType
   title: string
   accent: string
   content: React.ReactNode
@@ -32,16 +39,16 @@ function MiniMap() {
       <div className="absolute w-4 h-4 rounded-full bg-[#3A9DBC] border-2 border-white shadow-lg shadow-[#3A9DBC]/50"
         style={{ top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
       {[
-        { top: '20%', left: '20%', emoji: '🐟', delay: 0 },
-        { top: '15%', left: '72%', emoji: '🦅', delay: 0.4 },
-        { top: '70%', left: '80%', emoji: '🐺', delay: 0.8 },
-        { top: '75%', left: '30%', emoji: '🦎', delay: 1.2 },
+        { top: '20%', left: '20%', Icon: GiSeahorse,    color: '#38BDF8', delay: 0 },
+        { top: '15%', left: '72%', Icon: GiEagleEmblem,  color: '#C084FC', delay: 0.4 },
+        { top: '70%', left: '80%', Icon: GiWolfHead,     color: '#34D399', delay: 0.8 },
+        { top: '75%', left: '30%', Icon: GiLizardman,    color: '#E0A24E', delay: 1.2 },
       ].map((c, i) => (
-        <motion.div key={i} className="absolute text-base"
+        <motion.div key={i} className="absolute"
           style={{ top: c.top, left: c.left }}
           animate={{ scale: [1, 1.2, 1], opacity: [0.7, 1, 0.7] }}
           transition={{ duration: 1.8, delay: c.delay, repeat: Infinity }}>
-          {c.emoji}
+          <c.Icon size={18} color={c.color} style={{ filter: `drop-shadow(0 0 4px ${c.color}88)` }} />
         </motion.div>
       ))}
       <div className="absolute rounded-full border border-dashed border-[#3A9DBC]/30"
@@ -82,11 +89,11 @@ function BattleDiagram() {
       </div>
       <div className="flex gap-2 pt-1">
         <button onClick={simulate}
-          className="flex-1 bg-[#E85D2F]/80 hover:bg-[#E85D2F] text-white text-xs font-bold py-2 rounded-lg transition-colors active:scale-95">
-          ⚔️ Attacca
+          className="flex-1 inline-flex items-center justify-center gap-1.5 bg-[#E85D2F]/80 hover:bg-[#E85D2F] text-white text-xs font-bold py-2 rounded-lg transition-colors active:scale-95">
+          <GiCrossedSwords size={14} /> Attacca
         </button>
-        <button className="flex-1 bg-[#3A9DBC]/80 hover:bg-[#3A9DBC] text-white text-xs font-bold py-2 rounded-lg transition-colors">
-          🥅 Lancia Rete
+        <button className="flex-1 inline-flex items-center justify-center gap-1.5 bg-[#3A9DBC]/80 hover:bg-[#3A9DBC] text-white text-xs font-bold py-2 rounded-lg transition-colors">
+          <GiFishingNet size={14} /> Lancia Rete
         </button>
       </div>
     </div>
@@ -125,18 +132,20 @@ function EvolutionDiagram() {
         <motion.div key={n}
           className="w-14 h-14 rounded-xl border border-white/20 bg-white/5 flex flex-col items-center justify-center"
           whileHover={{ scale: 1.05, borderColor: '#3A9DBC' }}>
-          <span className="text-2xl">🐟</span>
+          <GiSeahorse size={26} color="#9CA3AF" />
           <span className="text-[9px] text-white/40 mt-0.5">×1</span>
         </motion.div>
       ))}
-      <motion.div className="text-2xl"
+      <motion.div
         animate={{ scale: [1, 1.2, 1], opacity: [0.7, 1, 0.7] }}
-        transition={{ duration: 1.5, repeat: Infinity }}>✨</motion.div>
+        transition={{ duration: 1.5, repeat: Infinity }}>
+        <GiSparkles size={26} color="#F7C841" />
+      </motion.div>
       <motion.div
         className="w-16 h-16 rounded-xl border-2 border-[#F7C841] bg-[#F7C841]/10 flex flex-col items-center justify-center"
         animate={{ boxShadow: ['0 0 0px #F7C84100', '0 0 16px #F7C84166', '0 0 0px #F7C84100'] }}
         transition={{ duration: 2, repeat: Infinity }}>
-        <span className="text-3xl">🐬</span>
+        <GiSeaDragon size={34} color="#F7C841" style={{ filter: 'drop-shadow(0 0 6px rgba(247,200,65,0.6))' }} />
         <span className="text-[9px] text-[#F7C841] mt-0.5 font-bold">Evoluta!</span>
       </motion.div>
     </div>
@@ -146,11 +155,11 @@ function EvolutionDiagram() {
 // ─── Element Chart ────────────────────────────────────────────────────────────
 
 const ELEMENTS = [
-  { name: 'Fiamma',    color: '#E85D2F', icon: '🔥', strong: ['Bosco'],                         weak: ['Adriatico'] },
-  { name: 'Adriatico', color: '#3A9DBC', icon: '💧', strong: ['Fiamma'],                         weak: ['Terra'] },
-  { name: 'Bosco',     color: '#34D399', icon: '🌿', strong: ['Terra'],                          weak: ['Fiamma'] },
-  { name: 'Terra',     color: '#F7C841', icon: '🪨', strong: ['Adriatico'],                      weak: ['Bosco'] },
-  { name: 'Armonia',   color: '#C084FC', icon: '✨', strong: ['Fiamma', 'Adriatico', 'Bosco', 'Terra'], weak: [] },
+  { name: 'Fiamma',    color: '#E85D2F', strong: ['Bosco'],                         weak: ['Adriatico'] },
+  { name: 'Adriatico', color: '#3A9DBC', strong: ['Fiamma'],                         weak: ['Terra'] },
+  { name: 'Bosco',     color: '#34D399', strong: ['Terra'],                          weak: ['Fiamma'] },
+  { name: 'Terra',     color: '#F7C841', strong: ['Adriatico'],                      weak: ['Bosco'] },
+  { name: 'Armonia',   color: '#C084FC', strong: ['Fiamma', 'Adriatico', 'Bosco', 'Terra'], weak: [] },
 ]
 
 function ElementChart() {
@@ -184,10 +193,10 @@ function ElementChart() {
           </div>
         </div>
       ))}
-      <div className="rounded-xl border border-[#C084FC]/25 bg-[#C084FC]/5 px-3 py-2 text-xs text-[#C084FC]/80">
-        ⚡ Il danno con vantaggio elementale vale <strong className="text-[#C084FC]">×1.5</strong>.
+      <div className="flex items-start gap-1.5 rounded-xl border border-[#C084FC]/25 bg-[#C084FC]/5 px-3 py-2 text-xs text-[#C084FC]/80">
+        <GiLightningArc size={14} color="#C084FC" className="flex-shrink-0 mt-0.5" /> <span>Il danno con vantaggio elementale vale <strong className="text-[#C084FC]">×1.5</strong>.
         Lo svantaggio infligge solo <strong className="text-[#C084FC]">×0.5</strong> (neutro = ×1.0).
-        Armonia è forte su <em>tutti</em> gli elementi (×1.5) e non ha debolezze.
+        Armonia è forte su <em>tutti</em> gli elementi (×1.5) e non ha debolezze.</span>
       </div>
     </div>
   )
@@ -229,11 +238,11 @@ function ItemsGrid() {
 // ─── Egg section ─────────────────────────────────────────────────────────────
 
 const EGG_RARITIES = [
-  { icon: '🥚', label: 'Terrestre',     color: '#9CA3AF', pool: 'Creature comuni' },
-  { icon: '🪺', label: 'Arcaico', color: '#34D399', pool: 'Terrestre 70% · Arcaico 30%' },
-  { icon: '💎', label: 'Eroico',       color: '#3A9DBC', pool: 'Terrestre 50% · Arcaico 30% · Eroico 20%' },
-  { icon: '🔮', label: 'Mostruoso',      color: '#C084FC', pool: 'Terrestre 40% · Arcaico 30% · Eroico 20% · Mostruoso 10%' },
-  { icon: '⭐', label: 'Leggendario',color: '#FBBF24', pool: '35% · 25% · 20% · 15% · Legg. 5%' },
+  { label: 'Terrestre',     color: '#9CA3AF', pool: 'Creature comuni' },
+  { label: 'Arcaico',       color: '#34D399', pool: 'Terrestre 70% · Arcaico 30%' },
+  { label: 'Eroico',        color: '#3A9DBC', pool: 'Terrestre 50% · Arcaico 30% · Eroico 20%' },
+  { label: 'Mostruoso',     color: '#C084FC', pool: 'Terrestre 40% · Arcaico 30% · Eroico 20% · Mostruoso 10%' },
+  { label: 'Leggendario',   color: '#FBBF24', pool: '35% · 25% · 20% · 15% · Legg. 5%' },
 ]
 
 function EggGuide() {
@@ -241,10 +250,15 @@ function EggGuide() {
     <div className="mt-3 space-y-3">
       {/* Steps flow */}
       <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/4 px-3 py-3">
-        {[['📷', 'Scansiona QR uovo'], ['🚶', 'Cammina i passi richiesti'], ['🐣', 'Schiudi dallo Zaino'], ['✨', 'Creatura rivelata!']].map(([icon, label], i, arr) => (
+        {([
+          { Icon: GiMagnifyingGlass, label: 'Scansiona QR uovo',      color: '#34D399' },
+          { Icon: GiFootprint,       label: 'Cammina i passi richiesti', color: '#C084FC' },
+          { Icon: GiEggClutch,       label: 'Schiudi dallo Zaino',    color: '#FBBF24' },
+          { Icon: GiSparkles,        label: 'Creatura rivelata!',     color: '#46bad8' },
+        ] as const).map(({ Icon, label, color }, i, arr) => (
           <div key={label} className="flex items-center gap-1.5">
             <div className="flex flex-col items-center gap-1">
-              <span className="text-base">{icon}</span>
+              <Icon size={18} color={color} />
               <span className="text-[9px] text-white/40 text-center leading-tight" style={{ maxWidth: 52 }}>{label}</span>
             </div>
             {i < arr.length - 1 && <span className="text-white/20 text-xs flex-shrink-0">→</span>}
@@ -264,7 +278,7 @@ function EggGuide() {
         {EGG_RARITIES.map(egg => (
           <div key={egg.label} className="flex items-start gap-2 rounded-xl border px-3 py-2"
             style={{ borderColor: egg.color + '28', background: egg.color + '0a' }}>
-            <span className="text-base flex-shrink-0">{egg.icon}</span>
+            <GiEggClutch size={17} color={egg.color} className="flex-shrink-0 mt-0.5" />
             <div>
               <span className="text-xs font-bold" style={{ color: egg.color }}>{egg.label}</span>
               <p className="text-[11px] text-white/45 mt-0.5">{egg.pool}</p>
@@ -284,14 +298,14 @@ function SquadGuide() {
       {/* Visual squad bar example */}
       <div className="flex gap-2 rounded-xl border border-white/10 bg-white/4 p-3">
         {[
-          { label: 'Capitano ⚔', color: '#3ABCA8', border: 'rgba(58,188,168,0.5)', note: 'Entra per primo' },
+          { label: 'Capitano', color: '#3ABCA8', border: 'rgba(58,188,168,0.5)', note: 'Entra per primo' },
           { label: 'Riserva 2',  color: 'rgba(255,255,255,0.5)', border: 'rgba(255,255,255,0.3)', note: 'Entra se Cap. sviene' },
           { label: 'Riserva 3',  color: 'rgba(255,255,255,0.5)', border: 'rgba(255,255,255,0.3)', note: 'Ultima speranza' },
         ].map((slot, i) => (
           <div key={i} className="flex-1 flex flex-col items-center gap-1">
-            <div className="w-full h-14 rounded-xl flex items-center justify-center text-xl"
+            <div className="w-full h-14 rounded-xl flex items-center justify-center"
               style={{ background: i === 0 ? 'rgba(58,188,168,0.12)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${slot.border}` }}>
-              🐾
+              <GiPawPrint size={24} color={i === 0 ? '#3ABCA8' : 'rgba(255,255,255,0.45)'} />
             </div>
             <span className="text-[9px] font-bold text-center leading-tight" style={{ color: slot.color }}>{slot.label}</span>
             <span className="text-[8px] text-white/30 text-center leading-tight">{slot.note}</span>
@@ -301,15 +315,15 @@ function SquadGuide() {
 
       {/* How to set up */}
       <div className="space-y-1.5 text-xs">
-        {[
-          { icon: '📖', text: 'Apri il DaimonDex → tocca una creatura → sezione "Squadra da battaglia"' },
-          { icon: '1️⃣', text: 'Slot 1 = Capitano — combatte per primo in ogni battaglia' },
-          { icon: '🔄', text: 'Slots 2 e 3 = Riserve — entrano in automatico quando la precedente sviene' },
-          { icon: '✕',  text: 'Per rimuovere una creatura dalla squadra: tocca la X rossa nello slot in alto nel DaimonDex' },
-          { icon: '⚔️', text: 'Con meno di 3 creature un avviso ti chiede conferma prima di ogni battaglia' },
-        ].map(row => (
+        {([
+          { Icon: GiSpellBook,     text: 'Apri il DaimonDex → tocca una creatura → sezione "Squadra da battaglia"' },
+          { Icon: GiCrossedSwords, text: 'Slot 1 = Capitano — combatte per primo in ogni battaglia' },
+          { Icon: GiCycle,         text: 'Slots 2 e 3 = Riserve — entrano in automatico quando la precedente sviene' },
+          { Icon: GiCancel,        text: 'Per rimuovere una creatura dalla squadra: tocca la X rossa nello slot in alto nel DaimonDex' },
+          { Icon: GiBattleGear,    text: 'Con meno di 3 creature un avviso ti chiede conferma prima di ogni battaglia' },
+        ] as const).map(row => (
           <div key={row.text} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
-            <span className="flex-shrink-0 text-sm">{row.icon}</span>
+            <row.Icon size={15} color="#5FD0BF" className="flex-shrink-0 mt-0.5" />
             <span className="text-white/70 leading-relaxed">{row.text}</span>
           </div>
         ))}
@@ -317,12 +331,12 @@ function SquadGuide() {
 
       {/* Squad bar explanation */}
       <div className="rounded-xl border border-[#3ABCA8]/25 bg-[#3ABCA8]/6 px-3 py-2.5 text-xs text-[#3ABCA8]/90 space-y-1">
-        <p className="font-bold text-[#3ABCA8]">📊 Barra squadra in battaglia</p>
+        <p className="inline-flex items-center gap-1.5 font-bold text-[#3ABCA8]"><GiProgression size={15} color="#3ABCA8" /> Barra squadra in battaglia</p>
         <p>Durante incontri, duelli e boss fight appare in basso una barra con le 3 creature: immagine, nome e barra HP in tempo reale. La creatura attiva è evidenziata — le altre diventano grigie e mostrano ✕ se svenute.</p>
       </div>
 
-      <div className="rounded-xl border border-[#EF4444]/20 bg-[#EF4444]/5 px-3 py-2 text-xs text-[#EF4444]/80">
-        💀 Se tutte e 3 le creature della squadra svenono sei sconfitto — riorganizza la squadra prima della prossima battaglia!
+      <div className="flex items-start gap-1.5 rounded-xl border border-[#EF4444]/20 bg-[#EF4444]/5 px-3 py-2 text-xs text-[#EF4444]/80">
+        <GiDeathSkull size={15} color="#EF4444" className="flex-shrink-0 mt-0.5" /> <span>Se tutte e 3 le creature della squadra svenono sei sconfitto — riorganizza la squadra prima della prossima battaglia!</span>
       </div>
     </div>
   )
@@ -335,10 +349,15 @@ function BossGuide() {
     <div className="mt-3 space-y-3">
       {/* Flow */}
       <div className="flex items-center justify-center gap-2 flex-wrap rounded-xl border border-[#E85D2F]/20 bg-[#E85D2F]/5 px-3 py-3">
-        {[['📷', 'Scansiona QR Boss'], ['🐾', 'Scegli 3 creature'], ['⚔️', 'Combatti 3v3'], ['🏆', 'Ricompensa!']].map(([icon, label], i, arr) => (
+        {([
+          { Icon: GiMagnifyingGlass, label: 'Scansiona QR Boss' },
+          { Icon: GiPawPrint,        label: 'Scegli 3 creature' },
+          { Icon: GiCrossedSwords,   label: 'Combatti 3v3' },
+          { Icon: GiTrophyCup,       label: 'Ricompensa!' },
+        ] as const).map(({ Icon, label }, i, arr) => (
           <div key={label} className="flex items-center gap-1.5">
             <div className="flex flex-col items-center gap-0.5">
-              <span className="text-lg">{icon}</span>
+              <Icon size={20} color="#E85D2F" />
               <span className="text-[9px] text-white/50 text-center" style={{ maxWidth: 50 }}>{label}</span>
             </div>
             {i < arr.length - 1 && <span className="text-[#E85D2F]/40 text-xs flex-shrink-0">→</span>}
@@ -348,25 +367,25 @@ function BossGuide() {
 
       {/* Rules */}
       <div className="space-y-2 text-xs">
-        {[
-          { icon: '🐾', text: 'Seleziona la tua squadra dal DaimonDex prima di iniziare (fino a 3 creature). Con meno di 3 comparirà un avviso di conferma.' },
-          { icon: '⚔️', text: 'Il boss schiera fino a 3 creature. Il combattimento è a turni: tu attacchi, poi il boss risponde immediatamente.' },
-          { icon: '⏱️', text: 'Hai 30 secondi per attaccare ogni turno — allo scadere parte un attacco automatico.' },
-          { icon: '🔄', text: 'Quando una creatura è KO entra automaticamente la prossima della squadra.' },
-          { icon: '🧪', text: 'Gli oggetti Battaglia e Pozione si attivano automaticamente durante la battaglia.' },
-          { icon: '🏆', text: 'Vinci abbattendo tutte le creature boss → ricevi EXP, monete e oggetti rari.' },
-          { icon: '🎁', text: 'La ricompensa si ottiene solo alla prima vittoria per quel QR boss. Rivincite non danno premi aggiuntivi.' },
-          { icon: '💀', text: 'Se tutte le creature della squadra svenono la battaglia è persa — riprova scansionando di nuovo il QR.' },
-        ].map(row => (
+        {([
+          { Icon: GiPawPrint,       text: 'Seleziona la tua squadra dal DaimonDex prima di iniziare (fino a 3 creature). Con meno di 3 comparirà un avviso di conferma.' },
+          { Icon: GiCrossedSwords,  text: 'Il boss schiera fino a 3 creature. Il combattimento è a turni: tu attacchi, poi il boss risponde immediatamente.' },
+          { Icon: GiSandsOfTime,    text: 'Hai 30 secondi per attaccare ogni turno — allo scadere parte un attacco automatico.' },
+          { Icon: GiCycle,          text: 'Quando una creatura è KO entra automaticamente la prossima della squadra.' },
+          { Icon: GiStandingPotion, text: 'Gli oggetti Battaglia e Pozione si attivano automaticamente durante la battaglia.' },
+          { Icon: GiTrophyCup,      text: 'Vinci abbattendo tutte le creature boss → ricevi EXP, monete e oggetti rari.' },
+          { Icon: GiPresent,        text: 'La ricompensa si ottiene solo alla prima vittoria per quel QR boss. Rivincite non danno premi aggiuntivi.' },
+          { Icon: GiDeathSkull,     text: 'Se tutte le creature della squadra svenono la battaglia è persa — riprova scansionando di nuovo il QR.' },
+        ] as const).map(row => (
           <div key={row.text} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
-            <span className="text-sm flex-shrink-0">{row.icon}</span>
+            <row.Icon size={15} color="#E8915A" className="flex-shrink-0 mt-0.5" />
             <span className="text-white/70 leading-relaxed">{row.text}</span>
           </div>
         ))}
       </div>
 
-      <div className="rounded-xl border border-[#FBBF24]/25 bg-[#FBBF24]/6 px-3 py-2 text-xs text-[#FBBF24]/80">
-        💡 Scegli creature con vantaggio elementale contro il boss per infliggere <strong className="text-[#FBBF24]">×1.5</strong> danni — leggi prima la sezione Elementi!
+      <div className="flex items-start gap-1.5 rounded-xl border border-[#FBBF24]/25 bg-[#FBBF24]/6 px-3 py-2 text-xs text-[#FBBF24]/80">
+        <GiLightBulb size={15} color="#FBBF24" className="flex-shrink-0 mt-0.5" /> <span>Scegli creature con vantaggio elementale contro il boss per infliggere <strong className="text-[#FBBF24]">×1.5</strong> danni — leggi prima la sezione Elementi!</span>
       </div>
     </div>
   )
@@ -380,7 +399,7 @@ function DuelDiagram() {
       <div className="flex items-center justify-center gap-4 rounded-xl border border-white/10 bg-white/4 px-4 py-3">
         <div className="flex flex-col items-center gap-1">
           {[1, 2, 3].map(n => (
-            <div key={n} className="w-8 h-8 rounded-lg bg-[#3A9DBC]/20 border border-[#3A9DBC]/40 flex items-center justify-center text-sm">🐾</div>
+            <div key={n} className="w-8 h-8 rounded-lg bg-[#3A9DBC]/20 border border-[#3A9DBC]/40 flex items-center justify-center"><GiPawPrint size={15} color="#3A9DBC" /></div>
           ))}
           <span className="text-[10px] text-[#3A9DBC] font-bold mt-1">Tu</span>
         </div>
@@ -388,22 +407,23 @@ function DuelDiagram() {
           animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 1, repeat: Infinity }}>VS</motion.div>
         <div className="flex flex-col items-center gap-1">
           {[1, 2, 3].map(n => (
-            <div key={n} className="w-8 h-8 rounded-lg bg-[#E85D2F]/20 border border-[#E85D2F]/40 flex items-center justify-center text-sm">🐾</div>
+            <div key={n} className="w-8 h-8 rounded-lg bg-[#E85D2F]/20 border border-[#E85D2F]/40 flex items-center justify-center"><GiPawPrint size={15} color="#E85D2F" /></div>
           ))}
           <span className="text-[10px] text-[#E85D2F] font-bold mt-1">Avversario</span>
         </div>
       </div>
       <div className="space-y-1.5 text-xs">
-        {[
-          { t: '🐾 Seleziona la squadra dal DaimonDex (slot 1 = Capitano, 2 e 3 = Riserve) — fino a 3 creature' },
-          { t: '🔄 Quando una creatura è KO entra la successiva in automatico' },
-          { t: '⏱️ Hai 30 secondi per attaccare ogni tuo turno — allo scadere parte un attacco automatico' },
-          { t: '💤 Quando non è il tuo turno il timer è fermo — attendi la risposta dell\'avversario' },
-          { t: '🏆 Chi abbatte tutte le creature avversarie vince il duello' },
-          { t: '⚡ Vittoria → EXP + monete + progresso missione duello' },
-          { t: '⚠️ Se entrambi i giocatori restano in attesa di abbinamento, premi "Aggiorna" — la stanza è ancora attiva' },
-        ].map(row => (
+        {([
+          { Icon: GiPawPrint,      t: 'Seleziona la squadra dal DaimonDex (slot 1 = Capitano, 2 e 3 = Riserve) — fino a 3 creature' },
+          { Icon: GiCycle,         t: 'Quando una creatura è KO entra la successiva in automatico' },
+          { Icon: GiSandsOfTime,   t: 'Hai 30 secondi per attaccare ogni tuo turno — allo scadere parte un attacco automatico' },
+          { Icon: GiNightSleep,    t: 'Quando non è il tuo turno il timer è fermo — attendi la risposta dell\'avversario' },
+          { Icon: GiTrophyCup,     t: 'Chi abbatte tutte le creature avversarie vince il duello' },
+          { Icon: GiLightningArc,  t: 'Vittoria → EXP + monete + progresso missione duello' },
+          { Icon: GiCycle,         t: 'Se entrambi i giocatori restano in attesa di abbinamento, premi "Aggiorna" — la stanza è ancora attiva' },
+        ] as const).map(row => (
           <div key={row.t} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
+            <row.Icon size={15} color="#E8915A" className="flex-shrink-0 mt-0.5" />
             <span className="text-white/70 leading-relaxed">{row.t}</span>
           </div>
         ))}
@@ -423,7 +443,7 @@ function TipChips() {
     { text: 'Abbassa gli HP prima di lanciare la rete: ogni 10% di vita tolta aggiunge +20% al moltiplicatore di cattura (fino a ×3.0 a 0 HP)!', color: '#3A9DBC' },
     { text: 'Cammina per far schiudere le uova — ogni passo conta anche se non incontri creature!', color: '#C084FC' },
     { text: 'Completa le missioni QR e di cattura per guadagnare monete extra da spendere nel negozio', color: '#FBBF24' },
-    { text: 'Dopo una cattura apri il DaimonDex e cerca il pulsante 🧩 — alcune creature nascondono frammenti enigma segreti!', color: '#C084FC' },
+    { text: 'Dopo una cattura apri il DaimonDex e cerca il pulsante Frammenti Enigma — alcune creature nascondono indizi segreti!', color: '#C084FC' },
   ]
   return (
     <div className="flex flex-col gap-2 mt-3">
@@ -448,7 +468,7 @@ function buildSections(): Section[] {
   return [
     {
       id: 'benvenuto',
-      icon: '🌍',
+      Icon: GiWorld,
       title: 'Benvenuto in Daimon',
       accent: '#3A9DBC',
       content: (
@@ -458,17 +478,21 @@ function buildSections(): Section[] {
             nascondere creature nel mondo reale. Cammina, avvicinati, cattura.
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            {[['🚶', 'Cammina'], ['📍', 'Avvicinati'], ['🎯', 'Cattura']].map(([emoji, label]) => (
-              <div key={label} className="rounded-xl bg-white/5 border border-white/10 py-2 px-1">
-                <div className="text-xl">{emoji}</div>
+            {([
+              { Icon: GiFootprint,      label: 'Cammina',    color: '#34D399' },
+              { Icon: GiPositionMarker, label: 'Avvicinati', color: '#FBBF24' },
+              { Icon: GiBullseye,       label: 'Cattura',    color: '#E85D2F' },
+            ] as const).map(({ Icon, label, color }) => (
+              <div key={label} className="rounded-xl bg-white/5 border border-white/10 py-2 px-1 flex flex-col items-center">
+                <Icon size={22} color={color} />
                 <div className="text-xs text-white/60 mt-1">{label}</div>
               </div>
             ))}
           </div>
           <div className="mt-3 rounded-xl border border-[#3A9DBC]/20 bg-[#3A9DBC]/5 px-3 py-2">
-            <p className="text-xs text-[#3A9DBC]">
-              📋 Per iniziare hai bisogno di un <strong>codice invito</strong> dall&apos;organizzatore —
-              inseriscilo nella schermata di accesso oppure <strong>scansiona il QR code</strong> con la fotocamera.
+            <p className="inline-flex items-start gap-1.5 text-xs text-[#3A9DBC]">
+              <GiScrollUnfurled size={14} className="flex-shrink-0 mt-0.5" /> <span>Per iniziare hai bisogno di un <strong>codice invito</strong> dall&apos;organizzatore —
+              inseriscilo nella schermata di accesso oppure <strong>scansiona il QR code</strong> con la fotocamera.</span>
             </p>
           </div>
         </div>
@@ -476,7 +500,7 @@ function buildSections(): Section[] {
     },
     {
       id: 'mappa',
-      icon: '🗺️',
+      Icon: GiTreasureMap,
       title: 'La Mappa',
       accent: '#34D399',
       content: (
@@ -488,7 +512,7 @@ function buildSections(): Section[] {
           </p>
           <MiniMap />
           <div className="mt-3 rounded-xl border border-[#34D399]/25 bg-[#34D399]/6 px-3 py-2.5 text-xs text-[#34D399]/90">
-            <span className="font-bold text-[#34D399]">🪱 Esca attiva</span> — quando usi un&apos;esca dalla mappa comparirà
+            <span className="inline-flex items-center gap-1 font-bold text-[#34D399]"><GiFishingLure size={13} color="#34D399" /> Esca attiva</span> — quando usi un&apos;esca dalla mappa comparirà
             un badge verde con un <strong>conto alla rovescia M:SS</strong> che indica il tempo rimanente.
             Con l&apos;esca attiva le creature rare compaiono più spesso nell&apos;area.
           </div>
@@ -497,7 +521,7 @@ function buildSections(): Section[] {
     },
     {
       id: 'incontri',
-      icon: '⚔️',
+      Icon: GiCrossedSwords,
       title: 'Gli Incontri',
       accent: '#E85D2F',
       content: (
@@ -530,7 +554,7 @@ function buildSections(): Section[] {
     },
     {
       id: 'elementi',
-      icon: '🔥',
+      Icon: GiFireRing,
       title: 'Elementi & Debolezze',
       accent: '#E85D2F',
       content: (
@@ -546,7 +570,7 @@ function buildSections(): Section[] {
     },
     {
       id: 'danni',
-      icon: '⚡',
+      Icon: GiLightningArc,
       title: 'Calcolo Danni',
       accent: '#FBBF24',
       content: (
@@ -582,14 +606,14 @@ function buildSections(): Section[] {
             </div>
           </div>
           <div className="mt-3 rounded-xl border border-[#FBBF24]/20 bg-[#FBBF24]/5 px-3 py-2 text-xs text-[#FBBF24]/80">
-            💡 Il danno minimo è sempre 1 — nessun attacco va a vuoto.
+<span className="inline-flex items-center gap-1.5"><GiLightBulb size={14} color="#FBBF24" /> Il danno minimo è sempre 1 — nessun attacco va a vuoto.</span>
           </div>
         </div>
       ),
     },
     {
       id: 'daimondex',
-      icon: '📖',
+      Icon: GiSpellBook,
       title: 'DaimonDex',
       accent: '#7B4DB8',
       content: (
@@ -605,7 +629,7 @@ function buildSections(): Section[] {
     },
     {
       id: 'squadra',
-      icon: '🐾',
+      Icon: GiBattleGear,
       title: 'La Squadra',
       accent: '#3ABCA8',
       content: (
@@ -622,7 +646,7 @@ function buildSections(): Section[] {
     },
     {
       id: 'enigmi',
-      icon: '🧩',
+      Icon: GiPuzzle,
       title: 'Frammenti Enigma',
       accent: '#C084FC',
       content: (
@@ -630,31 +654,31 @@ function buildSections(): Section[] {
           <p className="text-white/80 text-sm leading-relaxed">
             Alcune creature nascondono un <span className="text-[#C084FC] font-bold">Frammento Enigma</span> —
             un indizio, un segreto o un dettaglio speciale sbloccato dopo la cattura.
-            Trovalo nel DaimonDex toccando la creatura e premendo il pulsante viola 🧩.
+            Trovalo nel DaimonDex toccando la creatura e premendo il pulsante viola dei Frammenti.
           </p>
           <div className="mt-3 space-y-2 text-xs">
-            {[
-              { icon: '🐾', text: 'Cattura la creatura — solo le creature nel tuo bestiario svelano l\'enigma' },
-              { icon: '📖', text: 'Vai nel DaimonDex → tocca la creatura → premi "🧩 Frammento Enigma"' },
-              { icon: '✨', text: 'L\'enigma si rivela con un\'animazione: titolo, testo, immagine o video' },
-              { icon: '🔒', text: 'Il pulsante è disattivato se la creatura non ha un enigma assegnato dall\'admin' },
-            ].map(row => (
+            {([
+              { Icon: GiPawPrint,  text: 'Cattura la creatura — solo le creature nel tuo bestiario svelano l\'enigma' },
+              { Icon: GiSpellBook, text: 'Vai nel DaimonDex → tocca la creatura → premi "Frammento Enigma"' },
+              { Icon: GiSparkles,  text: 'L\'enigma si rivela con un\'animazione: titolo, testo, immagine o video' },
+              { Icon: GiPadlock,   text: 'Il pulsante è disattivato se la creatura non ha un enigma assegnato dall\'admin' },
+            ] as const).map(row => (
               <div key={row.text} className="flex items-start gap-2 rounded-lg bg-white/4 border border-white/8 px-3 py-2">
-                <span className="flex-shrink-0">{row.icon}</span>
+                <row.Icon size={15} color="#C084FC" className="flex-shrink-0 mt-0.5" />
                 <span className="text-white/70 leading-relaxed">{row.text}</span>
               </div>
             ))}
           </div>
-          <div className="mt-3 rounded-xl border border-[#C084FC]/20 bg-[#C084FC]/5 px-3 py-2 text-xs text-[#C084FC]/80">
-            🧩 Non tutte le creature hanno un enigma — l&apos;organizzatore decide quali creature
-            portano frammenti e cosa contengono.
+          <div className="flex items-start gap-1.5 mt-3 rounded-xl border border-[#C084FC]/20 bg-[#C084FC]/5 px-3 py-2 text-xs text-[#C084FC]/80">
+            <GiPuzzle size={14} color="#C084FC" className="flex-shrink-0 mt-0.5" /> <span>Non tutte le creature hanno un enigma — l&apos;organizzatore decide quali creature
+            portano frammenti e cosa contengono.</span>
           </div>
         </div>
       ),
     },
     {
       id: 'evoluzione',
-      icon: '✨',
+      Icon: GiSparkles,
       title: 'Evoluzione',
       accent: '#F7C841',
       content: (
@@ -669,14 +693,14 @@ function buildSections(): Section[] {
     },
     {
       id: 'oggetti',
-      icon: '🎒',
+      Icon: GiSwapBag,
       title: 'Oggetti & Negozio',
       accent: '#3A9DBC',
       content: (
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
-            Nel <span className="text-[#3A9DBC] font-bold">Negozio 🛒</span> puoi acquistare oggetti con le monete guadagnate.
-            Nello <span className="text-[#3A9DBC] font-bold">Zaino 🎒</span> trovi tutti i tuoi oggetti e le uova.
+            Nel <span className="inline-flex items-center gap-1 text-[#3A9DBC] font-bold align-middle"><GiSwapBag size={13} color="#3A9DBC" /> Negozio</span> puoi acquistare oggetti con le monete guadagnate.
+            Nello <span className="inline-flex items-center gap-1 text-[#3A9DBC] font-bold align-middle"><GiKnapsack size={13} color="#3A9DBC" /> Zaino</span> trovi tutti i tuoi oggetti e le uova.
             Alcuni oggetti si usano automaticamente, altri richiedono di premere &ldquo;Usa&rdquo;.
           </p>
           <ItemsGrid />
@@ -685,7 +709,7 @@ function buildSections(): Section[] {
     },
     {
       id: 'uova',
-      icon: '🥚',
+      Icon: GiEggClutch,
       title: 'Uova & Schiusura',
       accent: '#C084FC',
       content: (
@@ -701,26 +725,26 @@ function buildSections(): Section[] {
     },
     {
       id: 'missioni',
-      icon: '🎯',
+      Icon: GiBullseye,
       title: 'Missioni',
       accent: '#34D399',
       content: (
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
             L&apos;admin crea missioni speciali per la sessione. Toccane una per vedere i dettagli
-            e i tuoi progressi. Ogni missione completata dona <span className="text-[#F7C841] font-bold">EXP e monete 🪙</span> bonus.
+            e i tuoi progressi. Ogni missione completata dona <span className="inline-flex items-center gap-1 text-[#F7C841] font-bold align-middle">EXP e monete <GiTwoCoins size={13} color="#F7C841" /></span> bonus.
           </p>
           <div className="mt-3 space-y-2">
-            {[
-              { icon: '🐾', label: 'Cattura — prendi la creatura indicata',         color: '#3A9DBC' },
-              { icon: '⚔️', label: 'Duello — vinci uno scontro PvP',               color: '#FBBF24' },
-              { icon: '📷', label: 'QR — scansiona il codice nascosto nell\'area',  color: '#34D399' },
-              { icon: '🚶', label: 'Cammino — percorri la distanza indicata in m',  color: '#C084FC' },
-              { icon: '🎒', label: 'Raccolta — acquista/usa oggetti nel negozio',   color: '#F97316' },
-            ].map(m => (
+            {([
+              { Icon: GiPawPrint,       label: 'Cattura — prendi la creatura indicata',         color: '#3A9DBC' },
+              { Icon: GiCrossedSwords,  label: 'Duello — vinci uno scontro PvP',               color: '#FBBF24' },
+              { Icon: GiMagnifyingGlass, label: 'QR — scansiona il codice nascosto nell\'area', color: '#34D399' },
+              { Icon: GiFootprint,      label: 'Cammino — percorri la distanza indicata in m',  color: '#C084FC' },
+              { Icon: GiKnapsack,       label: 'Raccolta — acquista/usa oggetti nel negozio',   color: '#F97316' },
+            ] as const).map(m => (
               <div key={m.label} className="flex items-center gap-3 rounded-lg border px-3 py-2"
                 style={{ background: m.color + '0a', borderColor: m.color + '28' }}>
-                <span className="text-base flex-shrink-0">{m.icon}</span>
+                <m.Icon size={17} color={m.color} className="flex-shrink-0" />
                 <span className="text-xs text-white/80">{m.label}</span>
               </div>
             ))}
@@ -730,7 +754,7 @@ function buildSections(): Section[] {
     },
     {
       id: 'qrscanner',
-      icon: '📷',
+      Icon: GiMagnifyingGlass,
       title: 'Scanner QR',
       accent: '#34D399',
       content: (
@@ -740,16 +764,16 @@ function buildSections(): Section[] {
             Aprili dalla sezione Missioni o scansiona direttamente dalla mappa.
           </p>
           <div className="mt-3 space-y-1.5 text-xs">
-            {[
-              { icon: '🎒', label: 'Oggetto',  desc: 'Aggiunge direttamente l\'oggetto al tuo zaino' },
-              { icon: '🥚', label: 'Uovo',     desc: 'Crea un uovo nel tuo zaino da schiudere dopo X passi' },
-              { icon: '💀', label: 'Boss',     desc: 'Avvia il boss fight — scegli la squadra e combatti!' },
-              { icon: '🐾', label: 'Creatura', desc: 'Aggiunge direttamente una creatura speciale al tuo DaimonDex' },
-              { icon: '📖', label: 'Indizio',  desc: 'Sblocca un capitolo narrativo della storia' },
-              { icon: '✨', label: 'Evento',   desc: 'Attiva un bonus temporaneo (EXP, spawn, oro)' },
-            ].map(row => (
+            {([
+              { Icon: GiKnapsack,   color: '#F97316', label: 'Oggetto',  desc: 'Aggiunge direttamente l\'oggetto al tuo zaino' },
+              { Icon: GiEggClutch,  color: '#C084FC', label: 'Uovo',     desc: 'Crea un uovo nel tuo zaino da schiudere dopo X passi' },
+              { Icon: GiDeathSkull, color: '#FF5A45', label: 'Boss',     desc: 'Avvia il boss fight — scegli la squadra e combatti!' },
+              { Icon: GiPawPrint,   color: '#3A9DBC', label: 'Creatura', desc: 'Aggiunge direttamente una creatura speciale al tuo DaimonDex' },
+              { Icon: GiSpellBook,  color: '#A78BFA', label: 'Indizio',  desc: 'Sblocca un capitolo narrativo della storia' },
+              { Icon: GiSparkles,   color: '#46bad8', label: 'Evento',   desc: 'Attiva un bonus temporaneo (EXP, spawn, oro)' },
+            ] as const).map(row => (
               <div key={row.label} className="flex items-center gap-3 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
-                <span className="text-base">{row.icon}</span>
+                <row.Icon size={17} color={row.color} className="flex-shrink-0" />
                 <div>
                   <span className="font-bold text-white/80">{row.label}</span>
                   <span className="text-white/45"> — {row.desc}</span>
@@ -767,14 +791,14 @@ function buildSections(): Section[] {
     },
     {
       id: 'duelli',
-      icon: '⚔️',
+      Icon: GiCrossedSwords,
       title: 'Duelli PvP 3v3',
       accent: '#E85D2F',
       content: (
         <div>
           <p className="text-white/80 text-sm leading-relaxed">
             Sfida altri giocatori in duelli <span className="text-[#E85D2F] font-bold">3v3 in tempo reale!</span>{' '}
-            Vai su <span className="text-[#E85D2F] font-bold">⚔️ Duelli</span>, crea una stanza e condividi il codice.
+            Vai su <span className="inline-flex items-center gap-1 text-[#E85D2F] font-bold align-middle"><GiCrossedSwords size={13} color="#E85D2F" /> Duelli</span>, crea una stanza e condividi il codice.
             Scegli la squadra migliore tenendo conto degli elementi!
           </p>
           <DuelDiagram />
@@ -783,7 +807,7 @@ function buildSections(): Section[] {
     },
     {
       id: 'boss',
-      icon: '💀',
+      Icon: GiDeathSkull,
       title: 'Boss Fight',
       accent: '#E85D2F',
       content: (
@@ -799,7 +823,7 @@ function buildSections(): Section[] {
     },
     {
       id: 'profilo',
-      icon: '🏆',
+      Icon: GiTrophyCup,
       title: 'Profilo & Sessioni',
       accent: '#F7C841',
       content: (
@@ -809,15 +833,15 @@ function buildSections(): Section[] {
             vedere le tue statistiche dettagliate: EXP, livello, creature catturate, oro e duelli vinti.
           </p>
           <div className="mt-3 space-y-2 text-xs">
-            {[
-              { icon: '🎮', label: 'Scegli sessione',     desc: 'Tocca una sessione per vederne le stats — quella attiva è marcata con un bordo verde',    color: '#34D399' },
-              { icon: '📊', label: 'Stats per sessione',   desc: 'EXP · Livello · Posizione classifica · Creature · Oro · Duelli vinti/giocati',            color: '#F7C841' },
-              { icon: '⚡', label: 'Entra in sessione',    desc: 'Dopo aver selezionato una sessione attiva, premi il pulsante per iniziare a giocare',      color: '#3A9DBC' },
-              { icon: '🏅', label: 'Classifica live',      desc: 'La classifica sotto le stats mostra la posizione di tutti i giocatori della sessione',     color: '#C084FC' },
-            ].map(row => (
+            {([
+              { Icon: GiCardPickup,   label: 'Scegli sessione',     desc: 'Tocca una sessione per vederne le stats — quella attiva è marcata con un bordo verde',    color: '#34D399' },
+              { Icon: GiProgression,  label: 'Stats per sessione',   desc: 'EXP · Livello · Posizione classifica · Creature · Oro · Duelli vinti/giocati',            color: '#F7C841' },
+              { Icon: GiLightningArc, label: 'Entra in sessione',    desc: 'Dopo aver selezionato una sessione attiva, premi il pulsante per iniziare a giocare',      color: '#3A9DBC' },
+              { Icon: GiPodiumWinner, label: 'Classifica live',      desc: 'La classifica sotto le stats mostra la posizione di tutti i giocatori della sessione',     color: '#C084FC' },
+            ] as const).map(row => (
               <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2"
                 style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
-                <span className="text-base flex-shrink-0">{row.icon}</span>
+                <row.Icon size={17} color={row.color} className="flex-shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-white/90">{row.label}</span>
                   <span className="text-white/45"> — {row.desc}</span>
@@ -825,16 +849,16 @@ function buildSections(): Section[] {
               </div>
             ))}
           </div>
-          <div className="mt-3 rounded-xl border border-[#F7C841]/20 bg-[#F7C841]/5 px-3 py-2 text-xs text-[#F7C841]/80">
-            💡 Puoi partecipare a più sessioni nel tempo — ogni sessione ha le sue statistiche indipendenti.
-            I totali in alto (EXP tot, creature, vittorie) sommano tutti gli eventi.
+          <div className="flex items-start gap-1.5 mt-3 rounded-xl border border-[#F7C841]/20 bg-[#F7C841]/5 px-3 py-2 text-xs text-[#F7C841]/80">
+            <GiLightBulb size={14} color="#F7C841" className="flex-shrink-0 mt-0.5" /> <span>Puoi partecipare a più sessioni nel tempo — ogni sessione ha le sue statistiche indipendenti.
+            I totali in alto (EXP tot, creature, vittorie) sommano tutti gli eventi.</span>
           </div>
         </div>
       ),
     },
     {
       id: 'consigli',
-      icon: '💡',
+      Icon: GiLightBulb,
       title: 'Consigli Rapidi',
       accent: '#34D399',
       content: <TipChips />,
@@ -850,10 +874,11 @@ const cardVariants = {
 }
 
 function SectionCard({ section, forceOpen }: { section: Section; forceOpen?: boolean }) {
-  const [open, setOpen] = useState(true)
-
-  // When forceOpen fires, ensure section is open
-  useState(() => { if (forceOpen) setOpen(true) })
+  // Sections start COLLAPSED so the guide reads as a clean, navigable index;
+  // the user expands what they need. Search (`forceOpen`) overrides this so
+  // filtered results show their content immediately.
+  const [open, setOpen] = useState(false)
+  const expanded = forceOpen || open
 
   return (
     <motion.div
@@ -872,18 +897,23 @@ function SectionCard({ section, forceOpen }: { section: Section; forceOpen?: boo
       <button
         className="w-full flex items-center gap-3 px-4 py-3 text-left"
         onClick={() => setOpen(o => !o)}>
-        <span className="text-2xl flex-shrink-0">{section.icon}</span>
-        <span className="flex-1 font-bold text-white text-base">{section.title}</span>
+        <span
+          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: `${section.accent}1f`, border: `1px solid ${section.accent}3d` }}
+        >
+          <section.Icon size={20} color={section.accent} style={{ filter: `drop-shadow(0 0 5px ${section.accent}55)` }} />
+        </span>
+        <span className="wc-display flex-1 font-bold text-white text-base">{section.title}</span>
         <motion.span
           className="text-white/40 text-sm flex-shrink-0"
-          animate={{ rotate: open ? 180 : 0 }}
+          animate={{ rotate: expanded ? 180 : 0 }}
           transition={{ duration: 0.25 }}>
           ▾
         </motion.span>
       </button>
 
       <AnimatePresence initial={false}>
-        {open && (
+        {expanded && (
           <motion.div
             key="body"
             initial={{ height: 0, opacity: 0 }}
@@ -901,20 +931,20 @@ function SectionCard({ section, forceOpen }: { section: Section; forceOpen?: boo
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-const QUICK_LINKS = [
-  { tag: '🗺️ Mappa',       id: 'mappa'      },
-  { tag: '⚔️ Incontri',    id: 'incontri'   },
-  { tag: '🔥 Elementi',    id: 'elementi'   },
-  { tag: '📖 DaimonDex',   id: 'daimondex'  },
-  { tag: '🐾 Squadra',     id: 'squadra'    },
-  { tag: '⚔️ Duelli',      id: 'duelli'     },
-  { tag: '💀 Boss',        id: 'boss'       },
-  { tag: '🥚 Uova',        id: 'uova'       },
-  { tag: '🎯 Missioni',    id: 'missioni'   },
-  { tag: '🎒 Oggetti',     id: 'oggetti'    },
-  { tag: '✨ Evoluzione',  id: 'evoluzione' },
-  { tag: '📷 QR Scanner',  id: 'qrscanner'  },
-  { tag: '🏆 Classifica',  id: 'profilo'    },
+const QUICK_LINKS: { Icon: IconType; label: string; id: string; color: string }[] = [
+  { Icon: GiTreasureMap,    label: 'Mappa',      id: 'mappa',      color: '#34D399' },
+  { Icon: GiCrossedSwords,  label: 'Incontri',   id: 'incontri',   color: '#E85D2F' },
+  { Icon: GiFireRing,       label: 'Elementi',   id: 'elementi',   color: '#E85D2F' },
+  { Icon: GiSpellBook,      label: 'DaimonDex',  id: 'daimondex',  color: '#A78BFA' },
+  { Icon: GiBattleGear,     label: 'Squadra',    id: 'squadra',    color: '#3ABCA8' },
+  { Icon: GiCrossedSwords,  label: 'Duelli',     id: 'duelli',     color: '#E85D2F' },
+  { Icon: GiDeathSkull,     label: 'Boss',       id: 'boss',       color: '#FF5A45' },
+  { Icon: GiEggClutch,      label: 'Uova',       id: 'uova',       color: '#C084FC' },
+  { Icon: GiBullseye,       label: 'Missioni',   id: 'missioni',   color: '#34D399' },
+  { Icon: GiSwapBag,        label: 'Oggetti',    id: 'oggetti',    color: '#46bad8' },
+  { Icon: GiSparkles,       label: 'Evoluzione', id: 'evoluzione', color: '#F7C841' },
+  { Icon: GiMagnifyingGlass, label: 'QR Scanner', id: 'qrscanner', color: '#34D399' },
+  { Icon: GiTrophyCup,      label: 'Classifica', id: 'profilo',    color: '#F7C841' },
 ]
 
 export default function GuidePage() {
@@ -1054,24 +1084,24 @@ export default function GuidePage() {
             style={{ background: 'radial-gradient(circle, #34D399 0%, transparent 70%)' }} />
           <div className="relative px-5 py-5">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-3xl">🐾</span>
-              <span className="text-xl font-black text-white tracking-tight">Daimon</span>
+              <GiPawPrint size={30} color="#3ABCA8" style={{ filter: 'drop-shadow(0 0 8px rgba(58,188,168,0.5))' }} />
+              <span className="wc-display wc-gold-text text-xl font-black tracking-tight">Daimon</span>
             </div>
             <p className="text-sm text-white/60 leading-relaxed">
               Avventura nella natura adriatica e nei boschi appenninici.<br />
               Cattura, evolvi, combatti — diventa il miglior cacciatore!
             </p>
             <div className="flex gap-2 mt-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
-              {QUICK_LINKS.map(({ tag, id }) => (
+              {QUICK_LINKS.map(({ Icon, label, id, color }) => (
                 <button
                   key={id}
                   onClick={() => scrollToSection(id)}
-                  className="text-[10px] px-2.5 py-1 rounded-full bg-white/8 border border-white/12 text-white/70 whitespace-nowrap shrink-0 transition-all active:scale-95"
+                  className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-white/8 border border-white/12 text-white/70 whitespace-nowrap shrink-0 transition-all active:scale-95"
                   style={{ WebkitTapHighlightColor: 'transparent' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.14)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.9)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.7)' }}
                 >
-                  {tag}
+                  <Icon size={12} color={color} /> {label}
                 </button>
               ))}
             </div>
@@ -1086,7 +1116,7 @@ export default function GuidePage() {
                   color: '#3ABCA8',
                 }}
               >
-                {replaying ? '...' : <>🎓 Tutorial</>}
+                {replaying ? '...' : <><GiGraduateCap size={15} color="#3ABCA8" /> Tutorial</>}
               </button>
               <button
                 onClick={replayCoachmarks}
@@ -1097,7 +1127,7 @@ export default function GuidePage() {
                   color: '#F7C841',
                 }}
               >
-                💡 Suggerimenti UI
+<GiLightBulb size={15} color="#F7C841" /> Suggerimenti UI
               </button>
             </div>
           </div>
@@ -1109,7 +1139,7 @@ export default function GuidePage() {
           <div className="text-center py-12 text-white/40 text-sm">Nessun argomento trovato per &ldquo;{query}&rdquo;</div>
         ) : (
           sections.map((section) => (
-            <SectionCard key={section.id} section={section} />
+            <SectionCard key={section.id} section={section} forceOpen={!!query.trim()} />
           ))
         )}
       </div>
