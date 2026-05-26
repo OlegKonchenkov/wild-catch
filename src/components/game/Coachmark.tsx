@@ -91,12 +91,18 @@ export default function Coachmark({
     let settleTimer: number | null = null
 
     function isOffscreen(r: DOMRect): boolean {
-      const margin = 24
+      // Only treat as offscreen when the element is GENUINELY outside the
+      // viewport (i.e. it needs scrolling to be revealed — e.g. a nav item
+      // pushed past the horizontal edge of a scrolling bar). Elements merely
+      // pinned near an edge — the top-right HUD, the bottom navbar — are
+      // fully visible: scrolling them does nothing and the scroll-settle wait
+      // would otherwise flash the tooltip at screen-centre before snapping it
+      // to the target. Those now resolve synchronously and open in place.
       return (
-        r.right  > window.innerWidth  - margin ||
-        r.bottom > window.innerHeight - margin ||
-        r.left   < margin ||
-        r.top    < margin
+        r.right  <= 0 ||
+        r.left   >= window.innerWidth ||
+        r.bottom <= 0 ||
+        r.top    >= window.innerHeight
       )
     }
 
