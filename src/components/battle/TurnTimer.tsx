@@ -22,9 +22,9 @@ export default function TurnTimer({ seconds, total, className, style }: Props) {
   return (
     <div
       className={className}
-      style={{ position: 'absolute', left: 0, right: 0, bottom: 82, zIndex: 10, display: 'flex', alignItems: 'center', gap: 10, padding: '0 15px', ...style }}
+      style={{ position: 'absolute', left: 0, right: 0, bottom: 92, zIndex: 12, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', ...style }}
     >
-      <span style={{ position: 'relative', flex: 1, height: 6, borderRadius: 999, background: 'rgba(255,255,255,.16)', overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(0,0,0,.5)' }}>
+      <span style={{ position: 'relative', flex: 1, height: 6, borderRadius: 999, background: 'rgba(255,255,255,.16)', overflow: 'hidden', boxShadow: '0 0 14px rgba(0,0,0,.45), inset 0 1px 2px rgba(0,0,0,.5)' }}>
         <span
           style={{
             display: 'block',
@@ -41,8 +41,8 @@ export default function TurnTimer({ seconds, total, className, style }: Props) {
             position: 'absolute',
             top: '50%',
             left: `${pct * 100}%`,
-            width: 12,
-            height: 12,
+            width: 10,
+            height: 10,
             borderRadius: '50%',
             transform: 'translate(-50%,-50%)',
             background: accent,
@@ -54,10 +54,10 @@ export default function TurnTimer({ seconds, total, className, style }: Props) {
       </span>
       <span
         style={{
-          minWidth: 34,
+          minWidth: 30,
           textAlign: 'right',
           fontFamily: 'var(--font-mono, monospace)',
-          fontSize: 11,
+          fontSize: 10.5,
           fontWeight: 800,
           color: accent,
           textShadow: urgent ? `0 0 10px ${accent}` : undefined,

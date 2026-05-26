@@ -36,7 +36,7 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
   return (
     <div
       className={className}
-      style={{ position: 'absolute', left: 0, right: 0, bottom: 106, zIndex: 10, display: 'flex', justifyContent: 'center', gap: 8, padding: '0 13px', ...style }}
+      style={{ position: 'absolute', left: 0, right: 0, bottom: 111, zIndex: 12, display: 'flex', justifyContent: 'center', gap: 6, padding: '0 10px', ...style }}
     >
       {members.map((m) => {
         const pct = m.maxHp > 0 ? Math.max(0, Math.min(1, m.hp / m.maxHp)) : 0
@@ -51,8 +51,8 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
             aria-label={m.name}
             className="squad-card"
             style={{
-              position: 'relative', flex: 1, minWidth: 0, height: 58, display: 'flex', alignItems: 'center', gap: 7,
-              padding: '6px 7px 6px 6px', borderRadius: 13,
+              position: 'relative', flex: 1, minWidth: 0, height: 50, display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 6px 5px 5px', borderRadius: 12,
               background: m.active
                 ? 'linear-gradient(145deg,rgba(62,42,12,.94),rgba(15,15,12,.82) 58%,rgba(5,8,11,.82))'
                 : 'linear-gradient(145deg,rgba(12,18,23,.68),rgba(6,9,13,.64))',
@@ -83,15 +83,15 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
               <span
                 style={{
                   position: 'absolute',
-                  top: -14,
+                  top: -10,
                   left: 8,
-                  width: 20,
-                  height: 20,
+                  width: 16,
+                  height: 16,
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 13,
+                  fontSize: 10,
                   color: '#3A2307',
                   background: 'linear-gradient(180deg,#FFE08A,#D99021)',
                   border: '1px solid rgba(255,246,196,.82)',
@@ -103,7 +103,7 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
             )}
             <span
               style={{
-                position: 'relative', flexShrink: 0, width: 44, height: 44, borderRadius: 10, overflow: 'hidden',
+                position: 'relative', flexShrink: 0, width: 38, height: 38, borderRadius: 9, overflow: 'hidden',
                 background: m.active
                   ? `radial-gradient(circle at 50% 42%, rgba(255,213,100,.36), ${glow}22 52%, rgba(0,0,0,.55) 76%)`
                   : `radial-gradient(circle at 50% 42%, ${glow}36, rgba(0,0,0,.5) 68%)`,
@@ -115,14 +115,14 @@ export default function SquadBar({ members, onSwitch, switchDisabled, className,
               }}
             >
               {m.imageUrl
-                ? <Image src={m.imageUrl} alt={m.name} width={44} height={44} style={{ objectFit: 'contain', transform: m.active ? 'scale(1.28)' : 'scale(1.18)' }} />
-                : <span style={{ filter: `drop-shadow(0 0 6px ${glow})`, display: 'flex' }}><ElementIcon element={m.element} size={22} /></span>}
-              {m.fainted && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#EF4444', fontWeight: 800 }}>{'\u2715'}</span>}
+                ? <Image src={m.imageUrl} alt={m.name} width={38} height={38} style={{ objectFit: 'contain', transform: m.active ? 'scale(1.26)' : 'scale(1.16)' }} />
+                : <span style={{ filter: `drop-shadow(0 0 6px ${glow})`, display: 'flex' }}><ElementIcon element={m.element} size={19} /></span>}
+              {m.fainted && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#EF4444', fontWeight: 800 }}>{'\u2715'}</span>}
             </span>
             <span style={{ flex: 1, minWidth: 0, height: '100%', display: 'grid', alignContent: 'center', textAlign: 'left' }}>
-              <span style={{ display: 'block', fontWeight: 900, fontSize: 10.5, color: m.active ? '#FFF5CB' : '#F7FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: m.active ? '0 0 8px rgba(255,196,70,.42), 0 1px 2px rgba(0,0,0,.8)' : '0 1px 2px rgba(0,0,0,.7)' }}>{m.name}</span>
-              <span style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5, fontFamily: 'var(--font-mono, monospace)', fontSize: 8.5, fontWeight: 800, color: 'rgba(255,255,255,.78)' }}>{Math.round(m.hp)}/{m.maxHp}</span>
-              <span style={{ display: 'block', height: 5, borderRadius: 999, background: 'rgba(255,255,255,.14)', overflow: 'hidden', marginTop: 3, boxShadow: 'inset 0 1px 2px rgba(0,0,0,.45)' }}>
+              <span style={{ display: 'block', fontWeight: 900, fontSize: 9.5, color: m.active ? '#FFF5CB' : '#F7FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: m.active ? '0 0 8px rgba(255,196,70,.42), 0 1px 2px rgba(0,0,0,.8)' : '0 1px 2px rgba(0,0,0,.7)' }}>{m.name}</span>
+              <span style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 3, fontFamily: 'var(--font-mono, monospace)', fontSize: 7.5, fontWeight: 800, color: 'rgba(255,255,255,.78)' }}>{Math.round(m.hp)}/{m.maxHp}</span>
+              <span style={{ display: 'block', height: 4, borderRadius: 999, background: 'rgba(255,255,255,.14)', overflow: 'hidden', marginTop: 2, boxShadow: 'inset 0 1px 2px rgba(0,0,0,.45)' }}>
                 <span style={{ display: 'block', height: '100%', width: `${pct * 100}%`, background: `linear-gradient(90deg,${hpColor(pct)},#5CF0B0)`, boxShadow: `0 0 8px ${hpColor(pct)}88`, transition: 'width .35s' }} />
               </span>
             </span>

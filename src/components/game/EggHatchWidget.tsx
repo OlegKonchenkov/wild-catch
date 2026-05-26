@@ -132,28 +132,53 @@ export default function EggHatchWidget({ sessionId }: { sessionId: string | null
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -6 }}
         transition={{ duration: 0.25 }}
-        className="flex items-center gap-2 rounded-lg backdrop-blur-sm pl-2 pr-2.5 py-1.5 shadow-lg"
+        className="relative overflow-hidden flex items-center gap-2 rounded-xl px-2.5 py-1.5"
         style={{
-          background: 'rgba(15,31,46,0.85)',
-          border: `1px solid ${color}55`,
-          maxWidth: 168,
+          width: 154,
+          background:
+            `radial-gradient(circle at 18% 18%, ${color}24, transparent 34%), ` +
+            'linear-gradient(150deg, rgba(8,36,46,0.90) 0%, rgba(5,18,27,0.96) 100%)',
+          border: `1.5px solid ${color}88`,
+          boxShadow: `0 0 14px ${color}26, 0 6px 16px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.16)`,
+          backdropFilter: 'blur(10px) saturate(1.16)',
         }}
         data-testid="egg-hatch-widget"
       >
-        <span className="leading-none shrink-0 flex"><GiEggClutch size={17} color={color} style={{ filter: `drop-shadow(0 0 4px ${color}66)` }} /></span>
+        <span
+          className="pointer-events-none absolute inset-x-4 top-0 h-px"
+          style={{ background: `linear-gradient(90deg, transparent, ${color}cc, transparent)` }}
+        />
+        <span
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+          style={{
+            background: `radial-gradient(circle, ${color}28 0%, rgba(8,30,38,0.66) 100%)`,
+            border: `1px solid ${color}88`,
+            boxShadow: `0 0 10px ${color}30, inset 0 0 9px ${color}18`,
+          }}
+        >
+          <GiEggClutch size={15} color={color} style={{ filter: `drop-shadow(0 0 4px ${color}88)` }} />
+        </span>
         <div className="flex-1 min-w-0">
-          <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.10)' }}>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span
+              className="text-[8px] font-black uppercase tracking-[0.14em]"
+              style={{ color: `${color}`, textShadow: `0 0 7px ${color}55` }}
+            >
+              Uovo
+            </span>
+            <span className="text-[8.5px] font-mono tabular-nums shrink-0" style={{ color: 'rgba(255,255,255,0.62)' }}>
+              {tweened}/{required}m
+            </span>
+          </div>
+          <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.12)', boxShadow: 'inset 0 0 5px rgba(0,0,0,0.34)' }}>
             <motion.div
               className="h-full"
               animate={{ width: `${pct}%` }}
               transition={{ duration: 0.4 }}
-              style={{ background: color }}
+              style={{ background: `linear-gradient(90deg, ${color}, #83F7FF)`, boxShadow: `0 0 8px ${color}aa` }}
             />
           </div>
         </div>
-        <span className="text-[10px] font-mono tabular-nums shrink-0" style={{ color }}>
-          {tweened}/{required}m
-        </span>
       </motion.div>
     </AnimatePresence>
   )

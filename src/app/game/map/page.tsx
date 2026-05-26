@@ -205,6 +205,8 @@ function MapPageInner() {
   const [sessionRestarted, setSessionRestarted] = useState(false)
   const [escaActiveUntil, setEscaActiveUntil] = useState<Date | null>(null)
   const [creatureImageUrl, setCreatureImageUrl] = useState<string | null>(null)
+  const [creatureElement, setCreatureElement] = useState<string | null>(null)
+  const [creatureRarity, setCreatureRarity] = useState<string | null>(null)
   const [mapPins, setMapPins] = useState<MapPin[]>([])
   const [claimedPinIds, setClaimedPinIds] = useState<Set<string>>(new Set())
   const claimedPinIdsRef = useRef<Set<string>>(new Set())
@@ -812,6 +814,8 @@ function MapPageInner() {
       setStarters([])
       setStarterPicked(null)
       setCreatureImageUrl(null)
+      setCreatureElement(null)
+      setCreatureRarity(null)
       supabase.from('sessions').select('*').eq('id', sid).single()
         .then(({ data }) => { if (data) setSession(data as unknown as Session) })
       // Load esca status
@@ -863,13 +867,21 @@ function MapPageInner() {
             setHasSelectedCreatureCheck(data?.selected_creature_id ? 'has' : 'missing')
             if (data?.selected_creature_id) {
               supabase.from('player_creatures')
-                .select('creatures(image_url, sprite_cutout_url, sprite_url)')
+                .select('creatures(image_url, sprite_cutout_url, sprite_url, element, rarity)')
                 .eq('id', data.selected_creature_id)
                 .single()
                 .then(({ data: pc }) => {
-                  const cr = pc?.creatures as any
+                  const cr = pc?.creatures as {
+                    image_url?: string | null
+                    sprite_cutout_url?: string | null
+                    sprite_url?: string | null
+                    element?: string | null
+                    rarity?: string | null
+                  } | null | undefined
                   const url = cr?.sprite_cutout_url || cr?.sprite_url || cr?.image_url
                   if (url) setCreatureImageUrl(url)
+                  setCreatureElement(typeof cr?.element === 'string' ? cr.element : null)
+                  setCreatureRarity(typeof cr?.rarity === 'string' ? cr.rarity : null)
                 })
             }
           })
@@ -1570,6 +1582,8 @@ function MapPageInner() {
         playerPosition={position ? { lat: position.lat, lng: position.lng } : null}
         sessionId={sessionId!}
         creatureImageUrl={creatureImageUrl}
+        creatureElement={creatureElement}
+        creatureRarity={creatureRarity}
         pins={renderedPins}
         onPinTap={handlePinTap}
       />
@@ -1701,7 +1715,7 @@ function MapPageInner() {
       <div className="absolute top-2 right-2 z-[900] flex flex-col items-end gap-1.5">
         <motion.div
           data-coachmark="step-counter"
-          className="relative flex items-center gap-1.5 overflow-hidden rounded-xl px-2.5 py-1.5"
+          className="relative flex items-center gap-1.5 overflow-hidden rounded-xl px-2 py-1.5"
           // Subtle glow pulse when a credit fires — keyed off stepsWalked
           // (server-confirmed) so we don't fire on pending interpolation.
           animate={{ boxShadow: stepsWalked > 0 ? [
@@ -1724,20 +1738,20 @@ function MapPageInner() {
             style={{ background: 'linear-gradient(90deg, transparent, rgba(117,232,255,0.82), transparent)' }}
           />
           <span
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
             style={{
               background: 'radial-gradient(circle, rgba(29,169,255,0.20) 0%, rgba(13,53,91,0.42) 72%, rgba(9,21,37,0.72) 100%)',
               border: '1.5px solid rgba(38,168,255,0.78)',
               boxShadow: '0 0 14px rgba(31,161,255,0.30), inset 0 0 10px rgba(41,184,255,0.16)',
             }}
           >
-            <GiBootPrints size={16} color="#35C8FF" style={{ filter: 'drop-shadow(0 0 4px rgba(53,200,255,0.72))' }} />
+            <GiBootPrints size={14} color="#35C8FF" style={{ filter: 'drop-shadow(0 0 4px rgba(53,200,255,0.72))' }} />
           </span>
           <div className="flex min-w-0 flex-col items-start leading-none">
             <span
               className="whitespace-nowrap font-black leading-none text-white tabular-nums"
               style={{
-                fontSize: displayedSteps >= 100000 ? 12 : displayedSteps >= 10000 ? 14 : 18,
+                fontSize: displayedSteps >= 100000 ? 11 : displayedSteps >= 10000 ? 12.5 : 15.5,
                 textShadow: '0 0 7px rgba(255,255,255,0.22)',
               }}
             >
@@ -1749,7 +1763,7 @@ function MapPageInner() {
                 shrinking ±Nm during warm-up is still the "acquiring GPS"
                 feedback the counter logic relies on. */}
             <span
-              className="mt-0.5 text-[9px] font-semibold leading-none tabular-nums"
+              className="mt-0.5 text-[8.5px] font-semibold leading-none tabular-nums"
               style={{
                 color: gpsAccuracy === null
                   ? 'rgba(154,188,222,0.58)'
@@ -1765,17 +1779,35 @@ function MapPageInner() {
         </motion.div>
         {escaActiveUntil && escaSecondsLeft > 0 && (
           <div
-            className="backdrop-blur-sm rounded-2xl px-3 py-2 flex items-center gap-2 whitespace-nowrap"
+            className="relative overflow-hidden rounded-xl px-2 py-1.5 flex items-center gap-1.5 whitespace-nowrap"
             style={{
-              background: 'linear-gradient(135deg, rgba(52,211,153,0.25) 0%, rgba(16,185,129,0.18) 100%)',
-              border: '1.5px solid rgba(52,211,153,0.7)',
-              boxShadow: '0 0 12px rgba(52,211,153,0.35), 0 2px 8px rgba(0,0,0,0.4)',
+              background:
+                'radial-gradient(circle at 26% 18%, rgba(52,211,153,0.22), transparent 36%), ' +
+                'linear-gradient(148deg, rgba(8,50,47,0.92) 0%, rgba(5,21,28,0.96) 100%)',
+              border: '1.5px solid rgba(52,211,153,0.72)',
+              boxShadow: '0 0 14px rgba(52,211,153,0.26), 0 5px 14px rgba(0,0,0,0.42), inset 0 0 12px rgba(52,211,153,0.08), inset 0 1px 0 rgba(162,255,218,0.18)',
+              backdropFilter: 'blur(10px) saturate(1.18)',
             }}
           >
-            <span className="leading-none flex" style={{ filter: 'drop-shadow(0 0 4px rgba(52,211,153,0.8))' }}><GiFishingLure size={17} color="#34D399" /></span>
-            <div className="flex flex-col leading-tight">
-              <span className="text-[10px] font-extrabold text-[#34D399] uppercase tracking-wider">Esca attiva</span>
-              <span className="text-[11px] font-mono font-bold text-white">
+            <span
+              className="pointer-events-none absolute inset-x-4 top-0 h-px"
+              style={{ background: 'linear-gradient(90deg, transparent, rgba(134,255,203,0.82), transparent)' }}
+            />
+            <span
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+              style={{
+                background: 'radial-gradient(circle, rgba(52,211,153,0.22) 0%, rgba(13,77,67,0.48) 74%, rgba(9,24,30,0.72) 100%)',
+                border: '1.5px solid rgba(52,211,153,0.78)',
+                boxShadow: '0 0 12px rgba(52,211,153,0.30), inset 0 0 9px rgba(52,211,153,0.16)',
+              }}
+            >
+              <GiFishingLure size={14} color="#54F0B0" style={{ filter: 'drop-shadow(0 0 4px rgba(84,240,176,0.72))' }} />
+            </span>
+            <div className="flex flex-col items-start leading-none">
+              <span className="text-[8px] font-black uppercase tracking-[0.12em]" style={{ color: '#7EF7C5', textShadow: '0 0 7px rgba(52,211,153,0.35)' }}>
+                Esca
+              </span>
+              <span className="mt-0.5 text-[9px] font-mono font-bold tabular-nums" style={{ color: '#D8FFF0' }}>
                 {Math.floor(escaSecondsLeft / 60)}:{String(escaSecondsLeft % 60).padStart(2, '0')}
               </span>
             </div>
@@ -1799,6 +1831,8 @@ function MapPageInner() {
               setStarterPicked(creature)
               setShowStarterSelect(false)
               setCreatureImageUrl(creature.sprite_cutout_url || creature.sprite_url || creature.image_url)
+              setCreatureElement(creature.element)
+              setCreatureRarity(creature.rarity)
               // Show the reveal card via the hatch queue (same bottom-sheet UI)
               setHatchQueue(prev => [{
                 name: creature.name,

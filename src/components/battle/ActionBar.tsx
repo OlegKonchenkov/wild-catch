@@ -42,31 +42,31 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
       className={className}
       style={{
         position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 11,
-        padding: '22px 13px calc(12px + env(safe-area-inset-bottom, 0px))',
-        display: 'flex', gap: 9, alignItems: 'stretch',
+        padding: '12px 11px calc(10px + env(safe-area-inset-bottom, 0px))',
+        display: 'flex', gap: 8, alignItems: 'stretch',
         background:
-          'linear-gradient(180deg, transparent 0%, rgba(6,13,25,.58) 18%, rgba(6,13,25,.96) 100%), ' +
+          'linear-gradient(180deg, rgba(6,13,25,.12) 0%, rgba(6,13,25,.72) 22%, rgba(6,13,25,.96) 100%), ' +
           'radial-gradient(80% 120% at 50% 100%, rgba(45,128,176,.18), transparent 62%)',
         borderTop: '1px solid rgba(117,190,255,.28)',
-        boxShadow: '0 -16px 44px rgba(0,0,0,.42), inset 0 1px 0 rgba(170,225,255,.14)',
+        boxShadow: '0 -12px 34px rgba(0,0,0,.38), inset 0 1px 0 rgba(170,225,255,.14)',
       }}
     >
       <span
         aria-hidden
         style={{
-          position: 'absolute', left: 0, right: 0, top: 0, height: 18,
+          position: 'absolute', left: 0, right: 0, top: 0, height: 12,
           background:
             'linear-gradient(90deg, transparent, rgba(122,201,255,.55), transparent), ' +
             'linear-gradient(180deg, rgba(78,142,195,.22), transparent)',
-          clipPath: 'polygon(0 0, 46% 0, 50% 100%, 54% 0, 100% 0, 100% 18%, 0 18%)',
+          clipPath: 'polygon(0 0, 47% 0, 50% 100%, 53% 0, 100% 0, 100% 18%, 0 18%)',
           pointerEvents: 'none',
         }}
       />
       <span
         aria-hidden
         style={{
-          position: 'absolute', top: 0, left: '50%', width: 34, height: 34,
-          transform: 'translate(-50%, -48%) rotate(45deg)',
+          position: 'absolute', top: 0, left: '50%', width: 26, height: 26,
+          transform: 'translate(-50%, -42%) rotate(45deg)',
           border: '1px solid rgba(145,218,255,.58)',
           background: 'radial-gradient(circle, rgba(153,234,255,.45), rgba(16,39,61,.74) 58%, rgba(3,8,16,.1) 100%)',
           boxShadow: '0 0 18px rgba(80,197,255,.38), inset 0 0 10px rgba(255,255,255,.18)',
@@ -86,10 +86,10 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
             disabled={disabled}
             onClick={a.onClick}
             style={{
-              flex: 1, minWidth: 0, minHeight: 80,
+              flex: 1, minWidth: 0, minHeight: 62,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: a.sub ? 5 : 7, padding: '8px 6px', position: 'relative', overflow: 'hidden',
-              borderRadius: 18, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.48 : 1,
+              gap: a.sub ? 3 : 5, padding: '6px 5px', position: 'relative', overflow: 'hidden',
+              borderRadius: 15, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.48 : 1,
               color: filled ? f!.ink : '#c6d3df',
               border: filled ? `1.5px solid ${f!.ring}` : '1.2px solid rgba(124,190,215,.34)',
               background: filled
@@ -105,7 +105,7 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
             <span
               aria-hidden
               style={{
-                position: 'absolute', inset: 3, borderRadius: 15,
+                position: 'absolute', inset: 3, borderRadius: 12,
                 border: filled ? '1px solid rgba(255,255,255,.18)' : '1px solid rgba(130,200,225,.12)',
                 pointerEvents: 'none',
               }}
@@ -113,7 +113,7 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
             {/* soft circular vignette behind the icon (coloured buttons only) */}
             {filled && (
               <span aria-hidden style={{
-                position: 'absolute', top: 9, width: 50, height: 50, borderRadius: '50%',
+                position: 'absolute', top: 6, width: 40, height: 40, borderRadius: '50%',
                 background: 'radial-gradient(circle, rgba(255,255,255,.20) 0%, transparent 68%)', pointerEvents: 'none',
               }} />
             )}
@@ -124,16 +124,16 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
                 filter: filled ? 'drop-shadow(0 2px 6px rgba(0,0,0,.54))' : 'drop-shadow(0 1px 3px rgba(0,0,0,.60))',
               }}
             >
-              {a.loading ? <Spinner size={a.primary ? 26 : 24} /> : a.icon}
+              {a.loading ? <Spinner size={a.primary ? 22 : 20} /> : a.icon}
             </span>
-            <span style={{ position: 'relative', zIndex: 1, fontWeight: 900, fontSize: a.primary ? 13 : 12, letterSpacing: '.04em', textTransform: 'uppercase', lineHeight: 1, color: filled ? f!.ink : '#b9c7d4', textShadow: filled ? '0 1px 4px rgba(0,0,0,.56)' : '0 1px 3px rgba(0,0,0,.42)' }}>
+            <span style={{ position: 'relative', zIndex: 1, fontWeight: 900, fontSize: a.primary ? 11.5 : 10.5, letterSpacing: '.04em', textTransform: 'uppercase', lineHeight: 1, color: filled ? f!.ink : '#b9c7d4', textShadow: filled ? '0 1px 4px rgba(0,0,0,.56)' : '0 1px 3px rgba(0,0,0,.42)' }}>
               {a.label}
             </span>
             {a.sub && (
               <span style={{
                 position: 'relative', zIndex: 1, fontFamily: 'var(--font-mono, monospace)',
-                fontSize: 8.5, fontWeight: 700, opacity: 0.95, lineHeight: 1.1,
-                padding: '1px 6px', borderRadius: 999, background: 'rgba(0,0,0,.28)',
+                fontSize: 7.5, fontWeight: 700, opacity: 0.95, lineHeight: 1,
+                padding: '1px 5px', borderRadius: 999, background: 'rgba(0,0,0,.28)',
                 // Stay inside the button — never spill past its rounded edge.
                 maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>{a.sub}</span>
@@ -141,7 +141,7 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
           </button>
         )
       })}
-      <style>{`@keyframes abSpin{to{transform:rotate(360deg)}} .ab-btn:active:not(:disabled){transform:scale(.97)} .ab-btn:hover:not(:disabled){filter:brightness(1.07) saturate(1.04)} .ab-btn:focus-visible{outline:2px solid rgba(255,232,170,.88);outline-offset:3px}`}</style>
+      <style>{`@keyframes abSpin{to{transform:rotate(360deg)}} .ab-btn svg{width:26px;height:26px}.ab-btn:active:not(:disabled){transform:scale(.97)} .ab-btn:hover:not(:disabled){filter:brightness(1.07) saturate(1.04)} .ab-btn:focus-visible{outline:2px solid rgba(255,232,170,.88);outline-offset:3px}`}</style>
     </div>
   )
 }

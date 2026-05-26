@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import type { Session } from '@/lib/types'
+import { ELEMENT_BACKGROUND } from '@/lib/game/battle-scene'
 
 export interface MapPin {
   id: string
@@ -20,6 +21,8 @@ interface Props {
   playerPosition: { lat: number; lng: number } | null
   sessionId: string
   creatureImageUrl?: string | null
+  creatureElement?: string | null
+  creatureRarity?: string | null
   pins?: MapPin[]
   onPinTap?: (pin: MapPin) => void
 }
@@ -44,40 +47,54 @@ function computeBearing(lat1: number, lon1: number, lat2: number, lon2: number):
   return (Math.atan2(y, x) * (180 / Math.PI) + 360) % 360
 }
 
+const ELEMENT_MARKER: Record<string, { glow: string; core: string }> = {
+  fiamma:    { glow: '#FF6B35', core: '#4A1208' },
+  adriatico: { glow: '#3A9DBC', core: '#071D34' },
+  bosco:     { glow: '#34D399', core: '#092817' },
+  terra:     { glow: '#D4A060', core: '#2B1D08' },
+  armonia:   { glow: '#C084FC', core: '#210B34' },
+}
+
+const RARITY_MARKER: Record<string, string> = {
+  comune:      '#9CA3AF',
+  non_comune:  '#34D399',
+  raro:        '#3A9DBC',
+  epico:       '#C084FC',
+  leggendario: '#F7C841',
+  mitologico:  '#FF4D6D',
+}
+
 // Build the player marker HTML
-function markerHTML(bearing: number | null, creatureImageUrl?: string | null): string {
+function markerHTML(
+  bearing: number | null,
+  creatureImageUrl?: string | null,
+  creatureElement?: string | null,
+  creatureRarity?: string | null,
+): string {
   const rotate = bearing !== null ? bearing : 0
   const showCone = bearing !== null
+  const theme = ELEMENT_MARKER[creatureElement ?? ''] ?? { glow: '#3ABCA8', core: '#0F1F2E' }
+  const rarity = RARITY_MARKER[creatureRarity ?? ''] ?? '#7FE6FF'
+  const sceneUrl = creatureElement && creatureElement in ELEMENT_BACKGROUND
+    ? ELEMENT_BACKGROUND[creatureElement as keyof typeof ELEMENT_BACKGROUND]
+    : null
 
   if (creatureImageUrl) {
-    // Creature image marker — 40×40 circular portrait
     return `
-      <div class="wc-player-inner" style="
-        width:40px; height:40px; position:relative;
-        transform:rotate(${rotate}deg);
-        transform-origin:50% 50%;
-        transition:transform 0.4s ease-out;
-      ">
+      <div style="width:48px;height:52px;position:relative;transform-origin:50% 50%;">
         ${showCone ? `
-          <div style="
-            position:absolute; bottom:100%; left:50%; margin-left:-4px;
-            width:0; height:0;
-            border-left:4px solid transparent;
-            border-right:4px solid transparent;
-            border-bottom:9px solid rgba(58,157,188,0.9);
-            margin-bottom:1px;
-          "></div>
+          <div style="position:absolute;left:50%;top:1px;width:34px;height:34px;margin-left:-17px;transform:rotate(${rotate}deg);transform-origin:50% 50%;transition:transform 0.4s ease-out;pointer-events:none;">
+            <div style="position:absolute;left:50%;top:-4px;margin-left:-4px;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:9px solid ${theme.glow};filter:drop-shadow(0 0 5px ${theme.glow});opacity:.96;"></div>
+            <div style="position:absolute;inset:2px;border-radius:50%;border:1px solid ${theme.glow}66;border-top-color:${theme.glow};opacity:.42;"></div>
+          </div>
         ` : ''}
-        <div style="
-          width:40px; height:40px;
-          border-radius:50%;
-          border:3px solid #3A9DBC;
-          box-shadow:0 0 0 3px rgba(58,157,188,0.35), 0 2px 8px rgba(0,0,0,0.5);
-          overflow:hidden;
-          background:#0F1F2E;
-        ">
-          <img src="${creatureImageUrl}" style="width:100%;height:100%;object-fit:cover;" />
+        <div style="position:absolute;left:2px;top:6px;width:44px;height:44px;border-radius:50%;border:2px solid rgba(127,230,255,.92);box-shadow:0 0 0 2px ${rarity}66,0 0 16px ${theme.glow}88,0 6px 12px rgba(0,0,0,.58),inset 0 1px 0 rgba(255,255,255,.30);overflow:hidden;background:${sceneUrl ? `linear-gradient(180deg, rgba(3,7,12,.12), rgba(3,7,12,.48)), url('${sceneUrl}') center/cover no-repeat` : `radial-gradient(circle at 50% 34%, ${theme.glow}55 0%, ${theme.core} 58%, #06101d 100%)`};backdrop-filter:blur(4px);">
+          <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 35%, transparent 34%, rgba(2,5,10,.50) 100%);pointer-events:none;"></div>
+          <div style="position:absolute;inset:3px;border-radius:50%;border:1px solid rgba(255,255,255,.24);box-shadow:inset 0 0 14px ${theme.glow}22;pointer-events:none;"></div>
+          <div style="position:absolute;left:8px;right:8px;top:2px;height:1px;background:linear-gradient(90deg, transparent, rgba(185,250,255,.95), transparent);pointer-events:none;"></div>
+          <img src="${creatureImageUrl}" style="position:relative;z-index:1;width:100%;height:100%;object-fit:contain;padding:5px 4px 4px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.70)) drop-shadow(0 0 7px ${theme.glow}88);" />
         </div>
+        <div style="position:absolute;left:50%;bottom:0;margin-left:-5px;width:10px;height:10px;transform:rotate(45deg);background:${theme.core};border-right:1.5px solid rgba(127,230,255,.82);border-bottom:1.5px solid rgba(127,230,255,.82);box-shadow:4px 4px 9px rgba(0,0,0,.32);"></div>
       </div>
     `
   }
@@ -111,8 +128,8 @@ function markerHTML(bearing: number | null, creatureImageUrl?: string | null): s
   `
 }
 
-function markerSize(hasImage: boolean): number {
-  return hasImage ? 40 : 20
+function markerSize(hasImage: boolean): [number, number] {
+  return hasImage ? [48, 52] : [20, 20]
 }
 
 // Stable pulsing "presence" halo rendered as its OWN Leaflet marker,
@@ -132,7 +149,7 @@ function presenceHTML(): string {
   `
 }
 
-export default function GameMap({ session, playerPosition, sessionId, creatureImageUrl, pins, onPinTap }: Props) {
+export default function GameMap({ session, playerPosition, sessionId, creatureImageUrl, creatureElement, creatureRarity, pins, onPinTap }: Props) {
   const mapRef = useRef<unknown>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const markerRef = useRef<unknown>(null)
@@ -250,9 +267,9 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
 
         const sz = markerSize(!!creatureImageUrl)
         const icon = Leaflet.divIcon({
-          html: markerHTML(null, creatureImageUrl),
-          iconSize: [sz, sz],
-          iconAnchor: [sz / 2, sz / 2],
+          html: markerHTML(null, creatureImageUrl, creatureElement, creatureRarity),
+          iconSize: sz,
+          iconAnchor: [sz[0] / 2, sz[1] / 2],
           className: '',
         })
         markerRef.current = Leaflet.marker([pos.lat, pos.lng], { icon, zIndexOffset: 1000 }).addTo(map)
@@ -342,16 +359,16 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
         const marker = markerRef.current as import('leaflet').Marker
         marker.setLatLng([lat, lng])
         marker.setIcon(Leaflet.divIcon({
-          html: markerHTML(bearing, creatureImageUrl),
-          iconSize: [sz, sz],
-          iconAnchor: [sz / 2, sz / 2],
+          html: markerHTML(bearing, creatureImageUrl, creatureElement, creatureRarity),
+          iconSize: sz,
+          iconAnchor: [sz[0] / 2, sz[1] / 2],
           className: '',
         }))
       } else {
         const icon = Leaflet.divIcon({
-          html: markerHTML(bearing, creatureImageUrl),
-          iconSize: [sz, sz],
-          iconAnchor: [sz / 2, sz / 2],
+          html: markerHTML(bearing, creatureImageUrl, creatureElement, creatureRarity),
+          iconSize: sz,
+          iconAnchor: [sz[0] / 2, sz[1] / 2],
           className: '',
         })
         markerRef.current = Leaflet.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map)
@@ -364,7 +381,7 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
         map.panTo([lat, lng], { animate: true, duration: 0.5, easeLinearity: 0.5 })
       }
     })
-  }, [playerPosition, creatureImageUrl])
+  }, [playerPosition, creatureImageUrl, creatureElement, creatureRarity])
 
   // Render / update map pins
   useEffect(() => {

@@ -210,7 +210,7 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.25 }}
-        className="relative overflow-hidden text-left rounded-xl px-3 py-2 flex items-center gap-2.5 active:scale-[0.98]"
+        className="relative overflow-hidden text-left rounded-xl px-2.5 py-2 flex items-center gap-2 active:scale-[0.98]"
         style={{
           background:
             'radial-gradient(circle at 24% 16%, rgba(91,241,229,0.18), transparent 32%), ' +
@@ -218,7 +218,7 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
           border: '1.5px solid rgba(61,225,207,0.62)',
           backdropFilter: 'blur(10px) saturate(1.18)',
           boxShadow: '0 0 15px rgba(58,188,168,0.26), 0 6px 18px rgba(0,0,0,0.42), inset 0 0 14px rgba(58,188,168,0.10), inset 0 1px 0 rgba(154,255,238,0.24)',
-          width: 146,
+          width: 154,
         }}
         data-testid="next-objective-widget"
       >
@@ -227,28 +227,39 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
           style={{ background: 'linear-gradient(90deg, transparent, rgba(148,255,239,0.82), transparent)' }}
         />
         <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
           style={{
             background: 'radial-gradient(circle, rgba(58,188,168,0.24) 0%, rgba(12,58,60,0.56) 100%)',
             border: '1px solid rgba(91,241,229,0.52)',
             boxShadow: '0 0 12px rgba(58,188,168,0.28), inset 0 0 10px rgba(91,241,229,0.12)',
           }}
         >
-          <TileIcon size={18} color="#7DF7E8" style={{ filter: 'drop-shadow(0 0 5px rgba(91,241,229,0.66))' }} />
+          <TileIcon size={14} color="#7DF7E8" style={{ filter: 'drop-shadow(0 0 5px rgba(91,241,229,0.66))' }} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
             <span
-              className="text-[9px] font-black uppercase tracking-[0.14em]"
+              className="text-[8px] font-black uppercase tracking-[0.14em]"
               style={{ color: '#62EEDD', textShadow: '0 0 7px rgba(58,188,168,0.44)' }}
             >
               Prossimo
             </span>
             {objective.chapter_order != null && (
-              <span className="text-[9px] text-white/30 font-mono">#{objective.chapter_order}</span>
+              <span className="text-[8px] text-white/30 font-mono">#{objective.chapter_order}</span>
             )}
           </div>
-          <p className="text-white font-bold text-xs leading-tight truncate">{objective.title}</p>
+          <p
+            className="text-white font-extrabold text-[11px] leading-[1.12]"
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textShadow: '0 1px 3px rgba(0,0,0,0.72)',
+            }}
+          >
+            {objective.title}
+          </p>
           <div className="flex items-center gap-1.5 mt-1">
             <div
               className="flex-1 h-1 rounded-full overflow-hidden"
@@ -264,7 +275,7 @@ export default function NextObjectiveWidget({ sessionId }: { sessionId: string |
                 }}
               />
             </div>
-            <span className="text-[10px] text-white/55 font-mono tabular-nums shrink-0">
+            <span className="text-[8.5px] text-white/55 font-mono tabular-nums shrink-0">
               {isWalk ? `${progress}/${target}m` : `${progress}/${target}`}
             </span>
           </div>
