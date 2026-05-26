@@ -1,6 +1,13 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
+import { type IconType } from 'react-icons'
+import {
+  GiBullseye, GiBattleGear, GiSwapBag, GiSparkles, GiHearts, GiRoundStar, GiBroadsword,
+  GiFishingNet, GiStandingPotion, GiRun, GiFishingLure, GiHealthPotion, GiSwordsPower,
+  GiLightningArc, GiNightSleep, GiBrainFreeze, GiPoisonBottle,
+} from 'react-icons/gi'
+import ElementIcon from '@/components/ui/ElementIcon'
 
 /**
  * One-time encounter lesson — fired the FIRST time the player enters
@@ -23,21 +30,21 @@ interface Props {
   onClose: () => void
 }
 
-const SLIDES = [
+const SLIDES: { title: string; Icon: IconType; body: React.ReactNode }[] = [
   {
     title: 'Hai trovato un Daimon!',
-    emoji: '🎯',
+    Icon: GiBullseye,
     body: (
       <div className="space-y-3 text-sm text-white/70 leading-relaxed">
         <p>Due informazioni chiave in alto:</p>
         <ul className="space-y-2 text-[13px]">
           <li className="flex items-start gap-2">
-            <span className="text-base shrink-0">❤️</span>
+            <GiHearts size={17} color="#F87171" className="shrink-0 mt-0.5" />
             <span><b className="text-white">Barra HP</b> — più la indebolisci, più aumenta la probabilità di cattura.</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-base shrink-0">⭐</span>
-            <span><b className="text-white">Stelline di difficoltà</b> (1–5): più ne ha, più sarà difficile da catturare. Una creatura da 5⭐ richiede strategia.</span>
+            <GiRoundStar size={17} color="#FBBF24" className="shrink-0 mt-0.5" />
+            <span><b className="text-white">Stelline di difficoltà</b> (1–5): più ne ha, più sarà difficile da catturare. Una creatura da 5 stelle richiede strategia.</span>
           </li>
         </ul>
       </div>
@@ -45,23 +52,23 @@ const SLIDES = [
   },
   {
     title: 'Le tue azioni',
-    emoji: '🎮',
+    Icon: GiBattleGear,
     body: (
       <div className="space-y-2.5 text-[13px] text-white/75 leading-relaxed">
         <div className="flex items-start gap-2.5">
-          <span className="text-lg shrink-0">⚔️</span>
+          <GiBroadsword size={19} color="#E85D2F" className="shrink-0 mt-0.5" />
           <span><b className="text-white">Attacca</b> — riduci gli HP del Daimon selvatico.</span>
         </div>
         <div className="flex items-start gap-2.5">
-          <span className="text-lg shrink-0">🎯</span>
+          <GiFishingNet size={19} color="#F0843C" className="shrink-0 mt-0.5" />
           <span><b className="text-white">Cattura</b> — tenta di catturarlo (selezionando una Rete dalla lista oggetti per aumentare le chance).</span>
         </div>
         <div className="flex items-start gap-2.5">
-          <span className="text-lg shrink-0">🎒</span>
+          <GiStandingPotion size={19} color="#60A5FA" className="shrink-0 mt-0.5" />
           <span><b className="text-white">Oggetti</b> — apri lo zaino in combattimento per usare cura, battaglia, pozioni.</span>
         </div>
         <div className="flex items-start gap-2.5">
-          <span className="text-lg shrink-0">🏃</span>
+          <GiRun size={19} color="#9CA3AF" className="shrink-0 mt-0.5" />
           <span><b className="text-white">Fuga</b> — abbandona l&apos;incontro. Nessuna ricompensa ma nessun rischio.</span>
         </div>
       </div>
@@ -69,44 +76,49 @@ const SLIDES = [
   },
   {
     title: 'Gli oggetti utili',
-    emoji: '🎁',
+    Icon: GiSwapBag,
     body: (
       <div className="space-y-2 text-[12.5px] text-white/75 leading-relaxed">
         <div className="rounded-lg bg-[#3A9DBC]/10 border border-[#3A9DBC]/30 px-2.5 py-1.5">
-          <p><span className="text-base">🎯</span> <b className="text-[#3A9DBC]">Rete</b> — moltiplica le chance di cattura (es. ×2). Si usa selezionandola prima di toccare &quot;Cattura&quot;.</p>
+          <p><GiFishingNet size={14} color="#3A9DBC" className="inline-block align-[-2px] mr-1" /> <b className="text-[#3A9DBC]">Rete</b> — moltiplica le chance di cattura (es. ×2). Si usa selezionandola prima di toccare &quot;Cattura&quot;.</p>
         </div>
         <div className="rounded-lg bg-[#34D399]/10 border border-[#34D399]/30 px-2.5 py-1.5">
-          <p><span className="text-base">🍖</span> <b className="text-[#34D399]">Esca</b> — attiva un effetto passivo di 10 minuti che attrae più creature rare sulla mappa. Si attiva dallo <b>Zaino</b>, non in combattimento.</p>
+          <p><GiFishingLure size={14} color="#34D399" className="inline-block align-[-2px] mr-1" /> <b className="text-[#34D399]">Esca</b> — attiva un effetto passivo di 10 minuti che attrae più creature rare sulla mappa. Si attiva dallo <b>Zaino</b>, non in combattimento.</p>
         </div>
         <div className="rounded-lg bg-[#34D399]/10 border border-[#34D399]/30 px-2.5 py-1.5">
-          <p><span className="text-base">💊</span> <b className="text-[#34D399]">Cura</b> — ripristina HP della tua creatura ferita.</p>
+          <p><GiHealthPotion size={14} color="#34D399" className="inline-block align-[-2px] mr-1" /> <b className="text-[#34D399]">Cura</b> — ripristina HP della tua creatura ferita.</p>
         </div>
         <div className="rounded-lg bg-[#FBBF24]/10 border border-[#FBBF24]/30 px-2.5 py-1.5">
-          <p><span className="text-base">⚔️</span> <b className="text-[#FBBF24]">Battaglia</b> — potenzia il tuo attacco per un turno.</p>
+          <p><GiSwordsPower size={14} color="#FBBF24" className="inline-block align-[-2px] mr-1" /> <b className="text-[#FBBF24]">Battaglia</b> — potenzia il tuo attacco per un turno.</p>
         </div>
         <div className="rounded-lg bg-[#F472B6]/10 border border-[#F472B6]/30 px-2.5 py-1.5">
-          <p><span className="text-base">🧪</span> <b className="text-[#F472B6]">Pozione</b> — neutralizza una debolezza elementale.</p>
+          <p><GiStandingPotion size={14} color="#F472B6" className="inline-block align-[-2px] mr-1" /> <b className="text-[#F472B6]">Pozione</b> — neutralizza una debolezza elementale.</p>
         </div>
       </div>
     ),
   },
   {
     title: 'Effetti di stato + elementi',
-    emoji: '✨',
+    Icon: GiSparkles,
     body: (
       <div className="space-y-3 text-[12.5px] text-white/75 leading-relaxed">
         <div>
           <p className="mb-1.5">Alcune creature applicano <b className="text-white">effetti di stato</b> durante il combattimento:</p>
-          <ul className="space-y-1">
-            <li>⚡ <b className="text-[#FBBF24]">Paralisi</b> — può saltare il turno.</li>
-            <li>💤 <b className="text-[#60A5FA]">Sonno</b> — non attacca, +catch.</li>
-            <li>💫 <b className="text-[#C084FC]">Confusione</b> — può colpire sé stessa.</li>
-            <li>☠️ <b className="text-[#4ADE80]">Veleno</b> — perde HP a ogni turno.</li>
+          <ul className="space-y-1.5">
+            <li className="flex items-center gap-1.5"><GiLightningArc size={14} color="#FBBF24" className="shrink-0" /> <span><b className="text-[#FBBF24]">Paralisi</b> — può saltare il turno.</span></li>
+            <li className="flex items-center gap-1.5"><GiNightSleep size={14} color="#60A5FA" className="shrink-0" /> <span><b className="text-[#60A5FA]">Sonno</b> — non attacca, +catch.</span></li>
+            <li className="flex items-center gap-1.5"><GiBrainFreeze size={14} color="#C084FC" className="shrink-0" /> <span><b className="text-[#C084FC]">Confusione</b> — può colpire sé stessa.</span></li>
+            <li className="flex items-center gap-1.5"><GiPoisonBottle size={14} color="#4ADE80" className="shrink-0" /> <span><b className="text-[#4ADE80]">Veleno</b> — perde HP a ogni turno.</span></li>
           </ul>
         </div>
-        <p className="text-white/60 border-t border-white/10 pt-2">
-          🔥💧🌿⛰️✨ Ogni Daimon ha un <b className="text-white">elemento</b>. Fiamma è forte contro Bosco, Bosco contro Adriatico, Adriatico contro Fiamma. Armonia è neutra.
-        </p>
+        <div className="text-white/60 border-t border-white/10 pt-2">
+          <span className="inline-flex items-center gap-1 align-[-2px] mr-1.5">
+            {(['fiamma', 'adriatico', 'bosco', 'terra', 'armonia'] as const).map(e => (
+              <ElementIcon key={e} element={e} size={13} />
+            ))}
+          </span>
+          Ogni Daimon ha un <b className="text-white">elemento</b>. Fiamma è forte contro Bosco, Bosco contro Adriatico, Adriatico contro Fiamma. Armonia è neutra.
+        </div>
       </div>
     ),
   },
@@ -147,12 +159,12 @@ export default function TutorialEncounterLesson({ open, onClose }: Props) {
           >
             {/* Header */}
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-3xl">{cur.emoji}</span>
+              <cur.Icon size={28} color="#3ABCA8" style={{ filter: 'drop-shadow(0 0 8px rgba(58,188,168,0.45))' }} />
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] tracking-widest uppercase font-bold text-[#3ABCA8]/80">
                   Tutorial — primo incontro
                 </p>
-                <h2 className="text-base font-extrabold text-white leading-tight truncate">{cur.title}</h2>
+                <h2 className="wc-display text-base font-extrabold text-white leading-tight truncate">{cur.title}</h2>
               </div>
             </div>
 

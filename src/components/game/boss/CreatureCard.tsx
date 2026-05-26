@@ -2,8 +2,10 @@
 import { motion } from 'framer-motion'
 import CreatureSprite from '@/components/creature/CreatureSprite'
 import StatusAura from '@/components/battle/StatusAura'
-import { ELEMENT_EMOJI, RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
+import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Element, Rarity } from '@/lib/types'
+import ElementIcon from '@/components/ui/ElementIcon'
+import { GiDeathSkull } from 'react-icons/gi'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 
@@ -47,7 +49,6 @@ export default function CreatureCard({
     : 122
   const imageWidth = spriteSize + 10
   const rarityColor = isBoss ? '#F7C841' : (RARITY_COLORS[rarity as Rarity] ?? '#64748b')
-  const elemEmoji = ELEMENT_EMOJI[element as keyof typeof ELEMENT_EMOJI] ?? '✦'
   const hpPct = Math.max(0, Math.min(100, (currentHp / maxHp) * 100))
   const hpColor = hpPct > 50 ? '#34D399' : hpPct > 25 ? '#FBBF24' : '#EF4444'
 
@@ -131,7 +132,7 @@ export default function CreatureCard({
                 {RARITY_LABELS[rarity as Rarity]}
               </span>
             )}
-            <span className="text-[11px] leading-none">{elemEmoji}</span>
+            <ElementIcon element={element} size={11} />
             <span className="text-[9px] text-white/35 capitalize">{element}</span>
           </div>
           {statusEffect && STATUS_EFFECT_META[statusEffect] && (() => {
@@ -211,7 +212,7 @@ export default function CreatureCard({
           className="absolute inset-0 z-20 flex items-center justify-center"
           style={{ background: 'rgba(0,0,0,0.55)' }}
         >
-          <span className="text-4xl">💀</span>
+          <GiDeathSkull size={40} color="#E2E8F0" />
         </motion.div>
       )}
     </div>

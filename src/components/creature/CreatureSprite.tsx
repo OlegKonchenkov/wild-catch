@@ -1,6 +1,7 @@
 'use client'
 import { motion, type TargetAndTransition } from 'framer-motion'
 import Image from 'next/image'
+import { GiPawPrint } from 'react-icons/gi'
 
 type AnimState = 'idle' | 'attack' | 'damage' | 'catch' | 'flee' | 'victory'
 
@@ -149,13 +150,13 @@ export default function CreatureSprite({
     />
   ) : (
     <div
-      className="rounded-full flex items-center justify-center text-5xl"
+      className="rounded-full flex items-center justify-center"
       style={{
         width: size, height: size,
         background: glowColor ? `${glowColor}22` : 'rgba(255,255,255,0.08)',
       }}
     >
-      🐾
+      <GiPawPrint size={Math.round(size * 0.46)} color={glowColor ?? 'rgba(255,255,255,0.55)'} />
     </div>
   )
 
