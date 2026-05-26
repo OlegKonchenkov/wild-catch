@@ -645,6 +645,12 @@ export default function EncounterPage() {
     }, 1000)
   }, [])
 
+  const pauseTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = null
+    autoFightRef.current = true
+  }, [])
+
   useEffect(() => {
     if (state && !result) resetTimer()
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
@@ -686,9 +692,10 @@ export default function EncounterPage() {
     }, 900)
   }, [])
 
-  function finishPendingAction() {
+  function finishPendingAction(restart = true) {
     setPendingAction(null)
     setLoading(false)
+    if (restart) resetTimer()
   }
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -700,7 +707,7 @@ export default function EncounterPage() {
     const sleepingTurn = playerStatus === 'sonno'
     const statusMayChangeAttack = playerStatus === 'paralisi' || playerStatus === 'confusione' || playerStatus === 'veleno'
     const playedAttackOptimistically = !sleepingTurn && !statusMayChangeAttack
-    resetTimer(); setLoading(true); setPendingAction('fight'); setMessage(`⚔️ ${attackingName} all'attacco!`); setIsCritMessage(false); setShowItemsModal(false)
+    pauseTimer(); setLoading(true); setPendingAction('fight'); setMessage(`⚔️ ${attackingName} all'attacco!`); setIsCritMessage(false); setShowItemsModal(false)
 
     if (statusMayChangeAttack) setMessage(`${attackingName} si prepara...`)
     const actionStartedAt = Date.now()
@@ -773,7 +780,7 @@ export default function EncounterPage() {
 
       playDefeat()
       setResult('lost')
-      finishPendingAction()
+      finishPendingAction(false)
     }
 
     const updateCurrentPlayerHp = (newHp: number) => {
@@ -948,7 +955,7 @@ export default function EncounterPage() {
 
     if (wildWasDefeated) {
       playKnockout()
-      setWildAnim('flee'); setMessage(''); setResult('ko'); finishPendingAction(); return
+      setWildAnim('flee'); setMessage(''); setResult('ko'); finishPendingAction(false); return
     }
 
     if (data.playerTookDamage && data.wildDamage > 0) {
@@ -1009,7 +1016,7 @@ export default function EncounterPage() {
     const targetHp = slotHps[targetSlot] ?? targetCreature.hp
     if (targetHp <= 0) return  // can't switch to fainted
 
-    resetTimer()
+    pauseTimer()
     setLoading(true)
     setPendingAction('switch')
     setShowItemsModal(false)
@@ -1093,7 +1100,7 @@ export default function EncounterPage() {
       }
       playDefeat()
       setResult('lost')
-      finishPendingAction()
+      finishPendingAction(false)
     }
 
     // Wild's status tick events (sleep, poison etc) — same shape as fight
@@ -1151,7 +1158,7 @@ export default function EncounterPage() {
     // If the wild fainted from its own status during the tick, end the fight
     if (data.fightResult === 'fled') {
       playKnockout()
-      setWildAnim('flee'); setMessage(''); setResult('ko'); finishPendingAction(); return
+      setWildAnim('flee'); setMessage(''); setResult('ko'); finishPendingAction(false); return
     }
 
     // Wild's free attack on the incoming creature
@@ -1196,7 +1203,7 @@ export default function EncounterPage() {
 
   async function handleCatch() {
     if (!state || loading) return
-    resetTimer(); setLoading(true); setPendingAction('catch'); setShowItemsModal(false)
+    pauseTimer(); setLoading(true); setPendingAction('catch'); setShowItemsModal(false)
 
     // ── Avvia animazione rete immediatamente ──────────────────────────────────
     const throwMsg = THROW_MESSAGES[Math.floor(Math.random() * THROW_MESSAGES.length)]
@@ -1281,6 +1288,8 @@ export default function EncounterPage() {
       if (data.levelUp) window.dispatchEvent(new CustomEvent('wc:level-up', { detail: data.levelUp }))
       window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
       window.dispatchEvent(new CustomEvent('wc:refresh-bestiary'))
+      finishPendingAction(false)
+      return
     } else if (data.fled) {
       setCatchPhase('idle')
       playFlee()
@@ -1297,6 +1306,8 @@ export default function EncounterPage() {
           })
         }
       }
+      finishPendingAction(false)
+      return
     } else {
       // ── Cattura fallita: aggiorna counter effetto di stato ────────────────
       if (data.wildStatus !== undefined) setWildStatus(data.wildStatus)
@@ -1360,7 +1371,7 @@ export default function EncounterPage() {
             }
           }
           setResult('lost')
-          finishPendingAction()
+          finishPendingAction(false)
           return
         }
       }
@@ -1372,7 +1383,7 @@ export default function EncounterPage() {
     if (!state || loading) return
     haptics.tap()
     playHeal()
-    resetTimer(); setLoading(true); setPendingAction('heal'); setShowItemsModal(false)
+    pauseTimer(); setLoading(true); setPendingAction('heal'); setShowItemsModal(false)
     const res = await fetch('/api/game/encounter/heal', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ encounterId: state.encounterId, itemId }),

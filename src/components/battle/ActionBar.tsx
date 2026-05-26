@@ -27,10 +27,6 @@ const FILL: Record<Exclude<ActionTone, 'dark'>, { bg: string; glow: string; ring
   gold:   { bg: 'linear-gradient(160deg,#F8D26A 0%,#CC8E22 100%)',             glow: 'rgba(240,200,90,.55)', ring: 'rgba(255,228,150,.80)', ink: '#FFF8DA' },
 }
 
-function Spinner({ size = 18 }: { size?: number }) {
-  return <span style={{ width: size, height: size, borderRadius: '50%', border: '2px solid rgba(255,255,255,.35)', borderTopColor: '#fff', display: 'inline-block', animation: 'abSpin .7s linear infinite' }} />
-}
-
 /**
  * Hierarchic action bar. One wide primary + compact secondaries; colored tones
  * render as glossy filled buttons, `dark` as glass. Each screen passes its own
@@ -89,7 +85,7 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
               flex: 1, minWidth: 0, minHeight: 62,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               gap: a.sub ? 3 : 5, padding: '6px 5px', position: 'relative', overflow: 'hidden',
-              borderRadius: 15, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.48 : 1,
+              borderRadius: 15, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.76 : 1,
               color: filled ? f!.ink : '#c6d3df',
               border: filled ? `1.5px solid ${f!.ring}` : '1.2px solid rgba(124,190,215,.34)',
               background: filled
@@ -124,7 +120,7 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
                 filter: filled ? 'drop-shadow(0 2px 6px rgba(0,0,0,.54))' : 'drop-shadow(0 1px 3px rgba(0,0,0,.60))',
               }}
             >
-              {a.loading ? <Spinner size={a.primary ? 22 : 20} /> : a.icon}
+              {a.icon}
             </span>
             <span style={{ position: 'relative', zIndex: 1, fontWeight: 900, fontSize: a.primary ? 11.5 : 10.5, letterSpacing: '.04em', textTransform: 'uppercase', lineHeight: 1, color: filled ? f!.ink : '#b9c7d4', textShadow: filled ? '0 1px 4px rgba(0,0,0,.56)' : '0 1px 3px rgba(0,0,0,.42)' }}>
               {a.label}
@@ -141,7 +137,7 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
           </button>
         )
       })}
-      <style>{`@keyframes abSpin{to{transform:rotate(360deg)}} .ab-btn svg{width:26px;height:26px}.ab-btn:active:not(:disabled){transform:scale(.97)} .ab-btn:hover:not(:disabled){filter:brightness(1.07) saturate(1.04)} .ab-btn:focus-visible{outline:2px solid rgba(255,232,170,.88);outline-offset:3px}`}</style>
+      <style>{`.ab-btn svg{width:26px;height:26px}.ab-btn:active:not(:disabled){transform:scale(.97)} .ab-btn:hover:not(:disabled){filter:brightness(1.07) saturate(1.04)} .ab-btn:focus-visible{outline:2px solid rgba(255,232,170,.88);outline-offset:3px}`}</style>
     </div>
   )
 }
