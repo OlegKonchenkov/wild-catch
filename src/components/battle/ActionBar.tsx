@@ -37,7 +37,13 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
     <div
       className={className}
       style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 11,
+        // zIndex sits ABOVE the battle VFX (attack anim z9, impact flash z18) so
+        // those scene effects never composite over / sample the controls — the
+        // source of the per-attack flicker. Stays below CaptureOverlay (z20).
+        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 19,
+        // Own compositing layer + stacking context: the animating scene behind
+        // can no longer invalidate/repaint or blend into the bar.
+        transform: 'translateZ(0)', isolation: 'isolate',
         padding: '12px 11px calc(10px + env(safe-area-inset-bottom, 0px))',
         display: 'flex', gap: 8, alignItems: 'stretch',
         background:
@@ -90,11 +96,13 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
               border: filled ? `1.5px solid ${f!.ring}` : '1.2px solid rgba(124,190,215,.34)',
               background: filled
                 ? `radial-gradient(120% 82% at 50% -18%, rgba(255,255,255,.36), transparent 56%), radial-gradient(circle at 50% 42%, rgba(255,255,255,.12), transparent 32%), ${f!.bg}`
-                : 'radial-gradient(110% 82% at 50% -18%, rgba(156,214,235,.12), transparent 58%), linear-gradient(180deg, rgba(19,35,49,.78), rgba(6,14,25,.9))',
+                // Opaque (no see-through) so the attack animation playing behind
+                // the bar is fully hidden — combined with dropping backdrop-filter
+                // below, this kills the per-frame re-rasterisation that flickered.
+                : 'radial-gradient(110% 82% at 50% -18%, rgba(156,214,235,.12), transparent 58%), linear-gradient(180deg, rgb(19,35,49), rgb(6,14,25))',
               boxShadow: filled
                 ? `0 0 24px ${f!.glow}, 0 10px 22px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,255,255,.44), inset 0 -12px 22px rgba(0,0,0,.26)`
                 : '0 8px 20px rgba(0,0,0,.36), inset 0 1px 0 rgba(200,235,255,.10), inset 0 -10px 18px rgba(0,0,0,.20)',
-              backdropFilter: filled ? undefined : 'blur(8px)', WebkitBackdropFilter: filled ? undefined : 'blur(8px)',
               transition: 'transform .1s ease, filter .15s ease, border-color .15s ease',
             }}
           >
