@@ -14,8 +14,9 @@ import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import GameTopBar from '@/components/ui/GameTopBar'
 import { NAV_ICON } from '@/components/ui/NavIcons'
+import ElementIcon from '@/components/ui/ElementIcon'
+import { GiRingingBell, GiGears, GiMegaphone, GiJoystick, GiPawPrint } from 'react-icons/gi'
 import { getExpProgress } from '@/lib/game/leveling'
-import { ELEMENT_EMOJI } from '@/lib/types'
 import { playLevelUp } from '@/lib/game/sounds/events'
 import { getSharedAC } from '@/lib/game/sounds/shared-ac'
 import { hydrateAudioOverrides } from '@/lib/game/audio-overrides'
@@ -783,7 +784,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/10 flex-shrink-0">
-                <h2 className="font-bold text-white text-base">🔔 Notifiche</h2>
+                <h2 className="wc-display font-bold text-white text-base inline-flex items-center gap-2"><GiRingingBell size={18} color="#46bad8" /> Notifiche</h2>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setShowPushSettings(v => !v)}
@@ -798,7 +799,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                       color: showPushSettings ? '#3ABCA8' : 'rgba(255,255,255,0.55)',
                       fontSize: 15, lineHeight: 1,
                     }}
-                  >⚙️</button>
+                  ><GiGears size={16} /></button>
                   <button onClick={() => setShowNotifPanel(false)} className="text-white/40 hover:text-white text-xl px-2">✕</button>
                 </div>
               </div>
@@ -821,7 +822,9 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                         color: notifTab === tab ? 'white' : 'rgba(255,255,255,0.4)',
                       }}
                     >
-                      {tab === 'messaggi' ? '📢 Messaggi' : '🎮 Gioco'}
+                      <span className="inline-flex items-center justify-center gap-1.5">
+                        {tab === 'messaggi' ? <><GiMegaphone size={13} /> Messaggi</> : <><GiJoystick size={13} /> Gioco</>}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -835,7 +838,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                     </div>
                   ) : notifications.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-3 text-white/30">
-                      <span className="text-5xl">🔕</span>
+                      <GiRingingBell size={48} color="rgba(255,255,255,0.18)" />
                       <p className="text-sm">Nessun messaggio</p>
                     </div>
                   ) : (
@@ -948,7 +951,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                     </div>
                   ) : gameEvents.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-3 text-white/30">
-                      <span className="text-5xl">🎮</span>
+                      <GiJoystick size={48} color="rgba(255,255,255,0.18)" />
                       <p className="text-sm">Nessun evento di gioco</p>
                     </div>
                   ) : (
@@ -960,7 +963,6 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                       const p = ev.payload ?? {}
                       const theme = EVENT_THEMES[ev.type as string] ?? { color: '#60A5FA', dimColor: 'rgba(96,165,250,0.08)', label: ev.type }
                       const rarityInfo = p.rarity ? RARITY_DISPLAY[p.rarity as string] : null
-                      const elemEmoji  = p.element ? (ELEMENT_EMOJI as Record<string, string>)[p.element as string] : null
 
                       // ── helpers ──────────────────────────────────────────────
                       const RewardChips = ({ gold, exp }: { gold?: number; exp?: number }) => (
@@ -978,20 +980,19 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                           {creatures.map((cr: any, i: number) => {
                             const crRarity = cr.rarity ? RARITY_DISPLAY[cr.rarity as string] : null
-                            const crElem   = cr.element ? (ELEMENT_EMOJI as Record<string, string>)[cr.element as string] : null
                             return (
                               <div key={i} className="flex items-center gap-1.5 rounded-lg p-1.5" style={{ background: 'rgba(0,0,0,0.22)', border: `1px solid ${crRarity?.color ?? accentColor}22` }}>
                                 <div className="w-9 h-9 rounded-md shrink-0 overflow-hidden flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
                                   {cr.image_url
                                     ? <img src={cr.image_url} alt={cr.name} className="w-full h-full object-contain" />
-                                    : <span className="text-lg">🎯</span>
+                                    : <GiPawPrint size={18} color="rgba(255,255,255,0.4)" />
                                   }
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-[11px] font-semibold text-white truncate leading-tight">{cr.name ?? '—'}</p>
                                   <div className="flex items-center gap-1 mt-0.5">
                                     {crRarity && <span className="text-[9px] font-bold px-1 py-0.5 rounded-full" style={{ background: `${crRarity.color}20`, color: crRarity.color }}>{crRarity.label}</span>}
-                                    {crElem && cr.element && <span className="text-[9px] px-1 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>{crElem}</span>}
+                                    {cr.element && <span className="inline-flex items-center px-1 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}><ElementIcon element={cr.element as string} size={10} /></span>}
                                   </div>
                                 </div>
                               </div>
@@ -1069,7 +1070,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                           <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
                                             {p.image_url
                                               ? <img src={p.image_url} alt={p.creature_name} className="w-full h-full object-contain" />
-                                              : <span className="text-3xl">🎯</span>
+                                              : <GiPawPrint size={28} color="rgba(255,255,255,0.4)" />
                                             }
                                           </div>
                                           {/* Info */}
@@ -1081,9 +1082,9 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                                   {rarityInfo.label}
                                                 </span>
                                               )}
-                                              {elemEmoji && p.element && (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full capitalize" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)' }}>
-                                                  {elemEmoji} {p.element}
+                                              {p.element && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full capitalize" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)' }}>
+                                                  <ElementIcon element={p.element as string} size={11} /> {p.element}
                                                 </span>
                                               )}
                                               {p.evolved && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399' }}>✨ Ev.</span>}
