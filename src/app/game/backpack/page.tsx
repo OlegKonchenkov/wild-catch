@@ -14,6 +14,7 @@ import { type IconType } from 'react-icons'
 import {
   GiKnapsack, GiTwoCoins, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower,
   GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing,
+  GiSparkles, GiPawPrint,
 } from 'react-icons/gi'
 
 const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
@@ -31,12 +32,13 @@ const TYPE_META: Record<ItemType, { Icon: IconType; label: string; hint: string;
   accessorio:{ Icon: GiRing,          label: 'Accessorio', hint: 'Equipaggia dalla DaimonDex (bonus misti)', color: '#C084FC' },
 }
 
+// Canonical creature rarity palette + labels (shared with bestiary/combat).
 const RARITY_COLOR: Record<string, string> = {
-  comune:      '#9CA3AF',
-  non_comune:  '#34D399',
-  raro:        '#3A9DBC',
-  epico:       '#C084FC',
-  leggendario: '#FBBF24',
+  comune:      '#7AB87A',
+  non_comune:  '#4A9FD4',
+  raro:        '#E8A820',
+  epico:       '#7B4DB8',
+  leggendario: '#C8352A',
   mitologico:  '#FF4D6D',
 }
 
@@ -47,15 +49,6 @@ const RARITY_LABEL: Record<string, string> = {
   epico:       'Mostruoso',
   leggendario: 'Leggendario',
   mitologico:  'Mitologico',
-}
-
-const EGG_ICON: Record<string, string> = {
-  comune:      '🥚',
-  non_comune:  '🪺',
-  raro:        '💎',
-  epico:       '🔮',
-  leggendario: '⭐',
-  mitologico:  '🌌',
 }
 
 interface InventoryRow {
@@ -109,27 +102,39 @@ function HatchingAnimation({
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [])
 
-  const rarityColor = result ? (RARITY_COLOR[result.rarity] ?? '#9CA3AF') : '#9CA3AF'
+  const rarityColor = result ? (RARITY_COLOR[result.rarity] ?? '#7AB87A') : '#7AB87A'
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm"
          onClick={phase === 'reveal' ? onDone : undefined}>
       <AnimatePresence mode="wait">
         {phase === 'shake' && (
-          <motion.div key="shake"
-            animate={{ x: [-6, 6, -6, 6, 0], rotate: [-8, 8, -8, 8, 0] }}
-            transition={{ duration: 0.8, repeat: 1 }}
-            className="text-8xl select-none">
-            🥚
+          <motion.div key="shake" className="relative flex items-center justify-center"
+            animate={{ rotate: [-9, 9, -9, 9, -4, 4, 0] }}
+            transition={{ duration: 0.85, repeat: 1, ease: 'easeInOut' }}>
+            <div className="absolute rounded-full" style={{ width: 168, height: 168, background: `radial-gradient(circle, ${rarityColor}33 0%, transparent 70%)` }} />
+            <GiEggClutch size={108} color={rarityColor} style={{ filter: `drop-shadow(0 0 18px ${rarityColor}aa)` }} />
           </motion.div>
         )}
         {phase === 'crack' && (
-          <motion.div key="crack"
-            initial={{ scale: 1 }}
-            animate={{ scale: [1, 1.3, 0.9, 1.4] }}
-            transition={{ duration: 0.9 }}
-            className="text-8xl select-none">
-            🐣
+          <motion.div key="crack" className="relative flex items-center justify-center">
+            {/* expanding light ring + flash */}
+            <motion.div className="absolute rounded-full"
+              style={{ border: `2px solid ${rarityColor}` }}
+              initial={{ width: 70, height: 70, opacity: 0.85 }}
+              animate={{ width: 280, height: 280, opacity: 0 }}
+              transition={{ duration: 0.95, ease: 'easeOut' }} />
+            <motion.div className="absolute rounded-full"
+              style={{ background: `radial-gradient(circle, ${rarityColor}77 0%, transparent 70%)` }}
+              initial={{ width: 50, height: 50, opacity: 0 }}
+              animate={{ width: 230, height: 230, opacity: [0, 1, 0] }}
+              transition={{ duration: 0.95 }} />
+            <motion.div
+              initial={{ scale: 1, rotate: 0, opacity: 1 }}
+              animate={{ scale: [1, 1.22, 0.92, 1.4], rotate: [0, -12, 12, 0], opacity: [1, 1, 1, 0] }}
+              transition={{ duration: 0.95, ease: 'easeOut' }}>
+              <GiEggClutch size={108} color={rarityColor} style={{ filter: `drop-shadow(0 0 28px ${rarityColor})` }} />
+            </motion.div>
           </motion.div>
         )}
         {phase === 'reveal' && result && (
@@ -138,7 +143,7 @@ function HatchingAnimation({
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
             className="flex flex-col items-center gap-4 px-8 w-full max-w-xs">
-            <div className="text-4xl mb-1">✨</div>
+            <GiSparkles size={36} color={rarityColor} style={{ filter: `drop-shadow(0 0 10px ${rarityColor}aa)` }} />
             {(result.sprite_cutout_url || result.sprite_url || result.image_url) ? (
               <CreatureDiorama
                 creature={result}
@@ -149,9 +154,9 @@ function HatchingAnimation({
                 style={{ aspectRatio: '5 / 4' }}
               />
             ) : (
-              <div className="w-32 h-32 rounded-2xl flex items-center justify-center text-6xl"
+              <div className="w-32 h-32 rounded-2xl flex items-center justify-center"
                 style={{ background: `${rarityColor}22` }}>
-                🐾
+                <GiPawPrint size={56} color={rarityColor} />
               </div>
             )}
             <div className="text-center">
@@ -205,9 +210,8 @@ function EggCard({
   onHatch: (id: string) => void
   hatching: string | null
 }) {
-  const color = RARITY_COLOR[egg.egg_rarity] ?? '#9CA3AF'
+  const color = RARITY_COLOR[egg.egg_rarity] ?? '#7AB87A'
   const label = RARITY_LABEL[egg.egg_rarity] ?? egg.egg_rarity
-  const icon  = EGG_ICON[egg.egg_rarity] ?? '🥚'
   const pct   = egg.steps_required > 0
     ? Math.min(100, Math.round((egg.steps_progress / egg.steps_required) * 100))
     : 100
@@ -225,10 +229,10 @@ function EggCard({
       <motion.div
         animate={egg.can_hatch ? { scale: [1, 1.08, 1], rotate: [-4, 4, -4, 4, 0] } : {}}
         transition={{ duration: 2, repeat: Infinity, repeatDelay: 1.5 }}
-        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
-        style={{ background: `${color}18` }}
+        className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+        style={{ background: `${color}18`, border: `1px solid ${color}33` }}
       >
-        {icon}
+        <GiEggClutch size={26} color={color} style={{ filter: `drop-shadow(0 0 5px ${color}66)` }} />
       </motion.div>
 
       {/* Info */}
@@ -273,7 +277,7 @@ function EggCard({
         >
           {hatching === egg.id ? (
             <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          ) : '🐣 Schiudi'}
+          ) : <span className="inline-flex items-center gap-1"><GiEggClutch size={13} /> Schiudi</span>}
         </button>
       </div>
     </motion.div>

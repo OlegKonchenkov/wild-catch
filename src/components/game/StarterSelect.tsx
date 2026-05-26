@@ -5,11 +5,11 @@ import ElementIcon from '@/components/ui/ElementIcon'
 import { GiRoundStar } from 'react-icons/gi'
 
 const RARITY_COLOR: Record<string, string> = {
-  comune:      '#9CA3AF',
-  non_comune:  '#34D399',
-  raro:        '#3A9DBC',
-  epico:       '#C084FC',
-  leggendario: '#FBBF24',
+  comune:      '#7AB87A',
+  non_comune:  '#4A9FD4',
+  raro:        '#E8A820',
+  epico:       '#7B4DB8',
+  leggendario: '#C8352A',
   mitologico:  '#FF4D6D',
 }
 

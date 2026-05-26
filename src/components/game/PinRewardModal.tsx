@@ -2,16 +2,25 @@
 import { useEffect, useState } from 'react'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import ElementIcon from '@/components/ui/ElementIcon'
-import { GiTwoCoins, GiRoundStar } from 'react-icons/gi'
+import { GiTwoCoins, GiRoundStar, GiEggClutch } from 'react-icons/gi'
 import { playMissionComplete } from '@/lib/game/sounds/events'
 
 const RARITY_COLOR: Record<string, string> = {
-  comune:      '#9CA3AF',
-  non_comune:  '#34D399',
-  raro:        '#3A9DBC',
-  epico:       '#C084FC',
-  leggendario: '#FBBF24',
+  comune:      '#7AB87A',
+  non_comune:  '#4A9FD4',
+  raro:        '#E8A820',
+  epico:       '#7B4DB8',
+  leggendario: '#C8352A',
   mitologico:  '#FF4D6D',
+}
+
+const RARITY_LABEL: Record<string, string> = {
+  comune:      'Terrestre',
+  non_comune:  'Arcaico',
+  raro:        'Eroico',
+  epico:       'Mostruoso',
+  leggendario: 'Leggendario',
+  mitologico:  'Mitologico',
 }
 
 const ELEMENT_GLOW: Record<string, string> = {
@@ -114,15 +123,20 @@ export default function PinRewardModal({ reward, onDone }: { reward: PinRewardDa
             </div>
           )}
 
-          {type === 'uovo' && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
-              <p className="text-4xl mb-2">🥚</p>
-              <p className="text-white font-bold capitalize">{reward.eggRarity}</p>
-              {(reward.stepsRequired ?? 0) > 0 && (
-                <p className="text-white/50 text-sm mt-1">Si schiuderà dopo {reward.stepsRequired} passi</p>
-              )}
-            </div>
-          )}
+          {type === 'uovo' && (() => {
+            const eggColor = RARITY_COLOR[reward.eggRarity ?? ''] ?? '#7AB87A'
+            return (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+                <div className="flex justify-center mb-2">
+                  <GiEggClutch size={44} color={eggColor} style={{ filter: `drop-shadow(0 0 10px ${eggColor}88)` }} />
+                </div>
+                <p className="font-bold" style={{ color: eggColor }}>{RARITY_LABEL[reward.eggRarity ?? ''] ?? reward.eggRarity}</p>
+                {(reward.stepsRequired ?? 0) > 0 && (
+                  <p className="text-white/50 text-sm mt-1">Si schiuderà dopo {reward.stepsRequired} passi</p>
+                )}
+              </div>
+            )
+          })()}
 
           {type === 'creatura' && reward.creature && (() => {
             const c = reward.creature!
@@ -134,7 +148,7 @@ export default function PinRewardModal({ reward, onDone }: { reward: PinRewardDa
                   <div className="flex items-center gap-2 mt-1">
                     <ElementIcon element={c.element} size={14} />
                     <span className="text-xs capitalize text-white/40">{c.element}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: `${rarityColor}22`, color: rarityColor }}>{c.rarity}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: `${rarityColor}22`, color: rarityColor }}>{RARITY_LABEL[c.rarity] ?? c.rarity}</span>
                   </div>
                 </div>
               </div>
@@ -194,7 +208,7 @@ export default function PinRewardModal({ reward, onDone }: { reward: PinRewardDa
                       <div className="flex items-center gap-2 mt-1">
                         <ElementIcon element={c.element} size={14} />
                         <span className="text-xs capitalize text-white/40">{c.element}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: `${enigmaRarityColor}22`, color: enigmaRarityColor }}>{c.rarity}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: `${enigmaRarityColor}22`, color: enigmaRarityColor }}>{RARITY_LABEL[c.rarity] ?? c.rarity}</span>
                       </div>
                     </div>
                   </div>

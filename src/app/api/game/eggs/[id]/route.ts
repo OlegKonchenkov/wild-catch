@@ -1,14 +1,22 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-// Rarity-weighted creature pools
+// Rarity-weighted creature pools.
+// Rebalanced so a rarer egg meaningfully rewards rarer creatures — the egg's
+// own tier is a strong (often dominant) outcome instead of being drowned out
+// by commons. Weights per tier sum to 100 for readability.
+//   non_comune  → 45% Arcaico+
+//   raro        → 35% Eroico (+35% Arcaico)
+//   epico       → 30% Mostruoso (+60% Eroico-or-better)
+//   leggendario → 20% Leggendario (+50% Mostruoso-or-better)
+//   mitologico  → 15% Mitologico, 40% Leggendario+ (only the rarest egg can yield it)
 const RARITY_POOLS: Record<string, Array<{ rarity: string; weight: number }>> = {
-  comune:       [{ rarity: 'comune',      weight: 1 }],
-  non_comune:   [{ rarity: 'comune',      weight: 70 }, { rarity: 'non_comune',  weight: 30 }],
-  raro:         [{ rarity: 'comune',      weight: 50 }, { rarity: 'non_comune',  weight: 30 }, { rarity: 'raro',        weight: 20 }],
-  epico:        [{ rarity: 'comune',      weight: 40 }, { rarity: 'non_comune',  weight: 30 }, { rarity: 'raro',        weight: 20 }, { rarity: 'epico',       weight: 10 }],
-  leggendario:  [{ rarity: 'comune',      weight: 35 }, { rarity: 'non_comune',  weight: 25 }, { rarity: 'raro',        weight: 20 }, { rarity: 'epico',       weight: 15 }, { rarity: 'leggendario', weight: 5 }],
-  mitologico:   [{ rarity: 'comune',      weight: 30 }, { rarity: 'non_comune',  weight: 25 }, { rarity: 'raro',        weight: 20 }, { rarity: 'epico',       weight: 15 }, { rarity: 'leggendario', weight: 8 }, { rarity: 'mitologico', weight: 2 }],
+  comune:       [{ rarity: 'comune', weight: 100 }],
+  non_comune:   [{ rarity: 'comune', weight: 55 }, { rarity: 'non_comune', weight: 45 }],
+  raro:         [{ rarity: 'comune', weight: 30 }, { rarity: 'non_comune', weight: 35 }, { rarity: 'raro', weight: 35 }],
+  epico:        [{ rarity: 'comune', weight: 15 }, { rarity: 'non_comune', weight: 25 }, { rarity: 'raro', weight: 30 }, { rarity: 'epico', weight: 30 }],
+  leggendario:  [{ rarity: 'comune', weight: 8 },  { rarity: 'non_comune', weight: 17 }, { rarity: 'raro', weight: 25 }, { rarity: 'epico', weight: 30 }, { rarity: 'leggendario', weight: 20 }],
+  mitologico:   [{ rarity: 'comune', weight: 5 },  { rarity: 'non_comune', weight: 10 }, { rarity: 'raro', weight: 18 }, { rarity: 'epico', weight: 27 }, { rarity: 'leggendario', weight: 25 }, { rarity: 'mitologico', weight: 15 }],
 }
 
 function pickRarity(eggRarity: string): string {

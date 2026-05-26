@@ -238,11 +238,12 @@ function ItemsGrid() {
 // ─── Egg section ─────────────────────────────────────────────────────────────
 
 const EGG_RARITIES = [
-  { label: 'Terrestre',     color: '#9CA3AF', pool: 'Creature comuni' },
-  { label: 'Arcaico',       color: '#34D399', pool: 'Terrestre 70% · Arcaico 30%' },
-  { label: 'Eroico',        color: '#3A9DBC', pool: 'Terrestre 50% · Arcaico 30% · Eroico 20%' },
-  { label: 'Mostruoso',     color: '#C084FC', pool: 'Terrestre 40% · Arcaico 30% · Eroico 20% · Mostruoso 10%' },
-  { label: 'Leggendario',   color: '#FBBF24', pool: '35% · 25% · 20% · 15% · Legg. 5%' },
+  { label: 'Terrestre',   color: '#7AB87A', pool: 'Solo creature Terrestri' },
+  { label: 'Arcaico',     color: '#4A9FD4', pool: 'Arcaico 45% · Terrestre 55%' },
+  { label: 'Eroico',      color: '#E8A820', pool: 'Eroico 35% · Arcaico 35% · Terrestre 30%' },
+  { label: 'Mostruoso',   color: '#7B4DB8', pool: 'Mostruoso 30% · Eroico 30% · Arcaico 25% · Terrestre 15%' },
+  { label: 'Leggendario', color: '#C8352A', pool: 'Leggendario 20% · Mostruoso 30% · Eroico 25% · …' },
+  { label: 'Mitologico',  color: '#FF4D6D', pool: 'Mitologico 15% · Leggendario 25% · Mostruoso 27% · …' },
 ]
 
 function EggGuide() {

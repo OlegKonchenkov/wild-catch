@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { playEggHatch } from '@/lib/game/sounds/hatch'
 import ElementIcon from '@/components/ui/ElementIcon'
+import { GiEggClutch, GiRoundStar } from 'react-icons/gi'
 
 const RARITY_COLOR: Record<string, string> = {
-  comune:      '#9CA3AF',
-  non_comune:  '#34D399',
-  raro:        '#3A9DBC',
-  epico:       '#C084FC',
-  leggendario: '#FBBF24',
+  comune:      '#7AB87A',
+  non_comune:  '#4A9FD4',
+  raro:        '#E8A820',
+  epico:       '#7B4DB8',
+  leggendario: '#C8352A',
   mitologico:  '#FF4D6D',
 }
 
@@ -69,17 +70,18 @@ export default function EggHatchModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const rarityColor = RARITY_COLOR[creature.rarity] ?? '#9CA3AF'
+  const rarityColor = RARITY_COLOR[creature.rarity] ?? '#7AB87A'
   const glow = ELEMENT_GLOW[creature.element] ?? rarityColor
 
   return (
     <div className="fixed inset-0 z-[1200] flex flex-col items-center justify-center bg-black/88 backdrop-blur-sm">
       {phase !== 'reveal' && (
-        <div
-          className="text-8xl select-none"
-          style={{ animation: phase === 'shake' ? 'eggShake 0.85s ease-in-out' : 'eggCrack 0.85s ease-out' }}
-        >
-          {phase === 'shake' ? '🥚' : '🐣'}
+        <div className="relative flex items-center justify-center">
+          <span aria-hidden className="absolute rounded-full"
+            style={{ width: 180, height: 180, background: `radial-gradient(circle, ${rarityColor}33 0%, transparent 70%)`, animation: phase === 'crack' ? 'eggGlow 0.85s ease-out forwards' : undefined }} />
+          <div style={{ animation: phase === 'shake' ? 'eggShake 0.85s ease-in-out' : 'eggCrack 0.85s ease-out' }}>
+            <GiEggClutch size={110} color={rarityColor} style={{ filter: `drop-shadow(0 0 22px ${rarityColor}aa)` }} />
+          </div>
         </div>
       )}
 
@@ -117,7 +119,9 @@ export default function EggHatchModal({
                     transition: 'opacity 0.3s 0.15s, transform 0.4s 0.15s cubic-bezier(0.34,1.56,0.64,1)',
                   }}
                 >
-                  {creature.isStarter ? '🌟 Il tuo Starter!' : '🥚 Schiuso!'}
+                  {creature.isStarter
+                    ? <span className="inline-flex items-center gap-1.5"><GiRoundStar size={15} color="#080E1A" /> Il tuo Starter!</span>
+                    : <span className="inline-flex items-center gap-1.5"><GiEggClutch size={15} color="#080E1A" /> Schiuso!</span>}
                 </div>
               </div>
 
@@ -214,6 +218,11 @@ export default function EggHatchModal({
           30% { transform: scale(1.3); }
           60% { transform: scale(0.9); }
           100% { transform: scale(1.4); opacity: 0; }
+        }
+        @keyframes eggGlow {
+          0% { transform: scale(0.5); opacity: 0.4; }
+          50% { transform: scale(1.25); opacity: 1; }
+          100% { transform: scale(1.7); opacity: 0; }
         }
       `}</style>
     </div>

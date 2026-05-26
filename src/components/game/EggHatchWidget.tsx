@@ -26,12 +26,12 @@ interface EggView {
 }
 
 const RARITY_COLOR: Record<string, string> = {
-  comune:      '#9CA3AF',
-  non_comune:  '#34D399',
-  raro:        '#38BDF8',
-  epico:       '#C084FC',
-  leggendario: '#FBBF24',
-  mitologico:  '#F472B6',
+  comune:      '#7AB87A',
+  non_comune:  '#4A9FD4',
+  raro:        '#E8A820',
+  epico:       '#7B4DB8',
+  leggendario: '#C8352A',
+  mitologico:  '#FF4D6D',
 }
 
 export default function EggHatchWidget({ sessionId }: { sessionId: string | null }) {
