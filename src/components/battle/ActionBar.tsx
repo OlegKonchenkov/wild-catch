@@ -20,11 +20,11 @@ export interface BattleAction {
 // Vivid full-fill tones with a coloured outer glow — replicates the reference
 // mockup (bright amber CATTURA, rich purple LOTTA) where the whole button
 // glows in its hue. `ring` is the lighter rim; `glow` is the bleed halo.
-const FILL: Record<Exclude<ActionTone, 'dark'>, { bg: string; glow: string; ring: string }> = {
-  orange: { bg: 'linear-gradient(165deg,#F7A23C 0%,#E86A22 52%,#C5440F 100%)', glow: 'rgba(232,110,30,.6)',  ring: 'rgba(255,196,130,.75)' },
-  purple: { bg: 'linear-gradient(165deg,#A06FE3 0%,#7140C6 52%,#4A2390 100%)', glow: 'rgba(150,95,224,.55)', ring: 'rgba(199,160,255,.75)' },
-  red:    { bg: 'linear-gradient(165deg,#E8604A 0%,#B23120 100%)',             glow: 'rgba(210,70,50,.55)',  ring: 'rgba(255,150,130,.7)'  },
-  gold:   { bg: 'linear-gradient(165deg,#F8D26A 0%,#CC8E22 100%)',             glow: 'rgba(240,200,90,.55)', ring: 'rgba(255,228,150,.78)' },
+const FILL: Record<Exclude<ActionTone, 'dark'>, { bg: string; glow: string; ring: string; ink: string }> = {
+  orange: { bg: 'linear-gradient(160deg,#F9A33B 0%,#E66B20 48%,#A83B0B 100%)', glow: 'rgba(238,118,28,.68)',  ring: 'rgba(255,201,122,.86)', ink: '#FFF5E4' },
+  purple: { bg: 'linear-gradient(160deg,#B073F0 0%,#783DCE 50%,#3C1D7E 100%)', glow: 'rgba(164,93,236,.62)', ring: 'rgba(214,167,255,.84)', ink: '#F7EDFF' },
+  red:    { bg: 'linear-gradient(160deg,#E8604A 0%,#B23120 100%)',             glow: 'rgba(210,70,50,.55)',  ring: 'rgba(255,150,130,.72)', ink: '#FFF1EE' },
+  gold:   { bg: 'linear-gradient(160deg,#F8D26A 0%,#CC8E22 100%)',             glow: 'rgba(240,200,90,.55)', ring: 'rgba(255,228,150,.80)', ink: '#FFF8DA' },
 }
 
 function Spinner({ size = 18 }: { size?: number }) {
@@ -42,11 +42,37 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
       className={className}
       style={{
         position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 11,
-        padding: '10px 13px calc(12px + env(safe-area-inset-bottom, 0px))',
+        padding: '22px 13px calc(12px + env(safe-area-inset-bottom, 0px))',
         display: 'flex', gap: 9, alignItems: 'stretch',
-        background: 'linear-gradient(180deg,transparent,rgba(3,5,9,.62) 24%,rgba(3,5,9,.94) 100%)',
+        background:
+          'linear-gradient(180deg, transparent 0%, rgba(6,13,25,.58) 18%, rgba(6,13,25,.96) 100%), ' +
+          'radial-gradient(80% 120% at 50% 100%, rgba(45,128,176,.18), transparent 62%)',
+        borderTop: '1px solid rgba(117,190,255,.28)',
+        boxShadow: '0 -16px 44px rgba(0,0,0,.42), inset 0 1px 0 rgba(170,225,255,.14)',
       }}
     >
+      <span
+        aria-hidden
+        style={{
+          position: 'absolute', left: 0, right: 0, top: 0, height: 18,
+          background:
+            'linear-gradient(90deg, transparent, rgba(122,201,255,.55), transparent), ' +
+            'linear-gradient(180deg, rgba(78,142,195,.22), transparent)',
+          clipPath: 'polygon(0 0, 46% 0, 50% 100%, 54% 0, 100% 0, 100% 18%, 0 18%)',
+          pointerEvents: 'none',
+        }}
+      />
+      <span
+        aria-hidden
+        style={{
+          position: 'absolute', top: 0, left: '50%', width: 34, height: 34,
+          transform: 'translate(-50%, -48%) rotate(45deg)',
+          border: '1px solid rgba(145,218,255,.58)',
+          background: 'radial-gradient(circle, rgba(153,234,255,.45), rgba(16,39,61,.74) 58%, rgba(3,8,16,.1) 100%)',
+          boxShadow: '0 0 18px rgba(80,197,255,.38), inset 0 0 10px rgba(255,255,255,.18)',
+          pointerEvents: 'none',
+        }}
+      />
       {actions.map((a) => {
         const tone: ActionTone = a.tone ?? (a.primary ? 'orange' : 'dark')
         const disabled = a.disabled || a.loading
@@ -60,39 +86,47 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
             disabled={disabled}
             onClick={a.onClick}
             style={{
-              flex: 1, minWidth: 0, minHeight: 82,
+              flex: 1, minWidth: 0, minHeight: 80,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               gap: a.sub ? 5 : 7, padding: '8px 6px', position: 'relative', overflow: 'hidden',
-              borderRadius: 20, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1,
-              color: filled ? '#fff' : '#c4ccd6',
-              border: filled ? `1.5px solid ${f!.ring}` : '1px solid rgba(255,255,255,.1)',
+              borderRadius: 18, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.48 : 1,
+              color: filled ? f!.ink : '#c6d3df',
+              border: filled ? `1.5px solid ${f!.ring}` : '1.2px solid rgba(124,190,215,.34)',
               background: filled
-                ? `radial-gradient(125% 80% at 50% -12%, rgba(255,255,255,.32), transparent 56%), ${f!.bg}`
-                : 'radial-gradient(125% 80% at 50% -12%, rgba(255,255,255,.06), transparent 60%), linear-gradient(180deg, rgba(20,30,44,.74), rgba(9,15,24,.82))',
+                ? `radial-gradient(120% 82% at 50% -18%, rgba(255,255,255,.36), transparent 56%), radial-gradient(circle at 50% 42%, rgba(255,255,255,.12), transparent 32%), ${f!.bg}`
+                : 'radial-gradient(110% 82% at 50% -18%, rgba(156,214,235,.12), transparent 58%), linear-gradient(180deg, rgba(19,35,49,.78), rgba(6,14,25,.9))',
               boxShadow: filled
-                ? `0 0 22px ${f!.glow}, 0 8px 22px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.4), inset 0 -10px 20px rgba(0,0,0,.22)`
-                : 'inset 0 1px 0 rgba(255,255,255,.06), 0 6px 16px rgba(0,0,0,.32)',
+                ? `0 0 24px ${f!.glow}, 0 10px 22px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,255,255,.44), inset 0 -12px 22px rgba(0,0,0,.26)`
+                : '0 8px 20px rgba(0,0,0,.36), inset 0 1px 0 rgba(200,235,255,.10), inset 0 -10px 18px rgba(0,0,0,.20)',
               backdropFilter: filled ? undefined : 'blur(8px)', WebkitBackdropFilter: filled ? undefined : 'blur(8px)',
               transition: 'transform .1s ease, filter .15s ease, border-color .15s ease',
             }}
           >
+            <span
+              aria-hidden
+              style={{
+                position: 'absolute', inset: 3, borderRadius: 15,
+                border: filled ? '1px solid rgba(255,255,255,.18)' : '1px solid rgba(130,200,225,.12)',
+                pointerEvents: 'none',
+              }}
+            />
             {/* soft circular vignette behind the icon (coloured buttons only) */}
             {filled && (
               <span aria-hidden style={{
                 position: 'absolute', top: 9, width: 50, height: 50, borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(255,255,255,.18) 0%, transparent 68%)', pointerEvents: 'none',
+                background: 'radial-gradient(circle, rgba(255,255,255,.20) 0%, transparent 68%)', pointerEvents: 'none',
               }} />
             )}
             <span
               style={{
                 position: 'relative', zIndex: 1, display: 'flex',
-                color: filled ? '#fff' : '#cdd5df',
-                filter: filled ? 'drop-shadow(0 2px 5px rgba(0,0,0,.5))' : 'drop-shadow(0 1px 2px rgba(0,0,0,.55))',
+                color: filled ? f!.ink : '#b8cad7',
+                filter: filled ? 'drop-shadow(0 2px 6px rgba(0,0,0,.54))' : 'drop-shadow(0 1px 3px rgba(0,0,0,.60))',
               }}
             >
               {a.loading ? <Spinner size={a.primary ? 26 : 24} /> : a.icon}
             </span>
-            <span style={{ position: 'relative', zIndex: 1, fontWeight: 800, fontSize: a.primary ? 13 : 12, letterSpacing: '.07em', textTransform: 'uppercase', lineHeight: 1, color: filled ? '#fff' : '#aeb8c2', textShadow: filled ? '0 1px 3px rgba(0,0,0,.5)' : undefined }}>
+            <span style={{ position: 'relative', zIndex: 1, fontWeight: 900, fontSize: a.primary ? 13 : 12, letterSpacing: '.04em', textTransform: 'uppercase', lineHeight: 1, color: filled ? f!.ink : '#b9c7d4', textShadow: filled ? '0 1px 4px rgba(0,0,0,.56)' : '0 1px 3px rgba(0,0,0,.42)' }}>
               {a.label}
             </span>
             {a.sub && (

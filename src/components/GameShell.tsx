@@ -646,6 +646,10 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   }, [supabase])
 
   const xpPct = exp !== null && level !== null ? xpProgress(exp, level) : 0
+  const inEncounter = pathname.startsWith('/game/encounter/')
+  const inDuelFight = pathname.startsWith('/game/duel/') && pathname !== '/game/duel'
+  const inBossFight = pathname.startsWith('/game/boss/')
+  const inAnyBattle = inEncounter || inDuelFight || inBossFight
 
   return (
     <div ref={rootRef} className="flex flex-col bg-[#0F1F2E] text-white overflow-hidden" style={{ height: '100dvh' }}>
@@ -694,52 +698,19 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         </motion.div>
       </main>
 
-      {/* Bottom navigation — Gilded Relic rail */}
-      <nav
-        ref={navRef}
-        className="nav-scrollable relative flex flex-shrink-0"
-        style={{
-          background: 'radial-gradient(120% 180% at 50% 130%, #1a3142 0%, #0c1c2b 55%, #081420 100%)',
-          borderTop: '1px solid rgba(247,200,65,0.42)',
-          boxShadow: 'inset 0 1px 0 rgba(255,236,150,0.14), inset 0 10px 24px -12px rgba(0,0,0,0.6)',
-          overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 'env(safe-area-inset-bottom)',
-        } as React.CSSProperties}
-      >
-        {(() => {
-          const inEncounter = pathname.startsWith('/game/encounter/')
-          const inDuelFight = pathname.startsWith('/game/duel/') && pathname !== '/game/duel'
-          const inBossFight = pathname.startsWith('/game/boss/')
-          const inAnyBattle = inEncounter || inDuelFight || inBossFight
-          if (inAnyBattle) {
-            const BattleIcon = inBossFight ? GiDeathSkull : GiCrossedSwords
-            const battleMsg = inBossFight
-              ? 'Sfida al Capo Palestra — combatti!'
-              : inDuelFight
-                ? 'Duello in corso — combatti!'
-                : 'Incontro in corso — cattura o fuggi'
-            return (
-              <>
-                <div className="absolute inset-0 flex items-center justify-center gap-1.5 pointer-events-none" style={{ color: 'rgba(247,200,65,0.4)' }}>
-                  <BattleIcon size={12} />
-                  <span className="text-[10px] tracking-widest uppercase">{battleMsg}</span>
-                </div>
-                {NAV_ITEMS.map(({ href, key, label }) => {
-                  const Icon = NAV_ICON[key]
-                  return (
-                    <span
-                      key={href}
-                      className="flex-shrink-0 flex flex-col items-center pt-1.5 pb-1 gap-0.5 cursor-not-allowed select-none"
-                      style={{ minWidth: 56, width: `${100 / NAV_ITEMS.length}%`, opacity: 0.22 }}
-                    >
-                      {Icon && <Icon size={26} />}
-                      <span className="truncate w-full text-center px-0.5 text-[10px]" style={{ color: 'var(--wc-ink-faint)' }}>{label}</span>
-                    </span>
-                  )
-                })}
-              </>
-            )
-          }
-          return NAV_ITEMS.map(({ href, key, label, coachmark }) => {
+      {/* Bottom navigation — hidden during battles to give combat controls the full lower viewport. */}
+      {!inAnyBattle && (
+        <nav
+          ref={navRef}
+          className="nav-scrollable relative flex flex-shrink-0"
+          style={{
+            background: 'radial-gradient(120% 180% at 50% 130%, #1a3142 0%, #0c1c2b 55%, #081420 100%)',
+            borderTop: '1px solid rgba(247,200,65,0.42)',
+            boxShadow: 'inset 0 1px 0 rgba(255,236,150,0.14), inset 0 10px 24px -12px rgba(0,0,0,0.6)',
+            overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 'env(safe-area-inset-bottom)',
+          } as React.CSSProperties}
+        >
+          {NAV_ITEMS.map(({ href, key, label, coachmark }) => {
             const Icon = NAV_ICON[key]
             const active = pathname === href
             return (
@@ -766,9 +737,9 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                   style={{ color: active ? '#7FE6FF' : 'var(--wc-ink-faint)' }}>{label}</span>
               </Link>
             )
-          })
-        })()}
-      </nav>
+          })}
+        </nav>
+      )}
 
       <LevelUpModal info={levelUpInfo} onDismiss={() => setLevelUpInfo(null)} />
 
