@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { GiRingingBell, GiGears } from 'react-icons/gi'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 
 const TEAL = '#3ABCA8'
@@ -11,7 +12,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 function Head({ title, right }: { title: string; right?: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <span style={{ fontSize: 20, width: 24, textAlign: 'center', flexShrink: 0 }}>🔔</span>
+      <span style={{ width: 24, display: 'flex', justifyContent: 'center', flexShrink: 0 }}><GiRingingBell size={18} color={TEAL} /></span>
       <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{title}</span>
       {right}
     </div>
@@ -102,7 +103,7 @@ export default function PushOptIn({ expanded = false }: { expanded?: boolean } =
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px' }}>
-          <span style={{ fontSize: 20, width: 24, textAlign: 'center', flexShrink: 0 }}>🔔</span>
+          <span style={{ width: 24, display: 'flex', justifyContent: 'center', flexShrink: 0 }}><GiRingingBell size={18} color={TEAL} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>
               Notifiche
@@ -124,7 +125,7 @@ export default function PushOptIn({ expanded = false }: { expanded?: boolean } =
                 color: actionsOpen ? TEAL : 'rgba(255,255,255,0.6)',
                 fontSize: 16, lineHeight: 1, transition: 'background 0.18s, border-color 0.18s, color 0.18s',
               }}
-            >⚙️</button>
+            ><GiGears size={17} /></button>
           )}
         </div>
         {showActions && (
@@ -185,7 +186,7 @@ export default function PushOptIn({ expanded = false }: { expanded?: boolean } =
           opacity: busy ? 0.6 : 1,
         }}
       >
-        {busy ? '⏳ Attivazione…' : '🔔 Attiva notifiche'}
+        {busy ? 'Attivazione…' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><GiRingingBell size={16} color="#06231E" /> Attiva notifiche</span>}
       </button>
     </Shell>
   )

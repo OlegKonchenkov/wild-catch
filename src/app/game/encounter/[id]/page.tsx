@@ -27,7 +27,7 @@ import { haptics } from '@/lib/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import ElementIcon from '@/components/ui/ElementIcon'
-import { GiRoundStar, GiTwoCoins, GiTrophyCup } from 'react-icons/gi'
+import { GiRoundStar, GiTwoCoins, GiTrophyCup, GiDeathSkull } from 'react-icons/gi'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
@@ -179,7 +179,7 @@ function CreatureCard({ imageUrl, name, element, rarity, currentHp, maxHp, atk, 
           className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1"
           style={{ background: 'rgba(0,0,0,0.55)' }}
         >
-          <span style={{ fontSize: 32, lineHeight: 1 }}>💀</span>
+          <GiDeathSkull size={32} color="#E2E8F0" />
           <span className="text-[10px] font-extrabold tracking-widest uppercase text-white/60">Svenuta</span>
         </motion.div>
       )}
