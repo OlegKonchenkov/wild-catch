@@ -1,70 +1,39 @@
 'use client'
-import type { SVGProps } from 'react'
+import { GiFishingNet, GiCrossedSwords, GiBroadsword, GiStandingPotion, GiRun, GiHealthPotion } from 'react-icons/gi'
 
-// Crisp stroke icon family for the battle action bar — replaces emoji so the
-// HUD reads as a polished game UI. currentColor + round caps; size via prop.
-function Base({ size = 22, children, ...rest }: SVGProps<SVGSVGElement> & { size?: number }) {
-  return (
-    <svg
-      width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
-      aria-hidden {...rest}
-    >
-      {children}
-    </svg>
-  )
-}
+// Battle action-bar icons — themed Game Icons (game-icons.net) so the combat
+// HUD matches the rich glyph language used across the rest of the app. Each
+// keeps the simple `{ size }` API; the glyphs inherit `currentColor` from the
+// button, so the ActionBar tones tint them automatically.
 
-/** Capture — magnifier (matches the mockup's CATTURA). */
-export function IconCapture(p: { size?: number }) {
-  return <Base {...p}><circle cx="11" cy="11" r="7.5" /><path d="m21 21-4.3-4.3" /><path d="M8 11a3 3 0 0 1 3-3" /></Base>
+/** Capture — a thrown net (you catch creatures with reti). */
+export function IconCapture({ size = 22 }: { size?: number }) {
+  return <GiFishingNet size={size} />
 }
 
 /** Fight — crossed swords. */
-export function IconSwords(p: { size?: number }) {
-  return (
-    <Base {...p}>
-      <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" />
-      <line x1="13" x2="19" y1="19" y2="13" /><line x1="16" x2="20" y1="16" y2="20" /><line x1="19" x2="21" y1="21" y2="19" />
-      <polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" />
-      <line x1="5" x2="9" y1="14" y2="18" /><line x1="7" x2="4" y1="17" y2="20" /><line x1="3" x2="5" y1="19" y2="21" />
-    </Base>
-  )
+export function IconSwords({ size = 22 }: { size?: number }) {
+  return <GiCrossedSwords size={size} />
 }
 
-/** Attack — single sword (boss / duel primary). */
-export function IconSword(p: { size?: number }) {
-  return (
-    <Base {...p}>
-      <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" />
-      <line x1="13" x2="19" y1="19" y2="13" /><line x1="16" x2="20" y1="16" y2="20" />
-    </Base>
-  )
+/** Attack — single blade (boss / duel primary). */
+export function IconSword({ size = 22 }: { size?: number }) {
+  return <GiBroadsword size={size} />
 }
 
-/** Items — conical flask / potion. */
-export function IconFlask(p: { size?: number }) {
-  return (
-    <Base {...p}>
-      <path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2" />
-      <path d="M6.5 15h11" /><path d="M8.5 2h7" />
-    </Base>
-  )
+/** Items — battle potion. */
+export function IconFlask({ size = 22 }: { size?: number }) {
+  return <GiStandingPotion size={size} />
 }
 
-/** Flee — exit door + arrow. */
-export function IconFlee(p: { size?: number }) {
-  return (
-    <Base {...p}>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" />
-    </Base>
-  )
+/** Flee — sprint away. */
+export function IconFlee({ size = 22 }: { size?: number }) {
+  return <GiRun size={size} />
 }
 
 /** Heal / cure potion (for item use). */
-export function IconHeal(p: { size?: number }) {
-  return <Base {...p}><path d="M11 2a2 2 0 0 0-2 2v5H4a2 2 0 0 0-2 2v2c0 1.1.9 2 2 2h5v5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-5h5a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-5V4a2 2 0 0 0-2-2z" /></Base>
+export function IconHeal({ size = 22 }: { size?: number }) {
+  return <GiHealthPotion size={size} />
 }
 
 // ── Top-bar icons (premium gold) — filled, not stroke. ──────────────────────

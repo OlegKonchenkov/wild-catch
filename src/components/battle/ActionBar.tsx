@@ -57,30 +57,38 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
             disabled={disabled}
             onClick={a.onClick}
             style={{
-              flex: a.primary ? 1.12 : 1, minWidth: 0, height: 58,
+              flex: a.primary ? 1.12 : 1, minWidth: 0, height: 62,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: 4, padding: '7px 6px',
+              gap: 4, padding: '7px 6px', position: 'relative', overflow: 'hidden',
               borderRadius: 16, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.55 : 1,
               color: filled ? '#fff' : '#c9d1d9',
               border: filled ? `1px solid ${f!.ring}` : '1px solid rgba(255,255,255,.12)',
-              background: filled ? f!.bg : 'linear-gradient(180deg,rgba(21,28,36,.68),rgba(8,12,17,.72))',
+              background: filled
+                ? `radial-gradient(115% 78% at 50% -16%, rgba(255,255,255,.34), transparent 58%), ${f!.bg}`
+                : 'radial-gradient(115% 78% at 50% -16%, rgba(255,255,255,.10), transparent 60%), linear-gradient(180deg,rgba(21,28,36,.7),rgba(8,12,17,.74))',
               boxShadow: filled
-                ? `${f!.shadow}, inset 0 1px 0 rgba(255,255,255,.24), inset 0 -2px 7px rgba(0,0,0,.2)`
-                : 'inset 0 1px 0 rgba(255,255,255,.07), 0 6px 16px rgba(0,0,0,.22)',
+                ? `${f!.shadow}, inset 0 1px 0 rgba(255,255,255,.32), inset 0 -3px 9px rgba(0,0,0,.24)`
+                : 'inset 0 1px 0 rgba(255,255,255,.08), 0 6px 16px rgba(0,0,0,.22)',
               backdropFilter: filled ? undefined : 'blur(8px)', WebkitBackdropFilter: filled ? undefined : 'blur(8px)',
               transition: 'transform .1s ease, filter .15s ease, border-color .15s ease',
             }}
           >
             <span
               style={{
-                width: 24, height: 24, borderRadius: 9,
+                width: 30, height: 30, borderRadius: 11,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: filled ? f!.icon : 'rgba(255,255,255,.06)',
-                filter: filled ? 'drop-shadow(0 1px 1px rgba(0,0,0,.3))' : undefined,
-                color: filled ? '#fff' : '#aeb8c2',
+                background: filled ? f!.icon : 'rgba(255,255,255,.07)',
+                border: filled ? `1px solid ${f!.ring}` : '1px solid rgba(255,255,255,.1)',
+                boxShadow: filled
+                  ? `0 0 12px ${f!.ring}, inset 0 1px 0 rgba(255,255,255,.28)`
+                  : 'inset 0 1px 0 rgba(255,255,255,.06)',
+                color: filled ? '#fff' : '#b7c2cd',
+                fontSize: 0,
               }}
             >
-              {a.loading ? <Spinner size={a.primary ? 22 : 20} /> : a.icon}
+              <span style={{ display: 'flex', filter: filled ? 'drop-shadow(0 1px 2px rgba(0,0,0,.45))' : 'drop-shadow(0 1px 1px rgba(0,0,0,.4))' }}>
+                {a.loading ? <Spinner size={a.primary ? 22 : 20} /> : a.icon}
+              </span>
             </span>
             <span style={{ fontWeight: 900, fontSize: a.primary ? 12.5 : 11, letterSpacing: '.02em', textTransform: 'uppercase', lineHeight: 1, textShadow: filled ? '0 1px 2px rgba(0,0,0,.38)' : undefined }}>
               {a.label}
