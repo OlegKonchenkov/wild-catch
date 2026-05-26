@@ -2,6 +2,11 @@
 import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence, type PanInfo } from 'framer-motion'
+import {
+  GiFootprint, GiCrossedSwords, GiBattleGear, GiSwapBag, GiEggClutch, GiCrown,
+  GiMagnifyingGlass, GiPadlock, GiPositionMarker, GiCctvCamera,
+} from 'react-icons/gi'
+import ElementIcon from '@/components/ui/ElementIcon'
 import BgmController from '@/components/BgmController'
 
 type PermStatus = 'idle' | 'granted' | 'denied' | 'unavailable'
@@ -39,8 +44,8 @@ function PermissionInstructions({ type }: { type: 'gps' | 'camera' }) {
 // ── Slide content ───────────────────────────────────────────────────────────
 // Three elemental satellites orbiting the dragon. Each orbits at a different
 // radius/speed/phase so the cluster never aligns into a static-looking ring.
-function OrbitingElement({ emoji, radius, duration, delay, phase }: {
-  emoji: string; radius: number; duration: number; delay: number; phase: number
+function OrbitingElement({ element, radius, duration, delay, phase }: {
+  element: string; radius: number; duration: number; delay: number; phase: number
 }) {
   return (
     <motion.div
@@ -50,12 +55,12 @@ function OrbitingElement({ emoji, radius, duration, delay, phase }: {
       transition={{ duration, delay, repeat: Infinity, ease: 'linear' }}
     >
       <motion.span
-        className="block text-3xl"
+        className="block"
         style={{ transform: `translate(${radius}px, 0)` }}
         animate={{ scale: [1, 1.15, 1], filter: ['drop-shadow(0 0 4px rgba(58,188,168,0.3))', 'drop-shadow(0 0 10px rgba(58,188,168,0.6))', 'drop-shadow(0 0 4px rgba(58,188,168,0.3))'] }}
         transition={{ duration: 2.2, delay, repeat: Infinity, ease: 'easeInOut' }}
       >
-        {emoji}
+        <ElementIcon element={element} size={30} />
       </motion.span>
     </motion.div>
   )
@@ -106,12 +111,12 @@ function SlideWelcome() {
           animate={{ y: [0, -7, 0] }}
           transition={{ duration: 3.6, repeat: Infinity, ease: 'easeInOut' }}
         />
-        <OrbitingElement emoji="🌊" radius={78} duration={7}  delay={0}   phase={0}   />
-        <OrbitingElement emoji="🔥" radius={70} duration={8.5} delay={0.3} phase={120} />
-        <OrbitingElement emoji="🌿" radius={82} duration={9.5} delay={0.6} phase={240} />
+        <OrbitingElement element="adriatico" radius={78} duration={7}  delay={0}   phase={0}   />
+        <OrbitingElement element="fiamma"    radius={70} duration={8.5} delay={0.3} phase={120} />
+        <OrbitingElement element="bosco"     radius={82} duration={9.5} delay={0.6} phase={240} />
       </motion.div>
       <motion.h1
-        className="text-3xl font-black tracking-tight mb-2 text-white"
+        className="wc-display text-3xl font-black tracking-tight mb-2 text-white"
         variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
       >
         Le creature si sono risvegliate
@@ -132,11 +137,11 @@ function SlideGameLoop() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
       <div className="w-full max-w-xs space-y-3 mb-6">
-        {[
-          { icon: '🚶', title: 'Cammina nel territorio', desc: 'Il tuo cellulare ti segue via GPS. Le creature appaiono nelle vicinanze quando ti muovi.' },
-          { icon: '⚔️', title: 'Affronta e cattura', desc: 'Combatti turno per turno. Indebolisci la creatura per aumentare le chance di cattura.' },
-          { icon: '🛡️', title: 'Costruisci la tua squadra', desc: 'Fino a 3 creature attive. Elementi diversi, status, abilità — la strategia conta.' },
-        ].map((step, i) => (
+        {([
+          { Icon: GiFootprint,     title: 'Cammina nel territorio', desc: 'Il tuo cellulare ti segue via GPS. Le creature appaiono nelle vicinanze quando ti muovi.' },
+          { Icon: GiCrossedSwords, title: 'Affronta e cattura', desc: 'Combatti turno per turno. Indebolisci la creatura per aumentare le chance di cattura.' },
+          { Icon: GiBattleGear,    title: 'Costruisci la tua squadra', desc: 'Fino a 3 creature attive. Elementi diversi, status, abilità — la strategia conta.' },
+        ] as const).map((step, i) => (
           <motion.div
             key={step.title}
             className="flex items-start gap-3 rounded-2xl p-3 text-left"
@@ -146,10 +151,10 @@ function SlideGameLoop() {
             transition={{ delay: i * 0.12 }}
           >
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl shrink-0"
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: 'rgba(58,188,168,0.12)', border: '1px solid rgba(58,188,168,0.25)' }}
             >
-              {step.icon}
+              <step.Icon size={22} color="#5FD0BF" />
             </div>
             <div>
               <p className="font-bold text-white text-sm mb-0.5">{step.title}</p>
@@ -202,24 +207,24 @@ function SlideQRCodes() {
           </motion.div>
         ))}
       </motion.div>
-      <h2 className="text-2xl font-black text-white mb-2">Cerca i QR code</h2>
+      <h2 className="wc-display text-2xl font-black text-white mb-2">Cerca i QR code</h2>
       <p className="text-white/55 leading-relaxed max-w-xs mb-4">
         In giro per il territorio troverai QR speciali —
         sui banchi, ai punti di interesse, presso i partner dell'evento.
       </p>
       <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
-        {[
-          { icon: '🎁', label: 'Oggetti' },
-          { icon: '🥚', label: 'Uova' },
-          { icon: '👑', label: 'Capi Palestra' },
-          { icon: '🔍', label: 'Indizi enigmi' },
-        ].map(p => (
+        {([
+          { Icon: GiSwapBag,        label: 'Oggetti' },
+          { Icon: GiEggClutch,      label: 'Uova' },
+          { Icon: GiCrown,          label: 'Capi Palestra' },
+          { Icon: GiMagnifyingGlass, label: 'Indizi enigmi' },
+        ] as const).map(p => (
           <div
             key={p.label}
             className="flex items-center gap-2 rounded-xl px-3 py-2"
             style={{ background: 'rgba(247,200,65,0.06)', border: '1px solid rgba(247,200,65,0.2)' }}
           >
-            <span className="text-lg">{p.icon}</span>
+            <p.Icon size={18} color="#F7C841" className="shrink-0" />
             <span className="text-xs font-semibold text-white/70">{p.label}</span>
           </div>
         ))}
@@ -242,8 +247,8 @@ function SlidePermissions({
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-5 overflow-y-auto py-4">
       <div className="text-center mb-4">
-        <span className="text-5xl block mb-2">🔐</span>
-        <h2 className="text-xl font-black text-white mb-1">Permessi indispensabili</h2>
+        <span className="flex justify-center mb-2"><GiPadlock size={48} color="#F7C841" style={{ filter: 'drop-shadow(0 0 12px rgba(247,200,65,0.5))' }} /></span>
+        <h2 className="wc-display text-xl font-black text-white mb-1">Permessi indispensabili</h2>
         <p className="text-white/45 text-xs max-w-xs">
           Senza GPS o fotocamera non potrai esplorare e scansionare. Tocca per concedere.
         </p>
@@ -253,8 +258,8 @@ function SlidePermissions({
         {/* GPS card */}
         <div className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
           <div className="flex items-start gap-3 mb-2">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-              style={{ background: 'rgba(58,157,188,0.15)', border: '1px solid rgba(58,157,188,0.3)' }}>📍</div>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(58,157,188,0.15)', border: '1px solid rgba(58,157,188,0.3)' }}><GiPositionMarker size={18} color="#3A9DBC" /></div>
             <div className="flex-1">
               <p className="font-bold text-white text-sm">Posizione GPS</p>
               <p className="text-white/45 text-xs mt-0.5">Per la mappa e gli incontri.</p>
@@ -281,8 +286,8 @@ function SlidePermissions({
         {/* Camera card */}
         <div className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
           <div className="flex items-start gap-3 mb-2">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-              style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.3)' }}>📷</div>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.3)' }}><GiCctvCamera size={18} color="#34D399" /></div>
             <div className="flex-1">
               <p className="font-bold text-white text-sm">Fotocamera</p>
               <p className="text-white/45 text-xs mt-0.5">Per scansionare i QR code.</p>

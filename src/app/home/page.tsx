@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo, Suspense } from 'react'
+import { GiBullseye, GiGraduateCap, GiGears, GiJoystick, GiRoundStar, GiTicket } from 'react-icons/gi'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
 import { identify, resetIdentity, track } from '@/lib/analytics'
@@ -24,10 +25,12 @@ interface SessionStats {
 }
 
 /* ─── tiny helpers ─────────────────────────────── */
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div style={{ padding: '24px 20px 0' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', marginBottom: 12 }}>{title}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', marginBottom: 12 }}>
+        {icon}{title}
+      </div>
       {children}
     </div>
   )
@@ -53,10 +56,10 @@ function StatCell({ val, label, color }: { val: number | string; label: string; 
 }
 
 function statusMeta(status: string) {
-  if (status === 'active') return { label: 'In corso', color: '#34D399', icon: '🟢' }
-  if (status === 'ready')  return { label: 'In attesa', color: '#F7C841', icon: '🟡' }
-  if (status === 'ended')  return { label: 'Terminata', color: 'rgba(255,255,255,0.25)', icon: '🏁' }
-  return { label: status, color: 'rgba(255,255,255,0.25)', icon: '⚪' }
+  if (status === 'active') return { label: 'In corso', color: '#34D399' }
+  if (status === 'ready')  return { label: 'In attesa', color: '#F7C841' }
+  if (status === 'ended')  return { label: 'Terminata', color: 'rgba(255,255,255,0.25)' }
+  return { label: status, color: 'rgba(255,255,255,0.25)' }
 }
 
 /* ─── main ─────────────────────────────────────── */
@@ -408,8 +411,8 @@ function HomeLobby() {
               <span style={{
                 position: 'absolute', right: -3, bottom: -3, width: 15, height: 15, borderRadius: '50%',
                 background: '#0D1E2E', border: '1px solid rgba(58,188,168,0.5)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, lineHeight: 1,
-              }}>⚙️</span>
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, lineHeight: 1, color: '#3ABCA8',
+              }}><GiGears size={9} /></span>
             </span>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#3ABCA8', letterSpacing: '0.02em' }}>
               {showSettings ? 'Chiudi' : 'Profilo'}
@@ -419,7 +422,7 @@ function HomeLobby() {
 
         {/* ── Welcome ── */}
         <div style={{ padding: '24px 20px 0' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
+          <div className="wc-display" style={{ fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
             Ciao, {displayName}
           </div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>
@@ -432,7 +435,7 @@ function HomeLobby() {
           <div style={{ padding: '10px 20px 0' }}>
             {!editingNickInline ? (
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(58,188,168,0.08)', border: '1px solid rgba(58,188,168,0.18)', borderRadius: 20, padding: '5px 12px 5px 10px' }}>
-                <span style={{ fontSize: 13 }}>🎮</span>
+                <GiJoystick size={14} color="#3ABCA8" />
                 <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '0.01em' }}>{nickname}</span>
                 <button
                   onClick={() => { setEditingNickInline(true); setEditNick(nickname ?? ''); setSettingMsg(null) }}
@@ -477,7 +480,7 @@ function HomeLobby() {
 
         {/* ── Nickname prompt (one-time) ── */}
         {needsNickname && !showSettings && (
-          <Section title="🎯 Imposta il tuo nickname">
+          <Section icon={<GiBullseye size={13} color="#E85D2F" />} title="Imposta il tuo nickname">
             <Card accent="#F7C841">
               <div style={{ padding: '16px 18px' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 4 }}>Come vuoi essere chiamato?</div>
@@ -654,7 +657,7 @@ function HomeLobby() {
                       </div>
                       {/* Quick stats */}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#F7C841' }}>⚡ {sess.exp}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 13, fontWeight: 700, color: '#F7C841' }}><GiRoundStar size={12} /> {sess.exp}</span>
                         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Lv {sess.level}</span>
                       </div>
                       {/* Chevron */}
@@ -720,7 +723,7 @@ function HomeLobby() {
         </Section>
 
         {/* ── Tutorial (always-on free demo) ── */}
-        <Section title="🎓 Prova il gioco">
+        <Section icon={<GiGraduateCap size={14} color="#3ABCA8" />} title="Prova il gioco">
           <Card accent="#3ABCA8">
             <div style={{ padding: '16px 18px' }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
@@ -738,7 +741,7 @@ function HomeLobby() {
               >
                 {tutorialBusy === 'starting'
                   ? <><span className="spinner" /> Apertura...</>
-                  : hasTutorialBefore ? '▶ Rientra nel tutorial' : '🎮 Inizia il tutorial'}
+                  : hasTutorialBefore ? '▶ Rientra nel tutorial' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><GiJoystick size={16} /> Inizia il tutorial</span>}
               </button>
               {hasTutorialBefore && (
                 <button
@@ -771,7 +774,7 @@ function HomeLobby() {
           <Card>
             <div className="accordion-header" onClick={() => setShowJoin(v => !v)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(247,200,65,0.12)', border: '1px solid rgba(247,200,65,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎟️</div>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(247,200,65,0.12)', border: '1px solid rgba(247,200,65,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F7C841' }}><GiTicket size={20} /></div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>Inserisci codice invito</div>
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Ricevuto dall&apos;organizzatore dell&apos;evento</div>
@@ -837,7 +840,7 @@ function HomeLobby() {
                   disabled={!code || code.length < 4 || !gdpr || joining || needsNickname}
                   onClick={handleJoin}
                 >
-                  {joining ? <><span className="spinner dark" /> Accesso...</> : '🎮 PARTECIPA ALL\'EVENTO'}
+                  {joining ? <><span className="spinner dark" /> Accesso...</> : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><GiJoystick size={16} /> PARTECIPA ALL&apos;EVENTO</span>}
                 </button>
 
                 {joinError && <div className="msg err">⚠ {joinError}</div>}
