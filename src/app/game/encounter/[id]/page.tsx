@@ -1474,7 +1474,7 @@ export default function EncounterPage() {
     {
       id: 'catch',
       label: 'Cattura',
-      icon: <IconCapture size={23} />,
+      icon: <IconCapture size={32} />,
       primary: true,
       tone: 'orange',
       sub: catchInfoParts.length > 0 ? catchInfoParts.join(' / ') : undefined,
@@ -1485,7 +1485,7 @@ export default function EncounterPage() {
     {
       id: 'fight',
       label: playerSleeping ? 'Passa' : 'Lotta',
-      icon: <IconSwords size={22} />,
+      icon: <IconSwords size={30} />,
       tone: 'purple',
       onClick: handleFight,
       disabled: loading || state.turns >= 5,
@@ -1494,7 +1494,7 @@ export default function EncounterPage() {
     {
       id: 'items',
       label: activeItemLabel ? 'Attivo' : 'Oggetti',
-      icon: <IconFlask size={21} />,
+      icon: <IconFlask size={29} />,
       tone: activeItemLabel ? 'gold' : 'dark',
       onClick: () => setShowItemsModal(true),
       disabled: loading || !hasItems,
@@ -1502,7 +1502,7 @@ export default function EncounterPage() {
     {
       id: 'flee',
       label: 'Fuggi',
-      icon: <IconFlee size={21} />,
+      icon: <IconFlee size={29} />,
       tone: 'dark',
       onClick: handleFlee,
       disabled: loading,

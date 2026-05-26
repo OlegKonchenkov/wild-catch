@@ -17,11 +17,14 @@ export interface BattleAction {
   loading?: boolean
 }
 
-const FILL: Record<Exclude<ActionTone, 'dark'>, { bg: string; shadow: string; ring: string; icon: string }> = {
-  orange: { bg: 'linear-gradient(150deg,#F16E35 0%,#C94118 100%)', shadow: '0 8px 20px rgba(226,80,28,.34)', ring: 'rgba(255,178,128,.45)', icon: 'rgba(255,238,218,.22)' },
-  purple: { bg: 'linear-gradient(150deg,#8051C7 0%,#4E2A8B 100%)', shadow: '0 8px 20px rgba(123,77,184,.32)', ring: 'rgba(195,156,255,.4)', icon: 'rgba(232,216,255,.18)' },
-  red: { bg: 'linear-gradient(150deg,#D14530 0%,#8F261A 100%)', shadow: '0 8px 20px rgba(193,58,43,.34)', ring: 'rgba(255,140,120,.36)', icon: 'rgba(255,220,210,.18)' },
-  gold: { bg: 'linear-gradient(150deg,#F4CE62 0%,#B98624 100%)', shadow: '0 8px 20px rgba(240,206,122,.32)', ring: 'rgba(255,232,170,.42)', icon: 'rgba(60,37,8,.18)' },
+// Vivid full-fill tones with a coloured outer glow — replicates the reference
+// mockup (bright amber CATTURA, rich purple LOTTA) where the whole button
+// glows in its hue. `ring` is the lighter rim; `glow` is the bleed halo.
+const FILL: Record<Exclude<ActionTone, 'dark'>, { bg: string; glow: string; ring: string }> = {
+  orange: { bg: 'linear-gradient(165deg,#F7A23C 0%,#E86A22 52%,#C5440F 100%)', glow: 'rgba(232,110,30,.6)',  ring: 'rgba(255,196,130,.75)' },
+  purple: { bg: 'linear-gradient(165deg,#A06FE3 0%,#7140C6 52%,#4A2390 100%)', glow: 'rgba(150,95,224,.55)', ring: 'rgba(199,160,255,.75)' },
+  red:    { bg: 'linear-gradient(165deg,#E8604A 0%,#B23120 100%)',             glow: 'rgba(210,70,50,.55)',  ring: 'rgba(255,150,130,.7)'  },
+  gold:   { bg: 'linear-gradient(165deg,#F8D26A 0%,#CC8E22 100%)',             glow: 'rgba(240,200,90,.55)', ring: 'rgba(255,228,150,.78)' },
 }
 
 function Spinner({ size = 18 }: { size?: number }) {
@@ -57,44 +60,43 @@ export default function ActionBar({ actions, className }: { actions: BattleActio
             disabled={disabled}
             onClick={a.onClick}
             style={{
-              flex: a.primary ? 1.12 : 1, minWidth: 0, height: 62,
+              flex: 1, minWidth: 0, height: 82,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: 4, padding: '7px 6px', position: 'relative', overflow: 'hidden',
-              borderRadius: 16, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.55 : 1,
-              color: filled ? '#fff' : '#c9d1d9',
-              border: filled ? `1px solid ${f!.ring}` : '1px solid rgba(255,255,255,.12)',
+              gap: 7, padding: '8px 6px', position: 'relative', overflow: 'hidden',
+              borderRadius: 20, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1,
+              color: filled ? '#fff' : '#c4ccd6',
+              border: filled ? `1.5px solid ${f!.ring}` : '1px solid rgba(255,255,255,.1)',
               background: filled
-                ? `radial-gradient(115% 78% at 50% -16%, rgba(255,255,255,.34), transparent 58%), ${f!.bg}`
-                : 'radial-gradient(115% 78% at 50% -16%, rgba(255,255,255,.10), transparent 60%), linear-gradient(180deg,rgba(21,28,36,.7),rgba(8,12,17,.74))',
+                ? `radial-gradient(125% 80% at 50% -12%, rgba(255,255,255,.32), transparent 56%), ${f!.bg}`
+                : 'radial-gradient(125% 80% at 50% -12%, rgba(255,255,255,.06), transparent 60%), linear-gradient(180deg, rgba(20,30,44,.74), rgba(9,15,24,.82))',
               boxShadow: filled
-                ? `${f!.shadow}, inset 0 1px 0 rgba(255,255,255,.32), inset 0 -3px 9px rgba(0,0,0,.24)`
-                : 'inset 0 1px 0 rgba(255,255,255,.08), 0 6px 16px rgba(0,0,0,.22)',
+                ? `0 0 22px ${f!.glow}, 0 8px 22px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.4), inset 0 -10px 20px rgba(0,0,0,.22)`
+                : 'inset 0 1px 0 rgba(255,255,255,.06), 0 6px 16px rgba(0,0,0,.32)',
               backdropFilter: filled ? undefined : 'blur(8px)', WebkitBackdropFilter: filled ? undefined : 'blur(8px)',
               transition: 'transform .1s ease, filter .15s ease, border-color .15s ease',
             }}
           >
+            {/* soft circular vignette behind the icon (coloured buttons only) */}
+            {filled && (
+              <span aria-hidden style={{
+                position: 'absolute', top: 9, width: 50, height: 50, borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(255,255,255,.18) 0%, transparent 68%)', pointerEvents: 'none',
+              }} />
+            )}
             <span
               style={{
-                width: 30, height: 30, borderRadius: 11,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: filled ? f!.icon : 'rgba(255,255,255,.07)',
-                border: filled ? `1px solid ${f!.ring}` : '1px solid rgba(255,255,255,.1)',
-                boxShadow: filled
-                  ? `0 0 12px ${f!.ring}, inset 0 1px 0 rgba(255,255,255,.28)`
-                  : 'inset 0 1px 0 rgba(255,255,255,.06)',
-                color: filled ? '#fff' : '#b7c2cd',
-                fontSize: 0,
+                position: 'relative', zIndex: 1, display: 'flex',
+                color: filled ? '#fff' : '#cdd5df',
+                filter: filled ? 'drop-shadow(0 2px 5px rgba(0,0,0,.5))' : 'drop-shadow(0 1px 2px rgba(0,0,0,.55))',
               }}
             >
-              <span style={{ display: 'flex', filter: filled ? 'drop-shadow(0 1px 2px rgba(0,0,0,.45))' : 'drop-shadow(0 1px 1px rgba(0,0,0,.4))' }}>
-                {a.loading ? <Spinner size={a.primary ? 22 : 20} /> : a.icon}
-              </span>
+              {a.loading ? <Spinner size={a.primary ? 26 : 24} /> : a.icon}
             </span>
-            <span style={{ fontWeight: 900, fontSize: a.primary ? 12.5 : 11, letterSpacing: '.02em', textTransform: 'uppercase', lineHeight: 1, textShadow: filled ? '0 1px 2px rgba(0,0,0,.38)' : undefined }}>
+            <span style={{ position: 'relative', zIndex: 1, fontWeight: 800, fontSize: a.primary ? 13 : 12, letterSpacing: '.07em', textTransform: 'uppercase', lineHeight: 1, color: filled ? '#fff' : '#aeb8c2', textShadow: filled ? '0 1px 3px rgba(0,0,0,.5)' : undefined }}>
               {a.label}
             </span>
             {a.sub && (
-              <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 9, fontWeight: 700, opacity: 0.92, marginTop: 1, padding: '1px 7px', borderRadius: 999, background: 'rgba(0,0,0,.22)' }}>{a.sub}</span>
+              <span style={{ position: 'relative', zIndex: 1, fontFamily: 'var(--font-mono, monospace)', fontSize: 9, fontWeight: 700, opacity: 0.95, padding: '1px 7px', borderRadius: 999, background: 'rgba(0,0,0,.25)' }}>{a.sub}</span>
             )}
           </button>
         )

@@ -177,7 +177,7 @@ export default function BattleScreen({
     {
       id: 'items',
       label: selectedItemId ? 'Boost' : 'Oggetti',
-      icon: <IconFlask size={21} />,
+      icon: <IconFlask size={29} />,
       tone: selectedItemId ? 'gold' : 'dark',
       onClick: () => setShowItemsModal(true),
       disabled: attacking || bossAttacking || (battagliaItems.length === 0 && curaItems.length === 0),
@@ -185,7 +185,7 @@ export default function BattleScreen({
     {
       id: 'attack',
       label: playerSleeping ? 'Passa' : 'Attacca',
-      icon: <IconSword size={23} />,
+      icon: <IconSword size={32} />,
       primary: true,
       tone: selectedItemId ? 'gold' : 'orange',
       sub: selectedItem ? `+${selectedItem.effectValue}% ATK` : undefined,

@@ -1333,7 +1333,7 @@ export default function DuelPage() {
     {
       id: 'items',
       label: selectedItemId ? 'Boost' : 'Oggetti',
-      icon: <IconFlask size={21} />,
+      icon: <IconFlask size={29} />,
       tone: selectedItemId ? 'gold' : 'dark',
       onClick: () => { if (isMyTurn) setShowItemsModal(true) },
       disabled: !isMyTurn || (battagliaItems.length === 0 && curaItems.length === 0),
@@ -1341,7 +1341,7 @@ export default function DuelPage() {
     {
       id: 'attack',
       label: mySleeping ? 'Passa' : 'Attacca',
-      icon: <IconSword size={23} />,
+      icon: <IconSword size={32} />,
       primary: true,
       tone: selectedItemId ? 'gold' : 'orange',
       sub: selectedItem ? `+${selectedItem.effectValue}% ATK` : undefined,
@@ -1352,7 +1352,7 @@ export default function DuelPage() {
     {
       id: 'surrender',
       label: 'Resa',
-      icon: <IconFlee size={21} />,
+      icon: <IconFlee size={29} />,
       tone: 'dark',
       onClick: handleSurrender,
     },

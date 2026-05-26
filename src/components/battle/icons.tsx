@@ -1,5 +1,5 @@
 'use client'
-import { GiFishingNet, GiCrossedSwords, GiBroadsword, GiStandingPotion, GiRun, GiHealthPotion } from 'react-icons/gi'
+import { GiFishingNet, GiCrossedSwords, GiBroadsword, GiRoundBottomFlask, GiRun, GiHealthPotion } from 'react-icons/gi'
 
 // Battle action-bar icons — themed Game Icons (game-icons.net) so the combat
 // HUD matches the rich glyph language used across the rest of the app. Each
@@ -21,9 +21,9 @@ export function IconSword({ size = 22 }: { size?: number }) {
   return <GiBroadsword size={size} />
 }
 
-/** Items — battle potion. */
+/** Items — round-bottom flask (matches the reference's OGGETTI vial). */
 export function IconFlask({ size = 22 }: { size?: number }) {
-  return <GiStandingPotion size={size} />
+  return <GiRoundBottomFlask size={size} />
 }
 
 /** Flee — sprint away. */
