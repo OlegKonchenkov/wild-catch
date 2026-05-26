@@ -91,13 +91,15 @@ export default function BgmController() {
     audio.volume = BASE_VOLUME
     audioRef.current = audio
 
-    // The src is resolved behind a network fetch (admin override), so the
-    // audio element is often created AFTER the user's first gesture. If
-    // they already interacted (unlockedRef set), start playing the moment
-    // the element exists — otherwise music wouldn't start until a SECOND
-    // distinct gesture (the reported "non parte finché non clicco Avanti").
-    if (unlockedRef.current && !muted) {
-      audio.play().catch(() => { /* best-effort */ })
+    // Try to start immediately. The user reached the onboarding slides via a
+    // click (Home → "Partecipa" / starter pick), so the document already has
+    // "sticky activation" and .play() succeeds right away — the intro music
+    // begins WITH the first slide instead of only after the first "Avanti"
+    // (the reported bug). If the browser still blocks it (no prior gesture,
+    // e.g. a hard reload onto this page), the one-shot gesture listener below
+    // retries on the next tap/key. Muted → never auto-play.
+    if (!muted) {
+      audio.play().then(() => { unlockedRef.current = true }).catch(() => { /* gesture listener retries */ })
     }
 
     const onError = () => setAvailable(false)

@@ -295,15 +295,21 @@ function MapPageInner() {
     }
   }, [])
 
-  // Background ambience loop + ducking registration — starts on mount, stops on unmount
+  // Background ambience — gated on `ambienceReady`. The map music must NOT
+  // start during the brief first-session onboarding-gate fetch (which may
+  // redirect to the intro slides): otherwise the map loop audibly plays
+  // before / under the slides. We flip this true only once the session-load
+  // effect confirms we're STAYING on the map (onboarding already seen).
+  const [ambienceReady, setAmbienceReady] = useState(false)
   useEffect(() => {
+    if (!ambienceReady) return
     registerAmbienceDucking(duckMapAmbience, unduckMapAmbience)
     const stop = startMapAmbience()
     return () => {
       registerAmbienceDucking(null, null)
       stop()
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ambienceReady])
   const [showEncounterPopup, setShowEncounterPopup] = useState(false)
   const [pendingEncounter, setPendingEncounter] = useState<{
     encounterId: string
@@ -810,7 +816,7 @@ function MapPageInner() {
         .then(({ data }) => { if (data) setSession(data as unknown as Session) })
       // Load esca status
       getCurrentUser(supabase).then(user => {
-        if (!user) return
+        if (!user) { setAmbienceReady(true); return }
         supabase.from('player_sessions')
           .select('esca_active_until, selected_creature_id, steps_walked, onboarding_seen')
           .eq('user_id', user.id)
@@ -825,6 +831,9 @@ function MapPageInner() {
               router.replace(`/game/onboarding?next=${encodeURIComponent(`/game/map?restored=${sid}`)}`)
               return
             }
+            // Onboarding already done (or no row) → we're staying on the map,
+            // so it's now safe to start the background ambience.
+            setAmbienceReady(true)
             if (data?.esca_active_until) {
               const d = new Date(data.esca_active_until)
               if (d > new Date()) setEscaActiveUntil(d)
