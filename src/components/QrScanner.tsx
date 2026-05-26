@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { GiCctvCamera, GiKeyboard, GiFlashlight, GiAbacus } from 'react-icons/gi'
 
 interface Props {
   onScan: (data: string) => void
@@ -123,20 +124,20 @@ export default function QrScanner({ onScan, onClose, onPermissionError }: Props)
         <button onClick={onClose} className="text-white/70 hover:text-white text-sm flex items-center gap-1.5">
           ✕ <span>Chiudi</span>
         </button>
-        <span className="text-white font-bold text-sm">
-          {phase === 'manual' ? '⌨️ Inserisci codice' : '📷 Scansiona QR'}
+        <span className="text-white font-bold text-sm inline-flex items-center gap-1.5">
+          {phase === 'manual' ? <><GiKeyboard size={15} /> Inserisci codice</> : <><GiCctvCamera size={15} /> Scansiona QR</>}
         </span>
         <div className="flex items-center gap-2">
           {torchSupported && phase === 'scanning' && (
-            <button onClick={toggleTorch} className={`text-lg transition-opacity ${torch ? 'opacity-100' : 'opacity-40'}`} title="Torcia">
-              🔦
+            <button onClick={toggleTorch} className={`transition-opacity ${torch ? 'opacity-100 text-[#FBBF24]' : 'opacity-40 text-white'}`} title="Torcia">
+              <GiFlashlight size={18} />
             </button>
           )}
           <button
             onClick={() => setPhase(p => p === 'manual' ? 'scanning' : 'manual')}
-            className="text-xs text-white/60 hover:text-white border border-white/20 rounded-lg px-2.5 py-1"
+            className="text-xs text-white/60 hover:text-white border border-white/20 rounded-lg px-2.5 py-1 inline-flex items-center gap-1.5"
           >
-            {phase === 'manual' ? '📷 Camera' : '⌨️ Manuale'}
+            {phase === 'manual' ? <><GiCctvCamera size={13} /> Camera</> : <><GiKeyboard size={13} /> Manuale</>}
           </button>
         </div>
       </div>
@@ -163,7 +164,7 @@ export default function QrScanner({ onScan, onClose, onPermissionError }: Props)
           {/* Error overlay */}
           {phase === 'error' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 px-6 overflow-y-auto py-8">
-              <span className="text-5xl mb-4">📷</span>
+              <span className="mb-4"><GiCctvCamera size={52} color="#EF4444" /></span>
               <p className="text-white text-center font-bold text-base mb-1">{camError}</p>
 
               {camError === 'Permesso fotocamera negato' && (
@@ -232,7 +233,7 @@ export default function QrScanner({ onScan, onClose, onPermissionError }: Props)
       {phase === 'manual' && (
         <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
           <div className="text-center space-y-2">
-            <span className="text-6xl block">🔢</span>
+            <span className="flex justify-center"><GiAbacus size={56} color="#3A9DBC" /></span>
             <p className="text-white font-bold text-lg">Inserisci il codice</p>
             <p className="text-white/40 text-sm">Digita il codice a <strong className="text-white/60">6 caratteri</strong> stampato accanto al QR</p>
           </div>

@@ -1,5 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { type IconType } from 'react-icons'
+import { GiMusicalNotes, GiSpeaker, GiVibratingSmartphone } from 'react-icons/gi'
 import {
   isMusicMuted, isSfxMuted, isHapticsOff,
   setMusicMuted, setSfxMuted, setHapticsOff,
@@ -45,14 +47,14 @@ function Switch({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
 }
 
 function Row({
-  icon, title, desc, on, onToggle,
-}: { icon: string; title: string; desc: string; on: boolean; onToggle: () => void }) {
+  Icon, title, desc, on, onToggle,
+}: { Icon: IconType; title: string; desc: string; on: boolean; onToggle: () => void }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)',
     }}>
-      <span style={{ fontSize: 20, width: 24, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
+      <span style={{ width: 24, display: 'flex', justifyContent: 'center', flexShrink: 0 }}><Icon size={18} color="#3ABCA8" /></span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{title}</div>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{desc}</div>
@@ -83,16 +85,16 @@ export default function PlayerPreferences() {
   return (
     <div>
       <Row
-        icon="🎵" title="Musica" desc="Colonna sonora e atmosfere di gioco"
+        Icon={GiMusicalNotes} title="Musica" desc="Colonna sonora e atmosfere di gioco"
         on={music} onToggle={() => setMusicMuted(music)}
       />
       <Row
-        icon="🔊" title="Effetti sonori" desc="Attacchi, livelli, vittorie e altri suoni"
+        Icon={GiSpeaker} title="Effetti sonori" desc="Attacchi, livelli, vittorie e altri suoni"
         on={sfx} onToggle={() => setSfxMuted(sfx)}
       />
       {hapticsSupported && (
         <Row
-          icon="📳" title="Vibrazione" desc="Feedback aptico su eventi di gioco"
+          Icon={GiVibratingSmartphone} title="Vibrazione" desc="Feedback aptico su eventi di gioco"
           on={haptics} onToggle={() => setHapticsOff(haptics)}
         />
       )}

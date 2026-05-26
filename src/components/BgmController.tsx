@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { GiSpeaker, GiSpeakerOff } from 'react-icons/gi'
 import { isMusicMuted, setMusicMuted, onPrefsChange } from '@/lib/audioPrefs'
 
 /**
@@ -180,7 +181,7 @@ export default function BgmController() {
       onClick={toggle}
       aria-label={muted ? 'Attiva musica di sottofondo' : 'Disattiva musica di sottofondo'}
       title={muted ? 'Musica off' : 'Musica on'}
-      className="fixed bottom-3 left-3 z-[1500] w-9 h-9 rounded-full flex items-center justify-center text-base active:scale-90 transition-transform"
+      className="fixed bottom-3 left-3 z-[1500] w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform"
       style={{
         background: 'rgba(10,20,35,0.78)',
         border: '1px solid rgba(58,157,188,0.4)',
@@ -189,7 +190,7 @@ export default function BgmController() {
         color: muted ? 'rgba(255,255,255,0.45)' : '#3ABCA8',
       }}
     >
-      {muted ? '🔇' : '🔊'}
+      {muted ? <GiSpeakerOff size={18} /> : <GiSpeaker size={18} />}
     </button>
   )
 }
