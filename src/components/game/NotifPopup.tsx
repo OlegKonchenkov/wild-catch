@@ -28,7 +28,10 @@ export default function NotifPopup({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -60 }}
           transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-          className="fixed top-4 left-4 right-4 z-[9990] pointer-events-auto"
+          className="fixed left-4 right-4 z-[9990] pointer-events-auto"
+          // Slide in just BELOW the (resized) gilded top bar instead of over
+          // it — env() also keeps it clear of the iOS status bar / notch.
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 62px)' }}
           onClick={onDismiss}
         >
           <div
