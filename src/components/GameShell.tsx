@@ -15,7 +15,13 @@ import ImageLightbox from '@/components/ui/ImageLightbox'
 import GameTopBar from '@/components/ui/GameTopBar'
 import { NAV_ICON } from '@/components/ui/NavIcons'
 import ElementIcon from '@/components/ui/ElementIcon'
-import { GiRingingBell, GiGears, GiMegaphone, GiJoystick, GiPawPrint } from 'react-icons/gi'
+import { type IconType } from 'react-icons'
+import {
+  GiRingingBell, GiGears, GiMegaphone, GiJoystick, GiPawPrint, GiTwoCoins, GiRoundStar,
+  GiSwapBag, GiMagnifyingGlass, GiEggClutch, GiPadlock, GiLightningArc, GiTrophyCup,
+  GiDeathSkull, GiShakingHands, GiCrown, GiBullseye, GiUpgrade, GiSmartphone, GiCheckMark,
+  GiPresent, GiBreastplate, GiCrossedSwords, GiHearts, GiPositionMarker, GiSparkles,
+} from 'react-icons/gi'
 import { getExpProgress } from '@/lib/game/leveling'
 import { playLevelUp } from '@/lib/game/sounds/events'
 import { getSharedAC } from '@/lib/game/sounds/shared-ac'
@@ -42,9 +48,9 @@ function xpProgress(exp: number, level: number): number {
 // as local aliases so the rest of the file doesn't need to be touched.
 type NotifPopup = NotifPopupData
 
-const REWARD_TYPE_ICONS: Record<string, string> = {
-  exp: '⭐', gold: '💰', oggetto: '📦', indizio: '🔍',
-  uovo: '🥚', creatura: '🎯', enigma: '🔐', evento: '⚡',
+const REWARD_TYPE_ICONS: Record<string, IconType> = {
+  exp: GiRoundStar, gold: GiTwoCoins, oggetto: GiSwapBag, indizio: GiMagnifyingGlass,
+  uovo: GiEggClutch, creatura: GiPawPrint, enigma: GiPadlock, evento: GiLightningArc,
 }
 
 // Notifications and game events are stored in Postgres as JSON blobs whose
@@ -146,15 +152,15 @@ function readBool(p: JsonPayload, key: string): boolean {
 
 function rewardParts(p: JsonPayload): string {
   const parts: string[] = []
-  if (readNum(p, 'gold'))         parts.push(`+${readNum(p, 'gold')} 💰`)
-  if (readNum(p, 'exp'))          parts.push(`+${readNum(p, 'exp')} ⭐`)
-  if (readNum(p, 'gold_reward'))  parts.push(`+${readNum(p, 'gold_reward')} 💰`)
-  if (readNum(p, 'reward_gold'))  parts.push(`+${readNum(p, 'reward_gold')} 💰`)
-  if (readNum(p, 'reward_exp'))   parts.push(`+${readNum(p, 'reward_exp')} ⭐`)
+  if (readNum(p, 'gold'))         parts.push(`+${readNum(p, 'gold')} oro`)
+  if (readNum(p, 'exp'))          parts.push(`+${readNum(p, 'exp')} exp`)
+  if (readNum(p, 'gold_reward'))  parts.push(`+${readNum(p, 'gold_reward')} oro`)
+  if (readNum(p, 'reward_gold'))  parts.push(`+${readNum(p, 'reward_gold')} oro`)
+  if (readNum(p, 'reward_exp'))   parts.push(`+${readNum(p, 'reward_exp')} exp`)
   return parts.join(' · ')
 }
 
-function formatGameEvent(ev: PlayerGameEventRow): { icon: string; title: string; body: string } {
+function formatGameEvent(ev: PlayerGameEventRow): { icon: IconType; title: string; body: string } {
   const p: JsonPayload = ev.payload ?? {}
   switch (ev.type) {
     case 'catch': {
@@ -165,11 +171,11 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: string; title: string;
       const bodyParts = [
         rarityInfo?.label,
         readStr(p, 'element'),
-        evolved ? '✨ Evoluta' : '',
-        gold ? `+${gold} 💰` : '',
+        evolved ? 'Evoluta' : '',
+        gold ? `+${gold} oro` : '',
       ].filter(Boolean)
       return {
-        icon: evolved ? '✨' : '🎯',
+        icon: evolved ? GiSparkles : GiPawPrint,
         title: `Catturato: ${readStr(p, 'creature_name') ?? 'creatura'}`,
         body: bodyParts.join(' · '),
       }
@@ -177,23 +183,23 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: string; title: string;
     case 'duel_won': {
       const opponent = readStr(p, 'opponent_name')
       return {
-        icon: '🏆',
+        icon: GiTrophyCup,
         title: opponent ? `Vinto vs ${opponent}` : 'Duello vinto!',
         body: rewardParts(p) || 'Vittoria in duello',
       }
     }
     case 'duel_lost': {
       const winner = readStr(p, 'winner_name')
-      return { icon: '💀', title: winner ? `Perso vs ${winner}` : 'Duello perso', body: '' }
+      return { icon: GiDeathSkull, title: winner ? `Perso vs ${winner}` : 'Duello perso', body: '' }
     }
     case 'duel_cancelled': {
       const opponent = readStr(p, 'opponent_name')
-      return { icon: '🤝', title: opponent ? `Duello annullato vs ${opponent}` : 'Duello annullato', body: 'Nessun punto assegnato' }
+      return { icon: GiShakingHands, title: opponent ? `Duello annullato vs ${opponent}` : 'Duello annullato', body: 'Nessun punto assegnato' }
     }
     case 'boss_won': {
       const boss = readStr(p, 'boss_name')
       return {
-        icon: '👑',
+        icon: GiCrown,
         title: boss ? `${boss} sconfitto!` : 'Boss sconfitto!',
         body: rewardParts(p),
       }
@@ -201,7 +207,7 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: string; title: string;
     case 'boss_lost': {
       const boss = readStr(p, 'boss_name')
       return {
-        icon: '💀',
+        icon: GiDeathSkull,
         title: 'Sconfitto dal boss',
         body: boss ? `Boss: ${boss}` : '',
       }
@@ -210,7 +216,7 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: string; title: string;
       const mRewards = rewardParts(p)
       const title = readStr(p, 'title')
       return {
-        icon: '✅',
+        icon: GiBullseye,
         title: title ? `Missione: ${title}` : 'Missione completata!',
         body: mRewards || readStr(p, 'mission_target') || '',
       }
@@ -219,20 +225,20 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: string; title: string;
       const newLevel = readNum(p, 'new_level')
       const goldReward = readNum(p, 'gold_reward')
       return {
-        icon: '⭐',
+        icon: GiUpgrade,
         title: `Livello ${newLevel}!`,
-        body: goldReward > 0 ? `+${goldReward} 💰` : 'Nuovo livello raggiunto',
+        body: goldReward > 0 ? `+${goldReward} oro` : 'Nuovo livello raggiunto',
       }
     }
     case 'qr_redeemed': {
       return {
-        icon: '📱',
+        icon: GiSmartphone,
         title: `QR: "${readStr(p, 'item_name') ?? ''}"`,
         body: rewardParts(p),
       }
     }
     case 'pin_claimed': {
-      const pinIcon = REWARD_TYPE_ICONS[readStr(p, 'reward_type') ?? ''] ?? '📍'
+      const pinIcon = REWARD_TYPE_ICONS[readStr(p, 'reward_type') ?? ''] ?? GiPositionMarker
       const eggRarity = readStr(p, 'egg_rarity')
       const pinReward = rewardParts(p) ||
         readStr(p, 'creature_name') ||
@@ -245,7 +251,7 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: string; title: string;
       }
     }
     default:
-      return { icon: '🎮', title: ev.type, body: '' }
+      return { icon: GiJoystick, title: ev.type, body: '' }
   }
 }
 
@@ -534,11 +540,11 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         if (row.type === 'item_redeemed') {
           const r = row.payload?.reward ?? {}
           const parts: string[] = []
-          if (r.gold) parts.push(`+${r.gold} 💰`)
-          if (r.exp) parts.push(`+${r.exp} ⭐`)
+          if (r.gold) parts.push(`+${r.gold} oro`)
+          if (r.exp) parts.push(`+${r.exp} exp`)
           setNotifPopup({
             type: 'item_redeemed',
-            title: `✅ "${row.payload?.item_name}" riscattato!`,
+            title: `"${row.payload?.item_name}" riscattato!`,
             message: parts.length > 0 ? `Ricompensa: ${parts.join(' · ')}` : 'Oggetto consumato.',
             icon: '✅',
           })
@@ -652,7 +658,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       )}
       {sessionEnded && (
         <div className="flex-none bg-[#7B4DB8]/20 border-b border-[#7B4DB8]/40 px-4 py-1.5 text-center">
-          <p className="text-[11px] text-[#C084FC] font-semibold">🏁 Sessione terminata — modalità visualizzazione</p>
+          <p className="inline-flex items-center gap-1.5 text-[11px] text-[#C084FC] font-semibold"><GiTrophyCup size={13} /> Sessione terminata — modalità visualizzazione</p>
         </div>
       )}
 
@@ -705,15 +711,17 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
           const inBossFight = pathname.startsWith('/game/boss/')
           const inAnyBattle = inEncounter || inDuelFight || inBossFight
           if (inAnyBattle) {
+            const BattleIcon = inBossFight ? GiDeathSkull : GiCrossedSwords
             const battleMsg = inBossFight
-              ? '💀 Sfida al Capo Palestra — combatti!'
+              ? 'Sfida al Capo Palestra — combatti!'
               : inDuelFight
-                ? '⚔️ Duello in corso — combatti!'
-                : '⚔️ Incontro in corso — cattura o fuggi'
+                ? 'Duello in corso — combatti!'
+                : 'Incontro in corso — cattura o fuggi'
             return (
               <>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span className="text-[10px] tracking-widest uppercase" style={{ color: 'rgba(247,200,65,0.4)' }}>{battleMsg}</span>
+                <div className="absolute inset-0 flex items-center justify-center gap-1.5 pointer-events-none" style={{ color: 'rgba(247,200,65,0.4)' }}>
+                  <BattleIcon size={12} />
+                  <span className="text-[10px] tracking-widest uppercase">{battleMsg}</span>
                 </div>
                 {NAV_ITEMS.map(({ href, key, label }) => {
                   const Icon = NAV_ICON[key]
@@ -844,7 +852,8 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                   ) : (
                     notifications.map(n => {
                       const isRedeemed = n.type === 'item_redeemed'
-                      const icon = isRedeemed ? '✅' : '📢'
+                      const MsgIcon = isRedeemed ? GiCheckMark : GiMegaphone
+                      const msgIconColor = isRedeemed ? '#34D399' : '#46bad8'
                       const title = isRedeemed
                         ? `"${n.payload?.item_name}" riscattato`
                         : (n.payload?.title ?? 'Messaggio')
@@ -852,8 +861,8 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                         ? (() => {
                             const r = n.payload?.reward ?? {}
                             const p: string[] = []
-                            if (r.gold) p.push(`+${r.gold} 💰`)
-                            if (r.exp) p.push(`+${r.exp} ⭐`)
+                            if (r.gold) p.push(`+${r.gold} oro`)
+                            if (r.exp) p.push(`+${r.exp} exp`)
                             return p.length > 0 ? `Ricompensa: ${p.join(' · ')}` : ''
                           })()
                         : (n.payload?.message ?? '')
@@ -866,7 +875,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                             onClick={() => setExpandedNotifId(isExpanded ? null : n.id)}
                             className="w-full flex gap-3 px-4 py-3 border-b border-white/5 text-left active:bg-white/5 transition-colors cursor-pointer"
                           >
-                            <span className="text-xl shrink-0 mt-0.5">{icon}</span>
+                            <span className="shrink-0 mt-0.5"><MsgIcon size={20} color={msgIconColor} /></span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-sm font-medium text-white leading-snug">{title}</p>
@@ -897,7 +906,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                     <>
                                       <p className="text-[10px] text-white/35 uppercase tracking-wider mb-2">Dettagli riscatto</p>
                                       {n.payload?.item_name && (
-                                        <p className="text-sm font-bold text-white mb-2">📦 {n.payload.item_name}</p>
+                                        <p className="inline-flex items-center gap-1.5 text-sm font-bold text-white mb-2"><GiSwapBag size={15} color="#D4A96A" /> {n.payload.item_name}</p>
                                       )}
                                       {(() => {
                                         const r = n.payload?.reward ?? {}
@@ -906,15 +915,15 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                           <>
                                             {(r.gold || r.exp) && (
                                               <div className="flex gap-2 flex-wrap mb-2">
-                                                {r.gold ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{r.gold} 💰</span> : null}
-                                                {r.exp  ? <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841' }}>+{r.exp} ⭐</span>  : null}
+                                                {r.gold ? <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.15)', color: '#D4A96A' }}>+{r.gold} <GiTwoCoins size={12} /></span> : null}
+                                                {r.exp  ? <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841' }}>+{r.exp} <GiRoundStar size={12} /></span>  : null}
                                               </div>
                                             )}
                                             {bonusItems.length > 0 && (
                                               <div className="flex flex-wrap gap-1 mb-2">
                                                 {bonusItems.map((bi, i) => (
-                                                  <span key={i} className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                                    🎁 ×{bi.quantity} oggetto
+                                                  <span key={i} className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                    <GiPresent size={12} /> ×{bi.quantity} oggetto
                                                   </span>
                                                 ))}
                                               </div>
@@ -956,7 +965,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                     </div>
                   ) : (
                     gameEvents.map((ev) => {
-                      const { icon, title, body } = formatGameEvent(ev)
+                      const { icon: EvIcon, title, body } = formatGameEvent(ev)
                       const time     = new Date(ev.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
                       const fullDate = new Date(ev.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
                       const isExpanded = expandedEventId === ev.id
@@ -968,8 +977,8 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                       const RewardChips = ({ gold, exp }: { gold?: number; exp?: number }) => (
                         (gold || exp) ? (
                           <div className="flex gap-2 flex-wrap">
-                            {gold ? <span className="text-xs font-bold px-2.5 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.18)', color: '#D4A96A', border: '1px solid rgba(212,169,106,0.3)' }}>+{gold} 💰</span> : null}
-                            {exp  ? <span className="text-xs font-bold px-2.5 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841', border: '1px solid rgba(247,200,65,0.3)'  }}>+{exp} ⭐</span>  : null}
+                            {gold ? <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg" style={{ background: 'rgba(212,169,106,0.18)', color: '#D4A96A', border: '1px solid rgba(212,169,106,0.3)' }}>+{gold} <GiTwoCoins size={12} /></span> : null}
+                            {exp  ? <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg" style={{ background: 'rgba(247,200,65,0.15)',  color: '#F7C841', border: '1px solid rgba(247,200,65,0.3)'  }}>+{exp} <GiRoundStar size={12} /></span>  : null}
                           </div>
                         ) : null
                       )
@@ -1017,7 +1026,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                               className="text-base shrink-0 w-8 h-8 flex items-center justify-center rounded-xl mt-0.5"
                               style={{ background: theme.dimColor, border: `1px solid ${theme.color}30` }}
                             >
-                              {icon}
+                              <EvIcon size={18} color={theme.color} />
                             </span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2">
@@ -1054,7 +1063,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                 >
                                   {/* color header band */}
                                   <div className="px-3 py-2 flex items-center gap-2" style={{ background: `${theme.color}18`, borderBottom: `1px solid ${theme.color}25` }}>
-                                    <span className="text-sm">{icon}</span>
+                                    <EvIcon size={15} color={theme.color} />
                                     <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: theme.color }}>{theme.label}</span>
                                     <span className="ml-auto text-[10px]" style={{ color: theme.color + '80' }}>{fullDate}</span>
                                   </div>
@@ -1087,24 +1096,24 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                                   <ElementIcon element={p.element as string} size={11} /> {p.element}
                                                 </span>
                                               )}
-                                              {p.evolved && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399' }}>✨ Ev.</span>}
+                                              {p.evolved && <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399' }}><GiSparkles size={10} /> Ev.</span>}
                                             </div>
                                             {/* Stats */}
                                             {(p.hp || p.atk || p.def) && (
                                               <div className="flex gap-2.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                                                {p.hp  != null && <span>❤️ {p.hp}</span>}
-                                                {p.atk != null && <span>⚔️ {p.atk}</span>}
-                                                {p.def != null && <span>🛡️ {p.def}</span>}
+                                                {p.hp  != null && <span className="inline-flex items-center gap-1"><GiHearts size={11} color="#F87171" /> {p.hp}</span>}
+                                                {p.atk != null && <span className="inline-flex items-center gap-1"><GiCrossedSwords size={11} color="#FB923C" /> {p.atk}</span>}
+                                                {p.def != null && <span className="inline-flex items-center gap-1"><GiBreastplate size={11} color="#60A5FA" /> {p.def}</span>}
                                               </div>
                                             )}
                                           </div>
                                         </div>
                                         {/* Source + rewards */}
                                         <div className="flex flex-wrap gap-1.5">
-                                          {p.via_pin  && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(58,157,188,0.15)',  color: '#3A9DBC' }}>📍 pin</span>}
-                                          {p.via_egg  && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.15)',  color: '#FBBF24' }}>🥚 uovo</span>}
-                                          {p.via_qr   && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(192,132,252,0.15)', color: '#C084FC' }}>📱 QR</span>}
-                                          {p.starter  && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)',  color: '#34D399' }}>⭐ starter</span>}
+                                          {p.via_pin  && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(58,157,188,0.15)',  color: '#3A9DBC' }}><GiPositionMarker size={11} /> pin</span>}
+                                          {p.via_egg  && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.15)',  color: '#FBBF24' }}><GiEggClutch size={11} /> uovo</span>}
+                                          {p.via_qr   && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(192,132,252,0.15)', color: '#C084FC' }}><GiSmartphone size={11} /> QR</span>}
+                                          {p.starter  && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)',  color: '#34D399' }}><GiRoundStar size={11} /> starter</span>}
                                         </div>
                                         <RewardChips gold={p.gold} exp={p.exp} />
                                       </>
@@ -1118,7 +1127,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                       return (
                                         <>
                                           <div className="flex items-center gap-2">
-                                            <p className="text-base font-extrabold" style={{ color: '#34D399' }}>🏆 Vittoria!</p>
+                                            <p className="inline-flex items-center gap-1.5 text-base font-extrabold" style={{ color: '#34D399' }}><GiTrophyCup size={16} /> Vittoria!</p>
                                             {oppName && <span className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>vs {oppName}</span>}
                                           </div>
                                           {(mySquad.length > 0 || oppSquad.length > 0) && (
@@ -1140,7 +1149,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                       return (
                                         <>
                                           <div className="flex items-center gap-2">
-                                            <p className="text-base font-extrabold" style={{ color: '#F87171' }}>💀 Sconfitta</p>
+                                            <p className="inline-flex items-center gap-1.5 text-base font-extrabold" style={{ color: '#F87171' }}><GiDeathSkull size={16} /> Sconfitta</p>
                                             {winnerName && <span className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>vs {winnerName}</span>}
                                           </div>
                                           {(mySquad.length > 0 || oppSquad.length > 0) && (
@@ -1157,7 +1166,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                     {ev.type === 'duel_cancelled' && (
                                       <>
                                         <div className="flex items-center gap-2">
-                                          <p className="text-base font-extrabold" style={{ color: '#94A3B8' }}>🤝 Duello annullato</p>
+                                          <p className="inline-flex items-center gap-1.5 text-base font-extrabold" style={{ color: '#94A3B8' }}><GiShakingHands size={16} /> Duello annullato</p>
                                           {p.opponent_name && <span className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>vs {p.opponent_name as string}</span>}
                                         </div>
                                         <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Il duello è stato interrotto — nessun punto assegnato.</p>
@@ -1167,9 +1176,9 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                     {/* ── BOSS WON ──────────────────────────── */}
                                     {ev.type === 'boss_won' && (
                                       <>
-                                        {p.boss_name && <p className="text-base font-extrabold" style={{ color: '#F7C841' }}>💀 {p.boss_name}</p>}
+                                        {p.boss_name && <p className="inline-flex items-center gap-1.5 text-base font-extrabold" style={{ color: '#F7C841' }}><GiCrown size={16} /> {p.boss_name}</p>}
                                         <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(247,200,65,0.15)', color: '#F7C841', border: '1px solid rgba(247,200,65,0.35)' }}>
-                                          👑 Capo Palestra sconfitto
+                                          <GiCrown size={13} className="inline align-[-2px] mr-1" /> Capo Palestra sconfitto
                                         </span>
                                         <RewardChips gold={p.gold} exp={p.exp} />
                                       </>
@@ -1178,7 +1187,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                     {/* ── BOSS LOST ─────────────────────────── */}
                                     {ev.type === 'boss_lost' && (
                                       <>
-                                        {p.boss_name && <p className="text-base font-extrabold" style={{ color: 'rgba(255,255,255,0.75)' }}>💀 {p.boss_name}</p>}
+                                        {p.boss_name && <p className="inline-flex items-center gap-1.5 text-base font-extrabold" style={{ color: 'rgba(255,255,255,0.75)' }}><GiDeathSkull size={16} /> {p.boss_name}</p>}
                                         <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(248,113,113,0.12)', color: '#F87171', border: '1px solid rgba(248,113,113,0.3)' }}>
                                           Sconfitta dal Capo Palestra
                                         </span>
@@ -1195,7 +1204,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                         {/* Objective detail */}
                                         {(p.mission_target || (p.target_count ?? 0) > 1) && (
                                           <div className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)' }}>
-                                            <span className="text-sm">🎯</span>
+                                            <GiBullseye size={15} color="#A78BFA" className="shrink-0" />
                                             <p className="text-xs text-white/70">
                                               {(p.target_count ?? 0) > 1
                                                 ? `${p.target_count}× ${p.mission_target ?? 'completamenti'}`
@@ -1216,7 +1225,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                         </div>
                                         {(p.gold_reward ?? 0) > 0 && (
                                           <span className="inline-block text-sm font-bold px-3 py-1.5 rounded-xl" style={{ background: 'rgba(212,169,106,0.18)', color: '#D4A96A', border: '1px solid rgba(212,169,106,0.35)' }}>
-                                            +{p.gold_reward} 💰 bonus livello
+                                            <span className="inline-flex items-center gap-1">+{p.gold_reward} <GiTwoCoins size={12} /> bonus livello</span>
                                           </span>
                                         )}
                                       </>
@@ -1227,13 +1236,16 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                       <>
                                         <p className="text-sm font-bold text-white">{p.item_name ?? 'QR riscattato'}</p>
                                         <div className="flex flex-wrap gap-1.5">
-                                          {p.qr_type && (
-                                            <span className="text-xs px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(192,132,252,0.12)', color: '#C084FC', border: '1px solid rgba(192,132,252,0.28)' }}>
-                                              {REWARD_TYPE_ICONS[p.qr_type as string] ?? '📱'} {p.qr_type}
-                                            </span>
-                                          )}
+                                          {p.qr_type && (() => {
+                                            const QrIcon = REWARD_TYPE_ICONS[p.qr_type as string] ?? GiSmartphone
+                                            return (
+                                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(192,132,252,0.12)', color: '#C084FC', border: '1px solid rgba(192,132,252,0.28)' }}>
+                                                <QrIcon size={11} /> {p.qr_type}
+                                              </span>
+                                            )
+                                          })()}
                                           {p.egg_rarity && (
-                                            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.12)', color: '#FBBF24' }}>🥚 {p.egg_rarity}</span>
+                                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.12)', color: '#FBBF24' }}><GiEggClutch size={11} /> {p.egg_rarity}</span>
                                           )}
                                         </div>
                                         {p.qr_label && <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Etichetta: {p.qr_label}</p>}
@@ -1246,14 +1258,17 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
                                       <>
                                         <p className="text-sm font-bold text-white">{p.pin_name ?? 'Pin'}</p>
                                         <div className="flex flex-wrap gap-1.5">
-                                          {p.reward_type && (
-                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(56,189,248,0.12)', color: '#38BDF8', border: '1px solid rgba(56,189,248,0.28)' }}>
-                                              {REWARD_TYPE_ICONS[p.reward_type as string] ?? '🎁'} {p.reward_type}
-                                            </span>
-                                          )}
-                                          {p.creature_name && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)' }}>🎯 {p.creature_name}</span>}
-                                          {p.item_name    && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)' }}>📦 {p.item_name}</span>}
-                                          {p.egg_rarity   && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.12)', color: '#FBBF24' }}>🥚 uovo {p.egg_rarity}</span>}
+                                          {p.reward_type && (() => {
+                                            const PinTypeIcon = REWARD_TYPE_ICONS[p.reward_type as string] ?? GiPresent
+                                            return (
+                                              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(56,189,248,0.12)', color: '#38BDF8', border: '1px solid rgba(56,189,248,0.28)' }}>
+                                                <PinTypeIcon size={11} /> {p.reward_type}
+                                              </span>
+                                            )
+                                          })()}
+                                          {p.creature_name && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)' }}><GiPawPrint size={11} /> {p.creature_name}</span>}
+                                          {p.item_name    && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)' }}><GiSwapBag size={11} /> {p.item_name}</span>}
+                                          {p.egg_rarity   && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.12)', color: '#FBBF24' }}><GiEggClutch size={11} /> uovo {p.egg_rarity}</span>}
                                         </div>
                                         <RewardChips
                                           gold={p.gold ?? (p.reward_type === 'gold' ? p.amount : undefined)}
