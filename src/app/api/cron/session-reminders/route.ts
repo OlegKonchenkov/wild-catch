@@ -33,7 +33,10 @@ export async function GET(request: Request) {
   const admin = createAdminClient()
   const now = new Date()
   const horizonAhead = new Date(now.getTime() + 32 * 60 * 1000).toISOString()
-  const recentPast = new Date(now.getTime() - 5 * 60 * 1000).toISOString()
+  // Lookback must exceed the cron interval (now every 10 min) so a session that
+  // ended between two runs still gets its "ended" push. Dedup via ENDED_MARK
+  // keeps it idempotent across overlapping windows.
+  const recentPast = new Date(now.getTime() - 15 * 60 * 1000).toISOString()
 
   // 1. Active sessions ending within the next 32 minutes → fire 30/10/1 reminders
   const { data: ending } = await admin
