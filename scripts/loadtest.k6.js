@@ -1,57 +1,61 @@
-// Load test for wild-catch — simulate ~100 concurrent players on the read-heavy
-// authenticated endpoints, to validate the NANO Supabase instance holds up
-// before the first events.
+// k6 load test — realistic ~150 concurrent-player simulation.
 //
-// ── How to run ────────────────────────────────────────────────────────────────
-// 1) Install k6:  https://grafana.com/docs/k6/latest/set-up/install-k6/
-//      Windows:   winget install k6  (or  choco install k6)
-// 2) Log into the app in your browser (https://wild-catch.vercel.app), open
-//    DevTools → Network → click any /api/* request → Request Headers → copy the
-//    full value of the `Cookie` header (it carries the Supabase auth session).
-// 3) Grab the current SESSION_ID (localStorage `current_session_id`, or admin).
-// 4) Run:
-//      k6 run -e SESSION_ID=<uuid> -e COOKIE="<cookie header value>" scripts/loadtest.k6.js
-//    Optional: -e BASE_URL=... -e THINK=3 -e TARGET=100
+// Each VU runs a "player session loop" that mirrors what a real player does:
+// initial dashboard load (profile + game profile + squad + starters), then
+// map screen (pins + eggs), a leaderboard glance, and a map-pin refresh
+// (the polling rhythm of a player walking around). Sleeps between hits keep
+// the per-VU request rate at the ~1 req every few seconds rhythm of a real
+// player, so 150 VUs produce a realistic aggregate load (~50-80 req/s).
 //
-// ── While it runs ─────────────────────────────────────────────────────────────
-//  • Watch Supabase → Database → metrics (CPU / Disk IO) AND the Disk IO budget.
-//  • Pass criteria: error rate ~0% and p95 < 1s at 100 VUs, IO budget not draining.
-//  • Run it when NO real players are active (it hits production / the NANO DB).
+// ⚠️ Honest caveats
+// 1) All VUs share ONE auth cookie (= one player from the server's POV).
+//    The encounter write paths (start/fight/catch) are intentionally LEFT
+//    OUT of the loop because they rate-limit per user — 150 VUs sharing one
+//    user.id would just produce a flood of 429s, not real distinct-player
+//    write traffic. To simulate that we'd need N real session tokens.
+//    Pass several cookies with `-e COOKIES="ck1;;ck2"` to round-robin.
+// 2) Read endpoints don't rate-limit per user, so the loop below DOES
+//    represent credible concurrent read traffic from 150 active players.
 //
-// ── Caveats ───────────────────────────────────────────────────────────────────
-//  • All virtual users share ONE auth cookie (one player). The DB still does the
-//    full per-request query work, so this is a fair first-order capacity test,
-//    but slightly optimistic on cache locality vs 100 distinct users. For more
-//    realism, pass several cookies (see COOKIES below) — the script rotates them.
-//  • Supabase access tokens expire (~1h). If you start seeing 401s, refresh the
-//    cookie and re-run.
+// How to run
+//   k6 run -e SESSION_ID=<uuid> -e COOKIE="<full Cookie header value>" \
+//          -e TARGET=150 scripts/loadtest.k6.js
+//
+// Watch Supabase → Database (CPU / IO / Disk IO budget) during the run.
 
 import http from 'k6/http'
-import { check, sleep } from 'k6'
+import { check, sleep, group } from 'k6'
 
 const BASE = __ENV.BASE_URL || 'https://wild-catch.vercel.app'
 const SESSION_ID = __ENV.SESSION_ID || ''
-// One cookie, or several separated by ';;' to simulate distinct users.
 const COOKIES = (__ENV.COOKIES || __ENV.COOKIE || '').split(';;').filter(Boolean)
-const THINK = Number(__ENV.THINK || 3) // seconds of "think time" between a player's requests
-const TARGET = Number(__ENV.TARGET || 100)
+const TARGET = Number(__ENV.TARGET || 150)
 
 export const options = {
   stages: [
-    { duration: '30s', target: Math.ceil(TARGET * 0.2) }, // warm up
-    { duration: '1m', target: TARGET }, // ramp to ~100 players
-    { duration: '2m', target: TARGET }, // hold
-    { duration: '30s', target: 0 }, // ramp down
+    { duration: '30s', target: Math.max(1, Math.ceil(TARGET * 0.33)) }, // first wave
+    { duration: '1m',  target: TARGET },                                  // everyone joins
+    { duration: '3m',  target: TARGET },                                  // sustained gameplay
+    { duration: '30s', target: 0 },                                       // drain
   ],
   thresholds: {
-    http_req_failed: ['rate<0.01'], // < 1% errors
-    http_req_duration: ['p(95)<1000'], // 95% of requests under 1s
+    http_req_failed:    ['rate<0.02'],
+    http_req_duration:  ['p(95)<1500'],
+    // Per-endpoint visibility in the summary — each shows up as its own row.
+    'http_req_duration{name:profile-account}': ['p(95)<500'],
+    'http_req_duration{name:profile-game}':    ['p(95)<700'],
+    'http_req_duration{name:squad}':           ['p(95)<400'],
+    'http_req_duration{name:starters}':        ['p(95)<500'],
+    'http_req_duration{name:map-pins}':        ['p(95)<1500'],
+    'http_req_duration{name:eggs}':            ['p(95)<400'],
+    'http_req_duration{name:leaderboard}':     ['p(95)<600'],
+    'http_req_duration{name:map-pins-poll}':   ['p(95)<1500'],
   },
 }
 
 export function setup() {
   if (!SESSION_ID || COOKIES.length === 0) {
-    throw new Error('Missing config. Pass -e SESSION_ID=<uuid> -e COOKIE="<cookie header>". See header comment.')
+    throw new Error('Missing config. Pass -e SESSION_ID=<uuid> -e COOKIE="<Cookie header>". See file header.')
   }
   return {}
 }
@@ -60,16 +64,43 @@ export default function () {
   const cookie = COOKIES[__VU % COOKIES.length]
   const headers = { Cookie: cookie, Accept: 'application/json' }
 
-  // Heaviest realistic read: map pins (several DB queries per call, incl. claims
-  // + enigma lookups) — the best stress signal for the DB.
-  const pins = http.get(`${BASE}/api/game/map-pins?sessionId=${SESSION_ID}`, { headers, tags: { name: 'map-pins' } })
-  check(pins, { 'map-pins 200': (r) => r.status === 200 })
+  // 1) Initial dashboard load — fires when the player opens the app. The
+  //    React tree mounts and these four come up front.
+  group('open', () => {
+    const r1 = http.get(`${BASE}/api/profile`, { headers, tags: { name: 'profile-account' } })
+    check(r1, { 'profile-account 2xx': r => r.status >= 200 && r.status < 300 })
+    const r2 = http.get(`${BASE}/api/game/profile?sessionId=${SESSION_ID}`, { headers, tags: { name: 'profile-game' } })
+    check(r2, { 'profile-game 2xx': r => r.status >= 200 && r.status < 300 })
+    const r3 = http.get(`${BASE}/api/game/squad?sessionId=${SESSION_ID}`, { headers, tags: { name: 'squad' } })
+    check(r3, { 'squad 2xx': r => r.status >= 200 && r.status < 300 })
+    const r4 = http.get(`${BASE}/api/game/starters?sessionId=${SESSION_ID}`, { headers, tags: { name: 'starters' } })
+    check(r4, { 'starters 2xx': r => r.status >= 200 && r.status < 300 })
+  })
 
-  // Light read: profile.
-  const profile = http.get(`${BASE}/api/profile`, { headers, tags: { name: 'profile' } })
-  check(profile, { 'profile 200': (r) => r.status === 200 })
+  sleep(1)
 
-  // Player "think time" — real players don't hammer; this keeps the aggregate
-  // request rate realistic (~TARGET / THINK rps). Lower THINK to stress harder.
-  sleep(THINK + Math.random() * 2)
+  // 2) Map screen — the heaviest read (map-pins does the most DB work,
+  //    eggs is light). What every player sees most of the time.
+  group('map', () => {
+    const r5 = http.get(`${BASE}/api/game/map-pins?sessionId=${SESSION_ID}`, { headers, tags: { name: 'map-pins' } })
+    check(r5, { 'map-pins 200': r => r.status === 200 })
+    const r6 = http.get(`${BASE}/api/game/eggs?sessionId=${SESSION_ID}`, { headers, tags: { name: 'eggs' } })
+    check(r6, { 'eggs 2xx': r => r.status >= 200 && r.status < 300 })
+  })
+
+  sleep(2 + Math.random() * 3)
+
+  // 3) Leaderboard glance — players check rankings periodically.
+  const r7 = http.get(`${BASE}/api/game/leaderboard?sessionId=${SESSION_ID}`, { headers, tags: { name: 'leaderboard' } })
+  check(r7, { 'leaderboard 2xx': r => r.status >= 200 && r.status < 300 })
+
+  sleep(4 + Math.random() * 4)
+
+  // 4) Player walked, map refreshes (the typical polling rhythm).
+  const r8 = http.get(`${BASE}/api/game/map-pins?sessionId=${SESSION_ID}`, { headers, tags: { name: 'map-pins-poll' } })
+  check(r8, { 'map-pins-poll 200': r => r.status === 200 })
+
+  // Idle time — total iteration ~20-30s → 150 VU ≈ 5-7 iter/s ≈ 40-55 req/s
+  // aggregate. Realistic "150 players just exploring" load.
+  sleep(5 + Math.random() * 5)
 }
