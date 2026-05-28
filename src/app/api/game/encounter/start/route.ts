@@ -18,31 +18,47 @@ export async function POST(request: Request) {
 
   if (!sessionId) return NextResponse.json({ error: 'sessionId mancante' }, { status: 400 })
 
-  // Get player session (last_position included so we don't re-query for the bounds check)
-  const { data: playerSession } = await supabase
-    .from('player_sessions')
-    .select('id, level, selected_creature_id, squad_ids, last_position')
-    .eq('user_id', user.id)
-    .eq('session_id', sessionId)
-    .single()
+  const admin = createAdminClient()
 
+  // Batch 1 — four independent reads in parallel:
+  //   - player's session row (level, squad, last position)
+  //   - session metadata (status + bounds)
+  //   - spawnable creature pool
+  //   - per-session spawn config (admin client to bypass RLS)
+  const [psRes, sessRes, creaturesRes, spawnCfgRes] = await Promise.all([
+    supabase
+      .from('player_sessions')
+      .select('id, level, selected_creature_id, squad_ids, last_position')
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId)
+      .single(),
+    supabase
+      .from('sessions')
+      .select('status, area_bounds')
+      .eq('id', sessionId)
+      .single(),
+    supabase
+      .from('creatures')
+      .select('id, spawn_weight, rarity, min_level, hp, element')
+      .eq('spawnable', true),
+    admin
+      .from('session_spawn_config')
+      .select('non_comune_bonus, raro_bonus, epico_bonus, leggendario_bonus')
+      .eq('session_id', sessionId)
+      .maybeSingle(),
+  ])
+
+  const playerSession = psRes.data
   if (!playerSession) return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
 
-  // Block encounters if session is not active
-  const { data: session } = await supabase
-    .from('sessions')
-    .select('status, area_bounds')
-    .eq('id', sessionId)
-    .single()
-
+  const session = sessRes.data
   if (!session || session.status !== 'active') {
     return NextResponse.json({ error: 'Sessione non attiva' }, { status: 403 })
   }
 
-  // Block if player is out of bounds (use last stored position from the row above)
-  // area_bounds may be {} for sessions with no geographic restriction
-  // (e.g. the always-on Tutorial session). Only enforce the check when the
-  // bounds object actually contains the cardinal limits.
+  // Out-of-bounds check (CPU only) using the last position we already loaded.
+  // area_bounds may be {} for sessions with no geographic restriction (e.g. the
+  // always-on Tutorial session). Only enforce the check when the cardinals exist.
   const sessionBounds = session.area_bounds as { north?: number; south?: number; east?: number; west?: number } | null
   if (sessionBounds && typeof sessionBounds.north === 'number') {
     const { isWithinBounds, parsePoint } = await import('@/lib/game/anti-cheat')
@@ -53,25 +69,8 @@ export async function POST(request: Request) {
     }
   }
 
-  // Auto-expire encounters older than 3 minutes (player dismissed popup without entering)
-  await supabase
-    .from('encounters')
-    .update({ status: 'fled' })
-    .eq('user_id', user.id)
-    .eq('session_id', sessionId)
-    .eq('status', 'active')
-    .lt('created_at', new Date(Date.now() - 3 * 60 * 1000).toISOString())
-
-  // Check no active encounter already
-  const { data: existing } = await supabase
-    .from('encounters')
-    .select('id, created_at')
-    .eq('user_id', user.id)
-    .eq('session_id', sessionId)
-    .eq('status', 'active')
-    .maybeSingle()
-
-  if (existing) return NextResponse.json({ error: 'Incontro già in corso', encounterId: existing.id })
+  const creatures = creaturesRes.data
+  if (!creatures?.length) return NextResponse.json({ error: 'Nessuna creatura disponibile' }, { status: 500 })
 
   const squadIds: string[] = (playerSession as any).squad_ids ?? []
   const primaryCreatureId = squadIds.length > 0
@@ -85,54 +84,88 @@ export async function POST(request: Request) {
     }, { status: 409 })
   }
 
-  // Get creatures for selection
-  const { data: creatures } = await supabase
-    .from('creatures')
-    .select('id, spawn_weight, rarity, min_level, hp, element')
-    .eq('spawnable', true)
-
-  if (!creatures?.length) return NextResponse.json({ error: 'Nessuna creatura disponibile' }, { status: 500 })
-
-  // Load optional per-session spawn config
-  const admin = createAdminClient()
-  const { data: spawnCfg } = await admin
-    .from('session_spawn_config')
-    .select('non_comune_bonus, raro_bonus, epico_bonus, leggendario_bonus')
-    .eq('session_id', sessionId)
-    .maybeSingle()
-
-  // RNG creature selection — server-side only
-  const selected = selectCreatureForEncounter(creatures, playerSession.level, spawnCfg ?? undefined)
-  if (!selected) return NextResponse.json({ error: 'Nessuna creatura idonea' }, { status: 500 })
-
-  // Get full creature data
-  const { data: creature } = await supabase
-    .from('creatures')
-    .select('*')
-    .eq('id', selected.id)
-    .single()
-
-  if (!creature) return NextResponse.json({ error: 'Errore dati creatura' }, { status: 500 })
-
-  // Load squad creatures (up to 3), falling back to single selected_creature_id
-  let squadCreatures: Array<{ pcId: string; id: string; name: string; hp: number; atk: number; element: string; rarity: string; image_url: string | null; sprite_cutout_url: string | null; sprite_url: string | null; attack_sound_url: string | null; attack_sound_duration_ms: number | null }> = []
-  if (squadIds.length > 0) {
-    // Critical combat data — no sound fields so query never fails pre-migration
-    const { data: pcs } = await supabase
-      .from('player_creatures')
-      .select('id, creatures(id, name, hp, atk, element, rarity, image_url, sprite_cutout_url, sprite_url)')
-      .in('id', squadIds)
+  // Batch 2 — auto-expire stale encounters (write) runs in parallel with the
+  // squad-creatures join (incl. sound fields, migration 018 is already live) and
+  // the equipment-bonus map for the whole squad. All three are independent.
+  const [, squadJoinRes, equipBonusesMap] = await Promise.all([
+    supabase
+      .from('encounters')
+      .update({ status: 'fled' })
       .eq('user_id', user.id)
       .eq('session_id', sessionId)
+      .eq('status', 'active')
+      .lt('created_at', new Date(Date.now() - 3 * 60 * 1000).toISOString()),
+    squadIds.length > 0
+      ? supabase
+          .from('player_creatures')
+          .select('id, creatures(id, name, hp, atk, element, rarity, image_url, sprite_cutout_url, sprite_url, attack_sound_url, attack_sound_duration_ms)')
+          .in('id', squadIds)
+          .eq('user_id', user.id)
+          .eq('session_id', sessionId)
+      : Promise.resolve({ data: null as any[] | null }),
+    squadIds.length > 0
+      ? getEquipmentBonuses(supabase, squadIds)
+      : Promise.resolve(new Map<string, { hp: number; atk: number; def: number }>()),
+  ])
 
-    if (pcs) {
-      const equipBonuses = await getEquipmentBonuses(supabase, squadIds)
-      squadCreatures = squadIds
-        .map(sid => (pcs as any[]).find(pc => pc.id === sid))
-        .filter(Boolean)
-        .map((pc: any) => {
-          const b = equipBonuses.get(pc.id) ?? { hp: 0, atk: 0, def: 0 }
-          return {
+  // After expire, check whether the player already has an active encounter
+  // (would conflict with creating a new one). Sequential by design.
+  const { data: existing } = await supabase
+    .from('encounters')
+    .select('id, created_at')
+    .eq('user_id', user.id)
+    .eq('session_id', sessionId)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (existing) return NextResponse.json({ error: 'Incontro già in corso', encounterId: existing.id })
+
+  // RNG creature selection — server-side only.
+  const selected = selectCreatureForEncounter(creatures, playerSession.level, spawnCfgRes.data ?? undefined)
+  if (!selected) return NextResponse.json({ error: 'Nessuna creatura idonea' }, { status: 500 })
+
+  // Batch 3 — full row for the selected wild creature in parallel with the
+  // legacy fallback lookup for the primary creature's HP (only needed when the
+  // player still has no squad, just a selected_creature_id from the old system).
+  const needsPrimaryLookup = squadIds.length === 0 && !!primaryCreatureId
+  const [creatureRes, primaryPcRes, primaryEquipMap] = await Promise.all([
+    supabase
+      .from('creatures')
+      .select('*')
+      .eq('id', selected.id)
+      .single(),
+    needsPrimaryLookup
+      ? supabase
+          .from('player_creatures')
+          .select('creatures(hp)')
+          .eq('id', primaryCreatureId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null as any }),
+    needsPrimaryLookup
+      ? getEquipmentBonuses(supabase, [primaryCreatureId])
+      : Promise.resolve(null as Map<string, { hp: number; atk: number; def: number }> | null),
+  ])
+
+  const creature = creatureRes.data
+  if (!creature) return NextResponse.json({ error: 'Errore dati creatura' }, { status: 500 })
+
+  // Assemble the squad payload from data already in memory — no extra DB I/O.
+  // Sound fields were folded into the main join above (used to be a 2nd query).
+  let squadCreatures: Array<{
+    pcId: string; id: string; name: string; hp: number; atk: number;
+    element: string; rarity: string; image_url: string | null;
+    sprite_cutout_url: string | null; sprite_url: string | null;
+    attack_sound_url: string | null; attack_sound_duration_ms: number | null
+  }> = []
+  if (squadIds.length > 0 && squadJoinRes.data) {
+    const pcs = squadJoinRes.data as any[]
+    squadCreatures = squadIds
+      .map(sid => pcs.find(pc => pc.id === sid))
+      .filter(Boolean)
+      .map((pc: any) => {
+        const b = equipBonusesMap.get(pc.id) ?? { hp: 0, atk: 0, def: 0 }
+        return {
           pcId: pc.id,
           id: pc.creatures.id,
           name: pc.creatures.name,
@@ -143,52 +176,27 @@ export async function POST(request: Request) {
           image_url: pc.creatures.image_url ?? null,
           sprite_cutout_url: pc.creatures.sprite_cutout_url ?? null,
           sprite_url: pc.creatures.sprite_url ?? null,
-          attack_sound_url: null,
-          attack_sound_duration_ms: null,
-          }
-        })
-
-      // Try to enrich with sound data (requires 018_attack_sound migration)
-      const creatureIds = squadCreatures.map(c => c.id)
-      const { data: soundRows } = await supabase
-        .from('creatures')
-        .select('id, attack_sound_url, attack_sound_duration_ms')
-        .in('id', creatureIds)
-      if (soundRows) {
-        const soundMap: Record<string, { url: string | null; ms: number | null }> = {}
-        for (const r of soundRows as any[]) {
-          soundMap[r.id] = { url: r.attack_sound_url ?? null, ms: r.attack_sound_duration_ms ?? null }
+          attack_sound_url: pc.creatures.attack_sound_url ?? null,
+          attack_sound_duration_ms: pc.creatures.attack_sound_duration_ms ?? null,
         }
-        squadCreatures = squadCreatures.map(c => ({
-          ...c,
-          attack_sound_url: soundMap[c.id]?.url ?? null,
-          attack_sound_duration_ms: soundMap[c.id]?.ms ?? null,
-        }))
-      }
-    }
+      })
   }
 
-  // Create encounter — lock player_creature_id + initial player_hp at
-  // start (anti-cheat). The active creature's HP is now server-side so
-  // /fight and /heal can't be spoofed by sending inflated currentPlayerHp.
-  // primaryCreatureMaxHp is the active creature's base hp (combat doesn't
-  // use level scaling for wilds — see encounter/fight which reads
-  // playerCr.hp directly).
+  // Authoritative initial HP for the active creature (anti-cheat). When the
+  // player has a squad, slot 0 IS the primary and we already computed its
+  // bonus-adjusted HP. Only the legacy "selected_creature_id only" path needs
+  // the separate lookup we ran in batch 3.
   let primaryCreatureMaxHp: number | null = null
-  if (primaryCreatureId) {
-    const { data: pcRow } = await supabase
-      .from('player_creatures')
-      .select('creatures(hp)')
-      .eq('id', primaryCreatureId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-    const baseHp = (pcRow as any)?.creatures?.hp ?? null
+  if (squadIds.length > 0 && squadCreatures.length > 0) {
+    primaryCreatureMaxHp = squadCreatures[0].hp
+  } else if (needsPrimaryLookup && primaryPcRes.data) {
+    const baseHp = (primaryPcRes.data as any)?.creatures?.hp ?? null
     if (baseHp !== null) {
-      const b = (await getEquipmentBonuses(supabase, [primaryCreatureId])).get(primaryCreatureId)
-        ?? { hp: 0, atk: 0, def: 0 }
+      const b = (primaryEquipMap?.get(primaryCreatureId)) ?? { hp: 0, atk: 0, def: 0 }
       primaryCreatureMaxHp = baseHp + b.hp
     }
   }
+
   const { data: encounter, error: encError } = await supabase
     .from('encounters')
     .insert({
@@ -223,4 +231,3 @@ export async function POST(request: Request) {
     squadCreatures,
   })
 }
-

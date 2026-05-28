@@ -20,10 +20,10 @@ export async function POST(request: Request) {
 
   if (!encounterId) return NextResponse.json({ error: 'encounterId mancante' }, { status: 400 })
 
-  // Get active encounter
+  // One round-trip: encounter + wild creature + parent session status.
   const { data: encounter } = await supabase
     .from('encounters')
-    .select('*, creatures(*)')
+    .select('*, creatures(*), sessions(status)')
     .eq('id', encounterId)
     .eq('user_id', user.id)
     .eq('status', 'active')
@@ -32,9 +32,9 @@ export async function POST(request: Request) {
   if (!encounter) return NextResponse.json({ error: 'Incontro non trovato o già concluso' }, { status: 404 })
 
   // Guard: session must still be active
-  const { data: sessionCheck } = await supabase.from('sessions').select('status').eq('id', encounter.session_id).single()
-  if (!sessionCheck || sessionCheck.status !== 'active') {
-    const notStarted = sessionCheck?.status === 'draft' || sessionCheck?.status === 'ready'
+  const sessionStatus = (encounter as any).sessions?.status
+  if (sessionStatus !== 'active') {
+    const notStarted = sessionStatus === 'draft' || sessionStatus === 'ready'
     const errMsg = notStarted ? 'La sessione non è ancora iniziata' : 'La sessione è terminata'
     return NextResponse.json({ error: errMsg }, { status: 403 })
   }

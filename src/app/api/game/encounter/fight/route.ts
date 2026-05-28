@@ -32,9 +32,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'encounterId mancante' }, { status: 400 })
   }
 
+  // One round-trip: encounter + wild creature + parent session status.
   const { data: encounter } = await supabase
     .from('encounters')
-    .select('*, creatures(*)')
+    .select('*, creatures(*), sessions(status)')
     .eq('id', encounterId)
     .eq('user_id', user.id)
     .eq('status', 'active')
@@ -44,13 +45,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Incontro non trovato' }, { status: 404 })
   }
 
-  const { data: sessionCheck } = await supabase
-    .from('sessions')
-    .select('status')
-    .eq('id', encounter.session_id)
-    .single()
-  if (!sessionCheck || sessionCheck.status !== 'active') {
-    const notStarted = sessionCheck?.status === 'draft' || sessionCheck?.status === 'ready'
+  const sessionStatus = (encounter as any).sessions?.status
+  if (sessionStatus !== 'active') {
+    const notStarted = sessionStatus === 'draft' || sessionStatus === 'ready'
     const errMsg = notStarted ? 'La sessione non e ancora iniziata' : 'La sessione e terminata'
     return NextResponse.json({ error: errMsg }, { status: 403 })
   }
@@ -64,13 +61,28 @@ export async function POST(request: Request) {
   }
 
   const lookupId = activePlayerCreatureId ?? encounter.player_creature_id
-  const { data: playerCreature } = await supabase
-    .from('player_creatures')
-    .select('*, creatures(*)')
-    .eq('id', lookupId)
-    .eq('user_id', user.id)
-    .single()
 
+  // Three independent reads — fan out in parallel (player creature, equipped
+  // gear bonuses, optional inventory item) instead of three sequential awaits.
+  const [pcRes, equipBonusesMap, invItemRes] = await Promise.all([
+    supabase
+      .from('player_creatures')
+      .select('*, creatures(*)')
+      .eq('id', lookupId)
+      .eq('user_id', user.id)
+      .single(),
+    getEquipmentBonuses(supabase, [lookupId]),
+    itemId
+      ? supabase
+          .from('player_inventory')
+          .select('quantity, items(effect_value, type)')
+          .eq('id', itemId)
+          .eq('user_id', user.id)
+          .single()
+      : Promise.resolve({ data: null as { quantity: number; items: { effect_value: number; type: string } } | null }),
+  ])
+
+  const playerCreature = pcRes.data
   if (!playerCreature) {
     return NextResponse.json({ error: 'Creatura giocatore non trovata' }, { status: 404 })
   }
@@ -78,8 +90,7 @@ export async function POST(request: Request) {
   const playerCr = (playerCreature as any).creatures
 
   // Equipped gear adds flat bonuses to the player creature's base stats.
-  const equipBonus = (await getEquipmentBonuses(supabase, [lookupId])).get(lookupId)
-    ?? { hp: 0, atk: 0, def: 0 }
+  const equipBonus = equipBonusesMap.get(lookupId) ?? { hp: 0, atk: 0, def: 0 }
   const playerMaxHp = playerCr.hp + equipBonus.hp
   const playerAtk = playerCr.atk + equipBonus.atk
   const playerDef = (playerCr.def ?? 0) + equipBonus.def
@@ -90,20 +101,11 @@ export async function POST(request: Request) {
   let attackItemEffectValue = 0
   let attackItemQuantity = 0
 
-  if (itemId) {
-    const { data: invItem } = await supabase
-      .from('player_inventory')
-      .select('quantity, items(effect_value, type)')
-      .eq('id', itemId)
-      .eq('user_id', user.id)
-      .single()
-
-    const inv = invItem as { quantity: number; items: { effect_value: number; type: string } } | null
-    if (inv && inv.quantity > 0) {
-      attackItemType = inv.items?.type ?? null
-      attackItemEffectValue = inv.items?.effect_value ?? 0
-      attackItemQuantity = inv.quantity
-    }
+  const inv = invItemRes.data as { quantity: number; items: { effect_value: number; type: string } } | null
+  if (inv && inv.quantity > 0) {
+    attackItemType = inv.items?.type ?? null
+    attackItemEffectValue = inv.items?.effect_value ?? 0
+    attackItemQuantity = inv.quantity
   }
 
   const wildStatus = (encounter as any).wild_status as StatusEffect | null
