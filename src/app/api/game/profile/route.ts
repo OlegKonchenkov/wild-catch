@@ -10,36 +10,35 @@ export async function GET(request: Request) {
   const sessionId = new URL(request.url).searchParams.get('sessionId')
   if (!sessionId) return NextResponse.json({ error: 'sessionId richiesto' }, { status: 400 })
 
-  // Player session data
-  const { data: ps } = await supabase
-    .from('player_sessions')
-    .select('exp, gold, level')
-    .eq('user_id', user.id)
-    .eq('session_id', sessionId)
-    .single()
+  // Three independent reads — fan out in parallel (1 round-trip instead of 3).
+  const [psRes, profileRes, ccRes] = await Promise.all([
+    supabase
+      .from('player_sessions')
+      .select('exp, gold, level')
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId)
+      .single(),
+    supabase
+      .from('profiles')
+      .select('nickname, avatar_url')
+      .eq('user_id', user.id)
+      .single(),
+    supabase
+      .from('player_creatures')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId),
+  ])
 
+  const ps = psRes.data
   if (!ps) return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
-
-  // Profile (nickname)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('nickname, avatar_url')
-    .eq('user_id', user.id)
-    .single()
-
-  // Creatures caught count
-  const { count: creaturesCaught } = await supabase
-    .from('player_creatures')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('session_id', sessionId)
 
   return NextResponse.json({
     exp: ps.exp ?? 0,
     gold: ps.gold ?? 0,
     level: ps.level ?? 1,
-    nickname: profile?.nickname ?? 'Anonimo',
-    avatar_url: profile?.avatar_url ?? null,
-    creatures_caught: creaturesCaught ?? 0,
+    nickname: profileRes.data?.nickname ?? 'Anonimo',
+    avatar_url: profileRes.data?.avatar_url ?? null,
+    creatures_caught: ccRes.count ?? 0,
   })
 }

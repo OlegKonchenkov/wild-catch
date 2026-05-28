@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 // GET /api/game/map-pins?sessionId=...
-// Returns map pins for the given session (visible to all authenticated players)
+// Returns map pins for the given session (visible to all authenticated players).
+//
+// All enigma lookups are batched into a fixed handful of bulk queries (instead of
+// the previous per-pin Promise.all that fired 4 sequential queries per enigma
+// pin). The response shape is unchanged — purely a perf refactor so the route
+// stays flat regardless of how many enigma pins a session has.
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -12,102 +17,104 @@ export async function GET(request: Request) {
   const sessionId = searchParams.get('sessionId')
   if (!sessionId) return NextResponse.json({ error: 'sessionId mancante' }, { status: 400 })
 
-  const { data, error } = await supabase
+  // 1) All pins for this session.
+  const { data: pinsRaw, error } = await supabase
     .from('session_map_pins')
     .select('id, lat, lng, name, description, image_url, reward_type, reward_radius_m, reward_payload, enigma_id')
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const pins = pinsRaw ?? []
+  if (pins.length === 0) return NextResponse.json({ pins: [] })
 
-  // Mark which pins this user has already claimed
-  const pinIds    = (data ?? []).map((p: any) => p.id)
-  const bossPinIds = (data ?? []).filter((p: any) => p.reward_type === 'boss').map((p: any) => p.id)
+  // Partition pin ids by reward kind so we can fan the lookups out in parallel.
+  const allPinIds: string[] = pins.map((p: any) => p.id)
+  const bossPinIds: string[] = pins.filter((p: any) => p.reward_type === 'boss').map((p: any) => p.id)
+  const bossPinSet = new Set<string>(bossPinIds)
+  const regularPinIds: string[] = allPinIds.filter(id => !bossPinSet.has(id))
+  const enigmaIds: string[] = [...new Set(
+    pins
+      .filter((p: any) => p.reward_type === 'enigma' && p.enigma_id)
+      .map((p: any) => p.enigma_id as string)
+  )]
 
-  let claimedSet = new Set<string>()
-  if (pinIds.length > 0) {
-    // Regular pins — use pin_claims
-    const regularPinIds = pinIds.filter((id: string) => !bossPinIds.includes(id))
-    if (regularPinIds.length > 0) {
-      const { data: claims } = await supabase
-        .from('pin_claims')
-        .select('pin_id')
-        .eq('user_id', user.id)
-        .in('pin_id', regularPinIds)
-      for (const c of claims ?? []) claimedSet.add((c as any).pin_id)
-    }
+  // 2) Batch 1: claims, won boss fights, enigma definitions, player's creatures.
+  //    All independent — one round-trip fans them out in parallel.
+  const [claimsRes, wonFightsRes, enigmiRes, playerCreaturesRes] = await Promise.all([
+    regularPinIds.length > 0
+      ? supabase.from('pin_claims').select('pin_id').eq('user_id', user.id).in('pin_id', regularPinIds)
+      : Promise.resolve({ data: [] as Array<{ pin_id: string }>, error: null }),
+    bossPinIds.length > 0
+      ? supabase.from('boss_fights').select('pin_id').eq('user_id', user.id).eq('status', 'won').in('pin_id', bossPinIds)
+      : Promise.resolve({ data: [] as Array<{ pin_id: string }>, error: null }),
+    enigmaIds.length > 0
+      ? supabase.from('enigmi')
+          .select('id, title, description, frammenti:enigma_frammenti(id, title, description, image_url, video_url, order_index), suggerimenti:enigma_suggerimenti(id, text, image_url, order_index)')
+          .in('id', enigmaIds)
+      : Promise.resolve({ data: [] as any[], error: null }),
+    enigmaIds.length > 0
+      ? supabase.from('player_creatures').select('creature_id').eq('user_id', user.id).eq('session_id', sessionId)
+      : Promise.resolve({ data: [] as Array<{ creature_id: string }>, error: null }),
+  ])
 
-    // Boss pins — claimed only when the boss fight is won
-    if (bossPinIds.length > 0) {
-      const { data: wonFights } = await supabase
-        .from('boss_fights')
-        .select('pin_id')
-        .eq('user_id', user.id)
-        .eq('status', 'won')
-        .in('pin_id', bossPinIds)
-      for (const f of wonFights ?? []) claimedSet.add((f as any).pin_id)
-    }
+  const claimedSet = new Set<string>()
+  for (const c of (claimsRes.data ?? []) as Array<{ pin_id: string }>) claimedSet.add(c.pin_id)
+  for (const f of (wonFightsRes.data ?? []) as Array<{ pin_id: string }>) claimedSet.add(f.pin_id)
+
+  // Index enigmi by id, and collect every frammento / suggerimento id we need
+  // to resolve "player_has" for, across ALL enigma pins in one go.
+  const enigmasById = new Map<string, any>()
+  const allFrammentoIds = new Set<string>()
+  const allSuggerimentoIds = new Set<string>()
+  for (const e of (enigmiRes.data ?? []) as any[]) {
+    enigmasById.set(e.id, e)
+    for (const f of (e.frammenti ?? [])) if (f?.id) allFrammentoIds.add(f.id)
+    for (const s of (e.suggerimenti ?? [])) if (s?.id) allSuggerimentoIds.add(s.id)
+  }
+  const playerCreatureIds = ((playerCreaturesRes.data ?? []) as Array<{ creature_id: string }>).map(r => r.creature_id)
+
+  // 3) Batch 2: which frammenti does the player own (via their creatures), and
+  //    which suggerimenti has the player already unlocked. Independent → parallel.
+  const [creaturesRes, suggCollectedRes] = await Promise.all([
+    playerCreatureIds.length > 0 && allFrammentoIds.size > 0
+      ? supabase.from('creatures')
+          .select('enigma_frammento_id')
+          .in('id', playerCreatureIds)
+          .in('enigma_frammento_id', [...allFrammentoIds])
+      : Promise.resolve({ data: [] as Array<{ enigma_frammento_id: string | null }>, error: null }),
+    allSuggerimentoIds.size > 0
+      ? supabase.from('player_enigma_suggerimenti')
+          .select('suggerimento_id')
+          .eq('user_id', user.id)
+          .eq('session_id', sessionId)
+          .in('suggerimento_id', [...allSuggerimentoIds])
+      : Promise.resolve({ data: [] as Array<{ suggerimento_id: string }>, error: null }),
+  ])
+
+  const playerFrammentoIds = new Set<string>()
+  for (const c of (creaturesRes.data ?? []) as Array<{ enigma_frammento_id: string | null }>) {
+    if (c.enigma_frammento_id) playerFrammentoIds.add(c.enigma_frammento_id)
+  }
+  const playerSuggerimentoIds = new Set<string>()
+  for (const r of (suggCollectedRes.data ?? []) as Array<{ suggerimento_id: string }>) {
+    playerSuggerimentoIds.add(r.suggerimento_id)
   }
 
-  const pins = await Promise.all((data ?? []).map(async (p: any) => {
-    // For enigma pins: load from enigmi table if enigma_id is set (new format)
-    // Fall back to inline payload (old format) for backward compat
+  // 4) Assemble the response in memory — no more DB I/O per pin.
+  const result = pins.map((p: any) => {
     let enigmaPublic: Record<string, unknown> | null = null
 
     if (p.reward_type === 'enigma') {
       if (p.enigma_id) {
-        // New format: load from enigmi table
-        const { data: enigmaData } = await supabase
-          .from('enigmi')
-          .select('title, description, frammenti:enigma_frammenti(id, title, description, image_url, video_url, order_index), suggerimenti:enigma_suggerimenti(id, text, image_url, order_index)')
-          .eq('id', p.enigma_id)
-          .single()
-
-        if (enigmaData) {
-          const frammenti = ((enigmaData.frammenti as any[]) ?? []).sort((a: any, b: any) => a.order_index - b.order_index)
-          const suggerimenti = ((enigmaData.suggerimenti as any[]) ?? []).sort((a: any, b: any) => a.order_index - b.order_index)
-
-          // Check which frammento IDs the player has via their creatures
-          const frammentoIds = frammenti.map((f: any) => f.id).filter(Boolean)
-          let playerFrammentoIds = new Set<string>()
-          if (frammentoIds.length > 0) {
-            const { data: pc } = await supabase
-              .from('player_creatures')
-              .select('creature_id')
-              .eq('user_id', user.id)
-              .eq('session_id', sessionId)
-            const playerCreatureIds = (pc ?? []).map((r: any) => r.creature_id)
-            if (playerCreatureIds.length > 0) {
-              const { data: creaturesWithFrammenti } = await supabase
-                .from('creatures')
-                .select('enigma_frammento_id')
-                .in('id', playerCreatureIds)
-                .in('enigma_frammento_id', frammentoIds)
-              for (const c of creaturesWithFrammenti ?? []) {
-                if ((c as any).enigma_frammento_id) playerFrammentoIds.add((c as any).enigma_frammento_id)
-              }
-            }
-          }
-
-          // Check which suggerimenti the player has via player_enigma_suggerimenti (migration 026)
-          const suggerimentoIds = suggerimenti.map((s: any) => s.id).filter(Boolean)
-          let playerSuggerimentoIds = new Set<string>()
-          if (suggerimentoIds.length > 0) {
-            const { data: collected } = await supabase
-              .from('player_enigma_suggerimenti')
-              .select('suggerimento_id')
-              .eq('user_id', user.id)
-              .eq('session_id', sessionId)
-              .in('suggerimento_id', suggerimentoIds)
-            for (const row of collected ?? []) {
-              playerSuggerimentoIds.add((row as any).suggerimento_id)
-            }
-          }
-
+        const e = enigmasById.get(p.enigma_id)
+        if (e) {
+          const frammenti = ((e.frammenti as any[]) ?? []).slice().sort((a: any, b: any) => a.order_index - b.order_index)
+          const suggerimenti = ((e.suggerimenti as any[]) ?? []).slice().sort((a: any, b: any) => a.order_index - b.order_index)
           enigmaPublic = {
             enigma_id: p.enigma_id,
-            title: enigmaData.title,
-            description: enigmaData.description,
+            title: e.title,
+            description: e.description,
             frammenti: frammenti.map((f: any) => {
               const has = playerFrammentoIds.has(f.id)
               return {
@@ -130,7 +137,7 @@ export async function GET(request: Request) {
           }
         }
       } else {
-        // Old format: use inline payload
+        // Old format: inline reward_payload (kept for backward compat).
         enigmaPublic = {
           question:  p.reward_payload?.question  ?? null,
           image_url: p.reward_payload?.image_url ?? null,
@@ -138,14 +145,15 @@ export async function GET(request: Request) {
       }
     }
 
-    // Strip reward_payload from the response (contains secrets); replace with safe enigma data
+    // Strip reward_payload from the response (contains admin secrets); replace
+    // with safe enigma data above where applicable.
     const { reward_payload: _rp, enigma_id: _eid, ...rest } = p
     return {
       ...rest,
       claimed: claimedSet.has(p.id),
       ...(enigmaPublic ? { reward_payload: enigmaPublic } : {}),
     }
-  }))
+  })
 
-  return NextResponse.json({ pins })
+  return NextResponse.json({ pins: result })
 }
