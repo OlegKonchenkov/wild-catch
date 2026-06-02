@@ -16,7 +16,14 @@ export async function GET(request: Request) {
     .eq('session_id', sessionId)
     .single()
 
-  return NextResponse.json({ squadIds: data?.squad_ids ?? [] })
+  // Squad changes only on explicit PATCH from this same user — 15s of
+  // freshness is safe and removes most of the repeat traffic from the
+  // map/battle screen re-fetching on mount.
+  return NextResponse.json({ squadIds: data?.squad_ids ?? [] }, {
+    headers: {
+      'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
+    },
+  })
 }
 
 export async function PATCH(request: Request) {
