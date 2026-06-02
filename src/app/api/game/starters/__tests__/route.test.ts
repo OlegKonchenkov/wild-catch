@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }))
+// The route now reads the starters pool via config-cache (admin client + in-mem
+// TTL). Mock the cache helper so tests don't need to wire the admin client.
+vi.mock('@/lib/game/config-cache', () => ({
+  getStarterCreatures: vi.fn(async () => [{ id: 'starter-1', name: 'Volpino' }]),
+}))
 
 import { GET } from '../route'
 import { createClient } from '@/lib/supabase/server'

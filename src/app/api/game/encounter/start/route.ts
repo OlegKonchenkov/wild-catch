@@ -21,12 +21,14 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // Batch 1 — four independent reads in parallel:
+  // Batch 1 — three independent reads in parallel:
   //   - player's session row (level, squad, last position)
   //   - session metadata (status + bounds)
   //   - spawnable creature pool (cached — read-only config)
-  //   - per-session spawn config (admin client to bypass RLS)
-  const [psRes, sessRes, creatures, spawnCfgRes] = await Promise.all([
+  // The per-session spawn config is fetched in Batch 2 below: only needed for
+  // RNG selection, which we can skip entirely if the player has no squad/starter
+  // (early-out 409 before we ever touch it).
+  const [psRes, sessRes, creatures] = await Promise.all([
     supabase
       .from('player_sessions')
       .select('id, level, selected_creature_id, squad_ids, last_position')
@@ -39,11 +41,6 @@ export async function POST(request: Request) {
       .eq('id', sessionId)
       .single(),
     getSpawnableCreatures(),
-    admin
-      .from('session_spawn_config')
-      .select('non_comune_bonus, raro_bonus, epico_bonus, leggendario_bonus')
-      .eq('session_id', sessionId)
-      .maybeSingle(),
   ])
 
   const playerSession = psRes.data
@@ -82,9 +79,11 @@ export async function POST(request: Request) {
   }
 
   // Batch 2 — auto-expire stale encounters (write) runs in parallel with the
-  // squad-creatures join (incl. sound fields, migration 018 is already live) and
-  // the equipment-bonus map for the whole squad. All three are independent.
-  const [, squadJoinRes, equipBonusesMap] = await Promise.all([
+  // squad-creatures join (incl. sound fields, migration 018 is already live),
+  // the equipment-bonus map for the whole squad, and the per-session spawn
+  // config (admin client to bypass RLS — only fetched now that we know we'll
+  // need RNG selection). All four are independent.
+  const [, squadJoinRes, equipBonusesMap, spawnCfgRes] = await Promise.all([
     supabase
       .from('encounters')
       .update({ status: 'fled' })
@@ -103,6 +102,11 @@ export async function POST(request: Request) {
     squadIds.length > 0
       ? getEquipmentBonuses(supabase, squadIds)
       : Promise.resolve(new Map<string, { hp: number; atk: number; def: number }>()),
+    admin
+      .from('session_spawn_config')
+      .select('non_comune_bonus, raro_bonus, epico_bonus, leggendario_bonus')
+      .eq('session_id', sessionId)
+      .maybeSingle(),
   ])
 
   // After expire, check whether the player already has an active encounter

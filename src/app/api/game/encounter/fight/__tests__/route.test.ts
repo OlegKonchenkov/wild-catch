@@ -51,6 +51,7 @@ function buildSupabaseMock({
       status_effect: null,
       status_effect_chance: 0,
     },
+    sessions: { status: 'active' },
     ...encounterOverrides,
   }
 

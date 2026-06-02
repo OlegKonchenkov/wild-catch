@@ -7,6 +7,13 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn(() => ({})),
 }))
+// The route now reads the spawnable pool via config-cache (admin client + in-mem
+// TTL). Mock the cache helper so tests don't need to wire the admin client.
+vi.mock('@/lib/game/config-cache', () => ({
+  getSpawnableCreatures: vi.fn(async () => [
+    { id: 'wild-1', spawn_weight: 100, rarity: 'comune', min_level: 1, hp: 30, element: 'fiamma' },
+  ]),
+}))
 
 import { POST } from '../start/route'
 import { createClient } from '@/lib/supabase/server'

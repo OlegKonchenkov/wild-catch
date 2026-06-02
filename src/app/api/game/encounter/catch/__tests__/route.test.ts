@@ -27,7 +27,7 @@ import { createClient } from '@/lib/supabase/server'
 const mockGetUser = vi.fn()
 
 const CREATURE = { id: 'cr-1', name: 'Fiammare', hp: 80, atk: 15, def: 5, element: 'fiamma', rarity: 'comune', catch_difficulty: 3, image_url: null, sprite_url: null }
-const ENCOUNTER = { id: 'enc-1', user_id: 'user-1', session_id: 'sess-1', wild_creature_hp: 40, wild_status: null, wild_status_turns: 0, player_creature_id: 'pc-1', creatures: CREATURE }
+const ENCOUNTER = { id: 'enc-1', user_id: 'user-1', session_id: 'sess-1', wild_creature_hp: 40, wild_status: null, wild_status_turns: 0, player_creature_id: 'pc-1', creatures: CREATURE, sessions: { status: 'active' } }
 
 function buildMock() {
   const rpcFn = vi.fn(async () => ({ data: [{ leveled_up: false }], error: null }))

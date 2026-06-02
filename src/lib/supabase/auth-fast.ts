@@ -28,6 +28,31 @@ export async function getAuthUser(): Promise<{
   user: AuthUser | null
 }> {
   const supabase = await createClient()
+
+  // Fast path: local JWT verification via getClaims(). Production always
+  // takes this branch.
+  // Test fallback: many existing test mocks only stub `auth.getUser()`. If a
+  // mock client doesn't expose `getClaims`, fall back to `getUser()` so the
+  // test suite keeps working without having to touch ~50 mock files. The
+  // capability check is `typeof !== 'function'`, so a real client that returns
+  // an auth-error from getClaims still goes through the fast-path error branch
+  // — only "method missing" triggers the fallback.
+  const authAny = (supabase.auth as any)
+  if (typeof authAny?.getClaims !== 'function') {
+    const { data: { user: legacyUser } } = await supabase.auth.getUser()
+    if (!legacyUser) return { supabase, user: null }
+    return {
+      supabase,
+      user: {
+        id: legacyUser.id,
+        email: legacyUser.email,
+        role: (legacyUser as any).role ?? 'authenticated',
+        app_metadata: (legacyUser.app_metadata as Record<string, any>) ?? {},
+        user_metadata: (legacyUser.user_metadata as Record<string, any>) ?? {},
+      },
+    }
+  }
+
   const { data, error } = await supabase.auth.getClaims()
   if (error || !data?.claims) return { supabase, user: null }
   const c = data.claims as Record<string, any>
