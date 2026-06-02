@@ -1,5 +1,6 @@
 import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
@@ -287,9 +288,8 @@ async function grantBossFightRewards({
 // ── GET: load boss fight state ─────────────────────────────────────────────
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  const { supabase, user } = await getAuthUser()
+  if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const { data: rawFight } = await supabase
     .from('boss_fights')
@@ -312,9 +312,8 @@ export async function GET(_req: Request, { params }: Params) {
 // action: 'start' (submit lineup) | 'attack' | 'surrender'
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  const { supabase, user } = await getAuthUser()
+  if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const body = await request.json().catch(() => ({}))
   const { action, lineup, itemId, targetPlayerCreatureId } = body

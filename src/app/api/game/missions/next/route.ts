@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { getMissionUnlockState, type MissionUnlockFields } from '@/lib/game/mission-unlocks'
 import { isTutorialSession } from '@/lib/game/tutorial'
 
@@ -19,9 +20,8 @@ import { isTutorialSession } from '@/lib/game/tutorial'
  *   }
  */
 export async function GET(request: Request) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const { supabase, user } = await getAuthUser()
+  if (!user) {
     return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
   }
 

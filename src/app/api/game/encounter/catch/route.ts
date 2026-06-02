@@ -1,5 +1,7 @@
 import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/auth-fast'
+import { getGlobalCatchConfig } from '@/lib/game/config-cache'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
 import { RARITY_CATCH_RATES, CATCH_DIFFICULTY_MULT } from '@/lib/types'
@@ -8,9 +10,8 @@ import { sendPushToUser, getDisplayName, pickOne } from '@/lib/push'
 import type { StatusEffect } from '@/lib/game/combat'
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  const { supabase, user } = await getAuthUser()
+  if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const rl = await rateLimit('encounter_act', user.id)
   if (!rl.success) return rateLimitResponse(rl.reset)
@@ -85,16 +86,13 @@ export async function POST(request: Request) {
     : (wildStatus === 'paralisi' || wildStatus === 'confusione') ? 1.5
     : 1.0
 
-  // Fetch player level and global catch config in parallel
-  const { createAdminClient: adminFactory } = await import('@/lib/supabase/admin')
-  const adminCatch = adminFactory()
-  const [psResult, cfgResult] = await Promise.all([
+  // Player level (per-user) + global catch config (cached, ~zero-cost re-reads).
+  const [psResult, cfg] = await Promise.all([
     supabase.from('player_sessions').select('level, gold').eq('user_id', user.id).eq('session_id', encounter.session_id).single(),
-    adminCatch.from('global_catch_config').select('*').eq('id', 1).maybeSingle(),
+    getGlobalCatchConfig(),
   ])
   const playerLevel  = (psResult.data as any)?.level ?? 1
   const currentGold  = (psResult.data as any)?.gold  ?? 0
-  const cfg = cfgResult.data
 
   // Base catch rate: DB config overrides hardcoded defaults if present
   const rarity = creature.rarity as string

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/auth-fast'
+import { getStarterCreatures } from '@/lib/game/config-cache'
 
 export async function GET(request: Request) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  const { supabase, user } = await getAuthUser()
+  if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
   const sessionId = searchParams.get('sessionId')
@@ -44,13 +45,8 @@ export async function GET(request: Request) {
     })
   }
 
-  // Return all comune spawnable creatures
-  const { data: creatures } = await supabase
-    .from('creatures')
-    .select('id, name, rarity, element, image_url, sprite_cutout_url, sprite_url, hp, atk, def, description')
-    .eq('rarity', 'comune')
-    .eq('spawnable', true)
-    .order('name')
+  // Return all comune spawnable creatures (cached — read-only config table).
+  const creatures = await getStarterCreatures()
 
   return NextResponse.json({
     alreadyHasCreatures: false,

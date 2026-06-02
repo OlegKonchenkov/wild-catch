@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
-  // Auth check via user client (RLS)
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  // Auth check via JWT-local verification (fast); the `supabase` user client
+  // still respects RLS for subsequent DB calls.
+  const { supabase, user } = await getAuthUser()
+  if (!user) {
     return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
   }
 

@@ -1,5 +1,6 @@
 import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
@@ -10,9 +11,8 @@ import type { CompletedMission } from '@/lib/game/missions'
 import type { Element } from '@/lib/types'
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  const { supabase, user } = await getAuthUser()
+  if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
   const userId = user.id
 
   const { duelId, action, itemId, targetLineupId } = await request.json()

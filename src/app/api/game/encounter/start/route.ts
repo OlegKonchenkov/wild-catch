@@ -4,11 +4,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { selectCreatureForEncounter } from '@/lib/game/rng'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getEquipmentBonuses } from '@/lib/game/equipment'
+import { getAuthUser } from '@/lib/supabase/auth-fast'
+import { getSpawnableCreatures } from '@/lib/game/config-cache'
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  const { supabase, user } = await getAuthUser()
+  if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const rl = await rateLimit('encounter_start', user.id)
   if (!rl.success) return rateLimitResponse(rl.reset)
@@ -23,9 +24,9 @@ export async function POST(request: Request) {
   // Batch 1 — four independent reads in parallel:
   //   - player's session row (level, squad, last position)
   //   - session metadata (status + bounds)
-  //   - spawnable creature pool
+  //   - spawnable creature pool (cached — read-only config)
   //   - per-session spawn config (admin client to bypass RLS)
-  const [psRes, sessRes, creaturesRes, spawnCfgRes] = await Promise.all([
+  const [psRes, sessRes, creatures, spawnCfgRes] = await Promise.all([
     supabase
       .from('player_sessions')
       .select('id, level, selected_creature_id, squad_ids, last_position')
@@ -37,10 +38,7 @@ export async function POST(request: Request) {
       .select('status, area_bounds')
       .eq('id', sessionId)
       .single(),
-    supabase
-      .from('creatures')
-      .select('id, spawn_weight, rarity, min_level, hp, element')
-      .eq('spawnable', true),
+    getSpawnableCreatures(),
     admin
       .from('session_spawn_config')
       .select('non_comune_bonus, raro_bonus, epico_bonus, leggendario_bonus')
@@ -69,7 +67,6 @@ export async function POST(request: Request) {
     }
   }
 
-  const creatures = creaturesRes.data
   if (!creatures?.length) return NextResponse.json({ error: 'Nessuna creatura disponibile' }, { status: 500 })
 
   const squadIds: string[] = (playerSession as any).squad_ids ?? []

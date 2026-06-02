@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { isEquipmentSlot } from '@/lib/game/equipment'
 
 async function ensureSessionActive(supabase: Awaited<ReturnType<typeof createClient>>, sessionId: string) {
@@ -41,8 +42,7 @@ async function giveBackToInventory(
 
 // GET ?playerCreatureId= → equipped pieces for one owned creature
 export async function GET(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { supabase, user } = await getAuthUser()
   if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const playerCreatureId = new URL(request.url).searchParams.get('playerCreatureId')
@@ -59,8 +59,7 @@ export async function GET(request: Request) {
 
 // POST → equip an item into a slot (replaces any existing piece in that slot)
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { supabase, user } = await getAuthUser()
   if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const { sessionId, playerCreatureId, slot, itemId } = await request.json()
@@ -132,8 +131,7 @@ export async function POST(request: Request) {
 
 // DELETE → unequip a slot and return the piece to the inventory
 export async function DELETE(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { supabase, user } = await getAuthUser()
   if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const { sessionId, playerCreatureId, slot } = await request.json()

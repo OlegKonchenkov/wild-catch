@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-
-async function getAuthUser() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return { supabase, user }
-}
+import { getAuthUser } from '@/lib/supabase/auth-fast'
 
 // GET /api/profile
 export async function GET() {
@@ -15,16 +10,16 @@ export async function GET() {
 
   const { data } = await supabase
     .from('profiles')
-    .select('nickname, avatar_url, gdpr_consent_at, updated_at')
+    .select('nickname, avatar_url, gdpr_consent_at, updated_at, created_at')
     .eq('user_id', user.id)
     .single()
 
   return NextResponse.json({
     nickname:     data?.nickname ?? null,
-    avatarUrl:    data?.avatar_url ?? user.user_metadata?.avatar_url ?? null,
+    avatarUrl:    data?.avatar_url ?? (user.user_metadata as any)?.avatar_url ?? null,
     email:        user.email,
     gdprAccepted: !!data?.gdpr_consent_at,
-    createdAt:    user.created_at,
+    createdAt:    data?.created_at ?? null,
   })
 }
 
@@ -32,6 +27,7 @@ export async function GET() {
 export async function PUT(request: Request) {
   const { supabase, user } = await getAuthUser()
   if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  // PUT keeps using the JWT-derived user since we only need user.id for the upsert.
 
   const body = await request.json().catch(() => ({}))
   const { nickname, acceptGdpr } = body
@@ -59,9 +55,11 @@ export async function PUT(request: Request) {
   return NextResponse.json({ ok: true })
 }
 
-// DELETE /api/profile — permanently delete account
+// DELETE /api/profile — permanently delete account. Uses strict getUser() since
+// we want to be 100% sure the session is still valid before nuking the account.
 export async function DELETE() {
-  const { user } = await getAuthUser()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   // Requires service role key to delete auth user
