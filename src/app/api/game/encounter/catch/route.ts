@@ -7,6 +7,7 @@ import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
 import { RARITY_CATCH_RATES, CATCH_DIFFICULTY_MULT } from '@/lib/types'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import { sendPushToUser, getDisplayName, pickOne } from '@/lib/push'
+import { logSessionError } from '@/lib/logSessionError'
 import type { StatusEffect } from '@/lib/game/combat'
 
 export async function POST(request: Request) {
@@ -249,12 +250,22 @@ export async function POST(request: Request) {
     }
   } else {
     // ignoreDuplicates guards against the rare concurrent-catch race condition
-    await supabase.from('player_creatures').upsert({
+    const { error: grantErr } = await supabase.from('player_creatures').upsert({
       user_id: user.id,
       creature_id: creature.id,
       session_id: encounter.session_id,
       duplicates_count: 1,
     }, { onConflict: 'user_id,session_id,creature_id', ignoreDuplicates: true })
+    // The grant is the player's reward; if it silently fails they'd see
+    // "caught!" without the creature. Surface it for observability.
+    if (grantErr) {
+      logSessionError({
+        sessionId: encounter.session_id, userId: user.id, source: 'encounter_catch',
+        errorCode: 'server_error',
+        message: `Creatura catturata ma non salvata: ${grantErr.message}`,
+        context: { creatureId: creature.id, encounterId },
+      })
+    }
   }
 
   // Award EXP, gold and score — new catch=15, duplicate=5
@@ -264,7 +275,7 @@ export async function POST(request: Request) {
   const goldGain  = expGain   // gold mirrors EXP
   const scoreGain = existing ? 5  : 15 * rarityMult
 
-  const [{ data: rpcData }] = await Promise.all([
+  const [{ data: rpcData }, { error: goldErr }] = await Promise.all([
     supabase.rpc('increment_player_stats', {
       p_user_id: user.id,
       p_session_id: encounter.session_id,
@@ -276,6 +287,14 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .eq('session_id', encounter.session_id),
   ])
+  if (goldErr) {
+    logSessionError({
+      sessionId: encounter.session_id, userId: user.id, source: 'encounter_catch',
+      errorCode: 'server_error',
+      message: `Oro non aggiornato dopo cattura: ${goldErr.message}`,
+      context: { encounterId, goldGain },
+    })
+  }
 
   const rpcRow    = Array.isArray(rpcData) ? rpcData[0] : null
   const levelUp   = rpcRow?.leveled_up
