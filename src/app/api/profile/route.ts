@@ -8,23 +8,31 @@ export async function GET() {
   const { supabase, user } = await getAuthUser()
   if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
-  const { data } = await supabase
+  // Only select columns that actually exist on `profiles` (migration 006:
+  // user_id, nickname, avatar_url, gdpr_consent_at, gdpr_consent_minor,
+  // updated_at). The previous select asked for a non-existent `created_at`
+  // column, which made PostgREST fail the whole query — `data` came back null
+  // and the route returned `nickname: null` on EVERY call. That, not caching,
+  // was the real "il nickname non si salva" bug: the PUT persisted fine but the
+  // GET could never read it back, so /home kept showing the "set nickname"
+  // prompt. Surface the error instead of silently swallowing it.
+  const { data, error } = await supabase
     .from('profiles')
-    .select('nickname, avatar_url, gdpr_consent_at, updated_at, created_at')
+    .select('nickname, avatar_url, gdpr_consent_at')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
-  // No Cache-Control. The client (/home) reads this immediately after a PUT
-  // that saves the nickname/GDPR consent. A browser cache here served the
-  // pre-save value on reopen, so the app kept re-prompting for a nickname that
-  // was actually already saved ("nickname non si salva" bug). Always serve
-  // fresh — on NANO the saving from caching this is negligible anyway.
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // No Cache-Control: /home reads this right after the PUT that saves the
+  // nickname/GDPR consent, so it must always be fresh.
   return NextResponse.json({
     nickname:     data?.nickname ?? null,
     avatarUrl:    data?.avatar_url ?? (user.user_metadata as any)?.avatar_url ?? null,
     email:        user.email,
     gdprAccepted: !!data?.gdpr_consent_at,
-    createdAt:    data?.created_at ?? null,
   })
 }
 
