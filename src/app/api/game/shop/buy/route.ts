@@ -14,10 +14,19 @@ export async function POST(request: Request) {
   if (!rl.success) return rateLimitResponse(rl.reset)
 
   const body = await request.json().catch(() => ({}))
-  const { itemId, sessionId, quantity = 1 } = body
+  const { itemId, sessionId } = body
 
   if (!itemId || !sessionId) {
     return NextResponse.json({ error: 'itemId e sessionId richiesti' }, { status: 400 })
+  }
+
+  // Validate quantity: must be a positive integer. Without this, a negative
+  // quantity makes totalCost negative, the gold check passes, and the deduction
+  // `gold - (negative)` MINTS gold (and writes negative inventory) — an economy
+  // exploit. Cap at 99 per purchase.
+  const qty = Math.floor(Number(body.quantity ?? 1))
+  if (!Number.isFinite(qty) || qty < 1 || qty > 99) {
+    return NextResponse.json({ error: 'Quantità non valida' }, { status: 400 })
   }
 
   // Guard: session must still be active
@@ -55,7 +64,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Oggetto non disponibile nel tutorial' }, { status: 403 })
   }
 
-  const totalCost = item.shop_price * quantity
+  const totalCost = item.shop_price * qty
 
   // Get player gold
   const { data: ps } = await supabase
@@ -99,12 +108,12 @@ export async function POST(request: Request) {
 
   if (existing) {
     const { error: invError } = await supabase.from('player_inventory')
-      .update({ quantity: existing.quantity + quantity })
+      .update({ quantity: existing.quantity + qty })
       .eq('id', existing.id)
     if (invError) return NextResponse.json({ error: 'Errore aggiunta oggetto' }, { status: 500 })
   } else {
     const { error: invError } = await supabase.from('player_inventory').insert({
-      user_id: user.id, session_id: sessionId, item_id: itemId, quantity,
+      user_id: user.id, session_id: sessionId, item_id: itemId, quantity: qty,
     })
     if (invError) return NextResponse.json({ error: 'Errore aggiunta oggetto' }, { status: 500 })
   }
@@ -120,7 +129,7 @@ export async function POST(request: Request) {
     success: true,
     remainingGold: ps.gold - totalCost,
     itemName: item.name,
-    quantity,
+    quantity: qty,
     completedMissions,
   })
 }
