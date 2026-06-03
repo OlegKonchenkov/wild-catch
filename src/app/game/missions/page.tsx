@@ -448,7 +448,7 @@ export default function MissionsPage() {
       const missionsSWR = swr<Mission[]>(cacheKey, 10 * 60 * 1000, async () => {
         const base = supabase.from('missions').select('*').order('chapter_order')
         const { data } = await (isTut
-          ? base.eq('session_id', sessionId)
+          ? base.eq('session_id', sessionId!) // guarded non-null at line 438
           : base.or(`session_id.eq.${sessionId},session_id.is.null`))
         return (data ?? []) as Mission[]
       })
@@ -466,13 +466,13 @@ export default function MissionsPage() {
             .from('player_missions')
             .select('mission_id, progress, completed_at')
             .eq('user_id', user.id)
-            .eq('session_id', sessionId)
+            .eq('session_id', sessionId!)
             .in('mission_id', missionIds),
           supabase
             .from('player_sessions')
             .select('level')
             .eq('user_id', user.id)
-            .eq('session_id', sessionId)
+            .eq('session_id', sessionId!)
             .maybeSingle(),
         ])
         setPlayerMissions((pm ?? []) as PlayerMissionData[])

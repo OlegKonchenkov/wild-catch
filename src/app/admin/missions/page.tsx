@@ -221,7 +221,7 @@ export default function AdminMissions() {
       ? supabase.from('missions').select('*').eq('session_id', sid).order('chapter_order')
       : supabase.from('missions').select('*').order('chapter_order')
     query
-      .then(({ data }) => { if (data) setMissions(data as Mission[]) })
+      .then(({ data }) => { if (data) setMissions(data as unknown as Mission[]) })
       .then(() => setLoadingMissions(false), () => setLoadingMissions(false))
   }
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps

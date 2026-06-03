@@ -570,8 +570,11 @@ export default function DuelPage() {
         if (cancelled) return
 
         if (lineups) {
-          const mine = lineups.filter((l: LineupEntry) => l.user_id === user.id)
-          const opp  = lineups.filter((l: LineupEntry) => l.user_id !== user.id)
+          // The join shape (player_creatures(...)) differs from the app-level
+          // LineupEntry; cast once at the boundary.
+          const typedLineups = lineups as unknown as LineupEntry[]
+          const mine = typedLineups.filter(l => l.user_id === user.id)
+          const opp  = typedLineups.filter(l => l.user_id !== user.id)
           setMyLineup(mine)
           setOppLineup(opp)
           // Both lineups loaded — prevent re-fetch on subsequent turn changes
@@ -580,7 +583,7 @@ export default function DuelPage() {
           // Equipped gear bonuses for every creature in the duel (own rows via
           // RLS, opponent rows via the ce_duel_read policy). Needed so HP bars
           // and stat readouts match the server's equipped maximums.
-          const pcIds = lineups.map((l: LineupEntry) => l.player_creature_id).filter(Boolean)
+          const pcIds = typedLineups.map(l => l.player_creature_id).filter(Boolean)
           if (pcIds.length > 0) {
             const { data: equipRows } = await supabase
               .from('creature_equipment')
@@ -987,10 +990,11 @@ export default function DuelPage() {
                 .order('slot', { ascending: true })
                 .then(({ data: freshLineups }) => {
                   if (!freshLineups) return
+                  const typedFresh = freshLineups as unknown as LineupEntry[]
                   getCurrentUser(supabase).then(user => {
                     if (!user) return
-                    const mine = freshLineups.filter((l: LineupEntry) => l.user_id === user.id)
-                    const opp  = freshLineups.filter((l: LineupEntry) => l.user_id !== user.id)
+                    const mine = typedFresh.filter(l => l.user_id === user.id)
+                    const opp  = typedFresh.filter(l => l.user_id !== user.id)
                     setMyLineup(mine)
                     setOppLineup(opp)
                     if (mine.length > 0 && opp.length > 0) duelActivatedRef.current = true

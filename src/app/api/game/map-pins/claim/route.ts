@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { createAdminClient } from '@/lib/supabase/admin'
+import type { Json } from '@/types/database'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
@@ -440,7 +441,7 @@ export async function POST(request: Request) {
     if ((result as any).rewardType === 'exp')  evtPayload.exp  = (result as any).amount
     if ((result as any).rewardType === 'gold') evtPayload.gold = (result as any).amount
     admin.from('player_game_events').insert({
-      user_id: user.id, session_id: sessionId, type: 'pin_claimed', payload: evtPayload,
+      user_id: user.id, session_id: sessionId, type: 'pin_claimed', payload: evtPayload as Json,
     }).then(undefined, () => {})
   }
 

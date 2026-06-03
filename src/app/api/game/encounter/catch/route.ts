@@ -96,12 +96,15 @@ export async function POST(request: Request) {
 
   // Base catch rate: DB config overrides hardcoded defaults if present
   const rarity = creature.rarity as string
-  const baseRate: number = cfg
-    ? (cfg[`${rarity}_rate`] ?? RARITY_CATCH_RATES[rarity as keyof typeof RARITY_CATCH_RATES] ?? 0.10)
+  // Dynamic per-rarity column access (comune_rate, raro_rate, ...). The columns
+  // are all numeric; cast to an indexable record for the template-literal key.
+  const cfgRec = cfg as Record<string, number> | null
+  const baseRate: number = cfgRec
+    ? (cfgRec[`${rarity}_rate`] ?? RARITY_CATCH_RATES[rarity as keyof typeof RARITY_CATCH_RATES] ?? 0.10)
     : (RARITY_CATCH_RATES[rarity as keyof typeof RARITY_CATCH_RATES] ?? 0.10)
 
   // Level bonus: +X catch probability per level (0 by default = no scaling)
-  const levelBonus: number = cfg ? ((cfg[`${rarity}_level_bonus`] ?? 0) * playerLevel) : 0
+  const levelBonus: number = cfgRec ? ((cfgRec[`${rarity}_level_bonus`] ?? 0) * playerLevel) : 0
 
   const diffMult = CATCH_DIFFICULTY_MULT[creature.catch_difficulty ?? 3] ?? 1.0
   const catchRate = Math.min(1.0, baseRate * diffMult * hpMultiplier * statusCatchMult + levelBonus)

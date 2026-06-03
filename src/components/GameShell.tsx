@@ -461,7 +461,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       .limit(50)
       .then(({ data }) => {
         if (data) {
-          setNotifications(data)
+          setNotifications(data as AdminNotificationRow[])
           setUnreadCount(data.filter(n => !n.read).length)
         }
       })
@@ -481,7 +481,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
           .order('created_at', { ascending: false })
           .limit(50)
           .then(({ data }) => {
-            if (data) setNotifications(data)
+            if (data) setNotifications(data as AdminNotificationRow[])
             setNotifLoading(false)
             // Mark all as read
             supabase
@@ -511,7 +511,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       .order('created_at', { ascending: false })
       .limit(50)
       .then(({ data }) => {
-        if (data) setGameEvents(data)
+        if (data) setGameEvents(data as PlayerGameEventRow[])
         setEventsLoading(false)
       })
   }

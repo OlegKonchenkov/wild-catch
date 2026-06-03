@@ -320,7 +320,7 @@ async function grantMissionReward(
               return admin.from('player_inventory').insert({
                 user_id: userId,
                 session_id: sessionId,
-                item_id: mission.reward_item_id,
+                item_id: mission.reward_item_id!, // guarded by the truthy check above
                 quantity: 1,
               })
             }

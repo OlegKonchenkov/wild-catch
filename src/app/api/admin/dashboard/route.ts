@@ -67,12 +67,12 @@ export async function GET(request: Request) {
     const uids = [...new Set([
       ...(data ?? []).map(r => r.challenger_id),
       ...(data ?? []).map(r => r.opponent_id),
-    ].filter(Boolean))]
+    ].filter((v): v is string => Boolean(v)))]
     const profiles = await profileMap(supabase, uids)
     const rows = (data ?? []).map(r => ({
       ...r,
       challenger_nick: profiles[r.challenger_id] ?? null,
-      opponent_nick: profiles[r.opponent_id] ?? null,
+      opponent_nick: r.opponent_id ? (profiles[r.opponent_id] ?? null) : null,
       winner_nick: r.winner_id ? (profiles[r.winner_id] ?? null) : null,
     }))
     return NextResponse.json({ rows })

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import type { Json } from '@/types/database'
 
 export type SessionErrorCode =
   | 'session_ended'
@@ -31,7 +32,7 @@ export async function logSessionError(opts: LogOpts): Promise<void> {
       source:     opts.source,
       error_code: opts.errorCode,
       message:    opts.message,
-      context:    opts.context ?? {},
+      context:    (opts.context ?? {}) as Json,
     })
   } catch {
     // Intentionally silent — error logging must never break the main flow

@@ -262,7 +262,7 @@ export async function POST(request: Request) {
       .from('player_sessions')
       .select('user_id, level')
       .eq('session_id', duel.session_id)
-      .in('user_id', [userId, oppUserId].filter(Boolean))
+      .in('user_id', [userId, oppUserId].filter((v): v is string => Boolean(v)))
 
     const healLevels = Object.fromEntries(
       (healPlayerSessions ?? []).map((row: { user_id: string; level: number | null }) => [row.user_id, row.level ?? 1]),
@@ -282,21 +282,21 @@ export async function POST(request: Request) {
     async function endHealDuelFromStatusFaint() {
       const allMyFainted = healLineups
         .filter((lineup: any) => lineup.user_id === userId)
-        .every((lineup: any) => lineup.id === myHealActive.id || lineup.fainted_at !== null)
+        .every((lineup: any) => lineup.id === (myHealActive as any).id || lineup.fainted_at !== null)
       if (allMyFainted) {
         await supabase
           .from('duels')
           .update({ status: 'ended', winner_id: oppUserId, ended_at: new Date().toISOString() })
           .eq('id', duelId)
-        await awardDuelResults(supabase, duel.session_id, oppUserId!, userId)
-        incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel.session_id }).then(undefined, () => {})
+        await awardDuelResults(supabase, duel!.session_id, oppUserId!, userId)
+        incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel!.session_id }).then(undefined, () => {})
       }
       return allMyFainted
     }
 
     async function switchToNextHealCreature() {
       const remaining = healLineups
-        .filter((lineup: any) => lineup.user_id === userId && !lineup.fainted_at && lineup.id !== myHealActive.id)
+        .filter((lineup: any) => lineup.user_id === userId && !lineup.fainted_at && lineup.id !== (myHealActive as any).id)
         .sort((a: any, b: any) => a.slot - b.slot)
       const nextMine = remaining[0]
       if (!nextMine) return null
@@ -449,7 +449,7 @@ export async function POST(request: Request) {
     .from('player_sessions')
     .select('user_id, level')
     .eq('session_id', duel.session_id)
-    .in('user_id', duelUserIds)
+    .in('user_id', duelUserIds.filter((v): v is string => Boolean(v)))
 
   const levelByUser = Object.fromEntries(
     (playerSessions ?? []).map((row: { user_id: string; level: number | null }) => [row.user_id, row.level ?? 1]),
@@ -482,18 +482,18 @@ export async function POST(request: Request) {
   async function endDuelFromStatusFaint() {
     const allMyFainted = duelLineups
       .filter((l: any) => l.user_id === currentUserId)
-      .every((l: any) => l.id === myActive.id || l.fainted_at !== null)
+      .every((l: any) => l.id === (myActive as any).id || l.fainted_at !== null)
     if (allMyFainted) {
       await supabase.from('duels').update({ status: 'ended', winner_id: oppUserId, ended_at: new Date().toISOString() }).eq('id', duelId)
-      await awardDuelResults(supabase, duel.session_id, oppUserId!, currentUserId)
-      incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel.session_id }).then(undefined, () => {})
+      await awardDuelResults(supabase, duel!.session_id, oppUserId!, currentUserId)
+      incrementMissionProgress({ type: 'duel', userId: oppUserId!, sessionId: duel!.session_id }).then(undefined, () => {})
     }
     return allMyFainted
   }
 
   async function switchToNextMyCreature() {
     const myRemaining = duelLineups
-      .filter((l: any) => l.user_id === currentUserId && !l.fainted_at && l.id !== myActive.id)
+      .filter((l: any) => l.user_id === currentUserId && !l.fainted_at && l.id !== (myActive as any).id)
       .sort((a: any, b: any) => a.slot - b.slot)
     const nextMine = myRemaining[0]
     if (!nextMine) return null

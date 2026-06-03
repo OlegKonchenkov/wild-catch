@@ -460,8 +460,8 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: 'Oggetto non valido' }, { status: 400 })
     }
 
-    const healPlayerLineup: any[] = fight.player_lineup
-    const healBossLineup: any[] = fight.boss_lineup
+    const healPlayerLineup: any[] = fight.player_lineup as any[]
+    const healBossLineup: any[] = fight.boss_lineup as any[]
     const healPlayerActive = healPlayerLineup.find((c: any) => c.is_active && !c.fainted)
     const healBossActive = healBossLineup[fight.boss_active_slot]
 
@@ -652,7 +652,7 @@ export async function POST(request: Request, { params }: Params) {
       healStatus = 'lost'
     }
 
-    const updates = [
+    const updates: any[] = [
       supabase.from('boss_fights').update({
         player_lineup: healPlayerLineup,
         boss_lineup: healBossLineup,
@@ -729,8 +729,8 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: 'targetPlayerCreatureId richiesto' }, { status: 400 })
     }
 
-    const swPlayerLineup: any[] = fight.player_lineup
-    const swBossLineup:   any[] = fight.boss_lineup
+    const swPlayerLineup: any[] = fight.player_lineup as any[]
+    const swBossLineup:   any[] = fight.boss_lineup as any[]
     const swCurrentActive = swPlayerLineup.find((c: any) => c.is_active && !c.fainted)
     const swTargetSlot = swPlayerLineup.findIndex((c: any) => c.player_creature_id === targetPlayerCreatureId)
 
@@ -844,8 +844,8 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: 'Battaglia non attiva' }, { status: 409 })
     }
 
-    const playerLineup: any[] = fight.player_lineup
-    const bossLineup:   any[] = fight.boss_lineup
+    const playerLineup: any[] = fight.player_lineup as any[]
+    const bossLineup:   any[] = fight.boss_lineup as any[]
 
     const playerActive = playerLineup.find((c: any) => c.is_active && !c.fainted)
     const bossActive   = bossLineup[fight.boss_active_slot]

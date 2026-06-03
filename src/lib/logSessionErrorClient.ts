@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
+import type { Json } from '@/types/database'
 
 interface LogOpts {
   sessionId: string
@@ -23,7 +24,7 @@ export function logSessionErrorClient(opts: LogOpts): void {
         source:     opts.source,
         error_code: opts.errorCode,
         message:    opts.message,
-        context:    opts.context ?? {},
+        context:    (opts.context ?? {}) as Json,
       }).then(() => {}, () => {})
     }).catch(() => {})
   } catch {

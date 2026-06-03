@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import type { TablesInsert } from '@/types/database'
 
 const EQUIP_TYPES = ['arma', 'corazza', 'elmo', 'accessorio'] as const
 const VALID_TYPES = ['rete', 'esca', 'uovo', 'battaglia', 'pozione', 'cura', 'custom', ...EQUIP_TYPES] as const
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
     insertData.egg_rarity = egg_rarity ?? 'comune'
     insertData.steps_required = Number(steps_required) || 0
   }
-  const { data, error } = await admin.from('items').insert(insertData).select().single()
+  const { data, error } = await admin.from('items').insert(insertData as TablesInsert<'items'>).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ item: data })
