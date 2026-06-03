@@ -16,14 +16,11 @@ export async function GET(request: Request) {
     .eq('session_id', sessionId)
     .single()
 
-  // Squad changes only on explicit PATCH from this same user — 15s of
-  // freshness is safe and removes most of the repeat traffic from the
-  // map/battle screen re-fetching on mount.
-  return NextResponse.json({ squadIds: data?.squad_ids ?? [] }, {
-    headers: {
-      'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
-    },
-  })
+  // No Cache-Control. This is per-user data that changes via PATCH from the
+  // same client; browser caching it caused stale reads after a write (the same
+  // class of bug as the "nickname not saving" report). On NANO the perf benefit
+  // of caching this is negligible (compute-bound, not query-bound).
+  return NextResponse.json({ squadIds: data?.squad_ids ?? [] })
 }
 
 export async function PATCH(request: Request) {

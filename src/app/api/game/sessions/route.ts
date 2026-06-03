@@ -91,11 +91,8 @@ export async function GET() {
       return (b.start_at ?? '').localeCompare(a.start_at ?? '')
     })
 
-  // Per-user cache: stats (creatures caught, duel wins) update after gameplay events,
-  // but the home/profile pages where this is consumed aren't real-time. A 30 s private
-  // cache prevents rapid back-to-back fetches on navigation without user-visible
-  // staleness. `private` ensures no CDN/proxy caches the per-user response.
-  return NextResponse.json({ sessions }, {
-    headers: { 'Cache-Control': 'private, max-age=30, must-revalidate' },
-  })
+  // No Cache-Control. /home refetches this right after joining a session and
+  // expects the new session to appear; a 30s cache could hide it. Same
+  // stale-after-write class as the nickname bug. Negligible perf cost on NANO.
+  return NextResponse.json({ sessions })
 }

@@ -14,21 +14,17 @@ export async function GET() {
     .eq('user_id', user.id)
     .single()
 
-  // Per-user short-TTL cache. Nickname / avatar / gdpr rarely change, so a
-  // 30-second freshness window cuts the hit rate roughly 5-10x for clients
-  // (dashboard, header) that refetch on navigation. `private` prevents CDN
-  // sharing across users. `stale-while-revalidate` keeps UI snappy during
-  // refetch.
+  // No Cache-Control. The client (/home) reads this immediately after a PUT
+  // that saves the nickname/GDPR consent. A browser cache here served the
+  // pre-save value on reopen, so the app kept re-prompting for a nickname that
+  // was actually already saved ("nickname non si salva" bug). Always serve
+  // fresh — on NANO the saving from caching this is negligible anyway.
   return NextResponse.json({
     nickname:     data?.nickname ?? null,
     avatarUrl:    data?.avatar_url ?? (user.user_metadata as any)?.avatar_url ?? null,
     email:        user.email,
     gdprAccepted: !!data?.gdpr_consent_at,
     createdAt:    data?.created_at ?? null,
-  }, {
-    headers: {
-      'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
-    },
   })
 }
 

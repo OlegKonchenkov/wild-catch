@@ -33,10 +33,9 @@ export async function GET(request: Request) {
   const ps = psRes.data
   if (!ps) return NextResponse.json({ error: 'Sessione non trovata' }, { status: 404 })
 
-  // Per-user short-TTL cache. Values change on each catch (exp/gold/level/
-  // creatures_caught), so we keep the window very short. SWR=15s allows the
-  // client to render the stale value instantly and refresh in the background
-  // without blocking the map UI.
+  // No Cache-Control. exp/gold/level/creatures_caught change on every catch and
+  // the HUD reads this right after; caching produced stale stats. On NANO the
+  // perf benefit is negligible (the bottleneck is compute, not this query).
   return NextResponse.json({
     exp: ps.exp ?? 0,
     gold: ps.gold ?? 0,
@@ -44,9 +43,5 @@ export async function GET(request: Request) {
     nickname: profileRes.data?.nickname ?? 'Anonimo',
     avatar_url: profileRes.data?.avatar_url ?? null,
     creatures_caught: ccRes.count ?? 0,
-  }, {
-    headers: {
-      'Cache-Control': 'private, max-age=5, stale-while-revalidate=15',
-    },
   })
 }

@@ -39,14 +39,8 @@ export async function GET(request: Request) {
     isMe: p.user_id === user.id,
   }))
 
-  // Per-user short-TTL cache. Top-50 by score changes only after catches/
-  // boss-wins. 10s freshness keeps rank movements visible while letting
-  // browsers serve the cached copy when the leaderboard panel re-mounts
-  // (tab switching). `private` because the payload contains an `isMe`
-  // flag derived from the caller's user.id.
-  return NextResponse.json({ leaderboard }, {
-    headers: {
-      'Cache-Control': 'private, max-age=10, stale-while-revalidate=30',
-    },
-  })
+  // No Cache-Control. Players expect their rank to update right after a catch;
+  // a cache made the leaderboard lag behind their own score. Negligible perf
+  // cost to serve fresh on NANO.
+  return NextResponse.json({ leaderboard })
 }
