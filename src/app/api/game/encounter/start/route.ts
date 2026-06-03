@@ -90,7 +90,9 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .eq('session_id', sessionId)
       .eq('status', 'active')
-      .lt('created_at', new Date(Date.now() - 3 * 60 * 1000).toISOString()),
+      // encounters has `started_at`, not `created_at`. Using the wrong column
+      // made PostgREST error out, so stale encounters were never auto-expired.
+      .lt('started_at', new Date(Date.now() - 3 * 60 * 1000).toISOString()),
     squadIds.length > 0
       ? supabase
           .from('player_creatures')
@@ -113,7 +115,7 @@ export async function POST(request: Request) {
   // (would conflict with creating a new one). Sequential by design.
   const { data: existing } = await supabase
     .from('encounters')
-    .select('id, created_at')
+    .select('id')
     .eq('user_id', user.id)
     .eq('session_id', sessionId)
     .eq('status', 'active')

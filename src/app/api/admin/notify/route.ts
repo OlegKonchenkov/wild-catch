@@ -35,7 +35,8 @@ export async function POST(request: Request) {
       .from('player_sessions')
       .select('session_id')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
+      // player_sessions has `joined_at`, not `created_at`.
+      .order('joined_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
