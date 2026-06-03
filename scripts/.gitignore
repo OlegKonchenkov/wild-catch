@@ -5,3 +5,4 @@
 .loadtest-cleanup.mjs
 .loadtest-users.json
 .loadtest-verify.mjs
+.audit-columns.mjs
