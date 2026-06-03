@@ -1,1 +1,7 @@
 .loadtest-cookie.txt
+.db-diag.mjs
+.db-url.txt
+.loadtest-seed.mjs
+.loadtest-cleanup.mjs
+.loadtest-users.json
+.loadtest-verify.mjs
