@@ -42,7 +42,7 @@ function useHistory(supabase: ReturnType<typeof createClient>) {
           .limit(30),
         supabase
           .from('boss_fights')
-          .select('id, status, reward_claimed, started_at, ended_at, boss_lineup')
+          .select('id, status, reward_claimed, created_at, ended_at, boss_lineup')
           .eq('user_id', user.id)
           .eq('session_id', sessionId)
           .in('status', ['won', 'lost'])
@@ -86,7 +86,7 @@ function useHistory(supabase: ReturnType<typeof createClient>) {
         return {
           id: b.id,
           type: 'boss',
-          date: b.ended_at ?? b.started_at ?? '',
+          date: b.ended_at ?? b.created_at ?? '',
           result: b.status === 'won' ? 'won' : 'lost',
           label: `${bossName}`,
           detail: b.status === 'won' ? 'Vittoria' : 'Sconfitta',

@@ -21,7 +21,10 @@ export async function GET(request: Request) {
           .select('session_id, sessions!inner(status)')
           .eq('user_id', user.id)
           .in('sessions.status', ['active', 'ready'])
-          .order('created_at', { ascending: false })
+          // player_sessions has `joined_at`, not `created_at`. The wrong column
+          // errored, so post-login restore never found the active session and
+          // always fell through to /home instead of resuming the game.
+          .order('joined_at', { ascending: false })
           .limit(1)
           .single()
 

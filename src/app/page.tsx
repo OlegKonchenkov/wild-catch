@@ -15,7 +15,9 @@ export default async function LandingPage() {
       .select('session_id, sessions!inner(status)')
       .eq('user_id', user.id)
       .in('sessions.status', ['active', 'ready', 'ended'])
-      .order('created_at', { ascending: false })
+      // player_sessions has `joined_at`, not `created_at` — wrong column errored
+      // and broke the landing-page auto-resume into the user's active session.
+      .order('joined_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
