@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { Json } from '@/types/database'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
+import { grantAbility } from '@/lib/game/grant-ability'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { isTutorialSession } from '@/lib/game/tutorial'
@@ -138,6 +139,17 @@ export async function POST(request: Request) {
 
       const { data: item } = await supabase.from('items').select('name').eq('id', payload.item_id).single()
       result = { ...result, itemName: (item as any)?.name, quantity: payload.quantity }
+      break
+    }
+
+    case 'abilita': {
+      const abilityId = payload.abilityId ?? payload.ability_id
+      const quantity = Number(payload.quantity) || 1
+      if (abilityId) {
+        await grantAbility(supabase, user.id, sessionId, abilityId, quantity)
+        const { data: ab } = await supabase.from('abilities').select('name').eq('id', abilityId).single()
+        result = { ...result, abilityName: (ab as { name?: string } | null)?.name, quantity }
+      }
       break
     }
 

@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { incrementMissionProgress } from '@/lib/game/missions'
+import { grantAbility } from '@/lib/game/grant-ability'
 import { logSessionError } from '@/lib/logSessionError'
 import { isTutorialSession } from '@/lib/game/tutorial'
 
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
   }
 
   // Grant reward
-  const reward: { gold?: number; exp?: number; itemId?: string; creatureId?: string } = {}
+  const reward: { gold?: number; exp?: number; itemId?: string; creatureId?: string; abilityId?: string } = {}
   const payload = (enigma.reward_payload ?? {}) as Record<string, any>
 
   if (enigma.reward_type === 'gold' || (typeof payload.gold === 'number' && payload.gold > 0)) {
@@ -142,6 +143,16 @@ export async function POST(request: Request) {
         p_score: 0,
       })
       reward.exp = exp
+    }
+  }
+
+  // Ability token reward (reward_type 'abilita' or an abilityId in the payload)
+  if (enigma.reward_type === 'abilita' || payload.abilityId || payload.ability_id) {
+    const abilityId = payload.abilityId ?? payload.ability_id
+    const qty = Number(payload.quantity) || 1
+    if (abilityId) {
+      const r = await grantAbility(admin, user.id, sessionId, abilityId, qty)
+      if (r.granted) reward.abilityId = abilityId
     }
   }
 

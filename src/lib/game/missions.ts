@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sendPushToUser, getDisplayName, pickOne } from '@/lib/push'
 import { getMissionUnlockState, type MissionUnlockContext, type MissionUnlockFields } from '@/lib/game/mission-unlocks'
 import { TUTORIAL_MISSION_FRAMMENTO_GRANTS, isTutorialSession } from '@/lib/game/tutorial'
+import { grantAbility } from '@/lib/game/grant-ability'
 
 interface MissionRow {
   id: string
@@ -12,6 +13,7 @@ interface MissionRow {
   reward_gold: number
   reward_exp: number
   reward_item_id: string | null
+  reward_ability_id: string | null
   reward_items: Array<{ item_id: string; quantity: number }> | null
   reward_creature_id: string | null
   unlock_level: number | null
@@ -70,7 +72,7 @@ export async function incrementMissionProgress({
   // story without globals bleeding into it.
   const missionQuery = admin
     .from('missions')
-    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_items, reward_creature_id, unlock_level, unlock_after_mission_id')
+    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_ability_id, reward_items, reward_creature_id, unlock_level, unlock_after_mission_id')
     .eq('type', type)
   const { data: missions } = await (
     isTutorialSession(sessionId)
@@ -359,6 +361,11 @@ async function grantMissionReward(
         quantity: ri.quantity,
       })
     }
+  }
+
+  // Ability token reward
+  if (mission.reward_ability_id) {
+    await grantAbility(admin, userId, sessionId, mission.reward_ability_id, 1)
   }
 
   // Creature reward
