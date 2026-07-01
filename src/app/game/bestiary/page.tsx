@@ -14,6 +14,7 @@ import { resolveCreatureSprite, ELEMENT_BACKGROUND } from '@/lib/game/battle-sce
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { GameGridSkeleton } from '@/components/game/GameLoading'
 import EquipmentManager from '@/components/game/EquipmentManager'
+import AbilityManager from '@/components/game/AbilityManager'
 import EnigmaFragmentPanel from '@/components/game/EnigmaFragmentPanel'
 import { GiSpellBook, GiOpenBook, GiBreastplate, GiPuzzle } from 'react-icons/gi'
 import ElementIcon from '@/components/ui/ElementIcon'
@@ -39,7 +40,7 @@ export default function BestiaryPage() {
   const [showFilters, setShowFilters]       = useState(false)
   const [showWeakness, setShowWeakness]     = useState(false)
   const [showStatusInfo, setShowStatusInfo] = useState(false)
-  const [detailTab, setDetailTab]           = useState<'panoramica' | 'equip' | 'enigma'>('panoramica')
+  const [detailTab, setDetailTab]           = useState<'panoramica' | 'abilita' | 'equip' | 'enigma'>('panoramica')
   const [equipReloadKey, setEquipReloadKey] = useState(0)
   const [equipCounts, setEquipCounts]       = useState<Record<string, number>>({})
   const [loading, setLoading]               = useState(true)
@@ -1046,9 +1047,10 @@ export default function BestiaryPage() {
                       {/* Tab bar */}
                       <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
                         {([
-                          { id: 'panoramica' as const, label: 'Info',   Icon: GiOpenBook,    accent: '58,188,168',  fg: '#3ABCA8' },
-                          { id: 'equip'      as const, label: 'Equip',  Icon: GiBreastplate, accent: '58,188,168',  fg: '#3ABCA8' },
-                          { id: 'enigma'     as const, label: 'Enigma', Icon: GiPuzzle,      accent: '123,77,184',  fg: '#C084FC' },
+                          { id: 'panoramica' as const, label: 'Info',    Icon: GiOpenBook,    accent: '58,188,168',  fg: '#3ABCA8' },
+                          { id: 'abilita'    as const, label: 'Abilità', Icon: GiSpellBook,   accent: '184,139,240', fg: '#C084FC' },
+                          { id: 'equip'      as const, label: 'Equip',   Icon: GiBreastplate, accent: '58,188,168',  fg: '#3ABCA8' },
+                          { id: 'enigma'     as const, label: 'Enigma',  Icon: GiPuzzle,      accent: '123,77,184',  fg: '#C084FC' },
                         ]).map(t => {
                           const active = detailTab === t.id
                           return (
@@ -1063,6 +1065,17 @@ export default function BestiaryPage() {
                           )
                         })}
                       </div>
+
+                      {detailTab === 'abilita' && (
+                        <AbilityManager
+                          key={`ab:${pc.id}`}
+                          sessionId={sessionRef.current}
+                          playerCreatureId={pc.id}
+                          element={creature.element}
+                          rarity={creature.rarity}
+                          playerLevel={playerLevel}
+                        />
+                      )}
 
                       {detailTab === 'equip' && (
                         <EquipmentManager

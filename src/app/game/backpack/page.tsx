@@ -10,7 +10,12 @@ import { GameListSkeleton } from '@/components/game/GameLoading'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
+import { AbilityGlyph, abilityAccent, buildAbilityChips } from '@/components/game/ability-visuals'
+import type { Ability } from '@/lib/game/abilities'
+import ElementIcon from '@/components/ui/ElementIcon'
+import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import { type IconType } from 'react-icons'
+import { GiSpellBook } from 'react-icons/gi'
 import {
   GiKnapsack, GiTwoCoins, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower,
   GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing,
@@ -62,6 +67,12 @@ interface InventoryRow {
     effect_value: number
     shop_price: number
   }
+}
+
+interface AbilityTokenRow {
+  ability_id: string
+  quantity: number
+  abilities: Ability | null
 }
 
 interface PlayerEgg {
@@ -287,6 +298,7 @@ function EggCard({
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function BackpackPage() {
   const [inventory, setInventory] = useState<InventoryRow[]>([])
+  const [abilityTokens, setAbilityTokens] = useState<AbilityTokenRow[]>([])
   const [eggs, setEggs]           = useState<PlayerEgg[]>([])
   const [loading, setLoading]     = useState(true)
   const [filter, setFilter]       = useState<ItemType | 'all'>('all')
@@ -319,6 +331,19 @@ export default function BackpackPage() {
       .then(r => r.json())
       .then(d => { if (d.eggs) setEggs(d.eggs) })
   }, [])
+
+  function fetchAbilityTokens() {
+    const uid = userIdRef.current
+    const sid = sessionRef.current
+    if (!uid || !sid) return
+    supabase
+      .from('player_abilities')
+      .select('ability_id, quantity, abilities(*)')
+      .eq('user_id', uid)
+      .eq('session_id', sid)
+      .gt('quantity', 0)
+      .then(({ data }) => { if (data) setAbilityTokens(data as unknown as AbilityTokenRow[]) })
+  }
 
   async function handleUse(row: InventoryRow) {
     const sessionId = localStorage.getItem('current_session_id')
@@ -399,6 +424,7 @@ export default function BackpackPage() {
         })
 
       fetchEggs()
+      fetchAbilityTokens()
 
       // Realtime: re-fetch whenever inventory changes (shop, QR rewards, item use)
       const channel = supabase
@@ -411,6 +437,10 @@ export default function BackpackPage() {
           event: '*', schema: 'public', table: 'player_eggs',
           filter: `user_id=eq.${user.id}`,
         }, () => fetchEggs())
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'player_abilities',
+          filter: `user_id=eq.${user.id}`,
+        }, () => fetchAbilityTokens())
         .subscribe()
 
       return () => { supabase.removeChannel(channel) }
@@ -521,14 +551,68 @@ export default function BackpackPage() {
               </div>
             )}
 
+            {/* ── Abilità section (learn them from the DaimonDex) ── */}
+            {filter === 'all' && abilityTokens.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <GiSpellBook size={13} color="#C084FC" /> Abilità ({abilityTokens.reduce((s, t) => s + t.quantity, 0)})
+                </p>
+                <div className="space-y-2">
+                  {abilityTokens.map(t => {
+                    const a = t.abilities
+                    if (!a) return null
+                    const accent = abilityAccent(a)
+                    const chips = buildAbilityChips(a).slice(0, 3)
+                    return (
+                      <motion.div key={t.ability_id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-3 rounded-2xl p-3 border relative overflow-hidden"
+                        style={{ background: `${accent}0a`, borderColor: `${accent}30` }}>
+                        <span aria-hidden className="absolute left-0 top-3 bottom-3 w-[3px] rounded-full" style={{ background: accent }} />
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                          style={{ background: `${accent}18`, border: `1px solid ${accent}22` }}>
+                          <AbilityGlyph ability={a} size={26} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                            <p className="font-bold text-white text-sm truncate">{a.name}</p>
+                            {a.element && <ElementIcon element={a.element} size={12} />}
+                            {a.rarity && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-md font-semibold"
+                                style={{ background: `${RARITY_COLORS[a.rarity]}20`, color: RARITY_COLORS[a.rarity] }}>
+                                {RARITY_LABELS[a.rarity]}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-white/45 leading-relaxed line-clamp-2">{a.description}</p>
+                          {chips.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {chips.map(c => (
+                                <span key={c.key} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md leading-none"
+                                  style={{ background: `${c.color}18`, color: c.color, border: `1px solid ${c.color}30` }}>{c.label}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="shrink-0 flex flex-col items-end gap-1">
+                          <div className="inline-flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-lg font-extrabold text-sm"
+                            style={{ background: `${accent}22`, color: accent }}>×{t.quantity}</div>
+                          <span className="text-[9px] text-white/30 text-right leading-tight">Impara<br/>dalla DaimonDex</span>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* ── Items section ─────────────────────────────────── */}
-            {eggs.length > 0 && inventory.length > 0 && (
+            {(eggs.length > 0 || abilityTokens.length > 0) && inventory.length > 0 && (
               <p className="text-xs font-bold text-white/40 uppercase tracking-widest">
                 Oggetti
               </p>
             )}
 
-            {filtered.length === 0 && eggs.length === 0 ? (
+            {filtered.length === 0 && eggs.length === 0 && abilityTokens.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <span className="text-5xl opacity-20">🎒</span>
                 <p className="text-white/30 text-sm">
