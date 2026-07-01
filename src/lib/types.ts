@@ -263,6 +263,17 @@ export const CATCH_DIFFICULTY_MULT: Record<number, number> = {
   5: 0.45,  // Molto difficile
 }
 
+// Ordinal rank of each rarity (comune lowest … mitologico highest). Used for
+// "minimum rarity" gates (e.g. an ability that only strong Daimon can learn).
+export const RARITY_RANK: Record<Rarity, number> = {
+  comune: 0,
+  non_comune: 1,
+  raro: 2,
+  epico: 3,
+  leggendario: 4,
+  mitologico: 5,
+}
+
 export const RARITY_COLORS: Record<Rarity, string> = {
   comune: '#7AB87A',
   non_comune: '#4A9FD4',

@@ -10,6 +10,11 @@ import {
   rollStatusEffect,
   scaleCombatStats,
   STATUS_EFFECT_META,
+  calculateBurnDamage,
+  calculateRegenHeal,
+  rollFreezeThaw,
+  getIncomingDamageMultiplier,
+  getAttackerDamageMultiplier,
 } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 
@@ -293,5 +298,74 @@ describe('STATUS_EFFECT_META', () => {
     expect(STATUS_EFFECT_META.paralisi.preventsAttack).toBe(false)
     expect(STATUS_EFFECT_META.confusione.preventsAttack).toBe(false)
     expect(STATUS_EFFECT_META.veleno.preventsAttack).toBe(false)
+  })
+})
+
+describe('new status effects (abilities)', () => {
+  it('all four new effects are registered with valid meta', () => {
+    for (const key of ['scottatura', 'congelamento', 'rigenerazione', 'marchio'] as StatusEffect[]) {
+      const meta = STATUS_EFFECT_META[key]
+      expect(meta).toBeDefined()
+      expect(meta.label.length).toBeGreaterThan(0)
+      expect(meta.color).toMatch(/^#/)
+    }
+    expect(STATUS_EFFECT_META.congelamento.preventsAttack).toBe(true)
+    expect(STATUS_EFFECT_META.rigenerazione.beneficial).toBe(true)
+  })
+
+  it('calculateBurnDamage is 8% of max HP (min 1)', () => {
+    expect(calculateBurnDamage(200)).toBe(16)
+    expect(calculateBurnDamage(1)).toBe(1)
+  })
+
+  it('calculateRegenHeal is 10% of max HP (min 1)', () => {
+    expect(calculateRegenHeal(200)).toBe(20)
+  })
+
+  it('rollFreezeThaw clears ~25% of the time', () => {
+    expect(rollFreezeThaw(0.1)).toBe(true)
+    expect(rollFreezeThaw(0.5)).toBe(false)
+  })
+
+  it('marchio raises incoming damage; scottatura lowers outgoing', () => {
+    expect(getIncomingDamageMultiplier('marchio')).toBe(1.25)
+    expect(getIncomingDamageMultiplier('veleno')).toBe(1)
+    expect(getAttackerDamageMultiplier('scottatura')).toBe(0.8)
+    expect(getAttackerDamageMultiplier(null)).toBe(1)
+  })
+
+  it('scottatura ticks damage and expires by turns', () => {
+    const r = resolveTurnStartStatus({ effect: 'scottatura', turnsLeft: 1, currentHp: 100, maxHp: 200, atk: 30, def: 10 })
+    expect(r.currentHp).toBe(84) // 100 - 16
+    expect(r.nextEffect).toBeNull() // last turn cleared
+    expect(r.event?.type).toBe('scottatura')
+  })
+
+  it('congelamento skips the turn while frozen, frees on thaw', () => {
+    const frozen = resolveTurnStartStatus({ effect: 'congelamento', turnsLeft: 2, currentHp: 100, maxHp: 200, atk: 30, def: 10, randomValue: 0.9 })
+    expect(frozen.preventedAction).toBe(true)
+    expect(frozen.nextEffect).toBe('congelamento')
+    const thawed = resolveTurnStartStatus({ effect: 'congelamento', turnsLeft: 2, currentHp: 100, maxHp: 200, atk: 30, def: 10, randomValue: 0.1 })
+    expect(thawed.preventedAction).toBe(false)
+    expect(thawed.nextEffect).toBeNull()
+  })
+
+  it('rigenerazione heals each turn without preventing action', () => {
+    const r = resolveTurnStartStatus({ effect: 'rigenerazione', turnsLeft: 2, currentHp: 100, maxHp: 200, atk: 30, def: 10 })
+    expect(r.currentHp).toBe(120) // 100 + 20
+    expect(r.preventedAction).toBe(false)
+    expect(r.nextEffect).toBe('rigenerazione')
+  })
+
+  it('rigenerazione never overheals past max HP', () => {
+    const r = resolveTurnStartStatus({ effect: 'rigenerazione', turnsLeft: 2, currentHp: 195, maxHp: 200, atk: 30, def: 10 })
+    expect(r.currentHp).toBe(200)
+  })
+
+  it('marchio just counts down without touching HP or action', () => {
+    const r = resolveTurnStartStatus({ effect: 'marchio', turnsLeft: 2, currentHp: 100, maxHp: 200, atk: 30, def: 10 })
+    expect(r.currentHp).toBe(100)
+    expect(r.preventedAction).toBe(false)
+    expect(r.nextEffect).toBe('marchio')
   })
 })
