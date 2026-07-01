@@ -47,6 +47,9 @@ import CreatureCard from "@/components/game/boss/CreatureCard";
 import SquadSelector, { SquadSelectorSkeleton } from "@/components/game/boss/SquadSelector";
 import ResultScreen from "@/components/game/boss/ResultScreen";
 import BattleScreen from "@/components/game/boss/BattleScreen";
+import type { BattleMove } from "@/components/battle/AbilityMenu";
+import { abilityAccent } from "@/components/game/ability-visuals";
+import type { Ability } from "@/lib/game/abilities";
 
 /* ── Main Page ───────────────────────────────────────────────────────────────── */
 
@@ -118,6 +121,8 @@ export default function BossFightPage() {
   // Battle state
   const [bossLineup, setBossLineup] = useState<BossSlot[]>([]);
   const [playerLineup, setPlayerLineup] = useState<PlayerSlot[]>([]);
+  const [moveset, setMoveset] = useState<BattleMove[]>([]);
+  const [abilityFx, setAbilityFx] = useState<{ key: number; animationKey: string; color: string; name: string; side: "left" | "right" } | null>(null);
   const [bossActiveSlot, setBossActiveSlot] = useState(0);
   const [attacking, setAttacking] = useState(false);
   const [bossAttacking, setBossAttacking] = useState(false);
@@ -231,6 +236,30 @@ export default function BossFightPage() {
 
   const wait = (ms: number) =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  // The active player creature drives which moveset the MOSSE menu shows.
+  const activePcId = useMemo(
+    () => playerLineup.find((c) => c.is_active && !c.fainted)?.player_creature_id ?? null,
+    [playerLineup],
+  );
+
+  useEffect(() => {
+    const sid = typeof window !== "undefined" ? localStorage.getItem("current_session_id") : null;
+    if (!activePcId || !sid) { setMoveset([]); return; }
+    let cancelled = false;
+    fetch(`/api/game/creature/abilities?playerCreatureId=${activePcId}&sessionId=${sid}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        const ms = ((d.moveset ?? []) as { abilities: Ability | null }[])
+          .map((r) => r.abilities)
+          .filter((a): a is Ability => !!a)
+          .map((a) => ({ ability: a }));
+        setMoveset(ms);
+      })
+      .catch(() => { if (!cancelled) setMoveset([]); });
+    return () => { cancelled = true; };
+  }, [activePcId]);
 
   function syncActivePlayerPreview(
     activePlayerId: string | undefined,
@@ -725,11 +754,12 @@ export default function BossFightPage() {
     setStarting(false);
   }
 
-  async function handleAttack() {
+  async function handleAttack(abilityIdArg?: string | null) {
     if (attackingRef.current) return;
     attackingRef.current = true;
     haptics.tap();
     setAttacking(true);
+    const usingAbility = !!abilityIdArg;
     const actingPlayerNow = playerLineup.find(
       (c: PlayerSlot) => c.is_active && !c.fainted,
     );
@@ -738,7 +768,7 @@ export default function BossFightPage() {
       actingPlayerNow?.active_status === "paralisi" ||
       actingPlayerNow?.active_status === "confusione" ||
       actingPlayerNow?.active_status === "veleno";
-    const usedItemId = isSleepingTurn ? null : selectedItemId;
+    const usedItemId = (isSleepingTurn || usingAbility) ? null : selectedItemId;
     if (!isSleepingTurn && !statusMayChangeAttack) {
       setAnimState("attack");
       setTimeout(() => setAnimState("idle"), 300);
@@ -760,6 +790,7 @@ export default function BossFightPage() {
       body: JSON.stringify({
         action: "attack",
         itemId: usedItemId || undefined,
+        ...(abilityIdArg ? { abilityId: abilityIdArg } : {}),
       }),
     });
     const data = await res.json();
@@ -769,6 +800,13 @@ export default function BossFightPage() {
       attackingRef.current = false;
       setAttacking(false);
       return;
+    }
+
+    // Special-ability feedback: signature effect + banner.
+    if (usingAbility && data.abilityUsed) {
+      const move = moveset.find((m) => m.ability.id === data.abilityUsed.id)?.ability;
+      const color = move ? abilityAccent(move) : "#C084FC";
+      setAbilityFx({ key: Date.now(), animationKey: data.abilityAnimationKey ?? "basic_strike", color, name: data.abilityUsed.name, side: "left" });
     }
 
     if (usedItemId && data.playerDamage > 0) {
@@ -1636,6 +1674,9 @@ export default function BossFightPage() {
             playerLineup={playerLineup}
             bossActiveSlot={bossActiveSlot}
             onAttack={handleAttack}
+            moves={moveset}
+            abilityFx={abilityFx}
+            onAbilityFxDone={() => setAbilityFx(null)}
             attacking={attacking}
             bossAttacking={bossAttacking}
             log={log}

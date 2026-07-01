@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AttackAnimation from '@/components/battle/AttackAnimation'
+import AbilityMenu, { type BattleMove } from '@/components/battle/AbilityMenu'
+import AbilityFx from '@/components/battle/AbilityFx'
 import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
 import ImmersiveBattleLayout, { type ImmersiveDamage, type ImmersiveNotice } from '@/components/battle/ImmersiveBattleLayout'
 import type { BattleAction } from '@/components/battle/ActionBar'
@@ -27,6 +29,9 @@ export default function BattleScreen({
   playerLineup,
   bossActiveSlot,
   onAttack,
+  moves = [],
+  abilityFx = null,
+  onAbilityFxDone,
   attacking,
   bossAttacking,
   log,
@@ -51,7 +56,10 @@ export default function BattleScreen({
   bossLineup: BossSlot[]
   playerLineup: PlayerSlot[]
   bossActiveSlot: number
-  onAttack: () => void
+  onAttack: (abilityId?: string | null) => void
+  moves?: BattleMove[]
+  abilityFx?: { key: number; animationKey: string; color: string; name: string; side: 'left' | 'right' } | null
+  onAbilityFxDone?: () => void
   attacking: boolean
   bossAttacking: boolean
   log: string[]
@@ -74,6 +82,7 @@ export default function BattleScreen({
   onAttackAnimComplete: () => void
 }) {
   const [showItemsModal, setShowItemsModal] = useState(false)
+  const [showMovesModal, setShowMovesModal] = useState(false)
   const [pendingSwitchCreatureId, setPendingSwitchCreatureId] = useState<string | null>(null)
   const [showBossIntro, setShowBossIntro] = useState(true)
   const [turnTimer, setTurnTimer] = useState(30)
@@ -184,12 +193,12 @@ export default function BattleScreen({
     },
     {
       id: 'attack',
-      label: playerSleeping ? 'Passa' : 'Attacca',
+      label: playerSleeping ? 'Passa' : (moves.length > 0 ? 'Mosse' : 'Attacca'),
       icon: <IconSword size={32} />,
       primary: true,
       tone: selectedItemId ? 'gold' : 'orange',
       sub: selectedItem ? `+${selectedItem.effectValue}% ATK` : undefined,
-      onClick: onAttack,
+      onClick: () => { if (playerSleeping || moves.length === 0) onAttack(); else setShowMovesModal(true) },
       disabled: attacking || bossAttacking,
       loading: attacking,
     },
@@ -245,6 +254,21 @@ export default function BattleScreen({
         actions={bossActions}
       />
       )}
+
+      {/* Special-ability move selector + VFX */}
+      <AbilityMenu
+        open={showMovesModal}
+        onClose={() => setShowMovesModal(false)}
+        element={activePlayer.element}
+        moves={moves}
+        busy={attacking || bossAttacking}
+        onSelect={(abilityId) => { setShowMovesModal(false); onAttack(abilityId) }}
+      />
+      {abilityFx && (
+        <AbilityFx key={abilityFx.key} animationKey={abilityFx.animationKey} color={abilityFx.color}
+          name={abilityFx.name} side={abilityFx.side} onComplete={() => onAbilityFxDone?.()} />
+      )}
+
       {/* Atmospheric background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-0 w-[65%] h-[55%]" style={{ background: 'radial-gradient(ellipse at 80% 20%, rgba(247,200,65,0.22) 0%, transparent 70%)' }} />
@@ -722,7 +746,7 @@ export default function BattleScreen({
         )}
 
         <motion.button
-          onClick={onAttack}
+          onClick={() => { if (playerSleeping || moves.length === 0) onAttack(); else setShowMovesModal(true) }}
           disabled={attacking || bossAttacking}
           whileTap={!attacking && !bossAttacking ? { scale: 0.95 } : {}}
           className="flex-1 relative overflow-hidden rounded-2xl py-4 font-extrabold text-white text-base disabled:cursor-not-allowed transition-all"
