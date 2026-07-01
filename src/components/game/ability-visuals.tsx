@@ -5,6 +5,7 @@ import {
 } from 'react-icons/gi'
 import { STATUS_EFFECT_META, type StatusEffect } from '@/lib/game/combat'
 import type { Ability, AbilityCategory } from '@/lib/game/abilities'
+import type { AbilityFxSpec } from '@/components/battle/AbilityFx'
 
 /** Category → glyph + accent. Single source of truth for ability visuals. */
 export const CATEGORY_META: Record<AbilityCategory, { label: string; Icon: IconType; color: string }> = {
@@ -50,6 +51,26 @@ export function buildAbilityChips(a: Ability): AbilityChip[] {
   if (a.max_uses != null) chips.push({ key: 'pp', label: `${a.max_uses} usi`, color: '#94A3B8' })
   if (a.accuracy < 1) chips.push({ key: 'acc', label: `🎯 ${pct(a.accuracy)}`, color: '#94A3B8' })
   return chips
+}
+
+/**
+ * Build the procedural-VFX spec for an ability. The battle effect is composed
+ * automatically from element × category × mechanics — nothing hand-authored per
+ * move — so any ability an admin creates animates on-theme immediately.
+ */
+export function abilityFxSpec(
+  a: Pick<Ability, 'element' | 'category' | 'color' | 'name' | 'charge_turns' | 'recharge_turns' | 'hits_max' | 'target'>,
+): AbilityFxSpec {
+  return {
+    element: a.element,
+    category: a.category,
+    color: abilityAccent(a),
+    name: a.name,
+    charge: (a.charge_turns ?? 0) > 0,
+    recharge: (a.recharge_turns ?? 0) > 0,
+    multiHit: (a.hits_max ?? 1) > 1,
+    target: a.target,
+  }
 }
 
 /** A rounded, tinted square holding the ability's icon (art or category glyph). */

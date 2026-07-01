@@ -12,8 +12,8 @@ import AttackAnimation from '@/components/battle/AttackAnimation'
 import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
 import ImmersiveBattleLayout, { type ImmersiveDamage, type ImmersiveNotice } from '@/components/battle/ImmersiveBattleLayout'
 import AbilityMenu, { type BattleMove } from '@/components/battle/AbilityMenu'
-import AbilityFx from '@/components/battle/AbilityFx'
-import { abilityAccent } from '@/components/game/ability-visuals'
+import AbilityFx, { type AbilityFxSpec } from '@/components/battle/AbilityFx'
+import { abilityFxSpec } from '@/components/game/ability-visuals'
 import type { Ability } from '@/lib/game/abilities'
 import type { BattleAction } from '@/components/battle/ActionBar'
 import type { SquadMember } from '@/components/battle/SquadBar'
@@ -311,7 +311,7 @@ export default function DuelPage() {
   const [isMyTurn, setIsMyTurn]             = useState(false)
   const [moveset, setMoveset]               = useState<BattleMove[]>([])
   const [showMovesModal, setShowMovesModal] = useState(false)
-  const [abilityFx, setAbilityFx]           = useState<{ key: number; animationKey: string; color: string; name: string; side: 'left' | 'right' } | null>(null)
+  const [abilityFx, setAbilityFx]           = useState<{ key: number; spec: AbilityFxSpec; side: 'left' | 'right' } | null>(null)
   const [attacking, setAttacking]           = useState(false)
   const attackingRef = useRef(false)
   const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp'; id: number; isCrit?: boolean; tone?: 'normal' | 'poison' } | null>(null)
@@ -1188,8 +1188,10 @@ export default function DuelPage() {
     if (res.ok) {
       if (usingAbility && data.abilityUsed) {
         const move = moveset.find(m => m.ability.id === data.abilityUsed.id)?.ability
-        const color = move ? abilityAccent(move) : '#C084FC'
-        setAbilityFx({ key: Date.now(), animationKey: data.abilityAnimationKey ?? 'basic_strike', color, name: data.abilityUsed.name, side: 'left' })
+        const spec: AbilityFxSpec = move
+          ? abilityFxSpec(move)
+          : { element: null, category: 'attacco', color: '#C084FC', name: data.abilityUsed.name }
+        setAbilityFx({ key: Date.now(), spec, side: 'left' })
       }
       if (statusMayChangeAttack && data.damage > 0 && myActiveCrNow) {
         startAttackFeedback()
@@ -1472,8 +1474,7 @@ export default function DuelPage() {
         onSelect={(abilityId) => { setShowMovesModal(false); handleAttack(abilityId) }}
       />
       {abilityFx && (
-        <AbilityFx key={abilityFx.key} animationKey={abilityFx.animationKey} color={abilityFx.color}
-          name={abilityFx.name} side={abilityFx.side} onComplete={() => setAbilityFx(null)} />
+        <AbilityFx key={abilityFx.key} {...abilityFx.spec} side={abilityFx.side} onComplete={() => setAbilityFx(null)} />
       )}
 
       {/* ── Element-themed battle background ── */}

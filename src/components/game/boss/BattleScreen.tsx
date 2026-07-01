@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import AbilityMenu, { type BattleMove } from '@/components/battle/AbilityMenu'
-import AbilityFx from '@/components/battle/AbilityFx'
+import AbilityFx, { type AbilityFxSpec } from '@/components/battle/AbilityFx'
 import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
 import ImmersiveBattleLayout, { type ImmersiveDamage, type ImmersiveNotice } from '@/components/battle/ImmersiveBattleLayout'
 import type { BattleAction } from '@/components/battle/ActionBar'
@@ -58,7 +58,7 @@ export default function BattleScreen({
   bossActiveSlot: number
   onAttack: (abilityId?: string | null) => void
   moves?: BattleMove[]
-  abilityFx?: { key: number; animationKey: string; color: string; name: string; side: 'left' | 'right' } | null
+  abilityFx?: { key: number; spec: AbilityFxSpec; side: 'left' | 'right' } | null
   onAbilityFxDone?: () => void
   attacking: boolean
   bossAttacking: boolean
@@ -265,8 +265,7 @@ export default function BattleScreen({
         onSelect={(abilityId) => { setShowMovesModal(false); onAttack(abilityId) }}
       />
       {abilityFx && (
-        <AbilityFx key={abilityFx.key} animationKey={abilityFx.animationKey} color={abilityFx.color}
-          name={abilityFx.name} side={abilityFx.side} onComplete={() => onAbilityFxDone?.()} />
+        <AbilityFx key={abilityFx.key} {...abilityFx.spec} side={abilityFx.side} onComplete={() => onAbilityFxDone?.()} />
       )}
 
       {/* Atmospheric background */}

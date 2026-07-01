@@ -48,7 +48,8 @@ import SquadSelector, { SquadSelectorSkeleton } from "@/components/game/boss/Squ
 import ResultScreen from "@/components/game/boss/ResultScreen";
 import BattleScreen from "@/components/game/boss/BattleScreen";
 import type { BattleMove } from "@/components/battle/AbilityMenu";
-import { abilityAccent } from "@/components/game/ability-visuals";
+import type { AbilityFxSpec } from "@/components/battle/AbilityFx";
+import { abilityFxSpec } from "@/components/game/ability-visuals";
 import type { Ability } from "@/lib/game/abilities";
 
 /* ── Main Page ───────────────────────────────────────────────────────────────── */
@@ -122,7 +123,7 @@ export default function BossFightPage() {
   const [bossLineup, setBossLineup] = useState<BossSlot[]>([]);
   const [playerLineup, setPlayerLineup] = useState<PlayerSlot[]>([]);
   const [moveset, setMoveset] = useState<BattleMove[]>([]);
-  const [abilityFx, setAbilityFx] = useState<{ key: number; animationKey: string; color: string; name: string; side: "left" | "right" } | null>(null);
+  const [abilityFx, setAbilityFx] = useState<{ key: number; spec: AbilityFxSpec; side: "left" | "right" } | null>(null);
   const [bossActiveSlot, setBossActiveSlot] = useState(0);
   const [attacking, setAttacking] = useState(false);
   const [bossAttacking, setBossAttacking] = useState(false);
@@ -805,8 +806,10 @@ export default function BossFightPage() {
     // Special-ability feedback: signature effect + banner.
     if (usingAbility && data.abilityUsed) {
       const move = moveset.find((m) => m.ability.id === data.abilityUsed.id)?.ability;
-      const color = move ? abilityAccent(move) : "#C084FC";
-      setAbilityFx({ key: Date.now(), animationKey: data.abilityAnimationKey ?? "basic_strike", color, name: data.abilityUsed.name, side: "left" });
+      const spec: AbilityFxSpec = move
+        ? abilityFxSpec(move)
+        : { element: null, category: "attacco", color: "#C084FC", name: data.abilityUsed.name };
+      setAbilityFx({ key: Date.now(), spec, side: "left" });
     }
 
     if (usedItemId && data.playerDamage > 0) {

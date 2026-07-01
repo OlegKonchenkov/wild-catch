@@ -21,8 +21,8 @@ import { playKnockout, playFlee, playDefeat, playMissionComplete } from '@/lib/g
 import { playHeal } from '@/lib/game/sounds/ui'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import AbilityMenu, { type BattleMove } from '@/components/battle/AbilityMenu'
-import AbilityFx from '@/components/battle/AbilityFx'
-import { abilityAccent } from '@/components/game/ability-visuals'
+import AbilityFx, { type AbilityFxSpec } from '@/components/battle/AbilityFx'
+import { abilityFxSpec } from '@/components/game/ability-visuals'
 import type { Ability } from '@/lib/game/abilities'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
@@ -391,7 +391,7 @@ export default function EncounterPage() {
   const [moveset, setMoveset]       = useState<BattleMove[]>([])
   const [showMovesModal, setShowMovesModal] = useState(false)
   const [encounterPcId, setEncounterPcId]   = useState<string | null>(null)
-  const [abilityFx, setAbilityFx]   = useState<{ key: number; animationKey: string; color: string; name: string; side: 'left' | 'right' } | null>(null)
+  const [abilityFx, setAbilityFx]   = useState<{ key: number; spec: AbilityFxSpec; side: 'left' | 'right' } | null>(null)
   const [lastDamage, setLastDamage] = useState<{ amount: number; target: 'wild' | 'player'; id: number; isCrit?: boolean; tone?: 'normal' | 'poison' } | null>(null)
   const [catchPhase, setCatchPhase] = useState<'idle' | 'throwing' | 'hit'>('idle')
   const [showCatchSuccess, setShowCatchSuccess] = useState(false)
@@ -784,8 +784,10 @@ export default function EncounterPage() {
     // Special-ability feedback: play the move's signature effect + banner.
     if (usingAbility && data.abilityUsed) {
       const move = moveset.find(m => m.ability.id === data.abilityUsed.id)?.ability
-      const color = move ? abilityAccent(move) : '#C084FC'
-      setAbilityFx({ key: Date.now(), animationKey: data.abilityAnimationKey ?? 'basic_strike', color, name: data.abilityUsed.name, side: 'left' })
+      const spec: AbilityFxSpec = move
+        ? abilityFxSpec(move)
+        : { element: null, category: 'attacco', color: '#C084FC', name: data.abilityUsed.name }
+      setAbilityFx({ key: Date.now(), spec, side: 'left' })
       if (data.abilityCharging) setMessage(`🌀 ${attackingName} sta caricando ${data.abilityUsed.name}...`)
       else if (data.abilityMissed) setMessage(`💨 ${data.abilityUsed.name} ha mancato!`)
       else setMessage(`✨ ${data.abilityUsed.name}!`)
@@ -1627,8 +1629,7 @@ export default function EncounterPage() {
         <CaptureOverlay phase={catchPhase} success={showCatchSuccess} creatureName={state.creature.name ?? undefined} />
         <EvolutionFx phase={evoFx} element={(caughtCreatureData?.element ?? state.creature?.element ?? 'armonia') as string} />
         {abilityFx && (
-          <AbilityFx key={abilityFx.key} animationKey={abilityFx.animationKey} color={abilityFx.color}
-            name={abilityFx.name} side={abilityFx.side} onComplete={() => setAbilityFx(null)} />
+          <AbilityFx key={abilityFx.key} {...abilityFx.spec} side={abilityFx.side} onComplete={() => setAbilityFx(null)} />
         )}
       </ImmersiveBattleLayout>
       )}
