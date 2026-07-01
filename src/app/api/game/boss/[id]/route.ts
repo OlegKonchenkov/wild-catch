@@ -6,6 +6,11 @@ import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollC
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { getEquipmentBonuses } from '@/lib/game/equipment'
+import {
+  resolveAbilityCast, tickAbilityState, applyStatMods, addSelfBuffs, isAbilityUsable,
+  type Ability,
+} from '@/lib/game/abilities'
+import { normalizeEncounterAbilityState, clampMod } from '@/lib/game/ability-turn'
 import { sendPushToUser, getDisplayName, pickOne } from '@/lib/push'
 import type { Element } from '@/lib/types'
 
@@ -316,7 +321,7 @@ export async function POST(request: Request, { params }: Params) {
   if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const body = await request.json().catch(() => ({}))
-  const { action, lineup, itemId, targetPlayerCreatureId } = body
+  const { action, lineup, itemId, targetPlayerCreatureId, abilityId } = body
 
   const { data: rawFight } = await supabase
     .from('boss_fights')
@@ -912,9 +917,39 @@ export async function POST(request: Request, { params }: Params) {
       })
     }
 
+    // ── Special ability setup ────────────────────────────────────────────
+    const pEnc = normalizeEncounterAbilityState(playerActive.ability_state)
+    const pendingId = pEnc.player.pending?.abilityId ?? null
+    const effectiveAbilityId: string | null = pendingId ?? (abilityId ?? null)
+    let castAbility: Ability | null = null
+    if (effectiveAbilityId && !playerActive.fainted) {
+      const abRes = await supabase.from('abilities').select('*').eq('id', effectiveAbilityId).maybeSingle()
+      if (abRes.data) {
+        if (pendingId) {
+          castAbility = abRes.data as unknown as Ability
+        } else {
+          const known = await supabase.from('creature_abilities').select('ability_id')
+            .eq('player_creature_id', playerActive.player_creature_id)
+            .eq('ability_id', effectiveAbilityId).maybeSingle()
+          if (known.data) castAbility = abRes.data as unknown as Ability
+        }
+      }
+    }
+    const abTick = tickAbilityState(pEnc.player)
+    pEnc.player = abTick.state
+    if (abTick.recharging) skipPlayerAttack = true
+    if (castAbility && !pendingId && !abTick.recharging) {
+      const usable = isAbilityUsable(castAbility, pEnc.player)
+      if (!usable.usable) return NextResponse.json({ error: usable.reason ?? 'Mossa non disponibile' }, { status: 400 })
+    }
+    let abilityStatusToBoss: StatusEffect | null = null
+    let abilityAnimationKey: string | null = null
+    let abilityCharging = false
+    let abilityMissed = false
+
     // ── Optional battaglia item ──────────────────────────────────────────
     let atkMultiplier = 1
-    if (itemId && !skipPlayerAttack && !playerActive.fainted && !bossActive.fainted) {
+    if (itemId && !skipPlayerAttack && !playerActive.fainted && !bossActive.fainted && !castAbility) {
       const { data: invItem } = await supabase
         .from('player_inventory')
         .select('quantity, items(effect_value, type)')
@@ -929,11 +964,51 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     // ── Player → Boss ────────────────────────────────────────────────────
-    const playerMult   = getElementMultiplier(playerActive.element as Element, bossActive.element as Element)
+    let playerMult   = getElementMultiplier(playerActive.element as Element, bossActive.element as Element)
     let playerFortune = null
     let playerCrit = false
     let playerDamage = 0
-    if (!skipPlayerAttack && !playerActive.fainted && !bossActive.fainted) {
+    // Effective player stats after self-buffs (also used for incoming boss damage).
+    const effPlayer = applyStatMods(playerActive.atk, playerActive.def ?? 0, pEnc.player)
+    if (castAbility && !skipPlayerAttack && !playerActive.fainted && !bossActive.fainted) {
+      // ── Special ability cast ──
+      const effBossDef = Math.max(0, Math.round((bossActive.def ?? 0) * (1 + pEnc.enemyDefMod)))
+      const outcome = resolveAbilityCast({
+        ability: castAbility,
+        casterElement: playerActive.element as Element,
+        targetElement: bossActive.element as Element,
+        casterAtk: effPlayer.atk,
+        casterDef: effPlayer.def,
+        casterMaxHp: playerActive.max_hp,
+        casterHp: playerActive.current_hp,
+        casterStatus: playerActive.active_status as StatusEffect | null,
+        targetDef: effBossDef,
+        targetStatus: bossActive.active_status as StatusEffect | null,
+        state: pEnc.player,
+      })
+      pEnc.player = outcome.nextState
+      abilityAnimationKey = outcome.animationKey
+      if (outcome.phase === 'charging') {
+        abilityCharging = true
+      } else if (outcome.phase === 'fired' && !outcome.missed) {
+        playerDamage = outcome.totalDamage
+        playerCrit = outcome.isCrit
+        playerMult = outcome.elementMultiplier
+        if (outcome.healToCaster > 0) {
+          playerActive.current_hp = Math.min(playerActive.max_hp, playerActive.current_hp + outcome.healToCaster)
+        }
+        pEnc.player = addSelfBuffs(pEnc.player, outcome.buffs)
+        pEnc.enemyAtkMod = clampMod(pEnc.enemyAtkMod - outcome.debuffs.atk)
+        pEnc.enemyDefMod = clampMod(pEnc.enemyDefMod - outcome.debuffs.def)
+        abilityStatusToBoss = outcome.statusToTarget
+        if (outcome.selfStatus) {
+          playerActive.active_status = outcome.selfStatus
+          playerActive.status_turns_left = STATUS_EFFECT_META[outcome.selfStatus].turns
+        }
+      } else if (outcome.phase === 'fired' && outcome.missed) {
+        abilityMissed = true
+      }
+    } else if (!skipPlayerAttack && !playerActive.fainted && !bossActive.fainted) {
       playerFortune = rollCombatFortune({
         attackerLevel: playerActive.level ?? 1,
         defenderLevel: bossActive.level ?? 1,
@@ -970,7 +1045,13 @@ export async function POST(request: Request, { params }: Params) {
     // ── Player→Boss status roll (before counter-attack so paralisi/sonno blocks it) ─
     let statusAppliedToBoss: StatusEffect | null = null
     let bossStatusTurnsLeft = 0
-    if (playerDamage > 0 && newBossHp > 0 && !bossActive.fainted) {
+    if (abilityStatusToBoss && newBossHp > 0 && !bossActive.fainted) {
+      // Ability-inflicted status (already rolled by the resolver).
+      statusAppliedToBoss = abilityStatusToBoss
+      bossStatusTurnsLeft = STATUS_EFFECT_META[abilityStatusToBoss].turns
+      bossActive.active_status = abilityStatusToBoss
+      bossActive.status_turns_left = bossStatusTurnsLeft
+    } else if (!castAbility && playerDamage > 0 && newBossHp > 0 && !bossActive.fainted) {
       const triggered = rollStatusEffect(playerActive.status_effect as StatusEffect | null, playerActive.status_effect_chance)
       if (triggered) {
         statusAppliedToBoss = triggered
@@ -1029,9 +1110,11 @@ export async function POST(request: Request, { params }: Params) {
         })
         const { isCrit: bossCritRoll, critMultiplier: bossCritMult } = rollCrit()
         bossCrit = bossCritRoll
+        // enemyAtkMod (player debuffs) weakens the boss; effPlayer.def folds in self-buffs.
+        const effBossAtk = Math.max(1, Math.round(counterBoss.atk * (1 + pEnc.enemyAtkMod)))
         bossDamage = calculateCombatDamage({
-          attackerAtk: counterBoss.atk,
-          defenderDef: playerActive.def ?? 0,
+          attackerAtk: effBossAtk,
+          defenderDef: effPlayer.def,
           attackMultiplier: bossCritMult,
           elementMultiplier: bossMult,
           varianceMultiplier: bossFortune.multiplier,
@@ -1082,6 +1165,10 @@ export async function POST(request: Request, { params }: Params) {
     } else if (allPlayerFainted) {
       newStatus = 'lost'
     }
+
+    // Persist the active creature's ability state (cooldowns/charge/PP/buffs +
+    // boss debuffs) into its player_lineup entry — playerActive is a reference.
+    playerActive.ability_state = pEnc
 
     await supabase.from('boss_fights').update({
       boss_lineup:         bossLineup,
@@ -1141,6 +1228,10 @@ export async function POST(request: Request, { params }: Params) {
       bossStatusTurnsLeft,
       statusAppliedToPlayer,
       playerStatusTurnsLeft,
+      abilityUsed: castAbility ? { id: castAbility.id, name: castAbility.name } : null,
+      abilityAnimationKey,
+      abilityCharging,
+      abilityMissed,
     })
   }
 
