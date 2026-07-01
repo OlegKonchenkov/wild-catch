@@ -5,6 +5,11 @@ import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollC
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { getEquipmentBonuses } from '@/lib/game/equipment'
+import {
+  resolveAbilityCast, tickAbilityState, applyStatMods, addSelfBuffs, addEnemyDebuffs,
+  normalizeAbilityState, isAbilityUsable, type Ability, type AbilityBattleState,
+} from '@/lib/game/abilities'
+import type { Json } from '@/types/database'
 import { sendPushToUser, pickOne } from '@/lib/push'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
@@ -15,8 +20,9 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
   const userId = user.id
 
-  const { duelId, action, itemId, targetLineupId } = await request.json()
+  const { duelId, action, itemId, targetLineupId, abilityId } = await request.json()
   // action: 'attack' | 'heal' | 'switch' | 'surrender' | 'cancel' | 'opponent_timeout'
+  // 'attack' may carry an optional abilityId to cast a learned special ability.
 
   const { data: duel } = await supabase
     .from('duels')
@@ -471,6 +477,37 @@ export async function POST(request: Request) {
     oppEquipBonus,
   )
 
+  // ── Special ability setup (per-lineup ability_state) ───────────────────────
+  let myState: AbilityBattleState = normalizeAbilityState((myActive as { ability_state?: unknown }).ability_state)
+  let oppState: AbilityBattleState = normalizeAbilityState((oppActive as { ability_state?: unknown }).ability_state)
+  const abilitiesActive = (myActive as { ability_state?: unknown }).ability_state != null || !!abilityId
+  const pendingAbilityId = myState.pending?.abilityId ?? null
+  const effectiveAbilityId: string | null = pendingAbilityId ?? (abilityId ?? null)
+  let castAbility: Ability | null = null
+  if (effectiveAbilityId) {
+    const abRes = await supabase.from('abilities').select('*').eq('id', effectiveAbilityId).maybeSingle()
+    if (abRes.data) {
+      if (pendingAbilityId) {
+        castAbility = abRes.data as unknown as Ability
+      } else {
+        const known = await supabase.from('creature_abilities').select('ability_id')
+          .eq('player_creature_id', (myActive as { player_creature_id: string }).player_creature_id)
+          .eq('ability_id', effectiveAbilityId).maybeSingle()
+        if (known.data) castAbility = abRes.data as unknown as Ability
+      }
+    }
+  }
+  let abilityRecharging = false
+  if (abilitiesActive) {
+    const abTick = tickAbilityState(myState)
+    myState = abTick.state
+    abilityRecharging = abTick.recharging
+  }
+  if (castAbility && !pendingAbilityId && !abilityRecharging) {
+    const usable = isAbilityUsable(castAbility, myState)
+    if (!usable.usable) return NextResponse.json({ error: usable.reason ?? 'Mossa non disponibile' }, { status: 400 })
+  }
+
   // ── Status effect pre-turn processing ─────────────────────────────────────
   const attackerStatus    = (myActive as any).active_status as StatusEffect | null
   const attackerTurnsLeft = (myActive as any).status_turns_left ?? 0
@@ -597,32 +634,95 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Damage calculation ─────────────────────────────────────────────────────
-  const mult   = getElementMultiplier(myCreature.element as Element, oppCreature.element as Element)
-  const fortune = rollCombatFortune({
-    attackerLevel: levelByUser[userId],
-    defenderLevel: levelByUser[oppUserId!] ?? 1,
-    attackerStats: myCombatStats,
-    defenderStats: oppCombatStats,
-  })
-  const { isCrit, critMultiplier } = rollCrit()
-  const damage = calculateCombatDamage({
-    attackerAtk: myCombatStats.atk,
-    defenderDef: oppCombatStats.def,
-    attackMultiplier: atkMultiplier * critMultiplier,
-    elementMultiplier: mult,
-    varianceMultiplier: fortune.multiplier,
-  })
+  // ── Damage / ability resolution ────────────────────────────────────────────
+  let mult = getElementMultiplier(myCreature.element as Element, oppCreature.element as Element)
+  let fortune: ReturnType<typeof rollCombatFortune> | null = null
+  let isCrit = false
+  let damage = 0
+  let abilityStatusToOpp: StatusEffect | null = null
+  let abilitySelfStatus: StatusEffect | null = null
+  let abilityHealToMe = 0
+  let abilityCharging = false
+  let abilityMissed = false
+  let abilityAnimationKey: string | null = null
+
+  // Self-buffs/enemy-debuffs are 0 unless abilities are in play (→ identical maths).
+  const effMy = applyStatMods(myCombatStats.atk, myCombatStats.def, myState)
+  const effOppDef = applyStatMods(oppCombatStats.atk, oppCombatStats.def, oppState).def
+
+  if (abilityRecharging) {
+    // Forced recharge turn — the creature cannot attack.
+  } else if (castAbility) {
+    const outcome = resolveAbilityCast({
+      ability: castAbility,
+      casterElement: myCreature.element as Element,
+      targetElement: oppCreature.element as Element,
+      casterAtk: effMy.atk,
+      casterDef: effMy.def,
+      casterMaxHp: myCombatStats.hp,
+      casterHp: myActive.current_hp,
+      casterStatus: (myActive as { active_status?: StatusEffect | null }).active_status ?? null,
+      targetDef: effOppDef,
+      targetStatus: (oppActive as { active_status?: StatusEffect | null }).active_status ?? null,
+      state: myState,
+    })
+    myState = outcome.nextState
+    abilityAnimationKey = outcome.animationKey
+    if (outcome.phase === 'charging') {
+      abilityCharging = true
+    } else if (outcome.phase === 'fired' && !outcome.missed) {
+      damage = outcome.totalDamage
+      isCrit = outcome.isCrit
+      mult = outcome.elementMultiplier
+      abilityHealToMe = outcome.healToCaster
+      abilityStatusToOpp = outcome.statusToTarget
+      abilitySelfStatus = outcome.selfStatus
+      myState = addSelfBuffs(myState, outcome.buffs)
+      if (outcome.debuffs.atk || outcome.debuffs.def) oppState = addEnemyDebuffs(oppState, outcome.debuffs)
+    } else if (outcome.phase === 'fired' && outcome.missed) {
+      abilityMissed = true
+    }
+  } else {
+    fortune = rollCombatFortune({
+      attackerLevel: levelByUser[userId],
+      defenderLevel: levelByUser[oppUserId!] ?? 1,
+      attackerStats: myCombatStats,
+      defenderStats: oppCombatStats,
+    })
+    const crit = rollCrit()
+    isCrit = crit.isCrit
+    damage = calculateCombatDamage({
+      attackerAtk: effMy.atk,
+      defenderDef: effOppDef,
+      attackMultiplier: atkMultiplier * crit.critMultiplier,
+      elementMultiplier: mult,
+      varianceMultiplier: fortune.multiplier,
+    })
+  }
   const newOppHp = Math.max(0, oppActive.current_hp - damage)
 
-  // Update opponent active creature HP (+ mark fainted if dead)
+  // Update opponent active creature HP (+ ability_state for debuffs; mark fainted if dead)
   await supabase
     .from('duel_lineups')
     .update({
       current_hp: newOppHp,
+      ...(abilitiesActive ? { ability_state: oppState as unknown as Json } : {}),
       ...(newOppHp === 0 ? { fainted_at: new Date().toISOString(), is_active: false } : {}),
     })
     .eq('id', oppActive.id)
+
+  // Persist the attacker's ability state (cooldowns/charge/PP/buffs) + any heal / self-status.
+  if (abilitiesActive) {
+    const healedHp = abilityHealToMe > 0
+      ? Math.min(myCombatStats.hp, myActive.current_hp + abilityHealToMe)
+      : myActive.current_hp
+    await supabase.from('duel_lineups').update({
+      current_hp: healedHp,
+      ability_state: myState as unknown as Json,
+      ...(abilitySelfStatus ? { active_status: abilitySelfStatus, status_turns_left: STATUS_EFFECT_META[abilitySelfStatus].turns } : {}),
+    }).eq('id', myActive.id)
+    myActive.current_hp = healedHp
+  }
 
   // ── Handle faint & auto-switch ────────────────────────────────────────────
   let switchedTo: { userId: string; slot: number; playerCreatureId: string; name: string } | null = null
@@ -671,14 +771,24 @@ export async function POST(request: Request) {
   let statusAppliedToOpp: StatusEffect | null = null
   let oppStatusTurnsLeft = 0
   if (!duelOver && newOppHp > 0) {
-    const triggered = rollStatusEffect(myCreature.status_effect as StatusEffect | null, myCreature.status_effect_chance)
-    if (triggered) {
-      statusAppliedToOpp = triggered
-      oppStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
+    if (abilityStatusToOpp) {
+      // Ability-inflicted status (already rolled by the resolver).
+      statusAppliedToOpp = abilityStatusToOpp
+      oppStatusTurnsLeft = STATUS_EFFECT_META[abilityStatusToOpp].turns
       await supabase.from('duel_lineups').update({
-        active_status: triggered,
+        active_status: abilityStatusToOpp,
         status_turns_left: oppStatusTurnsLeft,
       }).eq('id', oppActive.id)
+    } else if (!castAbility) {
+      const triggered = rollStatusEffect(myCreature.status_effect as StatusEffect | null, myCreature.status_effect_chance)
+      if (triggered) {
+        statusAppliedToOpp = triggered
+        oppStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
+        await supabase.from('duel_lineups').update({
+          active_status: triggered,
+          status_turns_left: oppStatusTurnsLeft,
+        }).eq('id', oppActive.id)
+      }
     }
   }
 
@@ -749,6 +859,10 @@ export async function POST(request: Request) {
       statusAppliedToOpp,
       oppStatusTurnsLeft,
       poisonEvent,
+      abilityUsed: castAbility ? { id: castAbility.id, name: castAbility.name } : null,
+      abilityAnimationKey,
+      abilityCharging,
+      abilityMissed,
     },
   })
   await supabase.removeChannel(channel)
@@ -763,6 +877,10 @@ export async function POST(request: Request) {
     switchedTo,
     levelUp: myLevelUp,
     completedMissions,
+    abilityUsed: castAbility ? { id: castAbility.id, name: castAbility.name } : null,
+    abilityAnimationKey,
+    abilityCharging,
+    abilityMissed,
   })
 }
 
