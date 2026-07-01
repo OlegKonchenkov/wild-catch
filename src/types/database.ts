@@ -1589,6 +1589,7 @@ export type Database = {
         Row: {
           esca_active_until: string | null
           exp: number
+          gemme: number
           gold: number
           id: string
           joined_at: string | null
@@ -1608,6 +1609,7 @@ export type Database = {
         Insert: {
           esca_active_until?: string | null
           exp?: number
+          gemme?: number
           gold?: number
           id?: string
           joined_at?: string | null
@@ -1627,6 +1629,7 @@ export type Database = {
         Update: {
           esca_active_until?: string | null
           exp?: number
+          gemme?: number
           gold?: number
           id?: string
           joined_at?: string | null
@@ -2057,6 +2060,7 @@ export type Database = {
       increment_player_stats: {
         Args: {
           p_exp: number
+          p_gemme?: number
           p_gold?: number
           p_score: number
           p_session_id: string
