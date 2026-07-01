@@ -2359,12 +2359,17 @@ export default function EncounterPage() {
                     const chancePercent = Math.round((cr.status_effect_chance ?? 0.15) * 100)
                     const EFFECT_DURATIONS: Record<StatusEffect, string> = {
                       paralisi: '2 turni', confusione: '3 turni', sonno: '2 turni', veleno: 'Finché in campo',
+                      scottatura: '3 turni', congelamento: '~2 turni', rigenerazione: '3 turni', marchio: '3 turni',
                     }
                     const EFFECT_DESCRIPTIONS: Record<StatusEffect, string> = {
                       paralisi:   '35% di attaccare, 65% di fallire per 2 turni',
                       confusione: '50% di colpirsi da solo per 3 turni',
                       sonno:      'Salta sempre l\'attacco per 2 turni',
                       veleno:     "All'inizio del turno perde il 10% degli HP finché resta in campo",
+                      scottatura:    "Perde l'8% degli HP a turno e attacca più debolmente",
+                      congelamento:  'Salta il turno finché non si scongela (25% a turno)',
+                      rigenerazione: "Recupera il 10% degli HP all'inizio del turno",
+                      marchio:       'Subisce il 25% di danni in più dagli attacchi',
                     }
                     return (
                       <motion.div

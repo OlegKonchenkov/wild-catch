@@ -1138,10 +1138,14 @@ export default function BestiaryPage() {
                         const meta = STATUS_EFFECT_META[effect]
                         const chancePercent = Math.round(((creature as any).status_effect_chance ?? 0.15) * 100)
                         const EFFECT_DETAILS: Record<StatusEffect, { description: string; duration: string }> = {
-                          paralisi:   { description: 'Per 2 turni ha il 35% di attaccare normalmente e il 65% di fallire il turno.', duration: '2 turni' },
-                          confusione: { description: 'Per 3 turni ha il 50% di attaccare normalmente e il 50% di colpirsi da solo.', duration: '3 turni' },
-                          sonno:      { description: "Per 2 turni salta sempre l'attacco.", duration: '2 turni' },
-                          veleno:     { description: "All'inizio del suo turno perde il 10% degli HP massimi finché resta in campo.", duration: 'Finché in campo' },
+                          paralisi:      { description: 'Per 2 turni ha il 35% di attaccare normalmente e il 65% di fallire il turno.', duration: '2 turni' },
+                          confusione:    { description: 'Per 3 turni ha il 50% di attaccare normalmente e il 50% di colpirsi da solo.', duration: '3 turni' },
+                          sonno:         { description: "Per 2 turni salta sempre l'attacco.", duration: '2 turni' },
+                          veleno:        { description: "All'inizio del suo turno perde il 10% degli HP massimi finché resta in campo.", duration: 'Finché in campo' },
+                          scottatura:    { description: "All'inizio del turno perde l'8% degli HP massimi e attacca più debolmente.", duration: '3 turni' },
+                          congelamento:  { description: 'Resta congelato e salta il turno, con il 25% di scongelarsi ogni turno.', duration: '~2 turni' },
+                          rigenerazione: { description: "All'inizio del turno recupera il 10% degli HP massimi.", duration: '3 turni' },
+                          marchio:       { description: 'Marchiato: subisce il 25% di danni in più dagli attacchi.', duration: '3 turni' },
                         }
                         const detail = EFFECT_DETAILS[effect]
                         return (
