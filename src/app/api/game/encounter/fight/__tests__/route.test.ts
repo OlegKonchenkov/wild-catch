@@ -384,7 +384,7 @@ describe('POST /api/game/encounter/fight', () => {
     // Base attack is a mocked flat 10; the power-2 ability must exceed that.
     expect(body.playerDamage).toBeGreaterThan(10)
     // Cooldown state is persisted so the move can't be spammed next turn.
-    const updateArg = encounterUpdate.mock.calls[0][0]
+    const updateArg = (encounterUpdate.mock.calls[0] as unknown as any[])[0]
     expect(updateArg.ability_state.player.cooldowns['ab-fire']).toBe(2)
 
     randomSpy.mockRestore()
@@ -419,7 +419,7 @@ describe('POST /api/game/encounter/fight', () => {
     expect(res.status).toBe(200)
     expect(body.abilityCharging).toBe(true)
     expect(body.playerDamage).toBe(0)
-    const updateArg = encounterUpdate.mock.calls[0][0]
+    const updateArg = (encounterUpdate.mock.calls[0] as unknown as any[])[0]
     expect(updateArg.ability_state.player.pending.abilityId).toBe('ab-beam')
 
     randomSpy.mockRestore()

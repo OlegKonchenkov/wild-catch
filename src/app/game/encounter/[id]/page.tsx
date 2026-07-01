@@ -20,6 +20,10 @@ import { playCatchAttempt, playCatchFail, playCatchSuccess } from '@/lib/game/so
 import { playKnockout, playFlee, playDefeat, playMissionComplete } from '@/lib/game/sounds/events'
 import { playHeal } from '@/lib/game/sounds/ui'
 import AttackAnimation from '@/components/battle/AttackAnimation'
+import AbilityMenu, { type BattleMove } from '@/components/battle/AbilityMenu'
+import AbilityFx from '@/components/battle/AbilityFx'
+import { abilityAccent } from '@/components/game/ability-visuals'
+import type { Ability } from '@/lib/game/abilities'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
 import { track } from '@/lib/analytics'
@@ -383,6 +387,11 @@ export default function EncounterPage() {
   const [wildAnim, setWildAnim]     = useState<'idle' | 'damage' | 'catch' | 'flee'>('idle')
   const [playerAnim, setPlayerAnim] = useState<'idle' | 'attack' | 'damage'>('idle')
   const [attackAnim, setAttackAnim] = useState<{ key: number; element: string; rarity: string; side: 'left' | 'right'; soundUrl?: string | null; soundDurationMs?: number | null } | null>(null)
+  // Special abilities: the active creature's learned moveset + battle overlays.
+  const [moveset, setMoveset]       = useState<BattleMove[]>([])
+  const [showMovesModal, setShowMovesModal] = useState(false)
+  const [encounterPcId, setEncounterPcId]   = useState<string | null>(null)
+  const [abilityFx, setAbilityFx]   = useState<{ key: number; animationKey: string; color: string; name: string; side: 'left' | 'right' } | null>(null)
   const [lastDamage, setLastDamage] = useState<{ amount: number; target: 'wild' | 'player'; id: number; isCrit?: boolean; tone?: 'normal' | 'poison' } | null>(null)
   const [catchPhase, setCatchPhase] = useState<'idle' | 'throwing' | 'hit'>('idle')
   const [showCatchSuccess, setShowCatchSuccess] = useState(false)
@@ -522,6 +531,7 @@ export default function EncounterPage() {
     supabase.from('encounters').select('player_creature_id').eq('id', state.encounterId).single()
       .then(async ({ data: enc }) => {
         if (!enc?.player_creature_id) return
+        setEncounterPcId(enc.player_creature_id)
         const { data: pc } = await supabase
           .from('player_creatures')
           .select('creatures(name, hp, atk, element, image_url, sprite_cutout_url, sprite_url, rarity, attack_sound_url, attack_sound_duration_ms)')
@@ -546,6 +556,28 @@ export default function EncounterPage() {
         }
       })
   }, [state?.encounterId, supabase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The currently active player creature (squad slot or single locked creature).
+  const activePcId = squadCreatures.length > 0 ? (squadCreatures[activeSlot]?.pcId ?? null) : encounterPcId
+
+  // Load the active creature's learned moveset for the MOSSE menu.
+  useEffect(() => {
+    const sid = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null
+    if (!activePcId || !sid) { setMoveset([]); return }
+    let cancelled = false
+    fetch(`/api/game/creature/abilities?playerCreatureId=${activePcId}&sessionId=${sid}`)
+      .then(r => r.json())
+      .then(d => {
+        if (cancelled) return
+        const ms = ((d.moveset ?? []) as { abilities: Ability | null }[])
+          .map(r => r.abilities)
+          .filter((a): a is Ability => !!a)
+          .map(a => ({ ability: a }))
+        setMoveset(ms)
+      })
+      .catch(() => { if (!cancelled) setMoveset([]) })
+    return () => { cancelled = true }
+  }, [activePcId])
 
   // ── Timer ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -699,11 +731,13 @@ export default function EncounterPage() {
   }
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
-  async function handleFight() {
+  async function handleFight(abilityIdArg?: string | null) {
     if (!state || loading) return
+    const usingAbility = !!abilityIdArg
     const attackingName = playerCreature?.name ?? 'Creatura'
-    const usedBattagliaId = playerStatus === 'sonno' ? null : selectedBattagliaId
-    const usedPozioneId = playerStatus === 'sonno' ? null : selectedPozioneId
+    // Abilities never consume battaglia/pozione items.
+    const usedBattagliaId = (playerStatus === 'sonno' || usingAbility) ? null : selectedBattagliaId
+    const usedPozioneId = (playerStatus === 'sonno' || usingAbility) ? null : selectedPozioneId
     const sleepingTurn = playerStatus === 'sonno'
     const statusMayChangeAttack = playerStatus === 'paralisi' || playerStatus === 'confusione' || playerStatus === 'veleno'
     const playedAttackOptimistically = !sleepingTurn && !statusMayChangeAttack
@@ -726,6 +760,7 @@ export default function EncounterPage() {
         encounterId: state.encounterId,
         itemId: activeItemId,
         currentPlayerHp: playerHp ?? playerCreature?.maxHp ?? 100,
+        ...(abilityIdArg ? { abilityId: abilityIdArg } : {}),
         ...(activeSlot > 0 && activeSquadPcId ? { activePlayerCreatureId: activeSquadPcId } : {}),
         ...(shouldClearStatus ? { clearPlayerStatus: true } : {}),
       }),
@@ -745,6 +780,16 @@ export default function EncounterPage() {
     setPlayerAnim('idle')
 
     if (!res.ok) { setMessage(data.error); finishPendingAction(); return }
+
+    // Special-ability feedback: play the move's signature effect + banner.
+    if (usingAbility && data.abilityUsed) {
+      const move = moveset.find(m => m.ability.id === data.abilityUsed.id)?.ability
+      const color = move ? abilityAccent(move) : '#C084FC'
+      setAbilityFx({ key: Date.now(), animationKey: data.abilityAnimationKey ?? 'basic_strike', color, name: data.abilityUsed.name, side: 'left' })
+      if (data.abilityCharging) setMessage(`🌀 ${attackingName} sta caricando ${data.abilityUsed.name}...`)
+      else if (data.abilityMissed) setMessage(`💨 ${data.abilityUsed.name} ha mancato!`)
+      else setMessage(`✨ ${data.abilityUsed.name}!`)
+    }
 
     const remainingAttackMs = playedAttackOptimistically ? Math.max(0, 260 - (Date.now() - actionStartedAt)) : 0
     if (remainingAttackMs > 0) await new Promise(r => setTimeout(r, remainingAttackMs))
@@ -1507,10 +1552,10 @@ export default function EncounterPage() {
     },
     {
       id: 'fight',
-      label: playerSleeping ? 'Passa' : 'Lotta',
+      label: playerSleeping ? 'Passa' : (moveset.length > 0 ? 'Mosse' : 'Lotta'),
       icon: <IconSwords size={30} />,
       tone: 'purple',
-      onClick: handleFight,
+      onClick: () => { if (playerSleeping || moveset.length === 0) handleFight(); else setShowMovesModal(true) },
       disabled: loading || state.turns >= 5,
       loading: pendingAction === 'fight',
     },
@@ -1581,8 +1626,22 @@ export default function EncounterPage() {
       >
         <CaptureOverlay phase={catchPhase} success={showCatchSuccess} creatureName={state.creature.name ?? undefined} />
         <EvolutionFx phase={evoFx} element={(caughtCreatureData?.element ?? state.creature?.element ?? 'armonia') as string} />
+        {abilityFx && (
+          <AbilityFx key={abilityFx.key} animationKey={abilityFx.animationKey} color={abilityFx.color}
+            name={abilityFx.name} side={abilityFx.side} onComplete={() => setAbilityFx(null)} />
+        )}
       </ImmersiveBattleLayout>
       )}
+
+      {/* Special-ability move selector */}
+      <AbilityMenu
+        open={showMovesModal}
+        onClose={() => setShowMovesModal(false)}
+        element={playerElement}
+        moves={moveset}
+        busy={loading}
+        onSelect={(abilityId) => { setShowMovesModal(false); handleFight(abilityId) }}
+      />
 
       {renderLegacyBattleUi && (
         <>
@@ -1964,7 +2023,7 @@ export default function EncounterPage() {
               )}
             </motion.button>
 
-            <motion.button id="wc-fight-btn" onClick={handleFight} disabled={loading || state.turns >= 5} whileTap={{ scale: 0.93 }}
+            <motion.button id="wc-fight-btn" onClick={() => { if (playerSleeping || moveset.length === 0) handleFight(); else setShowMovesModal(true) }} disabled={loading || state.turns >= 5} whileTap={{ scale: 0.93 }}
               className="rounded-2xl py-[14px] flex flex-col items-center justify-center gap-0.5 disabled:opacity-50"
               style={{ background: 'linear-gradient(145deg,#7B4DB8,#5c3a8c)', boxShadow: '0 4px 18px rgba(123,77,184,0.4)' }}>
               {pendingAction === 'fight'

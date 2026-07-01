@@ -12,7 +12,7 @@ import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { getEquipmentBonuses } from '@/lib/game/equipment'
 import {
-  resolveAbilityCast, tickAbilityState, applyStatMods, addSelfBuffs,
+  resolveAbilityCast, tickAbilityState, applyStatMods, addSelfBuffs, isAbilityUsable,
   type Ability, type CastResult,
 } from '@/lib/game/abilities'
 import { normalizeEncounterAbilityState, clampMod } from '@/lib/game/ability-turn'
@@ -197,6 +197,15 @@ export async function POST(request: Request) {
     encState.player = abTick.state
     abilityRecharging = abTick.recharging
     if (abilityRecharging) skipPlayerAttack = true
+  }
+
+  // A fresh cast that's on cooldown / out of PP is rejected up-front so the
+  // player doesn't waste a turn — nothing has been persisted yet.
+  if (castAbility && !pendingId && !abilityRecharging) {
+    const usable = isAbilityUsable(castAbility, encState.player)
+    if (!usable.usable) {
+      return NextResponse.json({ error: usable.reason ?? 'Mossa non disponibile' }, { status: 400 })
+    }
   }
 
   if (!skipPlayerAttack && wildHpRemaining > 0 && itemId && attackItemQuantity > 0) {
