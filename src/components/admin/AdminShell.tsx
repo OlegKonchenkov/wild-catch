@@ -12,6 +12,7 @@ const NAV = [
   { href: '/admin/missions',    label: '🎯 Missioni'   },
   { href: '/admin/items',       label: '🎒 Oggetti'    },
   { href: '/admin/equipaggiamento', label: '🛡️ Equipaggiamento' },
+  { href: '/admin/abilita',     label: '✨ Abilità'    },
   { href: '/admin/qrcodes',     label: '📷 QR Codes'   },
   { href: '/admin/enigmi',      label: '🧩 Enigmi'     },
   { href: '/admin/invites',     label: '🎟️ Inviti'     },

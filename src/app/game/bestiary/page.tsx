@@ -14,6 +14,7 @@ import { resolveCreatureSprite, ELEMENT_BACKGROUND } from '@/lib/game/battle-sce
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { GameGridSkeleton } from '@/components/game/GameLoading'
 import EquipmentManager from '@/components/game/EquipmentManager'
+import AbilityManager from '@/components/game/AbilityManager'
 import EnigmaFragmentPanel from '@/components/game/EnigmaFragmentPanel'
 import { GiSpellBook, GiOpenBook, GiBreastplate, GiPuzzle } from 'react-icons/gi'
 import ElementIcon from '@/components/ui/ElementIcon'
@@ -39,7 +40,7 @@ export default function BestiaryPage() {
   const [showFilters, setShowFilters]       = useState(false)
   const [showWeakness, setShowWeakness]     = useState(false)
   const [showStatusInfo, setShowStatusInfo] = useState(false)
-  const [detailTab, setDetailTab]           = useState<'panoramica' | 'equip' | 'enigma'>('panoramica')
+  const [detailTab, setDetailTab]           = useState<'panoramica' | 'abilita' | 'equip' | 'enigma'>('panoramica')
   const [equipReloadKey, setEquipReloadKey] = useState(0)
   const [equipCounts, setEquipCounts]       = useState<Record<string, number>>({})
   const [loading, setLoading]               = useState(true)
@@ -1046,9 +1047,10 @@ export default function BestiaryPage() {
                       {/* Tab bar */}
                       <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
                         {([
-                          { id: 'panoramica' as const, label: 'Info',   Icon: GiOpenBook,    accent: '58,188,168',  fg: '#3ABCA8' },
-                          { id: 'equip'      as const, label: 'Equip',  Icon: GiBreastplate, accent: '58,188,168',  fg: '#3ABCA8' },
-                          { id: 'enigma'     as const, label: 'Enigma', Icon: GiPuzzle,      accent: '123,77,184',  fg: '#C084FC' },
+                          { id: 'panoramica' as const, label: 'Info',    Icon: GiOpenBook,    accent: '58,188,168',  fg: '#3ABCA8' },
+                          { id: 'abilita'    as const, label: 'Abilità', Icon: GiSpellBook,   accent: '184,139,240', fg: '#C084FC' },
+                          { id: 'equip'      as const, label: 'Equip',   Icon: GiBreastplate, accent: '58,188,168',  fg: '#3ABCA8' },
+                          { id: 'enigma'     as const, label: 'Enigma',  Icon: GiPuzzle,      accent: '123,77,184',  fg: '#C084FC' },
                         ]).map(t => {
                           const active = detailTab === t.id
                           return (
@@ -1063,6 +1065,17 @@ export default function BestiaryPage() {
                           )
                         })}
                       </div>
+
+                      {detailTab === 'abilita' && (
+                        <AbilityManager
+                          key={`ab:${pc.id}`}
+                          sessionId={sessionRef.current}
+                          playerCreatureId={pc.id}
+                          element={creature.element}
+                          rarity={creature.rarity}
+                          playerLevel={playerLevel}
+                        />
+                      )}
 
                       {detailTab === 'equip' && (
                         <EquipmentManager
@@ -1138,10 +1151,14 @@ export default function BestiaryPage() {
                         const meta = STATUS_EFFECT_META[effect]
                         const chancePercent = Math.round(((creature as any).status_effect_chance ?? 0.15) * 100)
                         const EFFECT_DETAILS: Record<StatusEffect, { description: string; duration: string }> = {
-                          paralisi:   { description: 'Per 2 turni ha il 35% di attaccare normalmente e il 65% di fallire il turno.', duration: '2 turni' },
-                          confusione: { description: 'Per 3 turni ha il 50% di attaccare normalmente e il 50% di colpirsi da solo.', duration: '3 turni' },
-                          sonno:      { description: "Per 2 turni salta sempre l'attacco.", duration: '2 turni' },
-                          veleno:     { description: "All'inizio del suo turno perde il 10% degli HP massimi finché resta in campo.", duration: 'Finché in campo' },
+                          paralisi:      { description: 'Per 2 turni ha il 35% di attaccare normalmente e il 65% di fallire il turno.', duration: '2 turni' },
+                          confusione:    { description: 'Per 3 turni ha il 50% di attaccare normalmente e il 50% di colpirsi da solo.', duration: '3 turni' },
+                          sonno:         { description: "Per 2 turni salta sempre l'attacco.", duration: '2 turni' },
+                          veleno:        { description: "All'inizio del suo turno perde il 10% degli HP massimi finché resta in campo.", duration: 'Finché in campo' },
+                          scottatura:    { description: "All'inizio del turno perde l'8% degli HP massimi e attacca più debolmente.", duration: '3 turni' },
+                          congelamento:  { description: 'Resta congelato e salta il turno, con il 25% di scongelarsi ogni turno.', duration: '~2 turni' },
+                          rigenerazione: { description: "All'inizio del turno recupera il 10% degli HP massimi.", duration: '3 turni' },
+                          marchio:       { description: 'Marchiato: subisce il 25% di danni in più dagli attacchi.', duration: '3 turni' },
                         }
                         const detail = EFFECT_DETAILS[effect]
                         return (

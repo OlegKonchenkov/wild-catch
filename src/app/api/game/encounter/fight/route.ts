@@ -11,7 +11,13 @@ import {
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
 import { getEquipmentBonuses } from '@/lib/game/equipment'
+import {
+  resolveAbilityCast, tickAbilityState, applyStatMods, addSelfBuffs, isAbilityUsable,
+  type Ability, type CastResult,
+} from '@/lib/game/abilities'
+import { normalizeEncounterAbilityState, clampMod } from '@/lib/game/ability-turn'
 import type { Element } from '@/lib/types'
+import type { Json } from '@/types/database'
 
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthUser()
@@ -21,7 +27,7 @@ export async function POST(request: Request) {
   if (!rl.success) return rateLimitResponse(rl.reset)
 
   const body = await request.json().catch(() => ({}))
-  const { encounterId, itemId, activePlayerCreatureId, clearPlayerStatus, currentPlayerHp } = body
+  const { encounterId, itemId, abilityId, activePlayerCreatureId, clearPlayerStatus, currentPlayerHp } = body
 
   if (!encounterId) {
     return NextResponse.json({ error: 'encounterId mancante' }, { status: 400 })
@@ -90,6 +96,34 @@ export async function POST(request: Request) {
   const playerAtk = playerCr.atk + equipBonus.atk
   const playerDef = (playerCr.def ?? 0) + equipBonus.def
 
+  // ── Special abilities ──────────────────────────────────────────────────────
+  // The player's active creature owns an AbilityBattleState (cooldowns / charge /
+  // PP / self-buffs); the wild's stat mods from player debuffs are two scalars.
+  const rawAbilityState = (encounter as { ability_state?: unknown }).ability_state
+  const encState = normalizeEncounterAbilityState(rawAbilityState)
+  // A charging move forces its own continuation regardless of what the client sent.
+  const pendingId = encState.player.pending?.abilityId ?? null
+  const effectiveAbilityId: string | null = pendingId ?? (abilityId ?? null)
+  let castAbility: Ability | null = null
+  if (effectiveAbilityId) {
+    const abRes = await supabase.from('abilities').select('*').eq('id', effectiveAbilityId).maybeSingle()
+    if (abRes.data) {
+      if (pendingId) {
+        castAbility = abRes.data as unknown as Ability // already validated when charging began
+      } else {
+        // A fresh cast must be a move this creature actually knows.
+        const known = await supabase
+          .from('creature_abilities')
+          .select('ability_id')
+          .eq('player_creature_id', lookupId)
+          .eq('ability_id', effectiveAbilityId)
+          .maybeSingle()
+        if (known.data) castAbility = abRes.data as unknown as Ability
+      }
+    }
+  }
+  const abilitiesActive = rawAbilityState != null || castAbility != null
+
   let atkMultiplier = 1
   let antiWeakness = false
   let attackItemType: string | null = null
@@ -156,6 +190,24 @@ export async function POST(request: Request) {
     skipWildAttack = true
   }
 
+  // Tick ability cooldowns / recharge at the start of the player's turn.
+  let abilityRecharging = false
+  if (abilitiesActive) {
+    const abTick = tickAbilityState(encState.player)
+    encState.player = abTick.state
+    abilityRecharging = abTick.recharging
+    if (abilityRecharging) skipPlayerAttack = true
+  }
+
+  // A fresh cast that's on cooldown / out of PP is rejected up-front so the
+  // player doesn't waste a turn — nothing has been persisted yet.
+  if (castAbility && !pendingId && !abilityRecharging) {
+    const usable = isAbilityUsable(castAbility, encState.player)
+    if (!usable.usable) {
+      return NextResponse.json({ error: usable.reason ?? 'Mossa non disponibile' }, { status: 400 })
+    }
+  }
+
   if (!skipPlayerAttack && wildHpRemaining > 0 && itemId && attackItemQuantity > 0) {
     if (attackItemType === 'battaglia') {
       atkMultiplier = 1 + attackItemEffectValue / 100
@@ -172,22 +224,77 @@ export async function POST(request: Request) {
   )
   if (antiWeakness && elementMult < 1) elementMult = 1
 
-  const playerCrit = Math.random() < 0.10
-  const critMult = playerCrit ? 1.75 : 1
-  if (!skipPlayerAttack && wildHpRemaining > 0) {
-    playerDamage = Math.round(calculateFightDamage(playerAtk) * elementMult * atkMultiplier * critMult)
-    wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
-  }
-
+  let playerCrit = false
+  let abilityCasting: CastResult | null = null
+  let abilityAnimationKey: string | null = null
+  let abilityCharging = false
+  let abilityMissed = false
   let statusAppliedToWild: StatusEffect | null = null
   let wildNewStatusTurns = 0
-  if (playerDamage > 0 && wildHpRemaining > 0) {
-    const triggered = rollStatusEffect(playerCr.status_effect as StatusEffect | null, playerCr.status_effect_chance)
-    if (triggered) {
-      statusAppliedToWild = triggered
-      wildNewStatusTurns = STATUS_EFFECT_META[triggered].turns
-      newWildStatus = triggered
-      newWildStatusTurns = wildNewStatusTurns
+
+  if (castAbility && !skipPlayerAttack && wildHpRemaining > 0) {
+    // ── Special ability cast ──
+    const effPlayer = applyStatMods(playerAtk, playerDef, encState.player)
+    const effWildDef = Math.max(0, Math.round((wildCreature.def ?? 0) * (1 + encState.enemyDefMod)))
+    const outcome = resolveAbilityCast({
+      ability: castAbility,
+      casterElement: playerCr.element as Element,
+      targetElement: wildCreature.element as Element,
+      casterAtk: effPlayer.atk,
+      casterDef: effPlayer.def,
+      casterMaxHp: playerMaxHp,
+      casterHp: playerHpRemaining,
+      casterStatus: newPlayerStatus,
+      targetDef: effWildDef,
+      targetStatus: newWildStatus,
+      state: encState.player,
+    })
+    encState.player = outcome.nextState
+    abilityCasting = outcome
+    abilityAnimationKey = outcome.animationKey
+
+    if (outcome.phase === 'charging') {
+      abilityCharging = true
+    } else if (outcome.phase === 'fired' && !outcome.missed) {
+      playerDamage = outcome.totalDamage
+      playerCrit = outcome.isCrit
+      elementMult = outcome.elementMultiplier
+      wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
+      if (outcome.healToCaster > 0) {
+        playerHpRemaining = Math.min(playerMaxHp, playerHpRemaining + outcome.healToCaster)
+      }
+      if (outcome.statusToTarget && wildHpRemaining > 0) {
+        statusAppliedToWild = outcome.statusToTarget
+        wildNewStatusTurns = STATUS_EFFECT_META[outcome.statusToTarget].turns
+        newWildStatus = outcome.statusToTarget
+        newWildStatusTurns = wildNewStatusTurns
+      }
+      if (outcome.selfStatus) {
+        newPlayerStatus = outcome.selfStatus
+        newPlayerStatusTurns = STATUS_EFFECT_META[outcome.selfStatus].turns
+      }
+      encState.player = addSelfBuffs(encState.player, outcome.buffs)
+      encState.enemyAtkMod = clampMod(encState.enemyAtkMod - outcome.debuffs.atk)
+      encState.enemyDefMod = clampMod(encState.enemyDefMod - outcome.debuffs.def)
+    } else if (outcome.phase === 'fired' && outcome.missed) {
+      abilityMissed = true
+    }
+  } else if (!skipPlayerAttack && wildHpRemaining > 0) {
+    // ── Base attack (unchanged behaviour) ──
+    playerCrit = Math.random() < 0.10
+    const critMult = playerCrit ? 1.75 : 1
+    playerDamage = Math.round(calculateFightDamage(playerAtk) * elementMult * atkMultiplier * critMult)
+    wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
+
+    // Innate on-hit status effect (base attacks only — abilities carry their own).
+    if (playerDamage > 0 && wildHpRemaining > 0) {
+      const triggered = rollStatusEffect(playerCr.status_effect as StatusEffect | null, playerCr.status_effect_chance)
+      if (triggered) {
+        statusAppliedToWild = triggered
+        wildNewStatusTurns = STATUS_EFFECT_META[triggered].turns
+        newWildStatus = triggered
+        newWildStatusTurns = wildNewStatusTurns
+      }
     }
   }
 
@@ -212,7 +319,9 @@ export async function POST(request: Request) {
   }
 
   if (wildHpRemaining > 0 && !skipWildAttack && playerHpRemaining > 0) {
-    wildDamage = calculateFightDamage(wildCreature.atk)
+    // enemyAtkMod is 0 unless the player debuffed the wild — identical to before otherwise.
+    const effWildAtk = Math.max(1, Math.round(wildCreature.atk * (1 + encState.enemyAtkMod)))
+    wildDamage = calculateFightDamage(effWildAtk)
     playerTookDamage = true
     playerHpRemaining = Math.max(0, playerHpRemaining - wildDamage)
   }
@@ -252,6 +361,9 @@ export async function POST(request: Request) {
       // Persist authoritative player HP — anti-cheat: the next fight call
       // will read this and ignore whatever currentPlayerHp the client sends.
       player_hp: playerHpRemaining,
+      // Persist ability cooldown/charge/PP/buff state (null when the fight ends
+      // or when abilities were never involved — keeps base-attack fights untouched).
+      ability_state: (fightResult === 'fled' ? null : (abilitiesActive ? encState : rawAbilityState ?? null)) as unknown as Json,
     })
     .eq('id', encounterId)
 
@@ -273,5 +385,12 @@ export async function POST(request: Request) {
     wildNewStatusTurns,
     statusAppliedToPlayer,
     playerNewStatusTurns,
+    // Ability feedback for the client (animation + turn messaging).
+    abilityUsed: castAbility ? { id: castAbility.id, name: castAbility.name } : null,
+    abilityAnimationKey,
+    abilityCharging,
+    abilityMissed,
+    abilityHits: abilityCasting?.hits ?? 0,
+    abilityHealedPlayer: abilityCasting?.healToCaster ?? 0,
   })
 }

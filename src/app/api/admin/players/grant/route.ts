@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { grantAbility } from '@/lib/game/grant-ability'
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { userId, sessionId, type, amount, itemId, quantity, creatureId } = body
+  const { userId, sessionId, type, amount, itemId, quantity, creatureId, abilityId } = body
 
   if (!userId || !sessionId || !type) {
     return NextResponse.json({ error: 'userId, sessionId e type richiesti' }, { status: 400 })
@@ -95,6 +96,14 @@ export async function POST(request: Request) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     }
     return NextResponse.json({ granted: true, type, itemId, quantity: qty })
+  }
+
+  if (type === 'abilita') {
+    if (!abilityId) return NextResponse.json({ error: 'abilityId richiesto' }, { status: 400 })
+    const qty = Number(quantity) || 1
+    const r = await grantAbility(admin, userId, sessionId, abilityId, qty)
+    if (!r.granted) return NextResponse.json({ error: r.error ?? 'Errore' }, { status: 500 })
+    return NextResponse.json({ granted: true, type, abilityId, quantity: r.quantity })
   }
 
   if (type === 'creature') {

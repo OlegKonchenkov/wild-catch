@@ -22,9 +22,13 @@ type EncounterOverrides = Partial<Record<string, unknown>>
 function buildSupabaseMock({
   encounterOverrides = {},
   playerCreatureOverrides = {},
+  abilityRow = null,
+  knownRow = null,
 }: {
   encounterOverrides?: EncounterOverrides
   playerCreatureOverrides?: EncounterOverrides
+  abilityRow?: Record<string, unknown> | null
+  knownRow?: Record<string, unknown> | null
 } = {}) {
   const encounterUpdate = vi.fn(() => ({
     eq: vi.fn(async () => ({ error: null })),
@@ -123,6 +127,28 @@ function buildSupabaseMock({
           })),
           update: vi.fn(() => ({
             eq: vi.fn(async () => ({ error: null })),
+          })),
+        }
+      }
+
+      if (table === 'abilities') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: abilityRow })),
+            })),
+          })),
+        }
+      }
+
+      if (table === 'creature_abilities') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({ data: knownRow })),
+              })),
+            })),
           })),
         }
       }
@@ -321,6 +347,80 @@ describe('POST /api/game/encounter/fight', () => {
     expect(body.statusEvents).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'veleno', target: 'wild', poisonDamage: 8, newHp: 0 }),
     ]))
+
+    randomSpy.mockRestore()
+  })
+
+  it('casts a special ability: hits harder than the base attack and persists cooldown state', async () => {
+    // 0.9 for every roll → never misses (accuracy 1), never crits.
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9)
+
+    const ability = {
+      id: 'ab-fire', name: 'Zanna Ardente', description: '', element: 'fiamma', category: 'attacco', rarity: 'comune',
+      power: 2, accuracy: 1, target: 'enemy', priority: 0, charge_turns: 0, recharge_turns: 0, cooldown: 2, max_uses: null,
+      hits_min: 1, hits_max: 1, status_effect: null, status_chance: 0, self_status: null,
+      heal_percent: 0, lifesteal_percent: 0, buff_atk: 0, buff_def: 0, debuff_atk: 0, debuff_def: 0,
+      min_level: 1, min_rarity: null, allowed_elements: null, icon_url: null, animation_key: 'fire_slash', sound_url: null, color: null,
+    }
+
+    const { client, encounterUpdate } = buildSupabaseMock({
+      abilityRow: ability,
+      knownRow: { ability_id: 'ab-fire' },
+    })
+    vi.mocked(createClient).mockResolvedValue(client as any)
+
+    const req = new Request('http://localhost/api/game/encounter/fight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ encounterId: 'enc-1', abilityId: 'ab-fire', currentPlayerHp: 60 }),
+    })
+
+    const res = await POST(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.abilityUsed).toEqual({ id: 'ab-fire', name: 'Zanna Ardente' })
+    expect(body.abilityCharging).toBe(false)
+    // Base attack is a mocked flat 10; the power-2 ability must exceed that.
+    expect(body.playerDamage).toBeGreaterThan(10)
+    // Cooldown state is persisted so the move can't be spammed next turn.
+    const updateArg = (encounterUpdate.mock.calls[0] as unknown as any[])[0]
+    expect(updateArg.ability_state.player.cooldowns['ab-fire']).toBe(2)
+
+    randomSpy.mockRestore()
+  })
+
+  it('a charging ability deals no damage on the first turn and stores the pending move', async () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9)
+
+    const ability = {
+      id: 'ab-beam', name: 'Esplosione Solare', description: '', element: 'fiamma', category: 'attacco', rarity: 'raro',
+      power: 3, accuracy: 1, target: 'enemy', priority: 0, charge_turns: 1, recharge_turns: 0, cooldown: 0, max_uses: null,
+      hits_min: 1, hits_max: 1, status_effect: null, status_chance: 0, self_status: null,
+      heal_percent: 0, lifesteal_percent: 0, buff_atk: 0, buff_def: 0, debuff_atk: 0, debuff_def: 0,
+      min_level: 1, min_rarity: null, allowed_elements: null, icon_url: null, animation_key: 'charge_beam', sound_url: null, color: null,
+    }
+
+    const { client, encounterUpdate } = buildSupabaseMock({
+      abilityRow: ability,
+      knownRow: { ability_id: 'ab-beam' },
+    })
+    vi.mocked(createClient).mockResolvedValue(client as any)
+
+    const req = new Request('http://localhost/api/game/encounter/fight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ encounterId: 'enc-1', abilityId: 'ab-beam', currentPlayerHp: 60 }),
+    })
+
+    const res = await POST(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.abilityCharging).toBe(true)
+    expect(body.playerDamage).toBe(0)
+    const updateArg = (encounterUpdate.mock.calls[0] as unknown as any[])[0]
+    expect(updateArg.ability_state.player.pending.abilityId).toBe('ab-beam')
 
     randomSpy.mockRestore()
   })

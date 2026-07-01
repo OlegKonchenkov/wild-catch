@@ -14,6 +14,114 @@ export type Database = {
   }
   public: {
     Tables: {
+      abilities: {
+        Row: {
+          accuracy: number
+          allowed_elements: string[] | null
+          animation_key: string
+          buff_atk: number
+          buff_def: number
+          category: string
+          charge_turns: number
+          color: string | null
+          cooldown: number
+          created_at: string | null
+          debuff_atk: number
+          debuff_def: number
+          description: string
+          element: string | null
+          heal_percent: number
+          hits_max: number
+          hits_min: number
+          icon_url: string | null
+          id: string
+          lifesteal_percent: number
+          max_uses: number | null
+          min_level: number
+          min_rarity: string | null
+          name: string
+          power: number
+          priority: number
+          rarity: string | null
+          recharge_turns: number
+          self_status: string | null
+          sound_url: string | null
+          status_chance: number
+          status_effect: string | null
+          target: string
+        }
+        Insert: {
+          accuracy?: number
+          allowed_elements?: string[] | null
+          animation_key?: string
+          buff_atk?: number
+          buff_def?: number
+          category?: string
+          charge_turns?: number
+          color?: string | null
+          cooldown?: number
+          created_at?: string | null
+          debuff_atk?: number
+          debuff_def?: number
+          description?: string
+          element?: string | null
+          heal_percent?: number
+          hits_max?: number
+          hits_min?: number
+          icon_url?: string | null
+          id?: string
+          lifesteal_percent?: number
+          max_uses?: number | null
+          min_level?: number
+          min_rarity?: string | null
+          name: string
+          power?: number
+          priority?: number
+          rarity?: string | null
+          recharge_turns?: number
+          self_status?: string | null
+          sound_url?: string | null
+          status_chance?: number
+          status_effect?: string | null
+          target?: string
+        }
+        Update: {
+          accuracy?: number
+          allowed_elements?: string[] | null
+          animation_key?: string
+          buff_atk?: number
+          buff_def?: number
+          category?: string
+          charge_turns?: number
+          color?: string | null
+          cooldown?: number
+          created_at?: string | null
+          debuff_atk?: number
+          debuff_def?: number
+          description?: string
+          element?: string | null
+          heal_percent?: number
+          hits_max?: number
+          hits_min?: number
+          icon_url?: string | null
+          id?: string
+          lifesteal_percent?: number
+          max_uses?: number | null
+          min_level?: number
+          min_rarity?: string | null
+          name?: string
+          power?: number
+          priority?: number
+          rarity?: string | null
+          recharge_turns?: number
+          self_status?: string | null
+          sound_url?: string | null
+          status_chance?: number
+          status_effect?: string | null
+          target?: string
+        }
+        Relationships: []
+      }
       audio_overrides: {
         Row: {
           created_at: string
@@ -121,6 +229,58 @@ export type Database = {
           },
           {
             foreignKeyName: "boss_fights_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creature_abilities: {
+        Row: {
+          ability_id: string
+          id: string
+          learned_at: string | null
+          player_creature_id: string
+          session_id: string
+          slot_index: number
+          user_id: string
+        }
+        Insert: {
+          ability_id: string
+          id?: string
+          learned_at?: string | null
+          player_creature_id: string
+          session_id: string
+          slot_index: number
+          user_id: string
+        }
+        Update: {
+          ability_id?: string
+          id?: string
+          learned_at?: string | null
+          player_creature_id?: string
+          session_id?: string
+          slot_index?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creature_abilities_ability_id_fkey"
+            columns: ["ability_id"]
+            isOneToOne: false
+            referencedRelation: "abilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creature_abilities_player_creature_id_fkey"
+            columns: ["player_creature_id"]
+            isOneToOne: false
+            referencedRelation: "player_creatures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creature_abilities_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
@@ -297,6 +457,7 @@ export type Database = {
       }
       duel_lineups: {
         Row: {
+          ability_state: Json | null
           active_status: string | null
           current_hp: number
           duel_id: string
@@ -309,6 +470,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ability_state?: Json | null
           active_status?: string | null
           current_hp: number
           duel_id: string
@@ -321,6 +483,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ability_state?: Json | null
           active_status?: string | null
           current_hp?: number
           duel_id?: string
@@ -424,6 +587,7 @@ export type Database = {
       }
       encounters: {
         Row: {
+          ability_state: Json | null
           creature_id: string
           id: string
           player_creature_id: string | null
@@ -441,6 +605,7 @@ export type Database = {
           wild_status_turns: number
         }
         Insert: {
+          ability_state?: Json | null
           creature_id: string
           id?: string
           player_creature_id?: string | null
@@ -458,6 +623,7 @@ export type Database = {
           wild_status_turns?: number
         }
         Update: {
+          ability_state?: Json | null
           creature_id?: string
           id?: string
           player_creature_id?: string | null
@@ -841,6 +1007,7 @@ export type Database = {
           description: string
           id: string
           is_required: boolean
+          reward_ability_id: string | null
           reward_creature_id: string | null
           reward_exp: number
           reward_gold: number
@@ -860,6 +1027,7 @@ export type Database = {
           description: string
           id?: string
           is_required?: boolean
+          reward_ability_id?: string | null
           reward_creature_id?: string | null
           reward_exp?: number
           reward_gold?: number
@@ -879,6 +1047,7 @@ export type Database = {
           description?: string
           id?: string
           is_required?: boolean
+          reward_ability_id?: string | null
           reward_creature_id?: string | null
           reward_exp?: number
           reward_gold?: number
@@ -893,6 +1062,13 @@ export type Database = {
           unlock_level?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "missions_reward_ability_id_fkey"
+            columns: ["reward_ability_id"]
+            isOneToOne: false
+            referencedRelation: "abilities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "missions_reward_creature_id_fkey"
             columns: ["reward_creature_id"]
@@ -990,6 +1166,48 @@ export type Database = {
           },
           {
             foreignKeyName: "pin_claims_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_abilities: {
+        Row: {
+          ability_id: string
+          id: string
+          obtained_at: string | null
+          quantity: number
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          ability_id: string
+          id?: string
+          obtained_at?: string | null
+          quantity?: number
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          ability_id?: string
+          id?: string
+          obtained_at?: string | null
+          quantity?: number
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_abilities_ability_id_fkey"
+            columns: ["ability_id"]
+            isOneToOne: false
+            referencedRelation: "abilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_abilities_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"

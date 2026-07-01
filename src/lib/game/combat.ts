@@ -136,7 +136,13 @@ export function calculateCombatDamage({
 
 // ── Status effects ─────────────────────────────────────────────────────────
 
-export type StatusEffect = 'paralisi' | 'confusione' | 'sonno' | 'veleno'
+export type StatusEffect =
+  | 'paralisi' | 'confusione' | 'sonno' | 'veleno'
+  // Introduced with Special Abilities (migration 049):
+  | 'scottatura'     // burn: damage-over-time + the burned creature attacks weaker
+  | 'congelamento'   // freeze: skips the turn (like sonno) with a per-turn thaw roll
+  | 'rigenerazione'  // regen: POSITIVE self effect, heals a % of max HP each turn
+  | 'marchio'        // mark: the marked creature takes extra incoming damage
 
 export interface StatusEffectMeta {
   emoji: string
@@ -145,13 +151,41 @@ export interface StatusEffectMeta {
   glow: string        // rgba for glow / shadow
   turns: number       // initial turns (0 = permanent, i.e. veleno)
   preventsAttack: boolean
+  /** true = a positive/beneficial status the owner wants (e.g. rigenerazione). */
+  beneficial?: boolean
 }
 
 export const STATUS_EFFECT_META: Record<StatusEffect, StatusEffectMeta> = {
-  paralisi:   { emoji: '⚡', label: 'Paralisi',   color: '#FBBF24', glow: 'rgba(251,191,36,0.40)',  turns: 2, preventsAttack: false },
-  confusione: { emoji: '💫', label: 'Confusione', color: '#C084FC', glow: 'rgba(192,132,252,0.40)', turns: 3, preventsAttack: false },
-  sonno:      { emoji: '💤', label: 'Sonno',      color: '#60A5FA', glow: 'rgba(96,165,250,0.40)',  turns: 2, preventsAttack: true  },
-  veleno:     { emoji: '☠️', label: 'Veleno',     color: '#4ADE80', glow: 'rgba(74,222,128,0.40)',  turns: 0, preventsAttack: false },
+  paralisi:      { emoji: '⚡', label: 'Paralisi',      color: '#FBBF24', glow: 'rgba(251,191,36,0.40)',  turns: 2, preventsAttack: false },
+  confusione:    { emoji: '💫', label: 'Confusione',    color: '#C084FC', glow: 'rgba(192,132,252,0.40)', turns: 3, preventsAttack: false },
+  sonno:         { emoji: '💤', label: 'Sonno',         color: '#60A5FA', glow: 'rgba(96,165,250,0.40)',  turns: 2, preventsAttack: true  },
+  veleno:        { emoji: '☠️', label: 'Veleno',        color: '#4ADE80', glow: 'rgba(74,222,128,0.40)',  turns: 0, preventsAttack: false },
+  scottatura:    { emoji: '🔥', label: 'Scottatura',    color: '#FB7185', glow: 'rgba(251,113,133,0.42)', turns: 3, preventsAttack: false },
+  congelamento:  { emoji: '❄️', label: 'Congelamento',  color: '#7DD3FC', glow: 'rgba(125,211,252,0.42)', turns: 2, preventsAttack: true  },
+  rigenerazione: { emoji: '💚', label: 'Rigenerazione', color: '#34D399', glow: 'rgba(52,211,153,0.42)',  turns: 3, preventsAttack: false, beneficial: true },
+  marchio:       { emoji: '🎯', label: 'Marchio',       color: '#F472B6', glow: 'rgba(244,114,182,0.42)', turns: 3, preventsAttack: false },
+}
+
+// ── Per-turn magnitudes for the new effects ──────────────────────────────────
+/** Burn tick: 8% of scaled max HP per turn, minimum 1. */
+export function calculateBurnDamage(maxHp: number): number {
+  return Math.max(1, Math.round(maxHp * 0.08))
+}
+/** Regen tick: heals 10% of scaled max HP per turn, minimum 1. */
+export function calculateRegenHeal(maxHp: number): number {
+  return Math.max(1, Math.round(maxHp * 0.10))
+}
+/** Freeze thaws (clears) with a 25% chance at the start of each turn. */
+export function rollFreezeThaw(randomValue = Math.random()): boolean {
+  return randomValue < 0.25
+}
+/** Extra incoming damage while the DEFENDER is afflicted (marchio → ×1.25). */
+export function getIncomingDamageMultiplier(effect: StatusEffect | null | undefined): number {
+  return effect === 'marchio' ? 1.25 : 1
+}
+/** Reduced outgoing damage while the ATTACKER is afflicted (scottatura → ×0.8). */
+export function getAttackerDamageMultiplier(effect: StatusEffect | null | undefined): number {
+  return effect === 'scottatura' ? 0.8 : 1
 }
 
 /** Roll whether an attacker's status effect triggers this attack. */
@@ -238,6 +272,69 @@ export function resolveTurnStartStatus({
         newHp: nextHp,
         fainted: nextHp === 0,
       },
+    }
+  }
+
+  // Burn — damage over time (finite turns).
+  if (effect === 'scottatura') {
+    const burnDamage = calculateBurnDamage(safeMaxHp)
+    const nextHp = Math.max(0, safeHp - burnDamage)
+    const burnTurns = Math.max(0, (turnsLeft ?? 0) - 1)
+    const burnCleared = burnTurns <= 0
+    return {
+      nextEffect: burnCleared ? null : 'scottatura',
+      nextTurnsLeft: burnTurns,
+      currentHp: nextHp,
+      preventedAction: nextHp === 0,
+      fainted: nextHp === 0,
+      event: { type: 'scottatura', burnDamage, newHp: nextHp, cleared: burnCleared, turnsLeft: burnTurns, fainted: nextHp === 0 },
+    }
+  }
+
+  // Freeze — skips the turn, with a per-turn thaw roll. Also expires by turns.
+  if (effect === 'congelamento') {
+    const thawed = rollFreezeThaw(randomValue)
+    const freezeTurns = Math.max(0, (turnsLeft ?? 0) - 1)
+    const freezeCleared = thawed || freezeTurns <= 0
+    return {
+      nextEffect: freezeCleared ? null : 'congelamento',
+      nextTurnsLeft: freezeCleared ? 0 : freezeTurns,
+      currentHp: safeHp,
+      // If it thaws this turn the creature is free to act; otherwise it is frozen.
+      preventedAction: !freezeCleared,
+      fainted: safeHp === 0,
+      event: { type: 'congelamento', thawed, cleared: freezeCleared, turnsLeft: freezeCleared ? 0 : freezeTurns },
+    }
+  }
+
+  // Regen — POSITIVE self effect, heals each turn (finite turns).
+  if (effect === 'rigenerazione') {
+    const healAmount = calculateRegenHeal(safeMaxHp)
+    const nextHp = Math.min(safeMaxHp, safeHp + healAmount)
+    const regenTurns = Math.max(0, (turnsLeft ?? 0) - 1)
+    const regenCleared = regenTurns <= 0
+    return {
+      nextEffect: regenCleared ? null : 'rigenerazione',
+      nextTurnsLeft: regenTurns,
+      currentHp: nextHp,
+      preventedAction: false,
+      fainted: nextHp === 0,
+      event: { type: 'rigenerazione', healAmount, newHp: nextHp, cleared: regenCleared, turnsLeft: regenTurns },
+    }
+  }
+
+  // Mark — no tick payload; just counts down. The damage bonus is applied by the
+  // caller via getIncomingDamageMultiplier when the marked creature is hit.
+  if (effect === 'marchio') {
+    const markTurns = Math.max(0, (turnsLeft ?? 0) - 1)
+    const markCleared = markTurns <= 0
+    return {
+      nextEffect: markCleared ? null : 'marchio',
+      nextTurnsLeft: markTurns,
+      currentHp: safeHp,
+      preventedAction: false,
+      fainted: safeHp === 0,
+      event: markCleared ? { type: 'marchio', cleared: true, turnsLeft: 0 } : null,
     }
   }
 

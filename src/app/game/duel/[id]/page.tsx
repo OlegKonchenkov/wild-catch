@@ -11,6 +11,10 @@ import StatusAura from '@/components/battle/StatusAura'
 import AttackAnimation from '@/components/battle/AttackAnimation'
 import BattleAtmosphere from '@/components/battle/BattleAtmosphere'
 import ImmersiveBattleLayout, { type ImmersiveDamage, type ImmersiveNotice } from '@/components/battle/ImmersiveBattleLayout'
+import AbilityMenu, { type BattleMove } from '@/components/battle/AbilityMenu'
+import AbilityFx, { type AbilityFxSpec } from '@/components/battle/AbilityFx'
+import { abilityFxSpec } from '@/components/game/ability-visuals'
+import type { Ability } from '@/lib/game/abilities'
 import type { BattleAction } from '@/components/battle/ActionBar'
 import type { SquadMember } from '@/components/battle/SquadBar'
 import { IconFlee, IconFlask, IconSword } from '@/components/battle/icons'
@@ -305,6 +309,9 @@ export default function DuelPage() {
   const [userId, setUserId]                 = useState<string | null>(null)
   const [myRole, setMyRole]                 = useState<'challenger' | 'opponent' | null>(null)
   const [isMyTurn, setIsMyTurn]             = useState(false)
+  const [moveset, setMoveset]               = useState<BattleMove[]>([])
+  const [showMovesModal, setShowMovesModal] = useState(false)
+  const [abilityFx, setAbilityFx]           = useState<{ key: number; spec: AbilityFxSpec; side: 'left' | 'right' } | null>(null)
   const [attacking, setAttacking]           = useState(false)
   const attackingRef = useRef(false)
   const [lastDamage, setLastDamage]         = useState<{ amount: number; target: 'me' | 'opp'; id: number; isCrit?: boolean; tone?: 'normal' | 'poison' } | null>(null)
@@ -1129,15 +1136,16 @@ export default function DuelPage() {
     return () => { stopDuelLoopRef.current?.(); stopDuelLoopRef.current = null }
   }, [waiting]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleAttack() {
+  async function handleAttack(abilityIdArg?: string | null) {
     if (attackingRef.current || !isMyTurn) return
     if (timerRef.current) clearInterval(timerRef.current)
     autoFightRef.current = true
+    const usingAbility = !!abilityIdArg
     const isSleepingTurn = myActive?.active_status === 'sonno'
     const statusMayChangeAttack = myActive?.active_status === 'paralisi'
       || myActive?.active_status === 'confusione'
       || myActive?.active_status === 'veleno'
-    const usedItemId = isSleepingTurn ? null : selectedItemId
+    const usedItemId = (isSleepingTurn || usingAbility) ? null : selectedItemId
     if (!isSleepingTurn && !statusMayChangeAttack) {
       startAttackFeedback()
       setAnimState('attack')
@@ -1161,6 +1169,7 @@ export default function DuelPage() {
 
     const body: Record<string, string> = { duelId: id, action: 'attack' }
     if (usedItemId) body.itemId = usedItemId
+    if (abilityIdArg) body.abilityId = abilityIdArg
 
     const res = await fetch('/api/game/duel/action', {
       method: 'POST',
@@ -1177,6 +1186,13 @@ export default function DuelPage() {
 
     const data = await res.json()
     if (res.ok) {
+      if (usingAbility && data.abilityUsed) {
+        const move = moveset.find(m => m.ability.id === data.abilityUsed.id)?.ability
+        const spec: AbilityFxSpec = move
+          ? abilityFxSpec(move)
+          : { element: null, category: 'attacco', color: '#C084FC', name: data.abilityUsed.name }
+        setAbilityFx({ key: Date.now(), spec, side: 'left' })
+      }
       if (statusMayChangeAttack && data.damage > 0 && myActiveCrNow) {
         startAttackFeedback()
         setAnimState('attack')
@@ -1265,6 +1281,27 @@ export default function DuelPage() {
   const oppActive   = oppLineup.find(l => l.is_active)
   const myActiveCr  = myActive?.player_creatures?.creatures
   const oppActiveCr = oppActive?.player_creatures?.creatures
+
+  // Load the active creature's learned moveset for the duel MOSSE menu.
+  const activeDuelPcId = myActive?.player_creature_id ?? null
+  const lastMovesetPcId = useRef<string | null>(null)
+  useEffect(() => {
+    const sid = typeof window !== 'undefined' ? localStorage.getItem('current_session_id') : null
+    if (!activeDuelPcId || !sid) { setMoveset([]); lastMovesetPcId.current = null; return }
+    if (lastMovesetPcId.current === activeDuelPcId) return
+    lastMovesetPcId.current = activeDuelPcId
+    let cancelled = false
+    fetch(`/api/game/creature/abilities?playerCreatureId=${activeDuelPcId}&sessionId=${sid}`)
+      .then(r => r.json())
+      .then(d => {
+        if (cancelled) return
+        const ms = ((d.moveset ?? []) as { abilities: Ability | null }[])
+          .map(r => r.abilities).filter((a): a is Ability => !!a).map(a => ({ ability: a }))
+        setMoveset(ms)
+      })
+      .catch(() => { if (!cancelled) setMoveset([]) })
+    return () => { cancelled = true }
+  }, [activeDuelPcId])
   const myCombatStats = getScaledLineupStats(myActive, playerLevels, equipBonus)
   const oppCombatStats = getScaledLineupStats(oppActive, playerLevels, equipBonus)
   const myHp        = myActive?.current_hp ?? 0
@@ -1350,12 +1387,12 @@ export default function DuelPage() {
     },
     {
       id: 'attack',
-      label: mySleeping ? 'Passa' : 'Attacca',
+      label: mySleeping ? 'Passa' : (moveset.length > 0 ? 'Mosse' : 'Attacca'),
       icon: <IconSword size={32} />,
       primary: true,
       tone: selectedItemId ? 'gold' : 'orange',
       sub: selectedItem ? `+${selectedItem.effectValue}% ATK` : undefined,
-      onClick: handleAttack,
+      onClick: () => { if (!isMyTurn) return; if (mySleeping || moveset.length === 0) handleAttack(); else setShowMovesModal(true) },
       disabled: attacking || !isMyTurn,
       loading: attacking,
     },
@@ -1425,6 +1462,19 @@ export default function DuelPage() {
         timerTotal={30}
         actions={!result && !waiting ? duelActions : undefined}
       />
+      )}
+
+      {/* Special-ability move selector + VFX */}
+      <AbilityMenu
+        open={showMovesModal}
+        onClose={() => setShowMovesModal(false)}
+        element={myElement}
+        moves={moveset}
+        busy={attacking || !isMyTurn}
+        onSelect={(abilityId) => { setShowMovesModal(false); handleAttack(abilityId) }}
+      />
+      {abilityFx && (
+        <AbilityFx key={abilityFx.key} {...abilityFx.spec} side={abilityFx.side} onComplete={() => setAbilityFx(null)} />
       )}
 
       {/* ── Element-themed battle background ── */}
@@ -1966,7 +2016,7 @@ export default function DuelPage() {
           {/* Attack button */}
           <motion.button
             id="wc-duel-atk-btn"
-            onClick={handleAttack}
+            onClick={() => { if (!isMyTurn) return; if (mySleeping || moveset.length === 0) handleAttack(); else setShowMovesModal(true) }}
             disabled={attacking || !isMyTurn}
             whileTap={isMyTurn ? { scale: 0.95 } : {}}
             className="flex-1 relative overflow-hidden rounded-2xl py-4 font-extrabold text-white text-base disabled:cursor-not-allowed transition-all"
