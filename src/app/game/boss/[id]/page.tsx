@@ -811,6 +811,11 @@ export default function BossFightPage() {
         : { element: null, category: "attacco", color: "#C084FC", name: data.abilityUsed.name };
       setAbilityFx({ key: Date.now(), spec, side: "left" });
     }
+    // Boss AI cast its own special move → play its VFX from the boss side.
+    if (data.bossAbilitySpec) {
+      const bspec = abilityFxSpec(data.bossAbilitySpec);
+      setTimeout(() => setAbilityFx({ key: Date.now(), spec: bspec, side: "right" }), usingAbility ? 720 : 260);
+    }
 
     if (usedItemId && data.playerDamage > 0) {
       setBattagliaItems((prev) =>

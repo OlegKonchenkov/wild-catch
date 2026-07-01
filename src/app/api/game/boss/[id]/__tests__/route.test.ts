@@ -75,6 +75,13 @@ function buildBossRouteMocks({
         }
       }
 
+      if (table === 'abilities') {
+        // Boss random-moveset assignment reads the catalogue; empty = base attack.
+        return {
+          select: vi.fn(async () => ({ data: [] })),
+        }
+      }
+
       if (table === 'player_game_events') {
         return {
           insert: vi.fn(() => Promise.resolve({ error: null })),

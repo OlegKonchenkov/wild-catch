@@ -8,11 +8,24 @@ import { getElementMultiplier } from '@/lib/game/elements'
 import { getEquipmentBonuses } from '@/lib/game/equipment'
 import {
   resolveAbilityCast, tickAbilityState, applyStatMods, addSelfBuffs, isAbilityUsable,
-  type Ability,
+  normalizeAbilityState, type Ability, type AbilityBattleState,
 } from '@/lib/game/abilities'
 import { normalizeEncounterAbilityState, clampMod } from '@/lib/game/ability-turn'
 import { sendPushToUser, getDisplayName, pickOne } from '@/lib/push'
-import type { Element } from '@/lib/types'
+import { RARITY_RANK, type Element, type Rarity } from '@/lib/types'
+import type { Json } from '@/types/database'
+
+/** Pick up to `count` random catalogue abilities a boss creature may wield,
+ *  gated only by element + rarity (bosses ignore the player-level gate). */
+export function pickBossAbilities(all: Ability[], element: string, rarity: string | null, count: number): Ability[] {
+  const rank = (r: string | null) => (r ? (RARITY_RANK[r as Rarity] ?? 0) : 0)
+  const eligible = all.filter(a =>
+    (!a.allowed_elements || a.allowed_elements.length === 0 || a.allowed_elements.includes(element)) &&
+    (!a.min_rarity || rank(rarity) >= rank(a.min_rarity)),
+  )
+  const shuffled = [...eligible].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, Math.min(count, shuffled.length))
+}
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -39,7 +52,8 @@ async function hydrateBossLineupStatusFields(
       slot.status_effect_chance === undefined ||
       slot.active_status === undefined ||
       slot.status_turns_left === undefined ||
-      slot.sprite_cutout_url === undefined
+      slot.sprite_cutout_url === undefined ||
+      slot.boss_abilities === undefined  // assign a random special-move set once
     ),
   )
 
@@ -50,18 +64,23 @@ async function hydrateBossLineupStatusFields(
     .filter((creatureId): creatureId is string => Boolean(creatureId))
 
   const admin = createAdminClient()
+  // A gym-leader's creatures get a random special-move set (element/rarity-gated).
+  const { data: abilityRows } = await admin.from('abilities').select('*')
+  const allAbilities = (abilityRows ?? []) as unknown as Ability[]
   const { data: creatureRows } = creatureIds.length > 0
     ? await admin
         .from('creatures')
-        .select('id, image_url, sprite_cutout_url, sprite_url, status_effect, status_effect_chance')
+        .select('id, element, rarity, image_url, sprite_cutout_url, sprite_url, status_effect, status_effect_chance')
         .in('id', creatureIds)
     : { data: [] }
 
-  const creatureMap: Record<string, { image_url: string | null; sprite_cutout_url: string | null; sprite_url: string | null; status_effect: StatusEffect | null; status_effect_chance: number | null }> =
+  const creatureMap: Record<string, { element: string; rarity: string | null; image_url: string | null; sprite_cutout_url: string | null; sprite_url: string | null; status_effect: StatusEffect | null; status_effect_chance: number | null }> =
     Object.fromEntries(
       (creatureRows ?? []).map((row: any) => [
         row.id,
         {
+          element: row.element ?? 'armonia',
+          rarity: row.rarity ?? null,
           image_url: row.image_url ?? null,
           sprite_cutout_url: row.sprite_cutout_url ?? null,
           sprite_url: row.sprite_url ?? null,
@@ -73,6 +92,12 @@ async function hydrateBossLineupStatusFields(
 
   const hydratedLineup = lineup.map(slot => {
     const creatureStatus = slot?.creature_id ? creatureMap[slot.creature_id] : null
+    // Assign a random ≤2-move set the first time (persisted with the lineup).
+    const bossAbilities = slot.boss_abilities !== undefined
+      ? slot.boss_abilities
+      : (creatureStatus
+          ? pickBossAbilities(allAbilities, creatureStatus.element, creatureStatus.rarity, 2)
+          : [])
 
     return {
       ...slot,
@@ -83,12 +108,14 @@ async function hydrateBossLineupStatusFields(
       status_effect_chance: slot.status_effect_chance ?? creatureStatus?.status_effect_chance ?? 0.15,
       active_status: slot.active_status ?? null,
       status_turns_left: slot.status_turns_left ?? 0,
+      boss_abilities: bossAbilities,
+      ability_state: slot.ability_state ?? null,
     }
   })
 
   await admin
     .from('boss_fights')
-    .update({ boss_lineup: hydratedLineup })
+    .update({ boss_lineup: hydratedLineup as unknown as Json })
     .eq('id', fightId)
 
   return hydratedLineup
@@ -1097,46 +1124,119 @@ export async function POST(request: Request, { params }: Params) {
     let newPlayerHp = playerActive.current_hp
     let bossFortune = null
     let bossCrit = false
+    let bossAbilityUsed: { id: string; name: string } | null = null
+    let bossAbilitySpec: Record<string, unknown> | null = null
+    let bossAbilityStatusToPlayer: StatusEffect | null = null
+    let bossAbilityCharging = false
 
     if (!allBossFainted && newBossHp > 0 && !skipBossAttack) {
       const counterBoss = bossActive
       if (counterBoss && !counterBoss.fainted) {
         const bossMult = getElementMultiplier(counterBoss.element as Element, playerActive.element as Element)
-        bossFortune = rollCombatFortune({
-          attackerLevel: counterBoss.level ?? 1,
-          defenderLevel: playerActive.level ?? 1,
-          attackerStats: { hp: counterBoss.max_hp, atk: counterBoss.atk, def: counterBoss.def ?? 0 },
-          defenderStats: { hp: playerActive.max_hp, atk: playerActive.atk, def: playerActive.def ?? 0 },
-        })
-        const { isCrit: bossCritRoll, critMultiplier: bossCritMult } = rollCrit()
-        bossCrit = bossCritRoll
-        // enemyAtkMod (player debuffs) weakens the boss; effPlayer.def folds in self-buffs.
-        const effBossAtk = Math.max(1, Math.round(counterBoss.atk * (1 + pEnc.enemyAtkMod)))
-        bossDamage = calculateCombatDamage({
-          attackerAtk: effBossAtk,
-          defenderDef: effPlayer.def,
-          attackMultiplier: bossCritMult,
-          elementMultiplier: bossMult,
-          varianceMultiplier: bossFortune.multiplier,
-        })
-        newPlayerHp = Math.max(0, playerActive.current_hp - bossDamage)
-        playerActive.current_hp = newPlayerHp
-        if (newPlayerHp === 0) playerActive.fainted = true
+
+        // Boss special-move AI: a gym-leader creature casts one of its random
+        // learned moves (or continues a charge), else falls back to base attack.
+        const bossAbilities: Ability[] = Array.isArray(counterBoss.boss_abilities) ? counterBoss.boss_abilities : []
+        let bState: AbilityBattleState = normalizeAbilityState(counterBoss.ability_state)
+        const bTick = tickAbilityState(bState)
+        bState = bTick.state
+        let chosen: Ability | null = null
+        if (!bTick.recharging) {
+          const pendId = bState.pending?.abilityId ?? null
+          if (pendId) chosen = bossAbilities.find(a => a.id === pendId) ?? null
+          else if (bossAbilities.length > 0 && Math.random() < 0.5) {
+            const usable = bossAbilities.filter(a => isAbilityUsable(a, bState).usable)
+            if (usable.length) chosen = usable[Math.floor(Math.random() * usable.length)]
+          }
+        }
+
+        if (bTick.recharging) {
+          // Boss must recover from its last big move — no counterattack.
+        } else if (chosen) {
+          const effBoss = applyStatMods(
+            Math.max(1, Math.round(counterBoss.atk * (1 + pEnc.enemyAtkMod))),
+            counterBoss.def ?? 0, bState,
+          )
+          const outcome = resolveAbilityCast({
+            ability: chosen,
+            casterElement: counterBoss.element as Element,
+            targetElement: playerActive.element as Element,
+            casterAtk: effBoss.atk,
+            casterDef: effBoss.def,
+            casterMaxHp: counterBoss.max_hp,
+            casterHp: counterBoss.current_hp,
+            casterStatus: counterBoss.active_status as StatusEffect | null,
+            targetDef: effPlayer.def,
+            targetStatus: playerActive.active_status as StatusEffect | null,
+            state: bState,
+          })
+          bState = outcome.nextState
+          bossAbilityUsed = { id: chosen.id, name: chosen.name }
+          bossAbilitySpec = {
+            element: chosen.element, category: chosen.category, color: chosen.color, name: chosen.name,
+            charge_turns: chosen.charge_turns, recharge_turns: chosen.recharge_turns, hits_max: chosen.hits_max, target: chosen.target,
+          }
+          if (outcome.phase === 'charging') {
+            bossAbilityCharging = true
+          } else if (outcome.phase === 'fired' && !outcome.missed) {
+            bossCrit = outcome.isCrit
+            bossDamage = outcome.totalDamage
+            if (outcome.healToCaster > 0) counterBoss.current_hp = Math.min(counterBoss.max_hp, counterBoss.current_hp + outcome.healToCaster)
+            bState = addSelfBuffs(bState, outcome.buffs)
+            bossAbilityStatusToPlayer = outcome.statusToTarget
+            if (outcome.selfStatus) {
+              counterBoss.active_status = outcome.selfStatus
+              counterBoss.status_turns_left = STATUS_EFFECT_META[outcome.selfStatus].turns
+            }
+            newPlayerHp = Math.max(0, playerActive.current_hp - bossDamage)
+            playerActive.current_hp = newPlayerHp
+            if (newPlayerHp === 0) playerActive.fainted = true
+          }
+        } else {
+          // Base attack (unchanged).
+          bossFortune = rollCombatFortune({
+            attackerLevel: counterBoss.level ?? 1,
+            defenderLevel: playerActive.level ?? 1,
+            attackerStats: { hp: counterBoss.max_hp, atk: counterBoss.atk, def: counterBoss.def ?? 0 },
+            defenderStats: { hp: playerActive.max_hp, atk: playerActive.atk, def: playerActive.def ?? 0 },
+          })
+          const { isCrit: bossCritRoll, critMultiplier: bossCritMult } = rollCrit()
+          bossCrit = bossCritRoll
+          const effBossAtk = Math.max(1, Math.round(counterBoss.atk * (1 + pEnc.enemyAtkMod)))
+          bossDamage = calculateCombatDamage({
+            attackerAtk: effBossAtk,
+            defenderDef: effPlayer.def,
+            attackMultiplier: bossCritMult,
+            elementMultiplier: bossMult,
+            varianceMultiplier: bossFortune.multiplier,
+          })
+          newPlayerHp = Math.max(0, playerActive.current_hp - bossDamage)
+          playerActive.current_hp = newPlayerHp
+          if (newPlayerHp === 0) playerActive.fainted = true
+        }
+        counterBoss.ability_state = bState
       }
     }
 
     // ── Boss→Player status roll ──────────────────────────────────────────
     let statusAppliedToPlayer: StatusEffect | null = null
     let playerStatusTurnsLeft = 0
-    if (bossDamage > 0 && newPlayerHp > 0 && !playerActive.fainted) {
-      const bossEffect = bossActive.status_effect as StatusEffect | null
-      const bossChance = bossActive.status_effect_chance ?? 0.15
-      const triggered = rollStatusEffect(bossEffect, bossChance)
-      if (triggered) {
-        statusAppliedToPlayer = triggered
-        playerStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
-        playerActive.active_status    = triggered
+    if (newPlayerHp > 0 && !playerActive.fainted) {
+      if (bossAbilityStatusToPlayer) {
+        statusAppliedToPlayer = bossAbilityStatusToPlayer
+        playerStatusTurnsLeft = STATUS_EFFECT_META[bossAbilityStatusToPlayer].turns
+        playerActive.active_status    = bossAbilityStatusToPlayer
         playerActive.status_turns_left = playerStatusTurnsLeft
+      } else if (!bossAbilityUsed && bossDamage > 0) {
+        const bossEffect = bossActive.status_effect as StatusEffect | null
+        const bossChance = bossActive.status_effect_chance ?? 0.15
+        const triggered = rollStatusEffect(bossEffect, bossChance)
+        if (triggered) {
+          statusAppliedToPlayer = triggered
+          playerStatusTurnsLeft = STATUS_EFFECT_META[triggered].turns
+          playerActive.active_status    = triggered
+          playerActive.status_turns_left = playerStatusTurnsLeft
+        }
       }
     }
 
@@ -1232,6 +1332,10 @@ export async function POST(request: Request, { params }: Params) {
       abilityAnimationKey,
       abilityCharging,
       abilityMissed,
+      // Boss AI special-move feedback (drives the boss-side VFX).
+      bossAbilityUsed,
+      bossAbilitySpec,
+      bossAbilityCharging,
     })
   }
 
