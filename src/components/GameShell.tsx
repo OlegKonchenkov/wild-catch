@@ -8,6 +8,8 @@ import { getCurrentUser } from '@/lib/supabase/client-user'
 import { track } from '@/lib/analytics'
 import { haptics } from '@/lib/haptics'
 import LevelUpModal, { type LevelUpInfo } from '@/components/game/LevelUpModal'
+import DailyRewardModal, { type DailyDrop } from '@/components/game/DailyRewardModal'
+import { romeDateKey } from '@/lib/game/daily'
 import NotifPopupComponent, { type NotifPopupData } from '@/components/game/NotifPopup'
 import PushOptIn from '@/components/game/PushOptIn'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
@@ -21,7 +23,7 @@ import {
   GiSwapBag, GiMagnifyingGlass, GiEggClutch, GiPadlock, GiLightningArc, GiTrophyCup,
   GiDeathSkull, GiShakingHands, GiCrown, GiBullseye, GiUpgrade, GiSmartphone, GiCheckMark,
   GiPresent, GiBreastplate, GiCrossedSwords, GiHearts, GiPositionMarker, GiSparkles,
-  GiCardboardBox, GiLockedChest,
+  GiCardboardBox, GiLockedChest, GiSun,
 } from 'react-icons/gi'
 import { getExpProgress } from '@/lib/game/leveling'
 import { playLevelUp } from '@/lib/game/sounds/events'
@@ -253,6 +255,14 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: IconType; title: strin
         body: pinReward,
       }
     }
+    case 'daily_claimed': {
+      const streak = readNum(p, 'streak')
+      return {
+        icon: GiSun,
+        title: 'Ricompensa giornaliera riscossa',
+        body: streak > 1 ? `Serie di ${streak} giorni 🔥` : '',
+      }
+    }
     case 'pack_opened': {
       const dropCount = readNum(p, 'drop_count')
       return {
@@ -296,6 +306,7 @@ const EVENT_THEMES: Record<string, { color: string; dimColor: string; label: str
   pin_claimed:       { color: '#38BDF8', dimColor: 'rgba(56,189,248,0.10)',  label: 'Pin'       },
   pack_opened:       { color: '#F59E0B', dimColor: 'rgba(245,158,11,0.10)',  label: 'Bustina'   },
   chest_opened:      { color: '#D97706', dimColor: 'rgba(217,119,6,0.10)',   label: 'Forziere'  },
+  daily_claimed:     { color: '#FFB36B', dimColor: 'rgba(255,179,107,0.10)', label: 'Giornaliero' },
 }
 
 export default function GameShell({ children }: { children: React.ReactNode }) {
@@ -309,6 +320,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const [sessionKind, setSessionKind] = useState<string>('event')
   const [adventureDay, setAdventureDay] = useState<number | null>(null)
   const [dailyStreak, setDailyStreak] = useState<number | null>(null)
+  const [showDailyModal, setShowDailyModal] = useState(false)
   const [level, setLevel]           = useState<number | null>(null)
   const [exp, setExp]               = useState<number | null>(null)
   const [sessionStatus, setSessionStatus] = useState<string | null>(null)
@@ -342,7 +354,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
           .eq('session_id', sid)
           .single(),
         supabase.from('sessions')
-          .select('end_at, start_at, duration_minutes, status, kind')
+          .select('end_at, start_at, duration_minutes, status, kind, daily_rewards_enabled')
           .eq('id', sid)
           .single(),
       ]).then(([psResult, sessResult]) => {
@@ -371,6 +383,21 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
               new Date(sess.start_at).getTime() + sess.duration_minutes * 60 * 1000
             ).toISOString()
             setEndAt(computed)
+          }
+
+          // Daily reward: streak per l'HUD + auto-prompt (una volta al giorno)
+          if ((sess as { daily_rewards_enabled?: boolean }).daily_rewards_enabled && sess.status === 'active') {
+            fetch(`/api/game/daily/status?sessionId=${sid}`)
+              .then(r => r.json())
+              .then((d: { enabled?: boolean; claimedToday?: boolean; streak?: number }) => {
+                if (!d.enabled) return
+                setDailyStreak(d.streak ?? 0)
+                const promptKey = `daily_prompted:${sid}:${romeDateKey()}`
+                if (!d.claimedToday && !localStorage.getItem(promptKey)) {
+                  setShowDailyModal(true)
+                }
+              })
+              .catch(() => {})
           }
         }
         setStatsLoading(false)
@@ -779,6 +806,33 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       )}
 
       <LevelUpModal info={levelUpInfo} onDismiss={() => setLevelUpInfo(null)} />
+
+      {showDailyModal && (
+        <DailyRewardModal
+          streak={dailyStreak ?? 0}
+          day={adventureDay ?? 1}
+          onClaim={async () => {
+            const sid = localStorage.getItem('current_session_id')
+            if (!sid) return null
+            try {
+              const res = await fetch('/api/game/daily/claim', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: sid }),
+              })
+              const d = await res.json()
+              if (!res.ok) return null
+              setDailyStreak(d.streak ?? null)
+              window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+              return { streak: d.streak as number, drops: (d.drops ?? []) as DailyDrop[] }
+            } catch { return null }
+          }}
+          onDone={() => {
+            const sid = localStorage.getItem('current_session_id')
+            if (sid) localStorage.setItem(`daily_prompted:${sid}:${romeDateKey()}`, '1')
+            setShowDailyModal(false)
+          }}
+        />
+      )}
 
       {/* Notification history panel */}
       <AnimatePresence>
