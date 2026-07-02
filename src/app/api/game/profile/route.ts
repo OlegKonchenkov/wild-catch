@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const [psRes, profileRes, ccRes] = await Promise.all([
     supabase
       .from('player_sessions')
-      .select('exp, gold, level')
+      .select('exp, gold, gemme, level')
       .eq('user_id', user.id)
       .eq('session_id', sessionId)
       .single(),
@@ -39,6 +39,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     exp: ps.exp ?? 0,
     gold: ps.gold ?? 0,
+    gemme: (ps as { gemme?: number }).gemme ?? 0,
     level: ps.level ?? 1,
     nickname: profileRes.data?.nickname ?? 'Anonimo',
     avatar_url: profileRes.data?.avatar_url ?? null,

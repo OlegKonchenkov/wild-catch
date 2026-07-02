@@ -2,7 +2,7 @@
 import { type CSSProperties } from 'react'
 import {
   GiTreasureMap, GiSpellBook, GiCrossedSwords, GiBullseye, GiPuzzle,
-  GiSwapBag, GiKnapsack, GiTrophyCup, GiCompass, GiHouse,
+  GiSwapBag, GiKnapsack, GiTrophyCup, GiCompass, GiHouse, GiGreekTemple,
 } from 'react-icons/gi'
 import { type IconType } from 'react-icons'
 
@@ -46,6 +46,7 @@ export const NAV_ICON: Record<string, (p: Props) => React.ReactElement> = {
   enigmi:   make(GiPuzzle,       '#C58BFA', '#A05CE8'),
   shop:     make(GiSwapBag,      '#FFD874', '#F3C233'),
   backpack: make(GiKnapsack,     '#FFB070', '#F0843C'),
+  collezione: make(GiGreekTemple, '#E6C989', '#C8A24A'),
   trophy:   make(GiTrophyCup,    '#FFDD7A', '#F3C233'),
   guide:    make(GiCompass,      '#7FE0F0', '#46BAD8'),
   home:     make(GiHouse,        '#6FD8C8', '#2FA0A8'),

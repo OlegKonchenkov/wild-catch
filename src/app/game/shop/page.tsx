@@ -18,7 +18,7 @@ import { motion } from 'framer-motion'
 import { type IconType } from 'react-icons'
 import {
   GiSwapBag, GiTwoCoins, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower,
-  GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing,
+  GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing, GiKeyring,
 } from 'react-icons/gi'
 
 const TYPE_META: Record<ItemType, { icon: string; Icon: IconType; label: string; hint: string; color: string }> = {
@@ -32,6 +32,7 @@ const TYPE_META: Record<ItemType, { icon: string; Icon: IconType; label: string;
   corazza:   { icon: '🛡️', Icon: GiBreastplate,   label: 'Corazza',    hint: 'Equipaggiamento (+HP/DEF)',            color: '#60A5FA' },
   elmo:      { icon: '⛑️', Icon: GiHelmet,        label: 'Elmo',        hint: 'Equipaggiamento (+HP/DEF)',            color: '#FBBF24' },
   accessorio:{ icon: '💍', Icon: GiRing,          label: 'Accessorio',  hint: 'Equipaggiamento (bonus misti)',        color: '#C084FC' },
+  chiave:    { icon: '🗝️', Icon: GiKeyring,       label: 'Chiave',      hint: 'Apre i forzieri del tesoro',           color: '#F59E0B' },
 }
 
 export default function ShopPage() {

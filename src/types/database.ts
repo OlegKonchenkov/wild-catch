@@ -1013,6 +1013,7 @@ export type Database = {
           reward_gold: number
           reward_item_id: string | null
           reward_items: Json
+          reward_extra: Json | null
           session_id: string | null
           target: string
           target_count: number
@@ -1033,6 +1034,7 @@ export type Database = {
           reward_gold?: number
           reward_item_id?: string | null
           reward_items?: Json
+          reward_extra?: Json | null
           session_id?: string | null
           target: string
           target_count?: number
@@ -1053,6 +1055,7 @@ export type Database = {
           reward_gold?: number
           reward_item_id?: string | null
           reward_items?: Json
+          reward_extra?: Json | null
           session_id?: string | null
           target?: string
           target_count?: number
@@ -1130,6 +1133,308 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chests: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          rarity: string | null
+          image_url: string
+          place_id: string | null
+          key_requirements: Json
+          contents: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          place_id?: string | null
+          key_requirements?: Json
+          contents?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          place_id?: string | null
+          key_requirements?: Json
+          contents?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
+      player_chests: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          chest_id: string
+          quantity: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          chest_id: string
+          quantity?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          chest_id?: string
+          quantity?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_chests_chest_id_fkey"
+            columns: ["chest_id"]
+            isOneToOne: false
+            referencedRelation: "chests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packs: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          rarity: string | null
+          image_url: string
+          min_drops: number
+          max_drops: number
+          price_gold: number | null
+          price_gemme: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          min_drops?: number
+          max_drops?: number
+          price_gold?: number | null
+          price_gemme?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          min_drops?: number
+          max_drops?: number
+          price_gold?: number | null
+          price_gemme?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      pack_pool: {
+        Row: {
+          id: string
+          pack_id: string
+          reward_type: string
+          reward_payload: Json
+          weight: number
+          rarity_tier: string | null
+          min_qty: number
+          max_qty: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          pack_id: string
+          reward_type: string
+          reward_payload?: Json
+          weight?: number
+          rarity_tier?: string | null
+          min_qty?: number
+          max_qty?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          pack_id?: string
+          reward_type?: string
+          reward_payload?: Json
+          weight?: number
+          rarity_tier?: string | null
+          min_qty?: number
+          max_qty?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pack_pool_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_packs: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          pack_id: string
+          quantity: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          pack_id: string
+          quantity?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          pack_id?: string
+          quantity?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_packs_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cultural_places: {
+        Row: { id: string; name: string; description: string; image_url: string; lat: number | null; lng: number | null; session_id: string | null; created_at: string }
+        Insert: { id?: string; name: string; description?: string; image_url?: string; lat?: number | null; lng?: number | null; session_id?: string | null; created_at?: string }
+        Update: { id?: string; name?: string; description?: string; image_url?: string; lat?: number | null; lng?: number | null; session_id?: string | null; created_at?: string }
+        Relationships: []
+      }
+      artworks: {
+        Row: { id: string; name: string; description: string; image_url: string; place_id: string | null; rarity: string | null; created_at: string }
+        Insert: { id?: string; name: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; created_at?: string }
+        Update: { id?: string; name?: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; created_at?: string }
+        Relationships: [{ foreignKeyName: "artworks_place_id_fkey"; columns: ["place_id"]; isOneToOne: false; referencedRelation: "cultural_places"; referencedColumns: ["id"] }]
+      }
+      characters: {
+        Row: { id: string; name: string; description: string; image_url: string; place_id: string | null; rarity: string | null; unlocks_ability_id: string | null; created_at: string }
+        Insert: { id?: string; name: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; unlocks_ability_id?: string | null; created_at?: string }
+        Update: { id?: string; name?: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; unlocks_ability_id?: string | null; created_at?: string }
+        Relationships: [{ foreignKeyName: "characters_place_id_fkey"; columns: ["place_id"]; isOneToOne: false; referencedRelation: "cultural_places"; referencedColumns: ["id"] }]
+      }
+      anecdotes: {
+        Row: { id: string; title: string; body: string; image_url: string; place_id: string | null; character_id: string | null; rarity: string | null; created_at: string }
+        Insert: { id?: string; title: string; body?: string; image_url?: string; place_id?: string | null; character_id?: string | null; rarity?: string | null; created_at?: string }
+        Update: { id?: string; title?: string; body?: string; image_url?: string; place_id?: string | null; character_id?: string | null; rarity?: string | null; created_at?: string }
+        Relationships: []
+      }
+      player_collection: {
+        Row: { id: string; user_id: string; session_id: string; kind: string; ref_id: string; copies: number; obtained_at: string }
+        Insert: { id?: string; user_id: string; session_id: string; kind: string; ref_id: string; copies?: number; obtained_at?: string }
+        Update: { id?: string; user_id?: string; session_id?: string; kind?: string; ref_id?: string; copies?: number; obtained_at?: string }
+        Relationships: []
+      }
+      trophies: {
+        Row: { id: string; name: string; description: string; image_url: string; criteria: Json; created_at: string }
+        Insert: { id?: string; name: string; description?: string; image_url?: string; criteria?: Json; created_at?: string }
+        Update: { id?: string; name?: string; description?: string; image_url?: string; criteria?: Json; created_at?: string }
+        Relationships: []
+      }
+      player_trophies: {
+        Row: { id: string; user_id: string; session_id: string; trophy_id: string; awarded_at: string }
+        Insert: { id?: string; user_id: string; session_id: string; trophy_id: string; awarded_at?: string }
+        Update: { id?: string; user_id?: string; session_id?: string; trophy_id?: string; awarded_at?: string }
+        Relationships: [{ foreignKeyName: "player_trophies_trophy_id_fkey"; columns: ["trophy_id"]; isOneToOne: false; referencedRelation: "trophies"; referencedColumns: ["id"] }]
+      }
+      special_prizes: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          rarity: string | null
+          image_url: string
+          redemption_note: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          redemption_note?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          redemption_note?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      player_prizes: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          prize_id: string
+          code: string
+          won_at: string
+          redeemed_at: string | null
+          redeemed_by_admin_id: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          prize_id: string
+          code: string
+          won_at?: string
+          redeemed_at?: string | null
+          redeemed_by_admin_id?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          prize_id?: string
+          code?: string
+          won_at?: string
+          redeemed_at?: string | null
+          redeemed_by_admin_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_prizes_prize_id_fkey"
+            columns: ["prize_id"]
+            isOneToOne: false
+            referencedRelation: "special_prizes"
             referencedColumns: ["id"]
           },
         ]
@@ -1589,6 +1894,7 @@ export type Database = {
         Row: {
           esca_active_until: string | null
           exp: number
+          gemme: number
           gold: number
           id: string
           joined_at: string | null
@@ -1608,6 +1914,7 @@ export type Database = {
         Insert: {
           esca_active_until?: string | null
           exp?: number
+          gemme?: number
           gold?: number
           id?: string
           joined_at?: string | null
@@ -1627,6 +1934,7 @@ export type Database = {
         Update: {
           esca_active_until?: string | null
           exp?: number
+          gemme?: number
           gold?: number
           id?: string
           joined_at?: string | null
@@ -2057,6 +2365,7 @@ export type Database = {
       increment_player_stats: {
         Args: {
           p_exp: number
+          p_gemme?: number
           p_gold?: number
           p_score: number
           p_session_id: string

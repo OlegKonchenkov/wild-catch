@@ -6,6 +6,7 @@ import type { Json } from '@/types/database'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
 import { grantAbility } from '@/lib/game/grant-ability'
+import { dispenseReward, type RewardType } from '@/lib/game/rewards/dispense'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { isTutorialSession } from '@/lib/game/tutorial'
@@ -382,6 +383,18 @@ export async function POST(request: Request) {
 
     case 'evento': {
       result = { ...result, eventType: payload.event_type, effect: payload.effect }
+      break
+    }
+
+    // Loot / currency / collection types → shared dispenser (keeps QR in sync
+    // with pins/enigmi/missions/admin). Requires the qr_codes.type CHECK to be
+    // widened (migration 057).
+    default: {
+      const dispenseAdmin = createAdminClient()
+      const res = await dispenseReward(dispenseAdmin, {
+        userId: user.id, sessionId, type: qr.type as RewardType, payload: payload ?? {},
+      })
+      result = { ...result, ...res.detail, dispensed: res.ok }
       break
     }
   }

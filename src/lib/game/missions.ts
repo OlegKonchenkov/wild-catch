@@ -4,6 +4,7 @@ import { sendPushToUser, getDisplayName, pickOne } from '@/lib/push'
 import { getMissionUnlockState, type MissionUnlockContext, type MissionUnlockFields } from '@/lib/game/mission-unlocks'
 import { TUTORIAL_MISSION_FRAMMENTO_GRANTS, isTutorialSession } from '@/lib/game/tutorial'
 import { grantAbility } from '@/lib/game/grant-ability'
+import { dispenseReward, type RewardType } from '@/lib/game/rewards/dispense'
 
 interface MissionRow {
   id: string
@@ -16,6 +17,7 @@ interface MissionRow {
   reward_ability_id: string | null
   reward_items: Array<{ item_id: string; quantity: number }> | null
   reward_creature_id: string | null
+  reward_extra: Array<{ type: string; payload: Record<string, unknown> }> | null
   unlock_level: number | null
   unlock_after_mission_id: string | null
 }
@@ -72,7 +74,7 @@ export async function incrementMissionProgress({
   // story without globals bleeding into it.
   const missionQuery = admin
     .from('missions')
-    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_ability_id, reward_items, reward_creature_id, unlock_level, unlock_after_mission_id')
+    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_ability_id, reward_items, reward_creature_id, reward_extra, unlock_level, unlock_after_mission_id')
     .eq('type', type)
   const { data: missions } = await (
     isTutorialSession(sessionId)
@@ -366,6 +368,17 @@ async function grantMissionReward(
   // Ability token reward
   if (mission.reward_ability_id) {
     await grantAbility(admin, userId, sessionId, mission.reward_ability_id, 1)
+  }
+
+  // Extra rewards (bustine, forzieri, gemme, premi, collezionabili, …) via the
+  // shared dispenser — lets any mission drop loot without new columns.
+  if (Array.isArray(mission.reward_extra)) {
+    for (const extra of mission.reward_extra) {
+      if (!extra?.type) continue
+      await dispenseReward(admin, {
+        userId, sessionId, type: extra.type as RewardType, payload: (extra.payload ?? {}) as Record<string, unknown>,
+      })
+    }
   }
 
   // Creature reward

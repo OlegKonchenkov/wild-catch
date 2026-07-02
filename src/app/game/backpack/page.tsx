@@ -11,6 +11,8 @@ import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { AbilityGlyph, abilityAccent, buildAbilityChips } from '@/components/game/ability-visuals'
+import PackOpenModal, { type PackDrop, type OpenedPack } from '@/components/game/PackOpenModal'
+import ChestOpenModal, { type ChestDrop, type OpenedChest } from '@/components/game/ChestOpenModal'
 import type { Ability } from '@/lib/game/abilities'
 import ElementIcon from '@/components/ui/ElementIcon'
 import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
@@ -19,7 +21,7 @@ import { GiSpellBook } from 'react-icons/gi'
 import {
   GiKnapsack, GiTwoCoins, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower,
   GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing,
-  GiSparkles, GiPawPrint,
+  GiSparkles, GiPawPrint, GiCardboardBox, GiLockedChest, GiKeyring, GiTrophyCup,
 } from 'react-icons/gi'
 
 const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
@@ -35,6 +37,7 @@ const TYPE_META: Record<ItemType, { Icon: IconType; label: string; hint: string;
   corazza:   { Icon: GiBreastplate,   label: 'Corazza',   hint: 'Equipaggia dalla DaimonDex (+HP/DEF)',  color: '#60A5FA' },
   elmo:      { Icon: GiHelmet,        label: 'Elmo',       hint: 'Equipaggia dalla DaimonDex (+HP/DEF)',  color: '#FBBF24' },
   accessorio:{ Icon: GiRing,          label: 'Accessorio', hint: 'Equipaggia dalla DaimonDex (bonus misti)', color: '#C084FC' },
+  chiave:    { Icon: GiKeyring,        label: 'Chiave',     hint: 'Apre i forzieri del tesoro',            color: '#F59E0B' },
 }
 
 // Canonical creature rarity palette + labels (shared with bestiary/combat).
@@ -73,6 +76,51 @@ interface AbilityTokenRow {
   ability_id: string
   quantity: number
   abilities: Ability | null
+}
+
+interface PackRow {
+  id: string
+  quantity: number
+  pack_id: string
+  pack: {
+    id: string
+    name: string
+    description: string
+    rarity: string | null
+    image_url: string
+    min_drops: number
+    max_drops: number
+  } | null
+}
+
+interface ChestRow {
+  id: string
+  quantity: number
+  chest_id: string
+  chest: {
+    id: string
+    name: string
+    description: string
+    rarity: string | null
+    image_url: string
+    key_requirements: { item_id: string; qty: number }[]
+    contents: unknown[]
+  } | null
+}
+
+interface PrizeRow {
+  id: string
+  code: string
+  won_at: string
+  redeemed_at: string | null
+  prize: {
+    id: string
+    name: string
+    description: string
+    rarity: string | null
+    image_url: string
+    redemption_note: string
+  } | null
 }
 
 interface PlayerEgg {
@@ -305,6 +353,14 @@ export default function BackpackPage() {
   const [usingId, setUsingId]     = useState<string | null>(null)
   const [hatchingId, setHatchingId] = useState<string | null>(null)
   const [hatchResult, setHatchResult] = useState<HatchResult | null>(null)
+  const [packs, setPacks] = useState<PackRow[]>([])
+  const [openingPackId, setOpeningPackId] = useState<string | null>(null)
+  const [packResult, setPackResult] = useState<{ pack: OpenedPack; drops: PackDrop[] } | null>(null)
+  const [chests, setChests] = useState<ChestRow[]>([])
+  const [chestKeys, setChestKeys] = useState<Record<string, number>>({})
+  const [openingChestId, setOpeningChestId] = useState<string | null>(null)
+  const [chestResult, setChestResult] = useState<{ chest: OpenedChest; contents: ChestDrop[] } | null>(null)
+  const [prizes, setPrizes] = useState<PrizeRow[]>([])
   const { toast, showSuccess, showApiError, showError, dismiss } = useGameToast()
   const supabase   = useMemo(() => createClient(), [])
   const userIdRef  = useRef<string | null>(null)
@@ -331,6 +387,91 @@ export default function BackpackPage() {
       .then(r => r.json())
       .then(d => { if (d.eggs) setEggs(d.eggs) })
   }, [])
+
+  const fetchPacks = useCallback(() => {
+    const sid = sessionRef.current
+    if (!sid) return
+    fetch(`/api/game/packs?sessionId=${sid}`)
+      .then(r => r.json())
+      .then(d => { if (d.packs) setPacks(d.packs as PackRow[]) })
+      .catch(() => {})
+  }, [])
+
+  const fetchChests = useCallback(() => {
+    const sid = sessionRef.current
+    if (!sid) return
+    fetch(`/api/game/chests?sessionId=${sid}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.chests) setChests(d.chests as ChestRow[])
+        if (d.keys) setChestKeys(Object.fromEntries((d.keys as { item_id: string; quantity: number }[]).map(k => [k.item_id, k.quantity])))
+      })
+      .catch(() => {})
+  }, [])
+
+  const fetchPrizes = useCallback(() => {
+    const sid = sessionRef.current
+    if (!sid) return
+    fetch(`/api/game/prizes?sessionId=${sid}`)
+      .then(r => r.json())
+      .then(d => { if (d.prizes) setPrizes(d.prizes as PrizeRow[]) })
+      .catch(() => {})
+  }, [])
+
+  async function handleOpenChest(row: ChestRow) {
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId || openingChestId || !row.chest) return
+    setOpeningChestId(row.chest_id)
+    try {
+      const res = await fetch('/api/game/chests/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chestId: row.chest_id, sessionId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setChestResult({ chest: data.chest, contents: data.contents })
+        setChests(prev => prev.map(c => c.chest_id === row.chest_id ? { ...c, quantity: c.quantity - 1 } : c).filter(c => c.quantity > 0))
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+        window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
+      } else if (data.missingKeys) {
+        const names = (data.missing as { name: string; needed: number; have: number }[])
+          .map(m => `${m.name} (${m.have}/${m.needed})`).join(', ')
+        showError(`Ti mancano delle chiavi: ${names}`)
+      } else {
+        showApiError(res.status, data.error ?? 'Apertura fallita')
+      }
+    } catch {
+      showError('Errore di rete')
+    }
+    setOpeningChestId(null)
+  }
+
+  async function handleOpenPack(row: PackRow) {
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId || openingPackId) return
+    setOpeningPackId(row.pack_id)
+    try {
+      const res = await fetch('/api/game/packs/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packId: row.pack_id, sessionId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPackResult({ pack: data.pack, drops: data.drops })
+        // Optimistically decrement locally; realtime will reconcile.
+        setPacks(prev => prev.map(p => p.pack_id === row.pack_id ? { ...p, quantity: p.quantity - 1 } : p).filter(p => p.quantity > 0))
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+        window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
+      } else {
+        showApiError(res.status, data.error ?? 'Apertura fallita')
+      }
+    } catch {
+      showError('Errore di rete')
+    }
+    setOpeningPackId(null)
+  }
 
   function fetchAbilityTokens() {
     const uid = userIdRef.current
@@ -425,6 +566,9 @@ export default function BackpackPage() {
 
       fetchEggs()
       fetchAbilityTokens()
+      fetchPacks()
+      fetchChests()
+      fetchPrizes()
 
       // Realtime: re-fetch whenever inventory changes (shop, QR rewards, item use)
       const channel = supabase
@@ -432,7 +576,7 @@ export default function BackpackPage() {
         .on('postgres_changes', {
           event: '*', schema: 'public', table: 'player_inventory',
           filter: `user_id=eq.${user.id}`,
-        }, () => fetchInventory())
+        }, () => { fetchInventory(); fetchChests() })
         .on('postgres_changes', {
           event: '*', schema: 'public', table: 'player_eggs',
           filter: `user_id=eq.${user.id}`,
@@ -441,6 +585,18 @@ export default function BackpackPage() {
           event: '*', schema: 'public', table: 'player_abilities',
           filter: `user_id=eq.${user.id}`,
         }, () => fetchAbilityTokens())
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'player_packs',
+          filter: `user_id=eq.${user.id}`,
+        }, () => fetchPacks())
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'player_chests',
+          filter: `user_id=eq.${user.id}`,
+        }, () => fetchChests())
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'player_prizes',
+          filter: `user_id=eq.${user.id}`,
+        }, () => fetchPrizes())
         .subscribe()
 
       return () => { supabase.removeChannel(channel) }
@@ -462,6 +618,28 @@ export default function BackpackPage() {
           <HatchingAnimation
             result={hatchResult}
             onDone={() => setHatchResult(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Pack opening overlay */}
+      <AnimatePresence>
+        {packResult && (
+          <PackOpenModal
+            pack={packResult.pack}
+            drops={packResult.drops}
+            onDone={() => setPackResult(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Chest opening overlay */}
+      <AnimatePresence>
+        {chestResult && (
+          <ChestOpenModal
+            chest={chestResult.chest}
+            contents={chestResult.contents}
+            onDone={() => setChestResult(null)}
           />
         )}
       </AnimatePresence>
@@ -530,6 +708,153 @@ export default function BackpackPage() {
           <GameListSkeleton rows={4} />
         ) : (
           <>
+            {/* ── Bustine section ──────────────────────────────── */}
+            {packs.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <GiCardboardBox size={13} color="#F59E0B" /> Bustine ({packs.reduce((s, p) => s + p.quantity, 0)})
+                </p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {packs.map(row => {
+                    if (!row.pack) return null
+                    const accent = row.pack.rarity && row.pack.rarity in RARITY_COLORS
+                      ? RARITY_COLORS[row.pack.rarity as keyof typeof RARITY_COLORS] : '#F59E0B'
+                    const busy = openingPackId === row.pack_id
+                    return (
+                      <motion.button
+                        key={row.id}
+                        onClick={() => handleOpenPack(row)}
+                        disabled={busy}
+                        layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        whileTap={{ scale: 0.96 }}
+                        className="relative rounded-2xl p-3 text-left overflow-hidden disabled:opacity-60"
+                        style={{ background: `linear-gradient(160deg, ${accent}1c, rgba(255,255,255,0.02))`, border: `1px solid ${accent}44` }}
+                      >
+                        {row.quantity > 1 && (
+                          <span className="absolute top-2 right-2 text-[11px] font-extrabold rounded-full px-1.5 py-0.5"
+                            style={{ background: accent, color: '#05070E' }}>×{row.quantity}</span>
+                        )}
+                        <div className="w-full aspect-[3/4] rounded-xl mb-2 flex items-center justify-center overflow-hidden"
+                          style={{ background: `radial-gradient(circle at 40% 30%, ${accent}33, transparent 70%)`, border: `1px solid ${accent}22` }}>
+                          {row.pack.image_url
+                            ? <img src={row.pack.image_url} alt={row.pack.name} className="w-full h-full object-cover" />
+                            : <GiCardboardBox size={46} color={accent} style={{ filter: `drop-shadow(0 0 8px ${accent}77)` }} />}
+                        </div>
+                        <p className="text-white font-bold text-sm leading-tight line-clamp-1">{row.pack.name}</p>
+                        <p className="text-[11px] font-semibold mt-0.5" style={{ color: accent }}>
+                          {busy ? 'Apertura…' : 'Tocca per aprire'}
+                        </p>
+                      </motion.button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Forzieri section ─────────────────────────────── */}
+            {chests.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <GiLockedChest size={13} color="#D97706" /> Forzieri ({chests.reduce((s, c) => s + c.quantity, 0)})
+                </p>
+                <div className="space-y-2">
+                  {chests.map(row => {
+                    if (!row.chest) return null
+                    const accent = row.chest.rarity && row.chest.rarity in RARITY_COLORS
+                      ? RARITY_COLORS[row.chest.rarity as keyof typeof RARITY_COLORS] : '#D97706'
+                    const reqs = row.chest.key_requirements ?? []
+                    const canOpen = reqs.every(r => (chestKeys[r.item_id] ?? 0) >= (r.qty ?? 1))
+                    const busy = openingChestId === row.chest_id
+                    return (
+                      <motion.div key={row.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-3 rounded-2xl p-3 border relative overflow-hidden"
+                        style={{ background: `${accent}0e`, borderColor: `${accent}33` }}>
+                        <span aria-hidden className="absolute left-0 top-3 bottom-3 w-[3px] rounded-full" style={{ background: accent }} />
+                        <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
+                          style={{ background: `${accent}18`, border: `1px solid ${accent}22` }}>
+                          {row.chest.image_url
+                            ? <img src={row.chest.image_url} alt={row.chest.name} className="w-full h-full object-cover" />
+                            : <GiLockedChest size={30} color={accent} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-white font-bold text-sm truncate">{row.chest.name}</p>
+                            {row.quantity > 1 && <span className="text-[11px] text-white/40 font-semibold">×{row.quantity}</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <GiKeyring size={12} color="#F59E0B" />
+                            {reqs.length === 0
+                              ? <span className="text-[11px] text-white/40">Nessuna chiave</span>
+                              : reqs.map((r, i) => {
+                                  const have = chestKeys[r.item_id] ?? 0
+                                  const ok = have >= (r.qty ?? 1)
+                                  return (
+                                    <span key={i} className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full"
+                                      style={{ background: ok ? '#16653420' : '#7f1d1d20', color: ok ? '#4ADE80' : '#F87171' }}>
+                                      {have}/{r.qty ?? 1}
+                                    </span>
+                                  )
+                                })}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleOpenChest(row)}
+                          disabled={!canOpen || busy}
+                          className="shrink-0 text-xs font-extrabold px-3.5 py-2 rounded-xl disabled:opacity-40"
+                          style={{ background: canOpen ? `linear-gradient(135deg, ${accent}, ${accent}bb)` : 'rgba(255,255,255,0.06)', color: canOpen ? '#05070E' : 'rgba(255,255,255,0.5)' }}>
+                          {busy ? '…' : canOpen ? 'Apri' : 'Bloccato'}
+                        </button>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Premi speciali section ───────────────────────── */}
+            {prizes.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <GiTrophyCup size={13} color="#FF4D6D" /> Premi speciali ({prizes.length})
+                </p>
+                <div className="space-y-2">
+                  {prizes.map(row => {
+                    if (!row.prize) return null
+                    const redeemed = !!row.redeemed_at
+                    const accent = redeemed ? '#6B7280' : '#FF4D6D'
+                    return (
+                      <motion.div key={row.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        className="rounded-2xl p-3 border relative overflow-hidden"
+                        style={{ background: redeemed ? 'rgba(255,255,255,0.03)' : `linear-gradient(120deg, ${accent}14, rgba(255,255,255,0.02))`, borderColor: `${accent}44` }}>
+                        {!redeemed && (
+                          <span aria-hidden className="absolute -right-6 -top-6 w-20 h-20 rounded-full" style={{ background: `radial-gradient(circle, ${accent}44, transparent 70%)` }} />
+                        )}
+                        <div className="flex items-center gap-3 relative">
+                          <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
+                            style={{ background: `${accent}18`, border: `1px solid ${accent}33` }}>
+                            {row.prize.image_url
+                              ? <img src={row.prize.image_url} alt={row.prize.name} className="w-full h-full object-cover" style={{ filter: redeemed ? 'grayscale(1)' : undefined }} />
+                              : <GiTrophyCup size={30} color={accent} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-bold text-sm truncate">{row.prize.name}</p>
+                            <p className="text-[11px] text-white/45 truncate">{row.prize.redemption_note || row.prize.description}</p>
+                            <div className="mt-1 inline-flex items-center gap-1.5">
+                              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md tracking-wider"
+                                style={{ background: `${accent}22`, color: accent, textDecoration: redeemed ? 'line-through' : undefined }}>
+                                {row.code}
+                              </span>
+                              {redeemed && <span className="text-[10px] text-white/40 font-semibold uppercase">Riscattato</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* ── Eggs section ─────────────────────────────────── */}
             {eggs.length > 0 && (
               <div>

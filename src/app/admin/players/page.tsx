@@ -48,11 +48,13 @@ export default function PlayersPage() {
 
   // Grant resources
   const [grantTarget, setGrantTarget]   = useState<GrantTarget | null>(null)
-  const [grantType, setGrantType]       = useState<'gold' | 'exp' | 'item' | 'creature'>('gold')
+  const [grantType, setGrantType]       = useState<'gold' | 'exp' | 'gemme' | 'item' | 'creature' | 'bustina'>('gold')
   const [grantAmount, setGrantAmount]   = useState(50)
   const [grantItemId, setGrantItemId]   = useState('')
   const [grantQty, setGrantQty]         = useState(1)
   const [grantCreatureId, setGrantCreatureId] = useState('')
+  const [grantPackId, setGrantPackId]   = useState('')
+  const [packs, setPacks]               = useState<any[]>([])
   const [grantLoading, setGrantLoading] = useState(false)
   const [grantFeedback, setGrantFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -70,6 +72,7 @@ export default function PlayersPage() {
   useEffect(() => {
     fetch('/api/admin/items').then(r => r.json()).then(d => setItems(d.items ?? []))
     fetch('/api/admin/creatures').then(r => r.json()).then(d => setCreatures(d.creatures ?? []))
+    fetch('/api/admin/packs').then(r => r.json()).then(d => setPacks(d.packs ?? [])).catch(() => {})
     supabase.from('sessions')
       .select('id, name, status')
       .then(({ data }) => {
@@ -145,7 +148,7 @@ export default function PlayersPage() {
 
   function openGrant(p: Player) {
     setGrantTarget({ userId: p.userId, label: p.nickname || p.email || p.userId.slice(0, 8) })
-    setGrantType('gold'); setGrantAmount(50); setGrantItemId(''); setGrantQty(1); setGrantCreatureId(''); setGrantFeedback(null)
+    setGrantType('gold'); setGrantAmount(50); setGrantItemId(''); setGrantQty(1); setGrantCreatureId(''); setGrantPackId(''); setGrantFeedback(null)
   }
 
   async function sendGrant() {
@@ -156,6 +159,7 @@ export default function PlayersPage() {
     }
     if (grantType === 'item') { body.itemId = grantItemId; body.quantity = grantQty }
     else if (grantType === 'creature') { body.creatureId = grantCreatureId }
+    else if (grantType === 'bustina') { body.packId = grantPackId; body.quantity = grantQty }
     else { body.amount = grantAmount }
     const res = await fetch('/api/admin/players/grant', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -502,22 +506,22 @@ export default function PlayersPage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-white/50 mb-1">Tipo risorsa</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['gold', 'exp', 'item', 'creature'] as const).map(t => (
+                <div className="grid grid-cols-3 gap-2">
+                  {(['gold', 'exp', 'gemme', 'item', 'creature', 'bustina'] as const).map(t => (
                     <button key={t} onClick={() => setGrantType(t)}
-                      className={`py-2 rounded-lg text-sm font-bold transition-all ${
+                      className={`py-2 rounded-lg text-xs font-bold transition-all ${
                         grantType === t ? 'bg-[#3A9DBC] text-white' : 'bg-white/5 text-white/50 border border-white/10'
                       }`}>
-                      {t === 'gold' ? '💰 Oro' : t === 'exp' ? '⭐ EXP' : t === 'item' ? '🎒 Oggetto' : '🐾 Creatura'}
+                      {t === 'gold' ? '💰 Oro' : t === 'exp' ? '⭐ EXP' : t === 'gemme' ? '💎 Gemme' : t === 'item' ? '🎒 Oggetto' : t === 'creature' ? '🐾 Creatura' : '🎴 Bustina'}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {grantType !== 'item' && (
+              {['gold', 'exp', 'gemme'].includes(grantType) && (
                 <div>
                   <label className="block text-xs font-semibold text-white/50 mb-1">
-                    {grantType === 'gold' ? 'Quantità oro' : 'Quantità EXP'}
+                    {grantType === 'gold' ? 'Quantità oro' : grantType === 'gemme' ? 'Quantità gemme' : 'Quantità EXP'}
                     <span className="ml-1 font-normal text-white/30">(negativo = rimuovi)</span>
                   </label>
                   <input type="number" value={grantAmount}
@@ -592,6 +596,28 @@ export default function PlayersPage() {
                     ))}
                   </select>
                 </div>
+              )}
+
+              {grantType === 'bustina' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-white/50 mb-1">Bustina</label>
+                    <select value={grantPackId} onChange={e => setGrantPackId(e.target.value)}
+                      className="w-full bg-[#0F1F2E] text-white border border-white/20 rounded-lg px-3 py-2">
+                      <option value="">— Seleziona bustina —</option>
+                      {packs.map((p: any) => (
+                        <option key={p.id} value={p.id}>{p.name}{p.rarity ? ` · ${p.rarity}` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-white/50 mb-1">Quantità</label>
+                    <input type="number" min={1} value={grantQty}
+                      onChange={e => setGrantQty(Number(e.target.value))}
+                      className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                </>
               )}
 
               {grantFeedback && (

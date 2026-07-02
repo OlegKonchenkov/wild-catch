@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { grantAbility } from '@/lib/game/grant-ability'
+import { dispenseReward } from '@/lib/game/rewards/dispense'
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
   const body = await request.json().catch(() => ({}))
-  const { userId, sessionId, type, amount, itemId, quantity, creatureId, abilityId } = body
+  const { userId, sessionId, type, amount, itemId, quantity, creatureId, abilityId, packId } = body
 
   if (!userId || !sessionId || !type) {
     return NextResponse.json({ error: 'userId, sessionId e type richiesti' }, { status: 400 })
@@ -128,5 +129,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ granted: true, type, creatureId })
   }
 
-  return NextResponse.json({ error: 'Tipo non valido (gold|exp|item|creature)' }, { status: 400 })
+  if (type === 'gemme') {
+    const gemmeAmount = Number(amount)
+    if (!gemmeAmount || gemmeAmount === 0) return NextResponse.json({ error: 'Importo non valido' }, { status: 400 })
+    const r = await dispenseReward(admin, { userId, sessionId, type: 'gemme', payload: { amount: gemmeAmount } })
+    if (!r.ok) return NextResponse.json({ error: (r.detail as any).error ?? 'Errore' }, { status: 500 })
+    return NextResponse.json({ granted: true, type, amount: gemmeAmount })
+  }
+
+  if (type === 'bustina') {
+    if (!packId) return NextResponse.json({ error: 'packId richiesto' }, { status: 400 })
+    const qty = Number(quantity) || 1
+    const r = await dispenseReward(admin, { userId, sessionId, type: 'bustina', payload: { pack_id: packId, quantity: qty } })
+    if (!r.ok) return NextResponse.json({ error: (r.detail as any).error ?? 'Errore' }, { status: 500 })
+    return NextResponse.json({ granted: true, type, packId, quantity: qty })
+  }
+
+  return NextResponse.json({ error: 'Tipo non valido (gold|exp|item|creature|gemme|bustina)' }, { status: 400 })
 }

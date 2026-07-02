@@ -7,6 +7,7 @@ import { scaleCombatStats } from '@/lib/game/combat'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
 import { grantAbility } from '@/lib/game/grant-ability'
+import { dispenseReward, type RewardType } from '@/lib/game/rewards/dispense'
 
 // Haversine distance in metres
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -429,6 +430,17 @@ export async function POST(request: Request) {
           result = { ...result, rewardType, creature: enigmaCreature }
         }
       }
+      break
+    }
+
+    // Loot / currency / collection types are handled by the shared dispenser
+    // (gold, exp, gemme, bustina, forziere, premio, personaggio, opera,
+    // aneddoto, missione). Keeps pins in sync with every other reward channel.
+    default: {
+      const res = await dispenseReward(admin, {
+        userId: user.id, sessionId, type: pin.reward_type as RewardType, payload: payload ?? {},
+      })
+      result = { ...result, ...res.detail, dispensed: res.ok }
       break
     }
   }
