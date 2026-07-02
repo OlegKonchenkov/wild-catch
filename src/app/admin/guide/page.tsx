@@ -14,6 +14,7 @@ const tocItems = [
   { id: 'players',       label: 'Giocatori' },
   { id: 'notifications', label: 'Notifiche' },
   { id: 'leaderboard',   label: 'Classifica' },
+  { id: 'tesori',        label: 'Tesori & Collezione' },
   { id: 'workflow',      label: 'Flusso operativo' },
 ]
 
@@ -919,6 +920,58 @@ export default function AdminGuidePage() {
                   </div>
                 ))}
               </div>
+            </section>
+
+            <Divider />
+
+            {/* ── 13. Tesori & Collezione ── */}
+            <section id="tesori" className="guide-section" style={{ marginBottom: '2.5rem' }}>
+              <SectionHeader color="#F59E0B">13. Tesori, Bustine &amp; Collezione</SectionHeader>
+              <Prose>
+                Il sistema loot ruota attorno a un <strong>unico dispenser di ricompense</strong>: qualsiasi
+                canale (pin, QR, enigmi, missioni, assegnazione manuale) può erogare gli stessi tipi di premio.
+                Due nuove pagine admin gestiscono i contenuti: <Code>Tesori</Code> e <Code>Collezione</Code>.
+              </Prose>
+
+              <SubHeader>Pagina Tesori</SubHeader>
+              <StepList items={[
+                'Bustine: crea una bustina (rarità, min/max ricompense, prezzo in oro/gemme per il Negozio), poi apri la scheda "Contenuti bustine" per aggiungere le voci del loot pool (tipo + payload JSON + peso di probabilità)',
+                'Forzieri: contenuto FISSO uguale per tutti; imposta le chiavi richieste (JSON [{item_id, qty}], anche più chiavi/tipi) e il contenuto (JSON [{type, payload}])',
+                'Premi: catalogo dei premi reali (voucher). Alla vincita il giocatore riceve un codice; riscattalo da Admin → Giocatori',
+                'Ogni scheda ha il pulsante 🎨 per generare l\'immagine con l\'AI',
+              ]} />
+
+              <SubHeader>Pagina Collezione</SubHeader>
+              <StepList items={[
+                'Luoghi culturali → Opere, Personaggi, Aneddoti collegati al luogo',
+                'Un Personaggio può sbloccare un\'Abilità speciale quando il giocatore lo colleziona (campo "Sblocca abilità")',
+                'Trofei: criterio JSON — {"kind":"personaggio","complete_all":true} per una categoria, oppure {"place_id":"<id>"} per un luogo intero',
+              ]} />
+
+              <SubHeader>Assegnare loot come ricompensa</SubHeader>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0.5rem 0' }}>
+                {[
+                  { field: 'bustina',  color: '#F59E0B', desc: 'Consegna una bustina (payload {pack_id})' },
+                  { field: 'forziere', color: '#D97706', desc: 'Consegna un forziere (payload {chest_id})' },
+                  { field: 'premio',   color: '#FF4D6D', desc: 'Consegna un premio speciale (payload {prize_id})' },
+                  { field: 'gemme',    color: '#4FD1C5', desc: 'Valuta premium (payload {amount})' },
+                  { field: 'personaggio / opera / aneddoto', color: '#E6C989', desc: 'Aggiunge un collezionabile (payload {character_id/artwork_id/anecdote_id})' },
+                ].map(({ field, color, desc }) => (
+                  <div key={field} style={{ background: `${color}0a`, border: `1px solid ${color}20`, borderRadius: '8px', padding: '0.5rem 0.85rem', display: 'flex', gap: '0.6rem', alignItems: 'center', fontSize: '0.85rem' }}>
+                    <code style={{ color, fontFamily: 'monospace', fontSize: '0.83rem', flexShrink: 0 }}>{field}</code>
+                    <span style={{ color: '#94a3b8' }}>{desc}</span>
+                  </div>
+                ))}
+              </div>
+              <Callout type="info">
+                Questi tipi sono selezionabili nell&rsquo;editor dei <strong>pin</strong> (mappa e sessione). Per QR ed enigmi
+                imposta <Code>reward_type</Code> allo stesso valore; per le missioni usa il campo <Code>reward_extra</Code>
+                (array JSON di <Code>{'{type, payload}'}</Code>). Tutto passa dallo stesso dispenser.
+              </Callout>
+              <Callout type="info">
+                <strong>Gemme &amp; bustine al volo:</strong> Admin → Giocatori → &ldquo;Assegna risorse&rdquo; ora include
+                💎 Gemme e 🎴 Bustina. Le gemme si spendono al Negozio (bustine) e per gli indizi degli enigmi.
+              </Callout>
             </section>
 
             <Divider />

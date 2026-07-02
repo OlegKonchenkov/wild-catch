@@ -10,6 +10,7 @@ import {
   GiPawPrint, GiFootprint, GiPositionMarker, GiKnapsack, GiCycle, GiCancel, GiTwoCoins, GiScrollUnfurled,
   GiPadlock, GiSandsOfTime, GiNightSleep, GiPresent, GiGraduateCap, GiCardPickup, GiProgression,
   GiPodiumWinner, GiSeahorse, GiEagleEmblem, GiWolfHead, GiLizardman, GiSeaDragon,
+  GiCardboardBox, GiLockedChest, GiKeyring, GiCutDiamond, GiGreekTemple, GiColumnVase, GiLaurelsTrophy,
 } from 'react-icons/gi'
 import ElementIcon from '@/components/ui/ElementIcon'
 
@@ -819,6 +820,157 @@ function buildSections(): Section[] {
             ma anche quelle con le ricompense maggiori!
           </p>
           <BossGuide />
+        </div>
+      ),
+    },
+    {
+      id: 'abilita',
+      Icon: GiSpellBook,
+      title: 'Abilità Speciali',
+      accent: '#A78BFA',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            Oltre all&apos;<span className="text-white/90 font-bold">Attacco base</span>, ogni Daimon può imparare fino a{' '}
+            <span className="text-[#A78BFA] font-bold">4 Mosse speciali</span>. Le Mosse arrivano come{' '}
+            <span className="text-[#A78BFA] font-bold">gettoni</span> da missioni, QR, pin, enigmi e boss.
+          </p>
+          <div className="mt-3 space-y-1.5 text-xs">
+            {([
+              { Icon: GiPresent,      color: '#A78BFA', label: 'Ottieni il gettone', desc: 'Come ricompensa da missioni, QR, pin, enigmi o boss' },
+              { Icon: GiSpellBook,    color: '#C084FC', label: 'Insegnala',          desc: 'Nella DaimonDex 📖 apri un Daimon → Mosse e insegnagli l\'abilità (consuma il gettone)' },
+              { Icon: GiCrossedSwords, color: '#E85D2F', label: 'Usala in battaglia', desc: 'In combattimento premi MOSSE e scegli l\'abilità: danni, stati, cure, potenziamenti' },
+            ] as const).map(row => (
+              <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2" style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
+                <row.Icon size={17} color={row.color} className="flex-shrink-0 mt-0.5" />
+                <div><span className="font-bold text-white/90">{row.label}</span><span className="text-white/45"> — {row.desc}</span></div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-start gap-1.5 mt-3 rounded-xl border border-[#A78BFA]/20 bg-[#A78BFA]/5 px-3 py-2 text-xs text-[#A78BFA]/85">
+            <GiLightBulb size={14} color="#A78BFA" className="flex-shrink-0 mt-0.5" /> <span>Non tutti i Daimon possono imparare tutto: alcune Mosse richiedono un certo livello, elemento o rarità. Usandole spesso migliorano.</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'gemme',
+      Icon: GiCutDiamond,
+      title: 'Gemme',
+      accent: '#4FD1C5',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            Le <span className="text-[#4FD1C5] font-bold">Gemme</span> 💎 sono una valuta preziosa, mostrata in alto accanto all&apos;oro.
+            Si guadagnano da bustine, missioni, pin ed enigmi.
+          </p>
+          <div className="mt-3 space-y-1.5 text-xs">
+            {([
+              { Icon: GiCardboardBox, color: '#F59E0B', label: 'Compra Bustine',  desc: 'Al Negozio alcune bustine si pagano in gemme' },
+              { Icon: GiLightBulb,    color: '#38BDF8', label: 'Sblocca Indizi',  desc: 'Negli enigmi puoi spendere gemme per rivelare un suggerimento' },
+            ] as const).map(row => (
+              <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2" style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
+                <row.Icon size={17} color={row.color} className="flex-shrink-0 mt-0.5" />
+                <div><span className="font-bold text-white/90">{row.label}</span><span className="text-white/45"> — {row.desc}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'bustine',
+      Icon: GiCardboardBox,
+      title: 'Bustine',
+      accent: '#F59E0B',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            Le <span className="text-[#F59E0B] font-bold">Bustine</span> 🎴 contengono da{' '}
+            <span className="text-[#F59E0B] font-bold">3 a 5 ricompense casuali</span>: oro, gemme, oggetti, equipaggiamento,
+            abilità, creature, chiavi, forzieri, personaggi e — raramente — premi speciali. Ogni contenuto ha una sua rarità.
+          </p>
+          <div className="mt-3 space-y-1.5 text-xs">
+            {([
+              { Icon: GiPresent,     color: '#F59E0B', label: 'Come si ottengono', desc: 'Da missioni, enigmi, boss, pin, QR, accesso giornaliero o comprandole al Negozio' },
+              { Icon: GiKnapsack,    color: '#34D399', label: 'Apertura',          desc: 'Aprile dallo Zaino: una breve animazione rivela le ricompense una a una' },
+            ] as const).map(row => (
+              <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2" style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
+                <row.Icon size={17} color={row.color} className="flex-shrink-0 mt-0.5" />
+                <div><span className="font-bold text-white/90">{row.label}</span><span className="text-white/45"> — {row.desc}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'forzieri',
+      Icon: GiLockedChest,
+      title: 'Forzieri & Chiavi',
+      accent: '#D97706',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            I <span className="text-[#D97706] font-bold">Forzieri</span> 🧰 custodiscono un bottino{' '}
+            <span className="text-white/90 font-bold">fisso, uguale per tutti</span>, ma sono chiusi a chiave.
+            Servono le <span className="inline-flex items-center gap-1 text-[#F59E0B] font-bold align-middle"><GiKeyring size={13} color="#F59E0B" /> Chiavi</span> giuste — a volte più di una, o di tipi diversi.
+          </p>
+          <div className="mt-3 space-y-1.5 text-xs">
+            {([
+              { Icon: GiKeyring,     color: '#F59E0B', label: 'Chiavi', desc: 'Bronzo, Argento, Oro — si trovano nelle bustine, in giro o al Negozio' },
+              { Icon: GiLockedChest, color: '#D97706', label: 'Apertura', desc: 'Nello Zaino, se possiedi le chiavi richieste, apri il forziere (le chiavi si consumano)' },
+            ] as const).map(row => (
+              <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2" style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
+                <row.Icon size={17} color={row.color} className="flex-shrink-0 mt-0.5" />
+                <div><span className="font-bold text-white/90">{row.label}</span><span className="text-white/45"> — {row.desc}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'collezione',
+      Icon: GiGreekTemple,
+      title: 'Collezione & Trofei',
+      accent: '#E6C989',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            La <span className="text-[#E6C989] font-bold">Collezione</span> 🏛️ raccoglie la storia del territorio, divisa per{' '}
+            <span className="text-[#E6C989] font-bold">luoghi culturali</span>. Ogni luogo ha opere, personaggi e aneddoti da trovare.
+          </p>
+          <div className="mt-3 space-y-1.5 text-xs">
+            {([
+              { Icon: GiColumnVase,    color: '#38BDF8', label: 'Opere',       desc: 'Reperti e capolavori, spesso nascosti nei forzieri' },
+              { Icon: GiLaurelsTrophy, color: '#F59E0B', label: 'Personaggi',  desc: 'Figure storiche: collezionarne uno sblocca una sua Abilità speciale' },
+              { Icon: GiScrollUnfurled, color: '#A3E635', label: 'Aneddoti',    desc: 'Storie e curiosità legate ai luoghi e ai personaggi' },
+              { Icon: GiTrophyCup,     color: '#F3C233', label: 'Trofei GOLD', desc: 'Completa un\'intera categoria o un luogo per vincere un trofeo' },
+            ] as const).map(row => (
+              <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2" style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
+                <row.Icon size={17} color={row.color} className="flex-shrink-0 mt-0.5" />
+                <div><span className="font-bold text-white/90">{row.label}</span><span className="text-white/45"> — {row.desc}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'premi',
+      Icon: GiTrophyCup,
+      title: 'Premi Speciali',
+      accent: '#FF4D6D',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            I <span className="text-[#FF4D6D] font-bold">Premi speciali</span> 🏆 sono ricompense reali molto rare (es. una cena, un buono, un tour VIP),
+            che si trovano quasi solo aprendo bustine o forzieri rari.
+          </p>
+          <div className="flex items-start gap-1.5 mt-3 rounded-xl border border-[#FF4D6D]/20 bg-[#FF4D6D]/5 px-3 py-2 text-xs text-[#FF4D6D]/85">
+            <GiLightBulb size={14} color="#FF4D6D" className="flex-shrink-0 mt-0.5" /> <span>Quando vinci un premio ricevi un <span className="font-bold">codice</span> nello Zaino (sezione Premi): mostralo secondo le istruzioni per riscattarlo.</span>
+          </div>
         </div>
       ),
     },
