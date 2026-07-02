@@ -176,11 +176,19 @@ describe('dispenseReward — personaggio', () => {
   })
 })
 
-describe('dispenseReward — not-yet-implemented loot types', () => {
-  it('reports ok:false for missione until its phase lands', async () => {
-    const c = makeClient()
+describe('dispenseReward — missione', () => {
+  it('assigns the mission to the player', async () => {
+    const upsert = vi.fn(async () => ({ error: null }))
+    const c = makeClient({ tables: { player_missions: { upsert }, missions: { selectData: { title: 'Il segreto del Foro' } } } })
     const r = await dispenseReward(c, { ...BASE, type: 'missione', payload: { mission_id: 'm1' } })
+    expect(r.ok).toBe(true)
+    expect(r.detail.title).toBe('Il segreto del Foro')
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ mission_id: 'm1', progress: 0 }), expect.anything())
+  })
+
+  it('fails without a mission_id', async () => {
+    const c = makeClient()
+    const r = await dispenseReward(c, { ...BASE, type: 'missione', payload: {} })
     expect(r.ok).toBe(false)
-    expect(r.detail.error).toContain('missione')
   })
 })

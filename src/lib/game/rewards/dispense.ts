@@ -246,9 +246,17 @@ export async function dispenseReward(
       return { type, ok: true, detail }
     }
 
-    // ── Special mission unlock (flagged mission granted to this player) ───────
-    case 'missione':
-      return { type, ok: false, detail: { error: `tipo '${type}' non ancora implementato` } }
+    // ── Special mission unlock — assigns the mission to this player ──────────
+    case 'missione': {
+      const missionId = payload.mission_id ?? payload.missionId
+      if (!missionId) return { type, ok: false, detail: { error: 'mission_id mancante' } }
+      await client.from('player_missions').upsert(
+        { user_id: userId, mission_id: missionId, progress: 0 },
+        { onConflict: 'user_id,mission_id', ignoreDuplicates: true },
+      )
+      const { data: mission } = await client.from('missions').select('title').eq('id', missionId).single()
+      return { type, ok: true, detail: { missionId, title: (mission as any)?.title ?? null } }
+    }
 
     default:
       return { type: type as RewardType, ok: false, detail: { error: 'tipo sconosciuto' } }
