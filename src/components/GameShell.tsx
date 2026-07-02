@@ -23,7 +23,7 @@ import {
   GiSwapBag, GiMagnifyingGlass, GiEggClutch, GiPadlock, GiLightningArc, GiTrophyCup,
   GiDeathSkull, GiShakingHands, GiCrown, GiBullseye, GiUpgrade, GiSmartphone, GiCheckMark,
   GiPresent, GiBreastplate, GiCrossedSwords, GiHearts, GiPositionMarker, GiSparkles,
-  GiCardboardBox, GiLockedChest, GiSun,
+  GiCardboardBox, GiLockedChest, GiSun, GiGraduateCap,
 } from 'react-icons/gi'
 import { getExpProgress } from '@/lib/game/leveling'
 import { playLevelUp } from '@/lib/game/sounds/events'
@@ -255,6 +255,13 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: IconType; title: strin
         body: pinReward,
       }
     }
+    case 'quiz_solved': {
+      return {
+        icon: GiGraduateCap,
+        title: 'Quiz risolto!',
+        body: readStr(p, 'question') ?? '',
+      }
+    }
     case 'daily_claimed': {
       const streak = readNum(p, 'streak')
       return {
@@ -307,6 +314,7 @@ const EVENT_THEMES: Record<string, { color: string; dimColor: string; label: str
   pack_opened:       { color: '#F59E0B', dimColor: 'rgba(245,158,11,0.10)',  label: 'Bustina'   },
   chest_opened:      { color: '#D97706', dimColor: 'rgba(217,119,6,0.10)',   label: 'Forziere'  },
   daily_claimed:     { color: '#FFB36B', dimColor: 'rgba(255,179,107,0.10)', label: 'Giornaliero' },
+  quiz_solved:       { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Quiz' },
 }
 
 export default function GameShell({ children }: { children: React.ReactNode }) {

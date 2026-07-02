@@ -17,6 +17,7 @@ const TABLES: Record<string, { cols: string[]; order?: string }> = {
   characters:      { cols: ['name', 'description', 'image_url', 'place_id', 'rarity', 'unlocks_ability_id'], order: 'created_at' },
   anecdotes:       { cols: ['title', 'body', 'image_url', 'place_id', 'character_id', 'rarity'], order: 'created_at' },
   trophies:        { cols: ['name', 'description', 'image_url', 'criteria'], order: 'created_at' },
+  quizzes:         { cols: ['question', 'options', 'correct_index', 'place_id', 'unlock_anecdote_id', 'reward', 'session_id'], order: 'created_at' },
 }
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {

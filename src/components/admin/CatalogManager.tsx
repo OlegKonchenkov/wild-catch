@@ -123,7 +123,7 @@ export default function CatalogManager({
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-semibold truncate">{row.name ?? row.title}{row.rarity ? <span className="text-white/30 font-normal"> · {row.rarity}</span> : null}</p>
+                <p className="text-white text-sm font-semibold truncate">{row.name ?? row.title ?? row.question}{row.rarity ? <span className="text-white/30 font-normal"> · {row.rarity}</span> : null}</p>
                 <p className="text-white/35 text-xs truncate">{row.description ?? row.body ?? ''}</p>
               </div>
               {hasArt && <button onClick={() => genArt(row)} disabled={busy} className="text-xs bg-purple-600/70 text-white px-2 py-1 rounded-md disabled:opacity-40">🎨</button>}
