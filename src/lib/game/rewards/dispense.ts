@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { grantAbility } from '@/lib/game/grant-ability'
+import { grantCollectible, checkTrophies, type CollectibleKind } from '@/lib/game/collection'
 
 /**
  * Every kind of reward the game can grant. The first block existed before the
@@ -206,10 +207,46 @@ export async function dispenseReward(
       return { type, ok: true, detail: { prizeId, code, prizeName: (prize as any)?.name ?? null } }
     }
 
-    // ── Loot / collection types — implemented in their respective phases ──────
+    // ── Cultural collectibles ────────────────────────────────────────────────
     case 'personaggio':
     case 'opera':
-    case 'aneddoto':
+    case 'aneddoto': {
+      const refId = payload.character_id ?? payload.artwork_id ?? payload.anecdote_id
+        ?? payload.ref_id ?? payload.id
+      if (!refId) return { type, ok: false, detail: { error: 'id collezionabile mancante' } }
+      const kind: CollectibleKind = type === 'personaggio' ? 'personaggio' : type === 'opera' ? 'opera' : 'aneddoto'
+      const grant = await grantCollectible(client, userId, sessionId, kind, refId)
+
+      const detail: Record<string, any> = { kind, refId, firstCopy: grant.firstCopy, copies: grant.copies }
+
+      // Personaggio: on the first copy, unlock its bound ability.
+      if (type === 'personaggio') {
+        const { data: character } = await client
+          .from('characters').select('name, image_url, rarity, unlocks_ability_id').eq('id', refId).single()
+        detail.name = (character as any)?.name
+        detail.image_url = (character as any)?.image_url
+        detail.rarity = (character as any)?.rarity
+        if (grant.firstCopy && (character as any)?.unlocks_ability_id) {
+          await grantAbility(client, userId, sessionId, (character as any).unlocks_ability_id, 1)
+          const { data: ab } = await client.from('abilities').select('name').eq('id', (character as any).unlocks_ability_id).single()
+          detail.unlockedAbility = (ab as any)?.name ?? null
+        }
+      } else if (type === 'opera') {
+        const { data: art } = await client.from('artworks').select('name, image_url, rarity').eq('id', refId).single()
+        detail.name = (art as any)?.name; detail.image_url = (art as any)?.image_url; detail.rarity = (art as any)?.rarity
+      } else {
+        const { data: an } = await client.from('anecdotes').select('title, image_url, rarity').eq('id', refId).single()
+        detail.title = (an as any)?.title; detail.image_url = (an as any)?.image_url; detail.rarity = (an as any)?.rarity
+      }
+
+      // Completing a category/place may award a trophy.
+      const trophies = await checkTrophies(client, userId, sessionId)
+      if (trophies.length > 0) detail.trophies = trophies
+
+      return { type, ok: true, detail }
+    }
+
+    // ── Special mission unlock (flagged mission granted to this player) ───────
     case 'missione':
       return { type, ok: false, detail: { error: `tipo '${type}' non ancora implementato` } }
 

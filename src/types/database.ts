@@ -1323,6 +1323,48 @@ export type Database = {
           },
         ]
       }
+      cultural_places: {
+        Row: { id: string; name: string; description: string; image_url: string; lat: number | null; lng: number | null; session_id: string | null; created_at: string }
+        Insert: { id?: string; name: string; description?: string; image_url?: string; lat?: number | null; lng?: number | null; session_id?: string | null; created_at?: string }
+        Update: { id?: string; name?: string; description?: string; image_url?: string; lat?: number | null; lng?: number | null; session_id?: string | null; created_at?: string }
+        Relationships: []
+      }
+      artworks: {
+        Row: { id: string; name: string; description: string; image_url: string; place_id: string | null; rarity: string | null; created_at: string }
+        Insert: { id?: string; name: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; created_at?: string }
+        Update: { id?: string; name?: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; created_at?: string }
+        Relationships: [{ foreignKeyName: "artworks_place_id_fkey"; columns: ["place_id"]; isOneToOne: false; referencedRelation: "cultural_places"; referencedColumns: ["id"] }]
+      }
+      characters: {
+        Row: { id: string; name: string; description: string; image_url: string; place_id: string | null; rarity: string | null; unlocks_ability_id: string | null; created_at: string }
+        Insert: { id?: string; name: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; unlocks_ability_id?: string | null; created_at?: string }
+        Update: { id?: string; name?: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; unlocks_ability_id?: string | null; created_at?: string }
+        Relationships: [{ foreignKeyName: "characters_place_id_fkey"; columns: ["place_id"]; isOneToOne: false; referencedRelation: "cultural_places"; referencedColumns: ["id"] }]
+      }
+      anecdotes: {
+        Row: { id: string; title: string; body: string; image_url: string; place_id: string | null; character_id: string | null; rarity: string | null; created_at: string }
+        Insert: { id?: string; title: string; body?: string; image_url?: string; place_id?: string | null; character_id?: string | null; rarity?: string | null; created_at?: string }
+        Update: { id?: string; title?: string; body?: string; image_url?: string; place_id?: string | null; character_id?: string | null; rarity?: string | null; created_at?: string }
+        Relationships: []
+      }
+      player_collection: {
+        Row: { id: string; user_id: string; session_id: string; kind: string; ref_id: string; copies: number; obtained_at: string }
+        Insert: { id?: string; user_id: string; session_id: string; kind: string; ref_id: string; copies?: number; obtained_at?: string }
+        Update: { id?: string; user_id?: string; session_id?: string; kind?: string; ref_id?: string; copies?: number; obtained_at?: string }
+        Relationships: []
+      }
+      trophies: {
+        Row: { id: string; name: string; description: string; image_url: string; criteria: Json; created_at: string }
+        Insert: { id?: string; name: string; description?: string; image_url?: string; criteria?: Json; created_at?: string }
+        Update: { id?: string; name?: string; description?: string; image_url?: string; criteria?: Json; created_at?: string }
+        Relationships: []
+      }
+      player_trophies: {
+        Row: { id: string; user_id: string; session_id: string; trophy_id: string; awarded_at: string }
+        Insert: { id?: string; user_id: string; session_id: string; trophy_id: string; awarded_at?: string }
+        Update: { id?: string; user_id?: string; session_id?: string; trophy_id?: string; awarded_at?: string }
+        Relationships: [{ foreignKeyName: "player_trophies_trophy_id_fkey"; columns: ["trophy_id"]; isOneToOne: false; referencedRelation: "trophies"; referencedColumns: ["id"] }]
+      }
       special_prizes: {
         Row: {
           id: string

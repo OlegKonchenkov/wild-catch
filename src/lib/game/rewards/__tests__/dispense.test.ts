@@ -157,11 +157,30 @@ describe('dispenseReward — premio', () => {
   })
 })
 
+describe('dispenseReward — personaggio', () => {
+  it('adds the character to the collection and unlocks its ability on first copy', async () => {
+    const insert = vi.fn(async () => ({ error: null }))
+    const c = makeClient({ tables: {
+      player_collection: { selectData: null, insert },      // not yet owned → first copy
+      characters: { selectData: { name: 'Ovidio', image_url: '', rarity: 'raro', unlocks_ability_id: 'ab1' } },
+      abilities: { selectData: { name: 'Verso Immortale' } },
+      trophies: { selectData: [] },
+      player_trophies: { selectData: [] },
+    } })
+    const r = await dispenseReward(c, { ...BASE, type: 'personaggio', payload: { character_id: 'ch1' } })
+    expect(r.ok).toBe(true)
+    expect(r.detail.firstCopy).toBe(true)
+    expect(r.detail.name).toBe('Ovidio')
+    expect(r.detail.unlockedAbility).toBe('Verso Immortale')
+    expect(grantAbility).toHaveBeenCalledWith(c, 'u1', 's1', 'ab1', 1)
+  })
+})
+
 describe('dispenseReward — not-yet-implemented loot types', () => {
-  it('reports ok:false for personaggio until its phase lands', async () => {
+  it('reports ok:false for missione until its phase lands', async () => {
     const c = makeClient()
-    const r = await dispenseReward(c, { ...BASE, type: 'personaggio', payload: { character_id: 'x1' } })
+    const r = await dispenseReward(c, { ...BASE, type: 'missione', payload: { mission_id: 'm1' } })
     expect(r.ok).toBe(false)
-    expect(r.detail.error).toContain('personaggio')
+    expect(r.detail.error).toContain('missione')
   })
 })

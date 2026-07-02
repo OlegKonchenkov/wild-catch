@@ -35,6 +35,7 @@ const NAV_ITEMS: Array<{ href: string; key: string; label: string; coachmark?: s
   { href: '/game/enigmi',   key: 'enigmi',   label: 'Enigmi',    coachmark: 'nav-enigmi'     },
   { href: '/game/shop',     key: 'shop',     label: 'Shop',      coachmark: 'nav-shop'       },
   { href: '/game/backpack', key: 'backpack', label: 'Zaino',     coachmark: 'nav-zaino'      },
+  { href: '/game/collezione', key: 'collezione', label: 'Collezione', coachmark: 'nav-collezione' },
   { href: '/game/profile',  key: 'trophy',   label: 'Classifica', coachmark: 'nav-classifica' },
   { href: '/game/guide',    key: 'guide',    label: 'Guida',     coachmark: 'nav-guida'      },
   { href: '/home',          key: 'home',     label: 'Profilo'                                },
