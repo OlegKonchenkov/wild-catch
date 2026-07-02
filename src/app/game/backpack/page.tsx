@@ -11,6 +11,7 @@ import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { AbilityGlyph, abilityAccent, buildAbilityChips } from '@/components/game/ability-visuals'
+import PackOpenModal, { type PackDrop, type OpenedPack } from '@/components/game/PackOpenModal'
 import type { Ability } from '@/lib/game/abilities'
 import ElementIcon from '@/components/ui/ElementIcon'
 import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
@@ -19,7 +20,7 @@ import { GiSpellBook } from 'react-icons/gi'
 import {
   GiKnapsack, GiTwoCoins, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower,
   GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing,
-  GiSparkles, GiPawPrint,
+  GiSparkles, GiPawPrint, GiCardboardBox,
 } from 'react-icons/gi'
 
 const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
@@ -73,6 +74,21 @@ interface AbilityTokenRow {
   ability_id: string
   quantity: number
   abilities: Ability | null
+}
+
+interface PackRow {
+  id: string
+  quantity: number
+  pack_id: string
+  pack: {
+    id: string
+    name: string
+    description: string
+    rarity: string | null
+    image_url: string
+    min_drops: number
+    max_drops: number
+  } | null
 }
 
 interface PlayerEgg {
@@ -305,6 +321,9 @@ export default function BackpackPage() {
   const [usingId, setUsingId]     = useState<string | null>(null)
   const [hatchingId, setHatchingId] = useState<string | null>(null)
   const [hatchResult, setHatchResult] = useState<HatchResult | null>(null)
+  const [packs, setPacks] = useState<PackRow[]>([])
+  const [openingPackId, setOpeningPackId] = useState<string | null>(null)
+  const [packResult, setPackResult] = useState<{ pack: OpenedPack; drops: PackDrop[] } | null>(null)
   const { toast, showSuccess, showApiError, showError, dismiss } = useGameToast()
   const supabase   = useMemo(() => createClient(), [])
   const userIdRef  = useRef<string | null>(null)
@@ -331,6 +350,41 @@ export default function BackpackPage() {
       .then(r => r.json())
       .then(d => { if (d.eggs) setEggs(d.eggs) })
   }, [])
+
+  const fetchPacks = useCallback(() => {
+    const sid = sessionRef.current
+    if (!sid) return
+    fetch(`/api/game/packs?sessionId=${sid}`)
+      .then(r => r.json())
+      .then(d => { if (d.packs) setPacks(d.packs as PackRow[]) })
+      .catch(() => {})
+  }, [])
+
+  async function handleOpenPack(row: PackRow) {
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId || openingPackId) return
+    setOpeningPackId(row.pack_id)
+    try {
+      const res = await fetch('/api/game/packs/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packId: row.pack_id, sessionId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPackResult({ pack: data.pack, drops: data.drops })
+        // Optimistically decrement locally; realtime will reconcile.
+        setPacks(prev => prev.map(p => p.pack_id === row.pack_id ? { ...p, quantity: p.quantity - 1 } : p).filter(p => p.quantity > 0))
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+        window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
+      } else {
+        showApiError(res.status, data.error ?? 'Apertura fallita')
+      }
+    } catch {
+      showError('Errore di rete')
+    }
+    setOpeningPackId(null)
+  }
 
   function fetchAbilityTokens() {
     const uid = userIdRef.current
@@ -425,6 +479,7 @@ export default function BackpackPage() {
 
       fetchEggs()
       fetchAbilityTokens()
+      fetchPacks()
 
       // Realtime: re-fetch whenever inventory changes (shop, QR rewards, item use)
       const channel = supabase
@@ -441,6 +496,10 @@ export default function BackpackPage() {
           event: '*', schema: 'public', table: 'player_abilities',
           filter: `user_id=eq.${user.id}`,
         }, () => fetchAbilityTokens())
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'player_packs',
+          filter: `user_id=eq.${user.id}`,
+        }, () => fetchPacks())
         .subscribe()
 
       return () => { supabase.removeChannel(channel) }
@@ -462,6 +521,17 @@ export default function BackpackPage() {
           <HatchingAnimation
             result={hatchResult}
             onDone={() => setHatchResult(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Pack opening overlay */}
+      <AnimatePresence>
+        {packResult && (
+          <PackOpenModal
+            pack={packResult.pack}
+            drops={packResult.drops}
+            onDone={() => setPackResult(null)}
           />
         )}
       </AnimatePresence>
@@ -530,6 +600,49 @@ export default function BackpackPage() {
           <GameListSkeleton rows={4} />
         ) : (
           <>
+            {/* ── Bustine section ──────────────────────────────── */}
+            {packs.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <GiCardboardBox size={13} color="#F59E0B" /> Bustine ({packs.reduce((s, p) => s + p.quantity, 0)})
+                </p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {packs.map(row => {
+                    if (!row.pack) return null
+                    const accent = row.pack.rarity && row.pack.rarity in RARITY_COLORS
+                      ? RARITY_COLORS[row.pack.rarity as keyof typeof RARITY_COLORS] : '#F59E0B'
+                    const busy = openingPackId === row.pack_id
+                    return (
+                      <motion.button
+                        key={row.id}
+                        onClick={() => handleOpenPack(row)}
+                        disabled={busy}
+                        layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        whileTap={{ scale: 0.96 }}
+                        className="relative rounded-2xl p-3 text-left overflow-hidden disabled:opacity-60"
+                        style={{ background: `linear-gradient(160deg, ${accent}1c, rgba(255,255,255,0.02))`, border: `1px solid ${accent}44` }}
+                      >
+                        {row.quantity > 1 && (
+                          <span className="absolute top-2 right-2 text-[11px] font-extrabold rounded-full px-1.5 py-0.5"
+                            style={{ background: accent, color: '#05070E' }}>×{row.quantity}</span>
+                        )}
+                        <div className="w-full aspect-[3/4] rounded-xl mb-2 flex items-center justify-center overflow-hidden"
+                          style={{ background: `radial-gradient(circle at 40% 30%, ${accent}33, transparent 70%)`, border: `1px solid ${accent}22` }}>
+                          {row.pack.image_url
+                            ? <img src={row.pack.image_url} alt={row.pack.name} className="w-full h-full object-cover" />
+                            : <GiCardboardBox size={46} color={accent} style={{ filter: `drop-shadow(0 0 8px ${accent}77)` }} />}
+                        </div>
+                        <p className="text-white font-bold text-sm leading-tight line-clamp-1">{row.pack.name}</p>
+                        <p className="text-[11px] font-semibold mt-0.5" style={{ color: accent }}>
+                          {busy ? 'Apertura…' : 'Tocca per aprire'}
+                        </p>
+                      </motion.button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* ── Eggs section ─────────────────────────────────── */}
             {eggs.length > 0 && (
               <div>
