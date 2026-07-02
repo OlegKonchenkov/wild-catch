@@ -1134,6 +1134,77 @@ export type Database = {
           },
         ]
       }
+      chests: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          rarity: string | null
+          image_url: string
+          place_id: string | null
+          key_requirements: Json
+          contents: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          place_id?: string | null
+          key_requirements?: Json
+          contents?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          place_id?: string | null
+          key_requirements?: Json
+          contents?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
+      player_chests: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          chest_id: string
+          quantity: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          chest_id: string
+          quantity?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          chest_id?: string
+          quantity?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_chests_chest_id_fkey"
+            columns: ["chest_id"]
+            isOneToOne: false
+            referencedRelation: "chests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       packs: {
         Row: {
           id: string

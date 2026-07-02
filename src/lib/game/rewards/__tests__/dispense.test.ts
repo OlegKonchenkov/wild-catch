@@ -134,11 +134,22 @@ describe('dispenseReward — bustina', () => {
   })
 })
 
+describe('dispenseReward — forziere', () => {
+  it('inserts a new player_chests row when the player owns none', async () => {
+    const insert = vi.fn(async () => ({ error: null }))
+    const c = makeClient({ tables: { player_chests: { selectData: null, insert }, chests: { selectData: { name: 'Forziere del Foro' } } } })
+    const r = await dispenseReward(c, { ...BASE, type: 'forziere', payload: { chest_id: 'ch1' } })
+    expect(r.ok).toBe(true)
+    expect(r.detail.chestName).toBe('Forziere del Foro')
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ chest_id: 'ch1', quantity: 1 }))
+  })
+})
+
 describe('dispenseReward — not-yet-implemented loot types', () => {
-  it('reports ok:false for forziere until its phase lands', async () => {
+  it('reports ok:false for premio until its phase lands', async () => {
     const c = makeClient()
-    const r = await dispenseReward(c, { ...BASE, type: 'forziere', payload: { chest_id: 'c1' } })
+    const r = await dispenseReward(c, { ...BASE, type: 'premio', payload: { prize_id: 'p1' } })
     expect(r.ok).toBe(false)
-    expect(r.detail.error).toContain('forziere')
+    expect(r.detail.error).toContain('premio')
   })
 })

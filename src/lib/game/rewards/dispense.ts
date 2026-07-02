@@ -170,8 +170,30 @@ export async function dispenseReward(
       return { type, ok: true, detail: { packId, quantity, packName: (pack as any)?.name ?? null } }
     }
 
+    // ── Forziere (chest) — adds an unopened chest to the player's stash ──────
+    case 'forziere': {
+      const chestId = payload.chest_id ?? payload.chestId
+      const quantity = Number(payload.quantity) || 1
+      if (!chestId) return { type, ok: false, detail: { error: 'chest_id mancante' } }
+      const { data: existing } = await client
+        .from('player_chests')
+        .select('id, quantity')
+        .eq('user_id', userId).eq('session_id', sessionId).eq('chest_id', chestId)
+        .maybeSingle()
+      if (existing) {
+        await client.from('player_chests')
+          .update({ quantity: (existing as any).quantity + quantity })
+          .eq('id', (existing as any).id)
+      } else {
+        await client.from('player_chests').insert({
+          user_id: userId, session_id: sessionId, chest_id: chestId, quantity,
+        })
+      }
+      const { data: chest } = await client.from('chests').select('name').eq('id', chestId).single()
+      return { type, ok: true, detail: { chestId, quantity, chestName: (chest as any)?.name ?? null } }
+    }
+
     // ── Loot / collection types — implemented in their respective phases ──────
-    case 'forziere':
     case 'premio':
     case 'personaggio':
     case 'opera':
