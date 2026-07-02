@@ -5,6 +5,7 @@ import { getMissionUnlockState, type MissionUnlockContext, type MissionUnlockFie
 import { TUTORIAL_MISSION_FRAMMENTO_GRANTS, isTutorialSession } from '@/lib/game/tutorial'
 import { grantAbility } from '@/lib/game/grant-ability'
 import { dispenseReward, type RewardType } from '@/lib/game/rewards/dispense'
+import { periodKeyFor, type MissionRecurrence } from '@/lib/game/recurrence'
 
 interface MissionRow {
   id: string
@@ -18,6 +19,7 @@ interface MissionRow {
   reward_items: Array<{ item_id: string; quantity: number }> | null
   reward_creature_id: string | null
   reward_extra: Array<{ type: string; payload: Record<string, unknown> }> | null
+  recurrence: MissionRecurrence
   unlock_level: number | null
   unlock_after_mission_id: string | null
 }
@@ -27,6 +29,7 @@ interface PlayerMissionProgressRow {
   mission_id: string
   progress: number
   completed_at: string | null
+  period_key?: string | null
 }
 
 interface GoldRow { gold: number }
@@ -74,7 +77,7 @@ export async function incrementMissionProgress({
   // story without globals bleeding into it.
   const missionQuery = admin
     .from('missions')
-    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_ability_id, reward_items, reward_creature_id, reward_extra, unlock_level, unlock_after_mission_id')
+    .select('id, title, target, target_count, reward_gold, reward_exp, reward_item_id, reward_ability_id, reward_items, reward_creature_id, reward_extra, recurrence, unlock_level, unlock_after_mission_id')
     .eq('type', type)
   const { data: missions } = await (
     isTutorialSession(sessionId)
@@ -102,20 +105,28 @@ export async function incrementMissionProgress({
   const missionIds = unlockedMatching.map(m => m.id)
   const { data: playerMissions } = await admin
     .from('player_missions')
-    .select('id, mission_id, progress, completed_at')
+    .select('id, mission_id, progress, completed_at, period_key')
     .eq('user_id', userId)
     .eq('session_id', sessionId)
     .in('mission_id', missionIds)
 
-  const pmMap: Record<string, PlayerMissionProgressRow> = Object.fromEntries(
-    ((playerMissions ?? []) as PlayerMissionProgressRow[]).map(pm => [pm.mission_id, pm])
-  )
+  // Progress rows are period-scoped: a recurring mission (daily/weekly/monthly)
+  // only matches the row of the CURRENT period, so a new period naturally
+  // starts from zero. One-shot missions use period_key '' — the exact rows
+  // that existed before recurrence shipped.
+  const pmRows = (playerMissions ?? []) as PlayerMissionProgressRow[]
+  const pmMap: Record<string, PlayerMissionProgressRow> = {}
+  for (const mission of unlockedMatching) {
+    const period = periodKeyFor(mission.recurrence)
+    const row = pmRows.find(pm => pm.mission_id === mission.id && (pm.period_key ?? '') === period)
+    if (row) pmMap[mission.id] = row
+  }
 
   const completed: CompletedMission[] = []
 
   for (const mission of unlockedMatching) {
     const existing = pmMap[mission.id]
-    if (existing?.completed_at) continue  // already completed in this session
+    if (existing?.completed_at) continue  // already completed in this period/session
 
     const newProgress = (existing?.progress ?? 0) + 1
     const justCompleted = newProgress >= mission.target_count
@@ -126,6 +137,7 @@ export async function incrementMissionProgress({
         user_id: userId,
         session_id: sessionId,
         mission_id: mission.id,
+        period_key: periodKeyFor(mission.recurrence),
         progress: newProgress,
         ...(justCompleted ? { completed_at: new Date().toISOString() } : {}),
       })

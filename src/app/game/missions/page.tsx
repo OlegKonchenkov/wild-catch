@@ -7,6 +7,7 @@ import { swr } from '@/lib/cache'
 import type { Mission } from '@/lib/types'
 import { getMissionUnlockState, type MissionUnlockState } from '@/lib/game/mission-unlocks'
 import { isTutorialSession } from '@/lib/game/tutorial'
+import { periodKeyFor, RECURRENCE_LABELS } from '@/lib/game/recurrence'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
@@ -172,6 +173,7 @@ interface PlayerMissionData {
   mission_id: string
   progress: number
   completed_at: string | null
+  period_key?: string | null
 }
 
 function MissionDetailModal({
@@ -464,7 +466,7 @@ export default function MissionsPage() {
         const [{ data: pm }, { data: ps }] = await Promise.all([
           supabase
             .from('player_missions')
-            .select('mission_id, progress, completed_at')
+            .select('mission_id, progress, completed_at, period_key')
             .eq('user_id', user.id)
             .eq('session_id', sessionId!)
             .in('mission_id', missionIds),
@@ -552,10 +554,17 @@ export default function MissionsPage() {
     }
   }
 
-  const pmMap = useMemo(() =>
-    Object.fromEntries(playerMissions.map(pm => [pm.mission_id, pm])),
-    [playerMissions]
-  )
+  // Le missioni ricorrenti mostrano solo la riga del periodo CORRENTE: al
+  // cambio periodo la missione riappare da zero, le righe vecchie sono storia.
+  const pmMap = useMemo(() => {
+    const map: Record<string, PlayerMissionData> = {}
+    for (const m of missions) {
+      const period = periodKeyFor(m.recurrence)
+      const row = playerMissions.find(pm => pm.mission_id === m.id && (pm.period_key ?? '') === period)
+      if (row) map[m.id] = row
+    }
+    return map
+  }, [missions, playerMissions])
 
   const missionTitleById = useMemo(() =>
     Object.fromEntries(missions.map(m => [m.id, m.title])),
@@ -747,6 +756,15 @@ export default function MissionsPage() {
                   </div>
                   <p className="font-bold text-white text-[15px] leading-tight truncate">
                     {mission.title}
+                    {mission.recurrence && (
+                      <span className="ml-1.5 align-middle text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md"
+                        style={{
+                          background: mission.recurrence === 'daily' ? 'rgba(255,179,107,0.15)' : mission.recurrence === 'weekly' ? 'rgba(56,189,248,0.15)' : 'rgba(192,132,252,0.15)',
+                          color: mission.recurrence === 'daily' ? '#FFB36B' : mission.recurrence === 'weekly' ? '#38BDF8' : '#C084FC',
+                        }}>
+                        🔁 {RECURRENCE_LABELS[mission.recurrence]}
+                      </span>
+                    )}
                   </p>
                   {locked ? (
                     <p className="text-xs text-white/40 mt-0.5 leading-relaxed line-clamp-1">

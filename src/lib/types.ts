@@ -204,6 +204,8 @@ export interface Mission {
   is_required: boolean
   unlock_level: number | null
   unlock_after_mission_id: string | null
+  /** null = one-shot · daily/weekly/monthly = si rinnova a ogni periodo (Europe/Rome). */
+  recurrence?: 'daily' | 'weekly' | 'monthly' | null
 }
 
 export interface QRCode {

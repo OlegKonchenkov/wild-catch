@@ -1007,6 +1007,7 @@ export type Database = {
           description: string
           id: string
           is_required: boolean
+          recurrence: string | null
           reward_ability_id: string | null
           reward_creature_id: string | null
           reward_exp: number
@@ -1028,6 +1029,7 @@ export type Database = {
           description: string
           id?: string
           is_required?: boolean
+          recurrence?: string | null
           reward_ability_id?: string | null
           reward_creature_id?: string | null
           reward_exp?: number
@@ -1049,6 +1051,7 @@ export type Database = {
           description?: string
           id?: string
           is_required?: boolean
+          recurrence?: string | null
           reward_ability_id?: string | null
           reward_creature_id?: string | null
           reward_exp?: number
@@ -1843,6 +1846,7 @@ export type Database = {
           completed_at: string | null
           id: string
           mission_id: string
+          period_key: string
           progress: number
           session_id: string | null
           user_id: string
@@ -1852,6 +1856,7 @@ export type Database = {
           completed_at?: string | null
           id?: string
           mission_id: string
+          period_key?: string
           progress?: number
           session_id?: string | null
           user_id: string
@@ -1861,6 +1866,7 @@ export type Database = {
           completed_at?: string | null
           id?: string
           mission_id?: string
+          period_key?: string
           progress?: number
           session_id?: string | null
           user_id?: string
