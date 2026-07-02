@@ -83,6 +83,8 @@ export interface Enigma {
   difficulty: EnigmaDifficulty
   reward_type: 'exp' | 'gold' | 'oggetto' | 'creatura' | null
   reward_payload: Record<string, unknown> | null
+  /** Input a lucchetto: rulli con questo alfabeto per `length` caratteri. null = campo testo. */
+  lock_config?: { alphabet: string; length: number } | null
   created_at: string
   frammenti?: EnigmaFrammento[]
   suggerimenti?: EnigmaSuggerimento[]

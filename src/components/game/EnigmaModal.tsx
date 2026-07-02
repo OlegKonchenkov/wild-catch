@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GiPadlock, GiPadlockOpen, GiPuzzle, GiLightBulb, GiKey } from 'react-icons/gi'
+import EnigmaLock from '@/components/game/EnigmaLock'
 import { playEnigmaSolve } from '@/lib/game/sounds/enigma'
 import type { MapPin } from '@/components/map/GameMap'
 import type { PinRewardData } from '@/components/game/PinRewardModal'
@@ -145,12 +146,14 @@ export default function EnigmaModal({
 
   const question: string       = payload.question  ?? ''
   const imageUrl: string | null = payload.image_url ?? null
+  const lockConfig: { alphabet: string; length: number } | null = payload.lock_config ?? null
 
   const suggerimentoHas   = suggerimenti.filter(s => s.player_has).length
   const suggerimentoTotal = suggerimenti.length
 
-  async function handleSubmit() {
-    if (!solution.trim() || submitting) return
+  async function handleSubmit(solutionOverride?: string) {
+    const attempt = (solutionOverride ?? solution).trim()
+    if (!attempt || submitting) return
     setSubmitting(true)
     setErrorMsg(null)
     try {
@@ -160,7 +163,7 @@ export default function EnigmaModal({
         body: JSON.stringify({
           pinId: pin.id, sessionId,
           lat: playerPos?.lat ?? pin.lat, lng: playerPos?.lng ?? pin.lng,
-          solution: solution.trim(),
+          solution: attempt,
         }),
       })
       const d: any = await res.json()
@@ -412,6 +415,22 @@ export default function EnigmaModal({
               </>
             )}
 
+            {lockConfig ? (
+              <div className="space-y-2">
+                <EnigmaLock config={lockConfig} onSubmit={sol => handleSubmit(sol)}
+                  submitting={submitting} wrong={shaking} />
+                {errorMsg && (
+                  <p className="text-xs font-semibold text-red-400 text-center">{errorMsg}</p>
+                )}
+                <button
+                  onClick={onClose}
+                  className="w-full py-3 rounded-xl font-bold text-sm text-white/50 transition-all active:scale-95"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}
+                >
+                  Più tardi
+                </button>
+              </div>
+            ) : (
             <div className="space-y-2">
               <input
                 value={solution}
@@ -430,7 +449,9 @@ export default function EnigmaModal({
                 <p className="text-xs font-semibold text-red-400 text-center">{errorMsg}</p>
               )}
             </div>
+            )}
 
+            {!lockConfig && (
             <div className="flex gap-3">
               <button
                 onClick={onClose}
@@ -440,7 +461,7 @@ export default function EnigmaModal({
                 Più tardi
               </button>
               <button
-                onClick={handleSubmit}
+                onClick={() => handleSubmit()}
                 disabled={submitting || !solution.trim()}
                 className="flex-[2] py-3.5 rounded-xl font-extrabold text-sm transition-all active:scale-95 disabled:opacity-40"
                 style={{
@@ -455,6 +476,7 @@ export default function EnigmaModal({
                 {submitting ? 'Verifica…' : <span className="inline-flex items-center justify-center gap-2"><GiKey size={16} /> RISOLVI ENIGMA</span>}
               </button>
             </div>
+            )}
           </div>
         </div>
       </div>

@@ -44,7 +44,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params
   const body = await request.json().catch(() => ({}))
-  const { title, description, solution, difficulty, reward_type, reward_payload } = body
+  const { title, description, solution, difficulty, reward_type, reward_payload, lock_config } = body
 
   const admin = createAdminClient()
 
@@ -56,6 +56,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     ...(difficulty !== undefined ? { difficulty } : {}),
     ...(reward_type !== undefined ? { reward_type: reward_type ?? null } : {}),
     ...(reward_payload !== undefined ? { reward_payload: reward_payload ?? null } : {}),
+    ...(lock_config !== undefined ? { lock_config: lock_config ?? null } : {}),
   }
 
   let enigma: any

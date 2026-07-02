@@ -143,6 +143,8 @@ interface EnigmaForm {
   reward_item_id: string
   reward_quantity: number
   reward_creature_id: string
+  lock_enabled: boolean
+  lock_alphabet: string
   frammenti: FrammentoForm[]
   suggerimenti: SuggerimentoForm[]
 }
@@ -158,6 +160,8 @@ const EMPTY_FORM: EnigmaForm = {
   reward_item_id: '',
   reward_quantity: 1,
   reward_creature_id: '',
+  lock_enabled: false,
+  lock_alphabet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
   frammenti: [],
   suggerimenti: [],
 }
@@ -192,6 +196,8 @@ function enigmaToForm(e: Enigma): EnigmaForm {
     reward_item_id,
     reward_quantity,
     reward_creature_id,
+    lock_enabled: !!e.lock_config,
+    lock_alphabet: e.lock_config?.alphabet ?? 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
     frammenti: (e.frammenti ?? []).map(f => ({
       title: f.title,
       description: f.description ?? '',
@@ -314,6 +320,9 @@ export default function EnigmiPage() {
       difficulty: form.difficulty,
       reward_type,
       reward_payload,
+      lock_config: form.lock_enabled
+        ? { alphabet: form.lock_alphabet.toUpperCase(), length: form.solution.trim().length }
+        : null,
       frammenti: form.frammenti.map((f, i) => ({
         title: f.title.trim(),
         description: f.description.trim() || null,
@@ -332,6 +341,14 @@ export default function EnigmiPage() {
   async function handleSave() {
     if (!form.title.trim()) { setError('Titolo obbligatorio'); return }
     if (!form.solution.trim()) { setError('Soluzione obbligatoria'); return }
+    if (form.lock_enabled) {
+      const alpha = form.lock_alphabet.toUpperCase()
+      if (alpha.length < 2) { setError("L'alfabeto del lucchetto deve avere almeno 2 caratteri"); return }
+      const sol = form.solution.trim().toUpperCase()
+      const missing = [...new Set(sol.split('').filter(c => !alpha.includes(c)))]
+      if (missing.length > 0) { setError(`Il lucchetto non può comporre la soluzione: mancano ${missing.join(', ')} nell'alfabeto`); return }
+      if (sol.length > 8) { setError('Con il lucchetto la soluzione può avere al massimo 8 caratteri'); return }
+    }
     for (const f of form.frammenti) {
       if (!f.title.trim()) { setError('Ogni frammento deve avere un titolo'); return }
     }
@@ -623,6 +640,30 @@ export default function EnigmiPage() {
                     />
                   </div>
                 </Field>
+
+                {/* Lucchetto a rulli */}
+                <div className="rounded-xl border border-[#E6C989]/25 bg-[#E6C989]/5 p-3 space-y-2.5">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" checked={form.lock_enabled}
+                      onChange={e => setForm(f => ({ ...f, lock_enabled: e.target.checked }))}
+                      className="w-4 h-4 accent-[#E6C989]" />
+                    <span className="text-sm text-white/80">🎰 Input a lucchetto (rulli)</span>
+                  </label>
+                  {form.lock_enabled && (
+                    <>
+                      <Field label="Alfabeto dei rulli">
+                        <input className={cls + ' font-mono uppercase'}
+                          value={form.lock_alphabet}
+                          onChange={e => setForm(f => ({ ...f, lock_alphabet: e.target.value.toUpperCase() }))}
+                          placeholder="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" />
+                      </Field>
+                      <p className="text-[11px] text-white/40 leading-relaxed">
+                        Il giocatore compone la soluzione ruotando {Math.max(1, form.solution.trim().length)} rulli
+                        con questi caratteri (max 8). Ogni carattere della soluzione deve essere presente nell&apos;alfabeto.
+                      </p>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* ── Section 3: Ricompensa ────────────────────────────── */}

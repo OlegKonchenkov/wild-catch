@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   // "L'Essenza del Daimon").
   const enigmiBase = admin
     .from('enigmi')
-    .select('id, session_id, title, description, difficulty, reward_type, created_at, frammenti:enigma_frammenti(id, enigma_id, title, description, image_url, video_url, order_index), suggerimenti:enigma_suggerimenti(id, enigma_id, text, image_url, order_index)')
+    .select('id, session_id, title, description, difficulty, reward_type, lock_config, created_at, frammenti:enigma_frammenti(id, enigma_id, title, description, image_url, video_url, order_index), suggerimenti:enigma_suggerimenti(id, enigma_id, text, image_url, order_index)')
     .order('created_at', { ascending: true })
   const { data: enigmiData, error: enigmiError } = await (isTutorialSession(sessionId)
     ? enigmiBase.eq('session_id', sessionId)
@@ -117,6 +117,7 @@ export async function GET(request: Request) {
       description: enigma.description,
       difficulty: enigma.difficulty,
       reward_type: enigma.reward_type,
+      lock_config: enigma.lock_config ?? null,
       solved: solvedEnigmaIds.has(enigma.id),
       frammenti,
       suggerimenti,

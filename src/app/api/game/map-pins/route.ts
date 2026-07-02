@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       : Promise.resolve({ data: [] as Array<{ pin_id: string }>, error: null }),
     enigmaIds.length > 0
       ? supabase.from('enigmi')
-          .select('id, title, description, frammenti:enigma_frammenti(id, title, description, image_url, video_url, order_index), suggerimenti:enigma_suggerimenti(id, text, image_url, order_index)')
+          .select('id, title, description, lock_config, frammenti:enigma_frammenti(id, title, description, image_url, video_url, order_index), suggerimenti:enigma_suggerimenti(id, text, image_url, order_index)')
           .in('id', enigmaIds)
       : Promise.resolve({ data: [] as any[], error: null }),
     enigmaIds.length > 0
@@ -115,6 +115,7 @@ export async function GET(request: Request) {
             enigma_id: p.enigma_id,
             title: e.title,
             description: e.description,
+            lock_config: e.lock_config ?? null,
             frammenti: frammenti.map((f: any) => {
               const has = playerFrammentoIds.has(f.id)
               return {

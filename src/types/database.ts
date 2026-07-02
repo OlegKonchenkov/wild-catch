@@ -746,6 +746,7 @@ export type Database = {
           description: string | null
           difficulty: string
           id: string
+          lock_config: Json | null
           reward_payload: Json | null
           reward_type: string | null
           session_id: string | null
@@ -757,6 +758,7 @@ export type Database = {
           description?: string | null
           difficulty?: string
           id?: string
+          lock_config?: Json | null
           reward_payload?: Json | null
           reward_type?: string | null
           session_id?: string | null
@@ -768,6 +770,7 @@ export type Database = {
           description?: string | null
           difficulty?: string
           id?: string
+          lock_config?: Json | null
           reward_payload?: Json | null
           reward_type?: string | null
           session_id?: string | null

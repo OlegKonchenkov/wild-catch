@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { EnigmaDifficulty } from '@/lib/types'
 import EnigmaSolvedModal from '@/components/game/EnigmaSolvedModal'
+import EnigmaLock from '@/components/game/EnigmaLock'
 import MissionRewardModal, { type CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import TutorialMomentModal from '@/components/game/TutorialMomentModal'
 import {
@@ -53,6 +54,7 @@ interface EnigmaView {
   description: string | null
   difficulty: EnigmaDifficulty
   reward_type: string | null
+  lock_config?: { alphabet: string; length: number } | null
   solved: boolean
   frammenti: EnigmaFrammentoView[]
   suggerimenti: EnigmaSuggerimentoView[]
@@ -262,8 +264,9 @@ function SolvePanel({ enigma, onCorrect }: {
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ kind: 'ko'; msg: string } | null>(null)
 
-  async function submit() {
-    if (!answer.trim() || submitting) return
+  async function submit(answerOverride?: string) {
+    const attempt = (answerOverride ?? answer).trim()
+    if (!attempt || submitting) return
     const sessionId = localStorage.getItem('current_session_id')
     if (!sessionId) {
       setFeedback({ kind: 'ko', msg: 'Sessione non trovata' })
@@ -275,7 +278,7 @@ function SolvePanel({ enigma, onCorrect }: {
       const res = await fetch('/api/game/enigmi/solve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enigmaId: enigma.id, sessionId, answer }),
+        body: JSON.stringify({ enigmaId: enigma.id, sessionId, answer: attempt }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -292,7 +295,7 @@ function SolvePanel({ enigma, onCorrect }: {
         }
         onCorrect({
           enigmaTitle: enigma.title,
-          solution: answer.trim(),
+          solution: attempt,
           reward: data.reward,
           completedMissions: Array.isArray(data.completedMissions) ? data.completedMissions : [],
           fresh: !data.alreadySolved,
@@ -312,6 +315,21 @@ function SolvePanel({ enigma, onCorrect }: {
       <div className="rounded-xl border border-[#34D399]/40 bg-[#34D399]/10 px-3 py-2.5 flex items-center gap-2">
         <GiCheckMark size={17} color="#34D399" />
         <p className="text-sm font-bold text-[#34D399]">Enigma risolto</p>
+      </div>
+    )
+  }
+
+  if (enigma.lock_config) {
+    return (
+      <div className="rounded-xl border border-[#E6C989]/25 bg-[#E6C989]/5 p-3 space-y-2.5">
+        <p className="text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5" style={{ color: 'rgba(230,201,137,0.7)' }}>
+          <GiPadlock size={13} color="#E6C989" /> Componi la combinazione
+        </p>
+        <EnigmaLock config={enigma.lock_config} onSubmit={sol => submit(sol)}
+          submitting={submitting} wrong={!!feedback} />
+        {feedback && (
+          <p className="text-xs font-semibold text-center" style={{ color: '#F87171' }}>{feedback.msg}</p>
+        )}
       </div>
     )
   }
@@ -336,7 +354,7 @@ function SolvePanel({ enigma, onCorrect }: {
           className="flex-1 min-w-0 rounded-lg bg-[#0A1520] border border-white/15 px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#3A9DBC]"
         />
         <button
-          onClick={submit}
+          onClick={() => submit()}
           disabled={submitting || !answer.trim()}
           className="shrink-0 rounded-lg bg-[#3A9DBC] disabled:bg-white/10 px-3 py-2 text-sm font-bold text-white disabled:text-white/30 transition-colors"
         >
