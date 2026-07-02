@@ -13,6 +13,8 @@ const NAV = [
   { href: '/admin/items',       label: '🎒 Oggetti'    },
   { href: '/admin/equipaggiamento', label: '🛡️ Equipaggiamento' },
   { href: '/admin/abilita',     label: '✨ Abilità'    },
+  { href: '/admin/tesori',      label: '🎴 Tesori'     },
+  { href: '/admin/collezione',  label: '🏛️ Collezione' },
   { href: '/admin/qrcodes',     label: '📷 QR Codes'   },
   { href: '/admin/enigmi',      label: '🧩 Enigmi'     },
   { href: '/admin/invites',     label: '🎟️ Inviti'     },

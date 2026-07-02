@@ -70,7 +70,7 @@ describe('GET /api/game/profile', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body).toEqual({
-      exp: 250, gold: 100, level: 3,
+      exp: 250, gold: 100, gemme: 0, level: 3,
       nickname: 'Alice', avatar_url: 'http://x/a.png',
       creatures_caught: 7,
     })

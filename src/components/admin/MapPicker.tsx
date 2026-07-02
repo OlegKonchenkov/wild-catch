@@ -244,6 +244,7 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
       const REWARD_LABELS: Record<string, string> = {
         oggetto: '🎁 Oggetto', uovo: '🥚 Uovo', creatura: '🐾 Creatura',
         indizio: '🧩 Indizio', boss: '⚔️ Boss', evento: '🎉 Evento',
+        bustina: '🎴 Bustina', forziere: '🧰 Forziere', premio: '🏆 Premio', gemme: '💎 Gemme',
       }
       const rewardBadge = pin.reward_type
         ? `<span style="display:inline-block;margin-top:4px;font-size:10px;padding:2px 7px;border-radius:999px;background:#F7C84122;color:#F7C841;border:1px solid #F7C84155;font-weight:700">
@@ -534,6 +535,10 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
               <option value="boss">⚔️ Boss</option>
               <option value="evento">🎉 Evento</option>
               <option value="enigma">🔐 Enigma</option>
+              <option value="bustina">🎴 Bustina</option>
+              <option value="forziere">🧰 Forziere</option>
+              <option value="premio">🏆 Premio</option>
+              <option value="gemme">💎 Gemme</option>
             </select>
           </div>
           {pinRewardType !== 'none' && (

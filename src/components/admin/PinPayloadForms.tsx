@@ -360,6 +360,48 @@ export function PinPayloadEvento({ value, onChange }: { value: string; onChange:
   )
 }
 
+// ── Loot / currency (bustina · forziere · premio · gemme) ─────────────────────
+
+export function PinPayloadLoot({ type, value, onChange }: {
+  type: 'bustina' | 'forziere' | 'premio' | 'gemme'
+  value: string
+  onChange: (v: string) => void
+}) {
+  const p = parsePayload(value)
+  const [opts, setOpts] = useState<{ id: string; name: string }[]>([])
+
+  useState(() => {
+    if (type === 'gemme') return
+    const table = type === 'bustina' ? 'packs' : type === 'forziere' ? 'chests' : 'special_prizes'
+    fetch(`/api/admin/catalog/${table}`).then(r => r.json()).then(d => setOpts((d.rows ?? []).map((x: any) => ({ id: x.id, name: x.name })))).catch(() => {})
+    return undefined
+  })
+
+  if (type === 'gemme') {
+    const amount = (p.amount as number) ?? 10
+    return (
+      <div>
+        <label className={LABEL}>Quantità gemme</label>
+        <input type="number" min={1} value={amount}
+          onChange={e => onChange(encodePayload({ amount: Math.max(1, +e.target.value) }))} className={INPUT} />
+      </div>
+    )
+  }
+
+  const key = type === 'bustina' ? 'pack_id' : type === 'forziere' ? 'chest_id' : 'prize_id'
+  const selected = (p[key] as string) ?? ''
+  const label = type === 'bustina' ? 'Bustina' : type === 'forziere' ? 'Forziere' : 'Premio'
+  return (
+    <div>
+      <label className={LABEL}>{label}</label>
+      <select value={selected} onChange={e => onChange(encodePayload({ [key]: e.target.value }))} className={SELECT}>
+        <option value="">— Seleziona {label.toLowerCase()} —</option>
+        {opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+      </select>
+    </div>
+  )
+}
+
 // ── Reward type dispatcher ────────────────────────────────────────────────────
 
 export function PinPayloadFields({ type, value, onChange, allItems, allCreatures, allEnigmi }: {
@@ -377,5 +419,7 @@ export function PinPayloadFields({ type, value, onChange, allItems, allCreatures
   if (type === 'boss')     return <PinPayloadBoss     allCreatures={allCreatures} allItems={allItems} value={value} onChange={onChange} />
   if (type === 'evento')   return <PinPayloadEvento                                value={value} onChange={onChange} />
   if (type === 'enigma')   return <PinPayloadEnigma   allEnigmi={allEnigmi ?? []}  value={value} onChange={onChange} />
+  if (type === 'bustina' || type === 'forziere' || type === 'premio' || type === 'gemme')
+    return <PinPayloadLoot type={type} value={value} onChange={onChange} />
   return null
 }
