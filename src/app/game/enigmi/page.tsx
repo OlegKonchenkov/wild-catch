@@ -12,6 +12,7 @@ import {
 import type { TutorialMoment } from '@/lib/game/tutorial'
 import {
   GiPuzzle, GiJigsawPiece, GiLightBulb, GiPadlock, GiCheckMark, GiWorld, GiScrollUnfurled, GiKey,
+  GiCutDiamond,
 } from 'react-icons/gi'
 
 const DIFFICULTY_COLOR: Record<EnigmaDifficulty, string> = {
@@ -351,7 +352,41 @@ function SolvePanel({ enigma, onCorrect }: {
   )
 }
 
-function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: SolveSuccess) => void }) {
+function BuyHintButton({ enigma, onRefresh }: { enigma: EnigmaView; onRefresh: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const lockedCount = enigma.suggerimenti_total - enigma.suggerimenti_collected
+  if (enigma.solved || lockedCount <= 0) return null
+
+  async function buy() {
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId || busy) return
+    setBusy(true); setErr(null)
+    try {
+      const res = await fetch('/api/game/enigmi/buy-hint', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enigmaId: enigma.id, sessionId }),
+      })
+      const d = await res.json()
+      if (res.ok) { window.dispatchEvent(new CustomEvent('wc:refresh-stats')); onRefresh() }
+      else setErr(res.status === 402 ? `Gemme insufficienti (servono ${d.cost ?? 10} 💎)` : (d.error ?? 'Errore'))
+    } catch { setErr('Errore di rete') }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="space-y-1">
+      <button onClick={buy} disabled={busy}
+        className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-lg disabled:opacity-50"
+        style={{ background: 'rgba(79,209,197,0.12)', color: '#8FF0E6', border: '1px solid rgba(79,209,197,0.3)' }}>
+        <GiCutDiamond size={14} /> {busy ? 'Sblocco…' : `Sblocca un indizio · 10 gemme`}
+      </button>
+      {err && <p className="text-[11px] text-red-300 text-center">{err}</p>}
+    </div>
+  )
+}
+
+function EnigmaCard({ enigma, onCorrect, onRefresh }: { enigma: EnigmaView; onCorrect: (s: SolveSuccess) => void; onRefresh: () => void }) {
   const [open, setOpen] = useState(false)
   const diffColor = DIFFICULTY_COLOR[enigma.difficulty]
   const isGlobal = !enigma.session_id
@@ -474,13 +509,14 @@ function EnigmaCard({ enigma, onCorrect }: { enigma: EnigmaView; onCorrect: (s: 
                     <GiLightBulb size={13} color="#38BDF8" /> Suggerimenti ({enigma.suggerimenti_collected}/{enigma.suggerimenti_total})
                   </p>
                   <p className="text-[11px] text-white/25 -mt-1">
-                    Si ottengono scansionando QR code o riscattando pin sulla mappa
+                    Si ottengono scansionando QR code, riscattando pin sulla mappa o spendendo gemme
                   </p>
                   <div className="space-y-1.5">
                     {enigma.suggerimenti.map((s, i) => (
                       <SuggerimentoCard key={s.id} suggerimento={s} index={i} />
                     ))}
                   </div>
+                  <BuyHintButton enigma={enigma} onRefresh={onRefresh} />
                 </div>
               )}
 
@@ -613,7 +649,7 @@ export default function EnigmiPage() {
         ) : (
           <div className="space-y-3">
             {enigmi.map(enigma => (
-              <EnigmaCard key={enigma.id} enigma={enigma} onCorrect={handleSolveCorrect} />
+              <EnigmaCard key={enigma.id} enigma={enigma} onCorrect={handleSolveCorrect} onRefresh={reload} />
             ))}
           </div>
         )}
