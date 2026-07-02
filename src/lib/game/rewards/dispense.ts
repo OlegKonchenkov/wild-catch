@@ -193,8 +193,20 @@ export async function dispenseReward(
       return { type, ok: true, detail: { chestId, quantity, chestName: (chest as any)?.name ?? null } }
     }
 
+    // ── Premio speciale — mints a redeemable voucher with a unique code ──────
+    case 'premio': {
+      const prizeId = payload.prize_id ?? payload.prizeId
+      if (!prizeId) return { type, ok: false, detail: { error: 'prize_id mancante' } }
+      const code = `WC-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+      const { error } = await client.from('player_prizes').insert({
+        user_id: userId, session_id: sessionId, prize_id: prizeId, code,
+      })
+      if (error) return { type, ok: false, detail: { error: error.message } }
+      const { data: prize } = await client.from('special_prizes').select('name').eq('id', prizeId).single()
+      return { type, ok: true, detail: { prizeId, code, prizeName: (prize as any)?.name ?? null } }
+    }
+
     // ── Loot / collection types — implemented in their respective phases ──────
-    case 'premio':
     case 'personaggio':
     case 'opera':
     case 'aneddoto':

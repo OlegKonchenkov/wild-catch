@@ -1323,6 +1323,77 @@ export type Database = {
           },
         ]
       }
+      special_prizes: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          rarity: string | null
+          image_url: string
+          redemption_note: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          redemption_note?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          redemption_note?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      player_prizes: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          prize_id: string
+          code: string
+          won_at: string
+          redeemed_at: string | null
+          redeemed_by_admin_id: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          prize_id: string
+          code: string
+          won_at?: string
+          redeemed_at?: string | null
+          redeemed_by_admin_id?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          prize_id?: string
+          code?: string
+          won_at?: string
+          redeemed_at?: string | null
+          redeemed_by_admin_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_prizes_prize_id_fkey"
+            columns: ["prize_id"]
+            isOneToOne: false
+            referencedRelation: "special_prizes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pin_claims: {
         Row: {
           claimed_at: string

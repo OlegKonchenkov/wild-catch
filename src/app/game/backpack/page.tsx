@@ -21,7 +21,7 @@ import { GiSpellBook } from 'react-icons/gi'
 import {
   GiKnapsack, GiTwoCoins, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower,
   GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing,
-  GiSparkles, GiPawPrint, GiCardboardBox, GiLockedChest, GiKeyring,
+  GiSparkles, GiPawPrint, GiCardboardBox, GiLockedChest, GiKeyring, GiTrophyCup,
 } from 'react-icons/gi'
 
 const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
@@ -105,6 +105,21 @@ interface ChestRow {
     image_url: string
     key_requirements: { item_id: string; qty: number }[]
     contents: unknown[]
+  } | null
+}
+
+interface PrizeRow {
+  id: string
+  code: string
+  won_at: string
+  redeemed_at: string | null
+  prize: {
+    id: string
+    name: string
+    description: string
+    rarity: string | null
+    image_url: string
+    redemption_note: string
   } | null
 }
 
@@ -345,6 +360,7 @@ export default function BackpackPage() {
   const [chestKeys, setChestKeys] = useState<Record<string, number>>({})
   const [openingChestId, setOpeningChestId] = useState<string | null>(null)
   const [chestResult, setChestResult] = useState<{ chest: OpenedChest; contents: ChestDrop[] } | null>(null)
+  const [prizes, setPrizes] = useState<PrizeRow[]>([])
   const { toast, showSuccess, showApiError, showError, dismiss } = useGameToast()
   const supabase   = useMemo(() => createClient(), [])
   const userIdRef  = useRef<string | null>(null)
@@ -390,6 +406,15 @@ export default function BackpackPage() {
         if (d.chests) setChests(d.chests as ChestRow[])
         if (d.keys) setChestKeys(Object.fromEntries((d.keys as { item_id: string; quantity: number }[]).map(k => [k.item_id, k.quantity])))
       })
+      .catch(() => {})
+  }, [])
+
+  const fetchPrizes = useCallback(() => {
+    const sid = sessionRef.current
+    if (!sid) return
+    fetch(`/api/game/prizes?sessionId=${sid}`)
+      .then(r => r.json())
+      .then(d => { if (d.prizes) setPrizes(d.prizes as PrizeRow[]) })
       .catch(() => {})
   }, [])
 
@@ -543,6 +568,7 @@ export default function BackpackPage() {
       fetchAbilityTokens()
       fetchPacks()
       fetchChests()
+      fetchPrizes()
 
       // Realtime: re-fetch whenever inventory changes (shop, QR rewards, item use)
       const channel = supabase
@@ -567,6 +593,10 @@ export default function BackpackPage() {
           event: '*', schema: 'public', table: 'player_chests',
           filter: `user_id=eq.${user.id}`,
         }, () => fetchChests())
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'player_prizes',
+          filter: `user_id=eq.${user.id}`,
+        }, () => fetchPrizes())
         .subscribe()
 
       return () => { supabase.removeChannel(channel) }
@@ -774,6 +804,50 @@ export default function BackpackPage() {
                           style={{ background: canOpen ? `linear-gradient(135deg, ${accent}, ${accent}bb)` : 'rgba(255,255,255,0.06)', color: canOpen ? '#05070E' : 'rgba(255,255,255,0.5)' }}>
                           {busy ? '…' : canOpen ? 'Apri' : 'Bloccato'}
                         </button>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Premi speciali section ───────────────────────── */}
+            {prizes.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <GiTrophyCup size={13} color="#FF4D6D" /> Premi speciali ({prizes.length})
+                </p>
+                <div className="space-y-2">
+                  {prizes.map(row => {
+                    if (!row.prize) return null
+                    const redeemed = !!row.redeemed_at
+                    const accent = redeemed ? '#6B7280' : '#FF4D6D'
+                    return (
+                      <motion.div key={row.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        className="rounded-2xl p-3 border relative overflow-hidden"
+                        style={{ background: redeemed ? 'rgba(255,255,255,0.03)' : `linear-gradient(120deg, ${accent}14, rgba(255,255,255,0.02))`, borderColor: `${accent}44` }}>
+                        {!redeemed && (
+                          <span aria-hidden className="absolute -right-6 -top-6 w-20 h-20 rounded-full" style={{ background: `radial-gradient(circle, ${accent}44, transparent 70%)` }} />
+                        )}
+                        <div className="flex items-center gap-3 relative">
+                          <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
+                            style={{ background: `${accent}18`, border: `1px solid ${accent}33` }}>
+                            {row.prize.image_url
+                              ? <img src={row.prize.image_url} alt={row.prize.name} className="w-full h-full object-cover" style={{ filter: redeemed ? 'grayscale(1)' : undefined }} />
+                              : <GiTrophyCup size={30} color={accent} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-bold text-sm truncate">{row.prize.name}</p>
+                            <p className="text-[11px] text-white/45 truncate">{row.prize.redemption_note || row.prize.description}</p>
+                            <div className="mt-1 inline-flex items-center gap-1.5">
+                              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md tracking-wider"
+                                style={{ background: `${accent}22`, color: accent, textDecoration: redeemed ? 'line-through' : undefined }}>
+                                {row.code}
+                              </span>
+                              {redeemed && <span className="text-[10px] text-white/40 font-semibold uppercase">Riscattato</span>}
+                            </div>
+                          </div>
+                        </div>
                       </motion.div>
                     )
                   })}

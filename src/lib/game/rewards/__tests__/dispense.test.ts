@@ -145,11 +145,23 @@ describe('dispenseReward — forziere', () => {
   })
 })
 
+describe('dispenseReward — premio', () => {
+  it('mints a voucher with a code', async () => {
+    const insert = vi.fn(async () => ({ error: null }))
+    const c = makeClient({ tables: { player_prizes: { insert }, special_prizes: { selectData: { name: 'Cena per due' } } } })
+    const r = await dispenseReward(c, { ...BASE, type: 'premio', payload: { prize_id: 'pr1' } })
+    expect(r.ok).toBe(true)
+    expect(r.detail.prizeName).toBe('Cena per due')
+    expect(typeof r.detail.code).toBe('string')
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ prize_id: 'pr1', code: r.detail.code }))
+  })
+})
+
 describe('dispenseReward — not-yet-implemented loot types', () => {
-  it('reports ok:false for premio until its phase lands', async () => {
+  it('reports ok:false for personaggio until its phase lands', async () => {
     const c = makeClient()
-    const r = await dispenseReward(c, { ...BASE, type: 'premio', payload: { prize_id: 'p1' } })
+    const r = await dispenseReward(c, { ...BASE, type: 'personaggio', payload: { character_id: 'x1' } })
     expect(r.ok).toBe(false)
-    expect(r.detail.error).toContain('premio')
+    expect(r.detail.error).toContain('personaggio')
   })
 })
