@@ -500,6 +500,13 @@ export default function AdminGuidePage() {
             {/* ── 2. Sessioni ── */}
             <section id="sessions" className="guide-section" style={{ marginBottom: '2.5rem' }}>
               <SectionHeader>2. Sessioni</SectionHeader>
+              <Callout type="info">
+                <strong>Due modalità:</strong> ⏱️ <strong>Evento</strong> (a tempo, countdown, stile escape-room) e
+                🗺️ <strong>Avventura</strong> (persistente: nessuna durata, scadenza opzionale mensile/annuale,
+                premi giornalieri + streak attivabili con la &ldquo;Bustina del giorno&rdquo;, missioni ricorrenti).
+                La modalità si sceglie alla creazione e non è modificabile dopo. Nell&apos;HUD dei giocatori
+                il countdown è sostituito da 🔥 streak + &ldquo;Giorno N&rdquo;.
+              </Callout>
               <Prose>
                 Una <strong style={{ color: '#e2e8f0' }}>sessione</strong> è il contenitore di una partita.
                 Definisce l&rsquo;area geografica (lat/lng + raggio), la durata, il testo narrativo e raggruppa
@@ -972,6 +979,27 @@ export default function AdminGuidePage() {
                 <strong>Gemme &amp; bustine al volo:</strong> Admin → Giocatori → &ldquo;Assegna risorse&rdquo; ora include
                 💎 Gemme e 🎴 Bustina. Le gemme si spendono al Negozio (bustine) e per gli indizi degli enigmi.
               </Callout>
+
+              <SubHeader>Quiz culturali</SubHeader>
+              <StepList items={[
+                'Admin → Collezione → scheda Quiz: domanda, opzioni (JSON array), indice della risposta corretta (0-based)',
+                'Collega il quiz a un Luogo (appare nella sua card in Collezione) e opzionalmente a un Aneddoto che lo sblocca',
+                'Ricompensa JSON [{type,payload}] — vuota = 5 gemme. Tentativi illimitati, premio solo alla prima risposta corretta',
+              ]} />
+
+              <SubHeader>Enigmi a lucchetto 🎰</SubHeader>
+              <StepList items={[
+                "Admin → Enigmi → attiva 'Input a lucchetto' e definisci l'alfabeto dei rulli",
+                "La lunghezza dei rulli = lunghezza della soluzione (max 8); ogni carattere della soluzione deve stare nell'alfabeto",
+                'Il giocatore compone la combinazione ruotando i rulli — la verifica resta lato server',
+              ]} />
+
+              <SubHeader>Ritmo Avventura (daily + ricorrenti)</SubHeader>
+              <StepList items={[
+                'Sessione Avventura → "Premi giornalieri": scegli la Bustina del giorno (vuota = 25 oro). Streak: gemme crescenti, bonus ogni 7 giorni',
+                'Missioni → campo "Ricorrenza": giornaliera / settimanale / mensile (fuso Europe/Rome). Progressi e ricompense si rinnovano a ogni periodo',
+                'Le missioni una-tantum e il tutorial restano identici a prima',
+              ]} />
             </section>
 
             <Divider />

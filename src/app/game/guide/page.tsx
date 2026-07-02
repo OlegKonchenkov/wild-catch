@@ -11,6 +11,7 @@ import {
   GiPadlock, GiSandsOfTime, GiNightSleep, GiPresent, GiGraduateCap, GiCardPickup, GiProgression,
   GiPodiumWinner, GiSeahorse, GiEagleEmblem, GiWolfHead, GiLizardman, GiSeaDragon,
   GiCardboardBox, GiLockedChest, GiKeyring, GiCutDiamond, GiGreekTemple, GiColumnVase, GiLaurelsTrophy,
+  GiSun,
 } from 'react-icons/gi'
 import ElementIcon from '@/components/ui/ElementIcon'
 
@@ -496,6 +497,35 @@ function buildSections(): Section[] {
               <GiScrollUnfurled size={14} className="flex-shrink-0 mt-0.5" /> <span>Per iniziare hai bisogno di un <strong>codice invito</strong> dall&apos;organizzatore —
               inseriscilo nella schermata di accesso oppure <strong>scansiona il QR code</strong> con la fotocamera.</span>
             </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'avventura',
+      Icon: GiTreasureMap,
+      title: 'Modalità Avventura',
+      accent: '#34D399',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            Esistono due tipi di sessione: gli <span className="text-[#E85D2F] font-bold">Eventi</span> ⏱️ a tempo
+            (stile escape-room, con countdown) e le <span className="text-[#34D399] font-bold">Avventure</span> 🗺️,
+            che vanno avanti per settimane o mesi. In un&apos;avventura non c&apos;è fretta: esplori, completi missioni,
+            sali di livello e torni ogni giorno.
+          </p>
+          <div className="mt-3 space-y-1.5 text-xs">
+            {([
+              { Icon: GiSun,       color: '#FFB36B', label: 'Premio giornaliero', desc: 'Ogni giorno il primo accesso regala una bustina e gemme — riscuotilo dal messaggio dell\'alba' },
+              { Icon: GiFireRing,  color: '#FF8A3C', label: 'Serie (streak) 🔥',  desc: 'Giorni consecutivi = ricompense crescenti; ogni 7 giorni di fila c\'è un bonus. Se salti un giorno riparte da 1' },
+              { Icon: GiCycle,     color: '#38BDF8', label: 'Missioni ricorrenti', desc: 'Le missioni marcate 🔁 si rinnovano ogni giorno/settimana/mese con nuove ricompense' },
+              { Icon: GiCompass,   color: '#34D399', label: 'Giorno N',            desc: 'In alto, al posto del timer, vedi la tua serie e il giorno della tua avventura' },
+            ] as const).map(row => (
+              <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2" style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
+                <row.Icon size={17} color={row.color} className="flex-shrink-0 mt-0.5" />
+                <div><span className="font-bold text-white/90">{row.label}</span><span className="text-white/45"> — {row.desc}</span></div>
+              </div>
+            ))}
           </div>
         </div>
       ),
