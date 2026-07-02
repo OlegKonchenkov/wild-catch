@@ -91,6 +91,22 @@ export interface TutorialMoment {
 }
 
 export const TUTORIAL_MISSION_MOMENTS: Record<string, TutorialMoment> = {
+  // M4 — bought the Rete → granted a special ability token (Colpo Rapido)
+  '7470a311-d41d-0500-0000-000000000404': {
+    key: 'ability-learned',
+    emoji: '✨',
+    title: 'Una Mossa Speciale',
+    body: '"Prendi, ragazzo — un antico segreto di combattimento." Il maestro ti consegna la Mossa “Colpo Rapido” 🥋.\n\nVai nella DaimonDex (icona 📖), scegli il tuo Daimon e apri le sue Mosse per insegnargliela. In battaglia la userai col pulsante MOSSE — provala contro il Capo del Tirocinio!"',
+    cta: { label: 'Vai alla DaimonDex', route: '/game/bestiary' },
+  },
+  // M6 — final walk → granted gemme + a tutorial bustina
+  '7470a311-d41d-0500-0000-000000000406': {
+    key: 'loot-intro',
+    emoji: '🎴',
+    title: 'Gemme e Bustine',
+    body: '"Un ultimo dono prima di salutarci." Il maestro sorride. "Hai ricevuto delle Gemme 💎 e una Bustina 🎴.\n\nApri la bustina dallo Zaino: dentro ci sono ricompense casuali. Le Gemme sono preziose — negli eventi reali servono per comprare bustine al Negozio e sbloccare indizi degli enigmi. E ricorda: personaggi e opere che raccoglierai finiscono nella Collezione (icona 🏛️)."',
+    cta: { label: 'Apri lo Zaino', route: '/game/backpack' },
+  },
   // M2 — first catch
   '7470a311-d41d-0500-0000-000000000402': {
     key: 'first-catch',
