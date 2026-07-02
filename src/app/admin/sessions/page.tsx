@@ -96,7 +96,10 @@ interface Session {
   id: string
   name: string
   status: string
+  kind?: string
   duration_minutes: number
+  daily_rewards_enabled?: boolean
+  daily_pack_id?: string | null
   area_bounds: Bounds | null
   narrative_config: any
   starter_kit: Array<{ item_id: string; quantity: number }> | null
@@ -106,6 +109,7 @@ interface Session {
 }
 
 interface Item { id: string; name: string; type: string }
+interface PackOption { id: string; name: string }
 
 interface EditForm {
   name: string
@@ -115,6 +119,18 @@ interface EditForm {
   introText: string
   villainName: string
   starterKit: Array<{ item_id: string; quantity: number }>
+  kind: string
+  endAt: string        // datetime-local value, '' = nessuna scadenza (solo avventura)
+  dailyEnabled: boolean
+  dailyPackId: string  // '' = fallback oro
+}
+
+/** ISO → datetime-local input value (local tz, minutes precision). */
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 export default function SessionsPage() {
@@ -158,6 +174,19 @@ export default function SessionsPage() {
   const [areaBounds, setAreaBounds]       = useState<Bounds | null>(null)
   const [durationMinutes, setDurationMinutes] = useState(120)
   const [wizardStarterKit, setWizardStarterKit] = useState<Array<{ item_id: string; quantity: number }>>([])
+  // Modalità: 'event' (escape-room a tempo) | 'avventura' (persistente)
+  const [wizardKind, setWizardKind] = useState<'event' | 'avventura'>('event')
+  const [wizardEndAt, setWizardEndAt] = useState('')          // scadenza opzionale avventura
+  const [wizardDailyEnabled, setWizardDailyEnabled] = useState(true)
+  const [wizardDailyPackId, setWizardDailyPackId] = useState('')
+  const [allPacks, setAllPacks] = useState<PackOption[]>([])
+
+  const loadPacks = () => {
+    if (allPacks.length > 0) return
+    fetch('/api/admin/catalog/packs').then(r => r.json())
+      .then(d => setAllPacks(((d.rows ?? []) as PackOption[]).map(p => ({ id: p.id, name: p.name }))))
+      .catch(() => {})
+  }
 
 
   const loadSessions = () =>
@@ -186,7 +215,12 @@ export default function SessionsPage() {
       introText: s.narrative_config?.intro_text ?? '',
       villainName: s.narrative_config?.villain_name ?? '',
       starterKit: Array.isArray(s.starter_kit) ? s.starter_kit : [],
+      kind: s.kind ?? 'event',
+      endAt: s.kind === 'avventura' ? isoToLocalInput(s.end_at) : '',
+      dailyEnabled: !!s.daily_rewards_enabled,
+      dailyPackId: s.daily_pack_id ?? '',
     })
+    if (s.kind === 'avventura') loadPacks()
     // Load items + creatures if not already loaded (needed for pin reward picker)
     if (allItems.length === 0) {
       supabase.from('items').select('id, name, type').order('type').then(({ data }) => {
@@ -327,6 +361,11 @@ export default function SessionsPage() {
           chapters: sessions.find(s => s.id === editingId)?.narrative_config?.chapters ?? [],
         },
         starterKit: editForm.starterKit,
+        ...(editForm.kind === 'avventura' ? {
+          endAt: editForm.endAt ? new Date(editForm.endAt).toISOString() : null,
+          dailyRewardsEnabled: editForm.dailyEnabled,
+          dailyPackId: editForm.dailyPackId || null,
+        } : {}),
       }),
     })
     const data = await res.json()
@@ -383,10 +422,16 @@ export default function SessionsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: sessionName,
+        kind: wizardKind,
         narrativeConfig: { story_title: storyTitle, intro_text: introText, villain_name: villainName, chapters: [] },
         areaBounds,
         durationMinutes,
         starterKit: wizardStarterKit,
+        ...(wizardKind === 'avventura' ? {
+          endAt: wizardEndAt ? new Date(wizardEndAt).toISOString() : null,
+          dailyRewardsEnabled: wizardDailyEnabled,
+          dailyPackId: wizardDailyPackId || null,
+        } : {}),
       }),
     })
     const data = await res.json()
@@ -402,6 +447,7 @@ export default function SessionsPage() {
     setStep(1); setCreatedId(null); setSessionName(''); setStoryTitle(''); setIntroText('')
     setVillainName(''); setAreaBounds(null); setDurationMinutes(120); setShowCreate(false)
     setWizardStarterKit([])
+    setWizardKind('event'); setWizardEndAt(''); setWizardDailyEnabled(true); setWizardDailyPackId('')
   }
 
   /* ── Render ─────────────────────────────────────────────── */
@@ -447,9 +493,21 @@ export default function SessionsPage() {
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
-                  <span className="text-xs text-white/40 flex items-center gap-1">
-                    ⏱ <span>{s.duration_minutes} min</span>
-                  </span>
+                  {s.kind === 'avventura' ? (
+                    <span className="text-xs font-bold flex items-center gap-1 px-1.5 py-0.5 rounded-md"
+                      style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399' }}>
+                      🗺️ Avventura{s.end_at ? ` · fino al ${new Date(s.end_at).toLocaleDateString('it-IT')}` : ' · senza fine'}
+                    </span>
+                  ) : s.kind === 'tutorial' ? (
+                    <span className="text-xs font-bold flex items-center gap-1 px-1.5 py-0.5 rounded-md"
+                      style={{ background: 'rgba(192,132,252,0.12)', color: '#C084FC' }}>
+                      🎓 Tutorial
+                    </span>
+                  ) : (
+                    <span className="text-xs text-white/40 flex items-center gap-1">
+                      ⏱ <span>{s.duration_minutes} min</span>
+                    </span>
+                  )}
                   <span className="text-xs text-white/40 flex items-center gap-1">
                     {s.area_bounds ? '🗺 Area definita' : '⚠️ Nessuna area'}
                   </span>
@@ -531,16 +589,48 @@ export default function SessionsPage() {
                       className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1 font-semibold">Durata (minuti)</label>
-                    <input
-                      type="number" min={30} max={480}
-                      value={editForm.durationMinutes}
-                      onChange={e => setEditForm(f => f && ({ ...f, durationMinutes: +e.target.value }))}
-                      className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60"
-                    />
-                  </div>
+                  {editForm.kind === 'avventura' ? (
+                    <div>
+                      <label className="block text-xs text-white/50 mb-1 font-semibold">🗺️ Scadenza <span className="text-white/25">(vuoto = senza fine)</span></label>
+                      <input
+                        type="datetime-local"
+                        value={editForm.endAt}
+                        onChange={e => setEditForm(f => f && ({ ...f, endAt: e.target.value }))}
+                        className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#34D399]/60"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs text-white/50 mb-1 font-semibold">Durata (minuti)</label>
+                      <input
+                        type="number" min={30} max={480}
+                        value={editForm.durationMinutes}
+                        onChange={e => setEditForm(f => f && ({ ...f, durationMinutes: +e.target.value }))}
+                        className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60"
+                      />
+                    </div>
+                  )}
                 </div>
+
+                {/* Daily reward config — solo avventura */}
+                {editForm.kind === 'avventura' && (
+                  <div className="rounded-xl border border-[#34D399]/25 bg-[#34D399]/5 p-3 space-y-2.5">
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input type="checkbox" checked={editForm.dailyEnabled}
+                        onChange={e => setEditForm(f => f && ({ ...f, dailyEnabled: e.target.checked }))}
+                        className="w-4 h-4 accent-[#34D399]" />
+                      <span className="text-sm text-white/80">Premi giornalieri + streak 🔥</span>
+                    </label>
+                    {editForm.dailyEnabled && (
+                      <select value={editForm.dailyPackId}
+                        onChange={e => setEditForm(f => f && ({ ...f, dailyPackId: e.target.value }))}
+                        className="w-full bg-[#0F1F2E] text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#34D399]/60">
+                        <option value="">— Nessuna bustina (fallback: 25 oro) —</option>
+                        {allPacks.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                )}
 
                 {/* Narrative */}
                 <details className="bg-white/3 border border-white/10 rounded-xl">
@@ -823,7 +913,34 @@ export default function SessionsPage() {
 
           {step === 1 && (
             <div className="space-y-3">
-              <p className="text-xs text-white/40 mb-2">Step 1 di 5 — Nome e Narrativa</p>
+              <p className="text-xs text-white/40 mb-2">Step 1 di 5 — Modalità, Nome e Narrativa</p>
+
+              {/* Modalità: evento a tempo vs avventura persistente */}
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { kind: 'event' as const, icon: '⏱️', title: 'Evento', accent: '#3A9DBC',
+                    desc: 'A tempo, stile escape-room. Countdown e classifica finale.' },
+                  { kind: 'avventura' as const, icon: '🗺️', title: 'Avventura', accent: '#34D399',
+                    desc: 'Persistente: premi giornalieri, streak e missioni ricorrenti.' },
+                ]).map(m => {
+                  const on = wizardKind === m.kind
+                  return (
+                    <button key={m.kind} type="button"
+                      onClick={() => { setWizardKind(m.kind); if (m.kind === 'avventura') loadPacks() }}
+                      className="text-left rounded-xl p-3 transition-all"
+                      style={{
+                        background: on ? `${m.accent}18` : 'rgba(255,255,255,0.04)',
+                        border: `2px solid ${on ? m.accent : 'rgba(255,255,255,0.1)'}`,
+                        boxShadow: on ? `0 0 14px ${m.accent}33` : 'none',
+                      }}>
+                      <p className="text-lg leading-none mb-1.5">{m.icon}</p>
+                      <p className="text-sm font-bold" style={{ color: on ? m.accent : 'rgba(255,255,255,0.85)' }}>{m.title}</p>
+                      <p className="text-[11px] text-white/45 leading-snug mt-0.5">{m.desc}</p>
+                    </button>
+                  )
+                })}
+              </div>
+
               <div>
                 <label className="block text-xs text-white/50 mb-1 font-semibold">Nome evento <span className="text-red-400">*</span></label>
                 <input value={sessionName} onChange={e => setSessionName(e.target.value)}
@@ -857,14 +974,40 @@ export default function SessionsPage() {
 
           {step === 2 && (
             <div className="space-y-3">
-              <p className="text-xs text-white/40 mb-2">Step 2 di 5 — Area geografica e Durata</p>
+              <p className="text-xs text-white/40 mb-2">Step 2 di 5 — Area geografica e {wizardKind === 'avventura' ? 'Ritmo' : 'Durata'}</p>
               <MapPicker key="create" onBoundsChange={setAreaBounds} initialBounds={areaBounds} />
-              <div>
-                <label className="block text-xs text-white/50 mb-1 font-semibold">Durata evento (30–480 minuti)</label>
-                <input type="number" value={durationMinutes} onChange={e => setDurationMinutes(+e.target.value)}
-                  min={30} max={480}
-                  className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
-              </div>
+              {wizardKind === 'event' ? (
+                <div>
+                  <label className="block text-xs text-white/50 mb-1 font-semibold">Durata evento (30–480 minuti)</label>
+                  <input type="number" value={durationMinutes} onChange={e => setDurationMinutes(+e.target.value)}
+                    min={30} max={480}
+                    className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3A9DBC]/60" />
+                </div>
+              ) : (
+                <div className="rounded-xl border border-[#34D399]/25 bg-[#34D399]/5 p-3 space-y-3">
+                  <p className="text-xs font-bold text-[#34D399]">🗺️ Impostazioni Avventura</p>
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Scadenza <span className="text-white/25">(opzionale — vuoto = senza fine)</span></label>
+                    <input type="datetime-local" value={wizardEndAt} onChange={e => setWizardEndAt(e.target.value)}
+                      className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#34D399]/60" />
+                  </div>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" checked={wizardDailyEnabled} onChange={e => setWizardDailyEnabled(e.target.checked)}
+                      className="w-4 h-4 accent-[#34D399]" />
+                    <span className="text-sm text-white/80">Premi giornalieri + streak 🔥</span>
+                  </label>
+                  {wizardDailyEnabled && (
+                    <div>
+                      <label className="block text-xs text-white/50 mb-1">Bustina del giorno</label>
+                      <select value={wizardDailyPackId} onChange={e => setWizardDailyPackId(e.target.value)}
+                        className="w-full bg-[#0F1F2E] text-white border border-white/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#34D399]/60">
+                        <option value="">— Nessuna (fallback: 25 oro) —</option>
+                        {allPacks.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex gap-2">
                 <button onClick={() => setStep(1)} className="flex-1 bg-white/8 text-white font-bold py-3 rounded-xl text-sm hover:bg-white/12 transition-colors">← Indietro</button>
                 <button onClick={() => {
@@ -949,7 +1092,15 @@ export default function SessionsPage() {
               <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-2 text-sm">
                 <p><span className="text-white/50">Nome:</span> <span className="text-white font-semibold">{sessionName}</span></p>
                 <p><span className="text-white/50">Storia:</span> <span className="text-white">{storyTitle || '—'}</span></p>
-                <p><span className="text-white/50">Durata:</span> <span className="text-white">{durationMinutes} min</span></p>
+                <p><span className="text-white/50">Modalità:</span> <span className="text-white">{wizardKind === 'avventura' ? '🗺️ Avventura' : '⏱️ Evento'}</span></p>
+                {wizardKind === 'avventura' ? (
+                  <>
+                    <p><span className="text-white/50">Scadenza:</span> <span className="text-white">{wizardEndAt ? new Date(wizardEndAt).toLocaleString('it-IT') : 'Senza fine'}</span></p>
+                    <p><span className="text-white/50">Premi giornalieri:</span> <span className="text-white">{wizardDailyEnabled ? `Attivi 🔥${wizardDailyPackId ? ` · ${allPacks.find(p => p.id === wizardDailyPackId)?.name ?? 'bustina'}` : ' · fallback oro'}` : 'Disattivati'}</span></p>
+                  </>
+                ) : (
+                  <p><span className="text-white/50">Durata:</span> <span className="text-white">{durationMinutes} min</span></p>
+                )}
                 <p><span className="text-white/50">Area:</span> <span className={areaBounds ? 'text-[#34d399]' : 'text-amber-400'}>{areaBounds ? '✅ Definita' : '⚠️ Non definita'}</span></p>
                 <p><span className="text-white/50">Kit iniziale:</span> <span className="text-white">{wizardStarterKit.length > 0 ? `${wizardStarterKit.length} oggetti` : 'default (Rete Base ×5)'}</span></p>
               </div>
