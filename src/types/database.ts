@@ -1134,6 +1134,124 @@ export type Database = {
           },
         ]
       }
+      packs: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          rarity: string | null
+          image_url: string
+          min_drops: number
+          max_drops: number
+          price_gold: number | null
+          price_gemme: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          min_drops?: number
+          max_drops?: number
+          price_gold?: number | null
+          price_gemme?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          rarity?: string | null
+          image_url?: string
+          min_drops?: number
+          max_drops?: number
+          price_gold?: number | null
+          price_gemme?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      pack_pool: {
+        Row: {
+          id: string
+          pack_id: string
+          reward_type: string
+          reward_payload: Json
+          weight: number
+          rarity_tier: string | null
+          min_qty: number
+          max_qty: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          pack_id: string
+          reward_type: string
+          reward_payload?: Json
+          weight?: number
+          rarity_tier?: string | null
+          min_qty?: number
+          max_qty?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          pack_id?: string
+          reward_type?: string
+          reward_payload?: Json
+          weight?: number
+          rarity_tier?: string | null
+          min_qty?: number
+          max_qty?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pack_pool_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_packs: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          pack_id: string
+          quantity: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          pack_id: string
+          quantity?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          pack_id?: string
+          quantity?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_packs_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pin_claims: {
         Row: {
           claimed_at: string
