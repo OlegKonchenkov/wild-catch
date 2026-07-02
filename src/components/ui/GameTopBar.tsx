@@ -87,12 +87,24 @@ function Hourglass({ color }: { color: string }) {
   )
 }
 
+function Gem() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.55))' }}>
+      <path d="M6 3h12l4 6-10 12L2 9z" fill="#4FD1C5" fillOpacity="0.9" />
+      <path d="M6 3h12l4 6H2z" fill="#7EE8DE" fillOpacity="0.95" />
+      <path d="M2 9h20l-10 12z" fill="#2FB3A8" />
+      <path d="M9 3l3 6 3-6M2 9h20" stroke="#0b2b28" strokeOpacity="0.35" strokeWidth="0.7" fill="none" />
+    </svg>
+  )
+}
+
 export default function GameTopBar({
-  level, xpPct, gold, timerFormatted, timerCritical, timerWarning, statsLoading, unreadCount, onBell,
+  level, xpPct, gold, gemme, timerFormatted, timerCritical, timerWarning, statsLoading, unreadCount, onBell,
 }: {
   level: number | null
   xpPct: number
   gold: number | null
+  gemme?: number | null
   timerFormatted: string
   timerCritical: boolean
   timerWarning: boolean
@@ -146,6 +158,18 @@ export default function GameTopBar({
         {statsLoading
           ? <div className="w-9 h-3.5 rounded bg-white/10 animate-pulse" />
           : <CountUp value={gold ?? 0} durationMs={650} formatter={n => n.toLocaleString('it-IT')} className="font-bold tabular-nums" style={{ fontFamily: CINZEL, fontSize: 15, color: '#FFE08A', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }} />
+        }
+      </div>
+
+      {/* gem divider */}
+      <span aria-hidden className="relative shrink-0" style={{ width: 1, height: 22, background: 'linear-gradient(180deg, transparent, rgba(79,209,197,0.5), transparent)' }} />
+
+      {/* Gemme — gem + number */}
+      <div className="relative flex items-center gap-1.5 shrink-0">
+        <Gem />
+        {statsLoading
+          ? <div className="w-8 h-3.5 rounded bg-white/10 animate-pulse" />
+          : <CountUp value={gemme ?? 0} durationMs={650} formatter={n => n.toLocaleString('it-IT')} className="font-bold tabular-nums" style={{ fontFamily: CINZEL, fontSize: 15, color: '#8FF0E6', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }} />
         }
       </div>
 

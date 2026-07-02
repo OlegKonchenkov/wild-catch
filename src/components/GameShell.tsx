@@ -285,6 +285,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const navRef   = useRef<HTMLElement>(null)
 
   const [gold, setGold]             = useState<number | null>(null)
+  const [gemme, setGemme]           = useState<number | null>(null)
   const [level, setLevel]           = useState<number | null>(null)
   const [exp, setExp]               = useState<number | null>(null)
   const [sessionStatus, setSessionStatus] = useState<string | null>(null)
@@ -313,7 +314,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       setUserId(user.id)
       Promise.all([
         supabase.from('player_sessions')
-          .select('gold, level, exp')
+          .select('gold, gemme, level, exp')
           .eq('user_id', user.id)
           .eq('session_id', sid)
           .single(),
@@ -324,6 +325,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       ]).then(([psResult, sessResult]) => {
         if (psResult.data) {
           setGold(psResult.data.gold)
+          setGemme((psResult.data as { gemme?: number }).gemme ?? 0)
           setLevel(psResult.data.level ?? 1)
           setExp(psResult.data.exp ?? 0)
         }
@@ -672,6 +674,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         level={level}
         xpPct={xpPct}
         gold={gold}
+        gemme={gemme}
         timerFormatted={timer.formatted || ''}
         timerCritical={timer.isCritical}
         timerWarning={timer.isWarning}

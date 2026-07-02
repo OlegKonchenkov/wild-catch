@@ -119,6 +119,7 @@ export interface PlayerSession {
   level: number
   exp: number
   gold: number
+  gemme: number
   role: PlayerRole
   last_position: { lat: number; lng: number } | null
   score_final: number | null
