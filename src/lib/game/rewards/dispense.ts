@@ -147,8 +147,30 @@ export async function dispenseReward(
       return { type, ok: true, detail: { eventType: payload.event_type, effect: payload.effect } }
     }
 
+    // ── Bustina (card pack) — adds an unopened pack to the player's stash ─────
+    case 'bustina': {
+      const packId = payload.pack_id ?? payload.packId
+      const quantity = Number(payload.quantity) || 1
+      if (!packId) return { type, ok: false, detail: { error: 'pack_id mancante' } }
+      const { data: existing } = await client
+        .from('player_packs')
+        .select('id, quantity')
+        .eq('user_id', userId).eq('session_id', sessionId).eq('pack_id', packId)
+        .maybeSingle()
+      if (existing) {
+        await client.from('player_packs')
+          .update({ quantity: (existing as any).quantity + quantity })
+          .eq('id', (existing as any).id)
+      } else {
+        await client.from('player_packs').insert({
+          user_id: userId, session_id: sessionId, pack_id: packId, quantity,
+        })
+      }
+      const { data: pack } = await client.from('packs').select('name').eq('id', packId).single()
+      return { type, ok: true, detail: { packId, quantity, packName: (pack as any)?.name ?? null } }
+    }
+
     // ── Loot / collection types — implemented in their respective phases ──────
-    case 'bustina':
     case 'forziere':
     case 'premio':
     case 'personaggio':

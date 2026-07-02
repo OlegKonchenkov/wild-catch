@@ -117,11 +117,28 @@ describe('dispenseReward — ability & creature', () => {
   })
 })
 
-describe('dispenseReward — not-yet-implemented loot types', () => {
-  it('reports ok:false for bustina until its phase lands', async () => {
+describe('dispenseReward — bustina', () => {
+  it('inserts a new player_packs row when the player owns none', async () => {
+    const insert = vi.fn(async () => ({ error: null }))
+    const c = makeClient({ tables: { player_packs: { selectData: null, insert }, packs: { selectData: { name: 'Bustina di Bronzo' } } } })
+    const r = await dispenseReward(c, { ...BASE, type: 'bustina', payload: { pack_id: 'pk1', quantity: 2 } })
+    expect(r.ok).toBe(true)
+    expect(r.detail.packName).toBe('Bustina di Bronzo')
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ pack_id: 'pk1', quantity: 2 }))
+  })
+
+  it('fails without a pack_id', async () => {
     const c = makeClient()
-    const r = await dispenseReward(c, { ...BASE, type: 'bustina', payload: { pack_id: 'p1' } })
+    const r = await dispenseReward(c, { ...BASE, type: 'bustina', payload: {} })
     expect(r.ok).toBe(false)
-    expect(r.detail.error).toContain('bustina')
+  })
+})
+
+describe('dispenseReward — not-yet-implemented loot types', () => {
+  it('reports ok:false for forziere until its phase lands', async () => {
+    const c = makeClient()
+    const r = await dispenseReward(c, { ...BASE, type: 'forziere', payload: { chest_id: 'c1' } })
+    expect(r.ok).toBe(false)
+    expect(r.detail.error).toContain('forziere')
   })
 })
