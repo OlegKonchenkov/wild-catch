@@ -1520,6 +1520,36 @@ export type Database = {
           },
         ]
       }
+      player_daily_claims: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          claim_date: string
+          streak: number
+          reward: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          claim_date: string
+          streak?: number
+          reward?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          claim_date?: string
+          streak?: number
+          reward?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
       player_creatures: {
         Row: {
           caught_at: string | null
