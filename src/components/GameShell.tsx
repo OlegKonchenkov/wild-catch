@@ -306,6 +306,9 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
 
   const [gold, setGold]             = useState<number | null>(null)
   const [gemme, setGemme]           = useState<number | null>(null)
+  const [sessionKind, setSessionKind] = useState<string>('event')
+  const [adventureDay, setAdventureDay] = useState<number | null>(null)
+  const [dailyStreak, setDailyStreak] = useState<number | null>(null)
   const [level, setLevel]           = useState<number | null>(null)
   const [exp, setExp]               = useState<number | null>(null)
   const [sessionStatus, setSessionStatus] = useState<string | null>(null)
@@ -334,12 +337,12 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       setUserId(user.id)
       Promise.all([
         supabase.from('player_sessions')
-          .select('gold, gemme, level, exp')
+          .select('gold, gemme, level, exp, joined_at')
           .eq('user_id', user.id)
           .eq('session_id', sid)
           .single(),
         supabase.from('sessions')
-          .select('end_at, start_at, duration_minutes, status')
+          .select('end_at, start_at, duration_minutes, status, kind')
           .eq('id', sid)
           .single(),
       ]).then(([psResult, sessResult]) => {
@@ -348,13 +351,22 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
           setGemme((psResult.data as { gemme?: number }).gemme ?? 0)
           setLevel(psResult.data.level ?? 1)
           setExp(psResult.data.exp ?? 0)
+          const joined = (psResult.data as { joined_at?: string | null }).joined_at
+          if (joined) {
+            // Giorno N dell'avventura personale: giorni interi dal join + 1
+            setAdventureDay(Math.floor((Date.now() - new Date(joined).getTime()) / 86_400_000) + 1)
+          }
         }
         const sess = sessResult.data
         if (sess) {
+          const kind = (sess as { kind?: string }).kind ?? 'event'
+          setSessionKind(kind)
           setSessionStatus(sess.status ?? null)
           if (sess.end_at) {
             setEndAt(sess.end_at)
-          } else if (sess.start_at && sess.duration_minutes) {
+          } else if (kind !== 'avventura' && sess.start_at && sess.duration_minutes) {
+            // Fallback countdown solo per sessioni a tempo: un'avventura senza
+            // scadenza non deve mai mostrare un countdown fantasma.
             const computed = new Date(
               new Date(sess.start_at).getTime() + sess.duration_minutes * 60 * 1000
             ).toISOString()
@@ -695,6 +707,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
         xpPct={xpPct}
         gold={gold}
         gemme={gemme}
+        adventure={sessionKind === 'avventura' ? { day: adventureDay ?? 1, streak: dailyStreak } : undefined}
         timerFormatted={timer.formatted || ''}
         timerCritical={timer.isCritical}
         timerWarning={timer.isWarning}
