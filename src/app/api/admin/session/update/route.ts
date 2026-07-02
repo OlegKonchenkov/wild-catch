@@ -11,7 +11,7 @@ export async function PATCH(request: Request) {
   if (!isAdmin) return NextResponse.json({ error: 'Non autorizzato' }, { status: 403 })
 
   const body = await request.json().catch(() => ({}))
-  const { sessionId, name, narrativeConfig, areaBounds, durationMinutes, starterKit } = body
+  const { sessionId, name, narrativeConfig, areaBounds, durationMinutes, starterKit, dailyRewardsEnabled, dailyPackId, endAt } = body
 
   if (!sessionId) return NextResponse.json({ error: 'sessionId richiesto' }, { status: 400 })
 
@@ -21,17 +21,28 @@ export async function PATCH(request: Request) {
   if (areaBounds       !== undefined) updates.area_bounds      = areaBounds
   if (durationMinutes  !== undefined) updates.duration_minutes = durationMinutes
   if (starterKit       !== undefined) updates.starter_kit      = starterKit
+  if (dailyRewardsEnabled !== undefined) updates.daily_rewards_enabled = !!dailyRewardsEnabled
+  if (dailyPackId      !== undefined) updates.daily_pack_id    = dailyPackId || null
+  // Avventura: optional explicit deadline (null clears it → runs forever).
+  // kind is intentionally NOT updatable after creation.
+  if (endAt !== undefined) {
+    updates.end_at   = endAt || null
+    updates.auto_end = !!endAt
+  }
 
   // BUG-01: se la sessione è attiva e si aggiorna duration_minutes,
-  // ricalcola end_at da start_at + nuova durata e lo persiste
+  // ricalcola end_at da start_at + nuova durata e lo persiste.
+  // Solo per sessioni 'event': per le avventure la durata è ignorata.
   let newEndAt: string | null = null
   if (durationMinutes !== undefined) {
     const { data: sess } = await supabase
       .from('sessions')
-      .select('status, start_at')
+      .select('status, start_at, kind')
       .eq('id', sessionId)
       .single()
-    if (sess?.status === 'active' && sess.start_at) {
+    if ((sess as { kind?: string } | null)?.kind === 'avventura') {
+      // no countdown recompute for avventure
+    } else if (sess?.status === 'active' && sess.start_at) {
       newEndAt = new Date(
         new Date(sess.start_at).getTime() + durationMinutes * 60 * 1000
       ).toISOString()

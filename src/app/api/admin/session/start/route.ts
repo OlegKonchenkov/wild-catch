@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   const { data: session } = await supabase
     .from('sessions')
-    .select('duration_minutes, status')
+    .select('duration_minutes, status, kind, end_at')
     .eq('id', sessionId)
     .single()
 
@@ -24,20 +24,27 @@ export async function POST(request: Request) {
   }
 
   const startAt = new Date()
-  const endAt = new Date(startAt.getTime() + session.duration_minutes * 60 * 1000)
+  const isAvventura = (session as { kind?: string }).kind === 'avventura'
+  // Avventura: persistent — keep the optional explicit deadline (or none).
+  // Event: countdown = start + duration, as always.
+  const endAt = isAvventura
+    ? ((session as { end_at?: string | null }).end_at ?? null)
+    : new Date(startAt.getTime() + session.duration_minutes * 60 * 1000).toISOString()
 
   await supabase.from('sessions').update({
     status: 'active',
     start_at: startAt.toISOString(),
-    end_at: endAt.toISOString(),
+    end_at: endAt,
   }).eq('id', sessionId)
 
   after(() => sendPushToSession(sessionId, {
-    title: '🎮 La sessione è iniziata!',
-    body: `Hai ${session.duration_minutes} minuti per esplorare. Buon gioco!`,
+    title: isAvventura ? '🗺️ L\'avventura è iniziata!' : '🎮 La sessione è iniziata!',
+    body: isAvventura
+      ? 'Esplora, completa le missioni e torna ogni giorno per la tua ricompensa!'
+      : `Hai ${session.duration_minutes} minuti per esplorare. Buon gioco!`,
     url: '/game/map',
     tag: `session_${sessionId}_start`,
   }))
 
-  return NextResponse.json({ started: true, endAt: endAt.toISOString() })
+  return NextResponse.json({ started: true, endAt })
 }

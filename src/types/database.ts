@@ -2313,6 +2313,8 @@ export type Database = {
           area_bounds: Json
           auto_end: boolean
           created_at: string | null
+          daily_pack_id: string | null
+          daily_rewards_enabled: boolean
           duration_minutes: number
           end_at: string | null
           id: string
@@ -2328,6 +2330,8 @@ export type Database = {
           area_bounds?: Json
           auto_end?: boolean
           created_at?: string | null
+          daily_pack_id?: string | null
+          daily_rewards_enabled?: boolean
           duration_minutes?: number
           end_at?: string | null
           id?: string
@@ -2343,6 +2347,8 @@ export type Database = {
           area_bounds?: Json
           auto_end?: boolean
           created_at?: string | null
+          daily_pack_id?: string | null
+          daily_rewards_enabled?: boolean
           duration_minutes?: number
           end_at?: string | null
           id?: string
@@ -2354,7 +2360,15 @@ export type Database = {
           starter_kit?: Json | null
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sessions_daily_pack_id_fkey"
+            columns: ["daily_pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

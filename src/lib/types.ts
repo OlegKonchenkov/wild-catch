@@ -92,8 +92,14 @@ export interface Session {
   id: string
   name: string
   status: SessionStatus
-  /** 'event' = normal event/sagra · 'tutorial' = always-on free demo session. */
-  kind?: 'event' | 'tutorial'
+  /** 'event' = evento a tempo (escape-room) · 'tutorial' = demo always-on ·
+   *  'avventura' = sessione persistente con loop giornaliero (daily reward,
+   *  streak, missioni ricorrenti); end_at opzionale (scadenza mensile/annuale). */
+  kind?: 'event' | 'tutorial' | 'avventura'
+  /** Daily login rewards attivi (default ON per avventura, OFF per eventi). */
+  daily_rewards_enabled?: boolean
+  /** Bustina consegnata dal daily reward (null = fallback oro). */
+  daily_pack_id?: string | null
   area_bounds: { north: number; south: number; east: number; west: number }
   duration_minutes: number
   start_at: string | null
