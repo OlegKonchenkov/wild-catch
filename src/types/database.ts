@@ -1013,6 +1013,7 @@ export type Database = {
           reward_gold: number
           reward_item_id: string | null
           reward_items: Json
+          reward_extra: Json | null
           session_id: string | null
           target: string
           target_count: number
@@ -1033,6 +1034,7 @@ export type Database = {
           reward_gold?: number
           reward_item_id?: string | null
           reward_items?: Json
+          reward_extra?: Json | null
           session_id?: string | null
           target: string
           target_count?: number
@@ -1053,6 +1055,7 @@ export type Database = {
           reward_gold?: number
           reward_item_id?: string | null
           reward_items?: Json
+          reward_extra?: Json | null
           session_id?: string | null
           target?: string
           target_count?: number
