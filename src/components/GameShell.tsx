@@ -21,6 +21,7 @@ import {
   GiSwapBag, GiMagnifyingGlass, GiEggClutch, GiPadlock, GiLightningArc, GiTrophyCup,
   GiDeathSkull, GiShakingHands, GiCrown, GiBullseye, GiUpgrade, GiSmartphone, GiCheckMark,
   GiPresent, GiBreastplate, GiCrossedSwords, GiHearts, GiPositionMarker, GiSparkles,
+  GiCardboardBox, GiLockedChest,
 } from 'react-icons/gi'
 import { getExpProgress } from '@/lib/game/leveling'
 import { playLevelUp } from '@/lib/game/sounds/events'
@@ -52,6 +53,7 @@ type NotifPopup = NotifPopupData
 const REWARD_TYPE_ICONS: Record<string, IconType> = {
   exp: GiRoundStar, gold: GiTwoCoins, oggetto: GiSwapBag, indizio: GiMagnifyingGlass,
   uovo: GiEggClutch, creatura: GiPawPrint, enigma: GiPadlock, evento: GiLightningArc,
+  bustina: GiCardboardBox, forziere: GiLockedChest, premio: GiTrophyCup, gemme: GiSparkles,
 }
 
 // Notifications and game events are stored in Postgres as JSON blobs whose
@@ -251,6 +253,22 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: IconType; title: strin
         body: pinReward,
       }
     }
+    case 'pack_opened': {
+      const dropCount = readNum(p, 'drop_count')
+      return {
+        icon: GiCardboardBox,
+        title: `Bustina aperta: ${readStr(p, 'pack_name') ?? ''}`.trim(),
+        body: dropCount ? `${dropCount} ricompense ottenute` : '',
+      }
+    }
+    case 'chest_opened': {
+      const dropCount = readNum(p, 'drop_count')
+      return {
+        icon: GiLockedChest,
+        title: `Forziere aperto: ${readStr(p, 'chest_name') ?? ''}`.trim(),
+        body: dropCount ? `${dropCount} ricompense trovate` : '',
+      }
+    }
     default:
       return { icon: GiJoystick, title: ev.type, body: '' }
   }
@@ -276,6 +294,8 @@ const EVENT_THEMES: Record<string, { color: string; dimColor: string; label: str
   level_up:          { color: '#F7C841', dimColor: 'rgba(247,200,65,0.10)',  label: 'Livello'   },
   qr_redeemed:       { color: '#C084FC', dimColor: 'rgba(192,132,252,0.10)', label: 'QR Code'   },
   pin_claimed:       { color: '#38BDF8', dimColor: 'rgba(56,189,248,0.10)',  label: 'Pin'       },
+  pack_opened:       { color: '#F59E0B', dimColor: 'rgba(245,158,11,0.10)',  label: 'Bustina'   },
+  chest_opened:      { color: '#D97706', dimColor: 'rgba(217,119,6,0.10)',   label: 'Forziere'  },
 }
 
 export default function GameShell({ children }: { children: React.ReactNode }) {

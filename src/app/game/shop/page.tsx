@@ -5,6 +5,17 @@ import { getCurrentUser } from '@/lib/supabase/client-user'
 import { track } from '@/lib/analytics'
 import { swr } from '@/lib/cache'
 import type { Item, ItemType } from '@/lib/types'
+import { RARITY_COLORS } from '@/lib/types'
+
+interface ShopPack {
+  id: string
+  name: string
+  description: string
+  rarity: string | null
+  image_url: string
+  price_gold: number | null
+  price_gemme: number | null
+}
 import MissionRewardModal from '@/components/game/MissionRewardModal'
 import type { CompletedMissionInfo } from '@/components/game/MissionRewardModal'
 import { GameListSkeleton } from '@/components/game/GameLoading'
@@ -19,6 +30,7 @@ import { type IconType } from 'react-icons'
 import {
   GiSwapBag, GiTwoCoins, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower,
   GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing, GiKeyring,
+  GiCutDiamond, GiCardboardBox,
 } from 'react-icons/gi'
 
 const TYPE_META: Record<ItemType, { icon: string; Icon: IconType; label: string; hint: string; color: string }> = {
@@ -38,6 +50,8 @@ const TYPE_META: Record<ItemType, { icon: string; Icon: IconType; label: string;
 export default function ShopPage() {
   const [items, setItems]         = useState<Item[]>([])
   const [gold, setGold]           = useState(0)
+  const [gemme, setGemme]         = useState(0)
+  const [packs, setPacks]         = useState<ShopPack[]>([])
   const [filter, setFilter]       = useState<ItemType | 'all'>('all')
   const [buying, setBuying]         = useState<string | null>(null)
   const [loading, setLoading]       = useState(true)
@@ -80,9 +94,18 @@ export default function ShopPage() {
       setItems(items)
       if (user && sessionId) {
         const { data: ps } = await supabase
-          .from('player_sessions').select('gold')
+          .from('player_sessions').select('gold, gemme')
           .eq('user_id', user.id).eq('session_id', sessionId).single()
-        if (ps) setGold(ps.gold)
+        if (ps) { setGold(ps.gold); setGemme((ps as { gemme?: number }).gemme ?? 0) }
+      }
+      // Bustine are sold only outside the tutorial (which is an isolated catalogue).
+      if (sessionId && !isTut) {
+        const { data: packRows } = await supabase
+          .from('packs').select('id, name, description, rarity, image_url, price_gold, price_gemme')
+          .order('created_at', { ascending: true })
+        setPacks(((packRows ?? []) as ShopPack[]).filter(p => (p.price_gold ?? 0) > 0 || (p.price_gemme ?? 0) > 0))
+      } else {
+        setPacks([])
       }
     } finally {
       setLoading(false)
@@ -126,6 +149,32 @@ export default function ShopPage() {
     }
   }
 
+  async function buyPack(pack: ShopPack, currency: 'gold' | 'gemme') {
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId || buying) return
+    setBuying(pack.id + currency)
+    try {
+      const res = await fetch('/api/game/shop/buy-pack', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packId: pack.id, sessionId, currency }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        playCoin(); haptics.tap()
+        setGold(data.remainingGold); setGemme(data.remainingGemme)
+        showSuccess(`🎴 ${pack.name} acquistata!`)
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+        window.dispatchEvent(new CustomEvent('wc:refresh-backpack'))
+      } else {
+        showApiError(res.status, data.error ?? 'Errore acquisto')
+      }
+    } catch {
+      showApiError(0, 'Errore di rete')
+    } finally {
+      setBuying(null)
+    }
+  }
+
   const filtered = filter === 'all' ? items : items.filter(i => i.type === filter)
   const types = [...new Set(items.map(i => i.type))] as ItemType[]
 
@@ -145,16 +194,24 @@ export default function ShopPage() {
             <GiSwapBag size={22} color="#F3C233" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />
             <span className="wc-display wc-gold-text" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }}>Negozio</span>
           </h1>
-          <div className="flex items-center gap-1.5 rounded-full" style={{ padding: '4px 11px', background: 'rgba(247,200,65,0.1)', border: '1px solid rgba(247,200,65,0.28)' }}>
-            <GiTwoCoins size={16} color="#F3C233" />
-            <CountUp
-              value={gold}
-              durationMs={550}
-              formatter={n => n.toLocaleString('it-IT')}
-              className="wc-display font-bold text-sm tabular-nums"
-              style={{ color: '#FFE08A' }}
-            />
-            <span className="text-xs" style={{ color: 'rgba(247,200,65,0.5)' }}>oro</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-full" style={{ padding: '4px 11px', background: 'rgba(247,200,65,0.1)', border: '1px solid rgba(247,200,65,0.28)' }}>
+              <GiTwoCoins size={16} color="#F3C233" />
+              <CountUp
+                value={gold}
+                durationMs={550}
+                formatter={n => n.toLocaleString('it-IT')}
+                className="wc-display font-bold text-sm tabular-nums"
+                style={{ color: '#FFE08A' }}
+              />
+              <span className="text-xs" style={{ color: 'rgba(247,200,65,0.5)' }}>oro</span>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-full" style={{ padding: '4px 11px', background: 'rgba(79,209,197,0.12)', border: '1px solid rgba(79,209,197,0.3)' }}>
+              <GiCutDiamond size={15} color="#4FD1C5" />
+              <CountUp value={gemme} durationMs={550} formatter={n => n.toLocaleString('it-IT')}
+                className="wc-display font-bold text-sm tabular-nums" style={{ color: '#8FF0E6' }} />
+              <span className="text-xs" style={{ color: 'rgba(79,209,197,0.5)' }}>gemme</span>
+            </div>
           </div>
         </div>
 
@@ -202,6 +259,45 @@ export default function ShopPage() {
 
       {/* Item list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {!loading && packs.length > 0 && filter === 'all' && (
+          <div className="mb-4">
+            <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+              <GiCardboardBox size={13} color="#F59E0B" /> Bustine
+            </p>
+            <div className="grid grid-cols-2 gap-2.5">
+              {packs.map(pack => {
+                const accent = pack.rarity && pack.rarity in RARITY_COLORS ? RARITY_COLORS[pack.rarity as keyof typeof RARITY_COLORS] : '#F59E0B'
+                const goldPrice = pack.price_gold ?? 0
+                const gemmePrice = pack.price_gemme ?? 0
+                return (
+                  <div key={pack.id} className="rounded-2xl p-3 overflow-hidden relative" style={{ background: `linear-gradient(160deg, ${accent}18, rgba(255,255,255,0.02))`, border: `1px solid ${accent}44` }}>
+                    <div className="w-full aspect-[3/4] rounded-xl mb-2 overflow-hidden flex items-center justify-center" style={{ background: `radial-gradient(circle at 40% 30%, ${accent}30, transparent 70%)` }}>
+                      {pack.image_url ? <img src={pack.image_url} alt={pack.name} className="w-full h-full object-cover" /> : <GiCardboardBox size={44} color={accent} />}
+                    </div>
+                    <p className="text-white font-bold text-sm leading-tight line-clamp-1">{pack.name}</p>
+                    <div className="flex gap-1.5 mt-2">
+                      {goldPrice > 0 && (
+                        <button onClick={() => buyPack(pack, 'gold')} disabled={!!buying || gold < goldPrice}
+                          className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-extrabold py-1.5 rounded-lg disabled:opacity-40"
+                          style={{ background: 'rgba(247,200,65,0.16)', color: '#FFE08A', border: '1px solid rgba(247,200,65,0.3)' }}>
+                          <GiTwoCoins size={13} /> {goldPrice}
+                        </button>
+                      )}
+                      {gemmePrice > 0 && (
+                        <button onClick={() => buyPack(pack, 'gemme')} disabled={!!buying || gemme < gemmePrice}
+                          className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-extrabold py-1.5 rounded-lg disabled:opacity-40"
+                          style={{ background: 'rgba(79,209,197,0.14)', color: '#8FF0E6', border: '1px solid rgba(79,209,197,0.3)' }}>
+                          <GiCutDiamond size={13} /> {gemmePrice}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="h-px my-4" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)' }} />
+          </div>
+        )}
         {loading ? (
           <GameListSkeleton rows={5} itemClassName="h-[78px]" />
         ) : filtered.length === 0 ? (
