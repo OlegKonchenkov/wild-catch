@@ -2344,6 +2344,69 @@ export type Database = {
           },
         ]
       }
+      quizzes: {
+        Row: {
+          id: string
+          session_id: string | null
+          place_id: string | null
+          unlock_anecdote_id: string | null
+          question: string
+          options: Json
+          correct_index: number
+          reward: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id?: string | null
+          place_id?: string | null
+          unlock_anecdote_id?: string | null
+          question: string
+          options?: Json
+          correct_index?: number
+          reward?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string | null
+          place_id?: string | null
+          unlock_anecdote_id?: string | null
+          question?: string
+          options?: Json
+          correct_index?: number
+          reward?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      player_quizzes: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          quiz_id: string
+          attempts: number
+          solved_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          quiz_id: string
+          attempts?: number
+          solved_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          quiz_id?: string
+          attempts?: number
+          solved_at?: string | null
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           area_bounds: Json
