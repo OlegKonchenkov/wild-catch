@@ -56,6 +56,7 @@ export const LIMITS = {
   auth_join:       makeLimiter(8,  '300s'),
   enigma_solve:    makeLimiter(10, '60s'),
   tutorial_claim_pin: makeLimiter(6, '60s'),
+  friend_request:  makeLimiter(10, '300s'),
 } as const
 
 export type LimitKey = keyof typeof LIMITS

@@ -19,6 +19,7 @@ const NAV = [
   { href: '/admin/enigmi',      label: '🧩 Enigmi'     },
   { href: '/admin/invites',     label: '🎟️ Inviti'     },
   { href: '/admin/players',       label: '👥 Giocatori'   },
+  { href: '/admin/gruppi',        label: '🏫 Gruppi'      },
   { href: '/admin/level-rewards', label: '⭐ Livelli'      },
   { href: '/admin/leaderboard',   label: '🏆 Classifica'  },
   { href: '/admin/suoni',       label: '🎵 Suoni'       },

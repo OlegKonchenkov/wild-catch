@@ -1001,6 +1001,13 @@ export default function AdminGuidePage() {
                 'Pergamene: automatiche — 1 ogni 250 passi; aprendole i giocatori ottengono aneddoti casuali + gemme (alimentano Collezione e Quiz)',
               ]} />
 
+              <SubHeader>Social (gruppi, amici, scambi, GOLD)</SubHeader>
+              <StepList items={[
+                'Gruppi: Admin → Gruppi → crea (nome → codice); condividi il codice con la classe. I giocatori entrano dal Profilo e la classifica guadagna il filtro Gruppo',
+                'Amici e scambi sono self-service dei giocatori (Profilo). Gli scambi muovono solo doppioni, in modo atomico',
+                'GOLD: i giocatori forgiano dal DaimonDex alla 3a copia (2 copie + 25 gemme, +10% stats base)',
+              ]} />
+
               <SubHeader>Ritmo Avventura (daily + ricorrenti)</SubHeader>
               <StepList items={[
                 'Sessione Avventura → "Premi giornalieri": scegli la Bustina del giorno (vuota = 25 oro). Streak: gemme crescenti, bonus ogni 7 giorni',

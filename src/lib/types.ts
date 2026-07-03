@@ -142,6 +142,8 @@ export interface PlayerCreature {
   session_id: string
   duplicates_count: number
   evolved: boolean
+  /** Variante GOLD forgiata (3ª copia + gemme): +10% stats base, bordo dorato. */
+  is_gold?: boolean
   caught_at: string
   creature?: Creature
 }

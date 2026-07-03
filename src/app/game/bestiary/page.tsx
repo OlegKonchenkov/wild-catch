@@ -68,6 +68,7 @@ export default function BestiaryPage() {
   const [squad, setSquad]                   = useState<string[]>([]) // array of player_creatures.id (up to 3)
   const [squadSaving, setSquadSaving]       = useState(false)
   // Reveal card after manual evolution
+  const [forgingGoldId, setForgingGoldId] = useState<string | null>(null)
   const [evolveReveal, setEvolveReveal]     = useState<{ name: string; rarity: string; element: string; image_url: string | null; sprite_cutout_url: string | null; sprite_url: string | null; hp: number; atk: number; def: number; description: string | null; copiesRemaining: number } | null>(null)
   const [evolvePhase, setEvolvePhase]       = useState<'charge' | 'flash' | 'reveal'>('charge')
   const [evolveCardVisible, setEvolveCardVisible] = useState(false)
@@ -290,6 +291,33 @@ export default function BestiaryPage() {
       setTimeout(() => { setEvolvePhase('reveal'); setTimeout(() => setEvolveCardVisible(true), 80) }, 1900)
     } else {
       setMessage(data.error)
+    }
+  }
+
+  async function handleForgeGold(playerCreatureId: string) {
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId || forgingGoldId) return
+    setForgingGoldId(playerCreatureId)
+    try {
+      const res = await fetch('/api/game/creature/forge-gold', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerCreatureId, sessionId }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        // Aggiorna la collezione in place (copie e flag GOLD)
+        setPlayerCreatures(prev => prev.map(p => p.id === playerCreatureId
+          ? { ...p, duplicates_count: data.remainingCopies, is_gold: true }
+          : p))
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+        setMessage(`🥇 ${data.creatureName ?? 'Daimon'} forgiato in GOLD! +10% alle stats`)
+      } else {
+        setMessage(data.error ?? 'Forgiatura fallita')
+      }
+    } catch {
+      setMessage('Errore di rete')
+    } finally {
+      setForgingGoldId(null)
     }
   }
 
@@ -809,7 +837,7 @@ export default function BestiaryPage() {
                   {pc && (
                     <div className="absolute top-1 right-1 text-[8px] font-bold px-1 py-0.5 rounded-md leading-none"
                       style={{ background: 'rgba(0,0,0,0.55)', color: pc.duplicates_count > 1 ? '#60CDDD' : 'rgba(255,255,255,0.45)' }}>
-                      ×{pc.duplicates_count}
+                      {(pc as { is_gold?: boolean }).is_gold ? '🥇 ' : ''}×{pc.duplicates_count}
                     </div>
                   )}
                   {/* Status effect indicator dot — bottom-left */}
@@ -1247,6 +1275,34 @@ export default function BestiaryPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Forgiatura GOLD (Wave 3): 3ª copia + 25 gemme → +10% stats base */}
+                      {(pc as { is_gold?: boolean }).is_gold ? (
+                        <div className="rounded-2xl p-3 flex items-center gap-3"
+                          style={{ background: 'linear-gradient(135deg, rgba(243,194,51,0.18) 0%, rgba(184,134,11,0.10) 100%)', border: '1.5px solid rgba(243,194,51,0.55)', boxShadow: '0 0 20px rgba(243,194,51,0.2)' }}>
+                          <span className="text-2xl shrink-0">🥇</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-extrabold text-sm leading-tight" style={{ color: '#F3C233' }}>Variante GOLD</p>
+                            <p className="text-white/50 text-xs mt-0.5">+10% a tutte le statistiche base, per sempre</p>
+                          </div>
+                        </div>
+                      ) : pc.duplicates_count >= 3 ? (
+                        <button
+                          onClick={() => handleForgeGold(pc.id)}
+                          disabled={forgingGoldId === pc.id}
+                          className="w-full rounded-2xl p-3 flex items-center gap-3 text-left disabled:opacity-60"
+                          style={{ background: 'linear-gradient(135deg, rgba(243,194,51,0.10) 0%, rgba(255,255,255,0.02) 100%)', border: '1.5px solid rgba(243,194,51,0.4)' }}>
+                          <span className="text-2xl shrink-0">🥇</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-extrabold text-sm leading-tight" style={{ color: '#F3C233' }}>
+                              {forgingGoldId === pc.id ? 'Forgiatura…' : 'Forgia la variante GOLD'}
+                            </p>
+                            <p className="text-white/50 text-xs mt-0.5">
+                              Consuma <span className="text-white/80 font-bold">2 copie + 25 💎</span> → +10% stats base permanente
+                            </p>
+                          </div>
+                        </button>
+                      ) : null}
 
                       {/* Squad assignment */}
                       <div>

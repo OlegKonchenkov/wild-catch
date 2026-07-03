@@ -876,6 +876,45 @@ export type Database = {
           },
         ]
       }
+      friendships: {
+        Row: {
+          id: string
+          requester_id: string
+          addressee_id: string
+          status: string
+          created_at: string
+          responded_at: string | null
+        }
+        Insert: {
+          id?: string
+          requester_id: string
+          addressee_id: string
+          status?: string
+          created_at?: string
+          responded_at?: string | null
+        }
+        Update: {
+          id?: string
+          requester_id?: string
+          addressee_id?: string
+          status?: string
+          created_at?: string
+          responded_at?: string | null
+        }
+        Relationships: []
+      }
+      groups: {
+        Row: { id: string; name: string; code: string; created_by: string | null; created_at: string }
+        Insert: { id?: string; name: string; code: string; created_by?: string | null; created_at?: string }
+        Update: { id?: string; name?: string; code?: string; created_by?: string | null; created_at?: string }
+        Relationships: []
+      }
+      group_members: {
+        Row: { id: string; group_id: string; user_id: string; joined_at: string }
+        Insert: { id?: string; group_id: string; user_id: string; joined_at?: string }
+        Update: { id?: string; group_id?: string; user_id?: string; joined_at?: string }
+        Relationships: []
+      }
       gym_holds: {
         Row: {
           id: string
@@ -1641,6 +1680,7 @@ export type Database = {
           duplicates_count: number
           evolved: boolean
           id: string
+          is_gold: boolean
           session_id: string
           user_id: string
         }
@@ -1650,6 +1690,7 @@ export type Database = {
           duplicates_count?: number
           evolved?: boolean
           id?: string
+          is_gold?: boolean
           session_id: string
           user_id: string
         }
@@ -1659,6 +1700,7 @@ export type Database = {
           duplicates_count?: number
           evolved?: boolean
           id?: string
+          is_gold?: boolean
           session_id?: string
           user_id?: string
         }
@@ -2491,6 +2533,42 @@ export type Database = {
         }
         Relationships: []
       }
+      trades: {
+        Row: {
+          id: string
+          session_id: string
+          proposer_id: string
+          recipient_id: string
+          proposer_creature_id: string
+          recipient_creature_id: string
+          status: string
+          created_at: string
+          responded_at: string | null
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          proposer_id: string
+          recipient_id: string
+          proposer_creature_id: string
+          recipient_creature_id: string
+          status?: string
+          created_at?: string
+          responded_at?: string | null
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          proposer_id?: string
+          recipient_id?: string
+          proposer_creature_id?: string
+          recipient_creature_id?: string
+          status?: string
+          created_at?: string
+          responded_at?: string | null
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           area_bounds: Json
@@ -2575,6 +2653,7 @@ export type Database = {
           old_level: number
         }[]
       }
+      execute_trade: { Args: { p_trade_id: string; p_user_id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_in_session: { Args: { p_session_id: string }; Returns: boolean }
     }

@@ -11,7 +11,7 @@ import {
   GiPadlock, GiSandsOfTime, GiNightSleep, GiPresent, GiGraduateCap, GiCardPickup, GiProgression,
   GiPodiumWinner, GiSeahorse, GiEagleEmblem, GiWolfHead, GiLizardman, GiSeaDragon,
   GiCardboardBox, GiLockedChest, GiKeyring, GiCutDiamond, GiGreekTemple, GiColumnVase, GiLaurelsTrophy,
-  GiSun,
+  GiSun, GiThreeFriends,
 } from 'react-icons/gi'
 import ElementIcon from '@/components/ui/ElementIcon'
 
@@ -550,6 +550,33 @@ function buildSections(): Section[] {
               <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2" style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
                 <row.Icon size={17} color={row.color} className="flex-shrink-0 mt-0.5" />
                 <div><span className="font-bold text-white/90">{row.label}</span><span className="text-white/45"> — {row.desc}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'social',
+      Icon: GiThreeFriends,
+      title: 'Amici, Scambi & GOLD',
+      accent: '#60CDDD',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            Dal <span className="text-[#60CDDD] font-bold">Profilo</span> puoi aggiungere amici (per nickname),
+            entrare in un gruppo (classe/squadra) e proporre scambi di doppioni.
+          </p>
+          <div className="mt-3 space-y-1.5 text-xs">
+            {([
+              { label: 'Amici', desc: 'Aggiungi col nickname esatto; la classifica ha il filtro "Amici"', color: '#60CDDD' },
+              { label: 'Gruppo', desc: 'Entra col codice dell\'organizzatore: classifica privata di classe/istituto', color: '#3A9DBC' },
+              { label: 'Scambi', desc: 'Solo doppioni, solo tra amici: a entrambi resta sempre almeno 1 copia', color: '#7FD6F2' },
+              { label: 'Variante GOLD 🥇', desc: 'Con 3 copie di un Daimon: forgia nel DaimonDex (2 copie + 25 gemme) → +10% stats base per sempre', color: '#F3C233' },
+            ] as const).map(row => (
+              <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2" style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
+                <span className="font-bold shrink-0" style={{ color: row.color }}>{row.label}</span>
+                <span className="text-white/50">{row.desc}</span>
               </div>
             ))}
           </div>
