@@ -23,7 +23,7 @@ import {
   GiSwapBag, GiMagnifyingGlass, GiEggClutch, GiPadlock, GiLightningArc, GiTrophyCup,
   GiDeathSkull, GiShakingHands, GiCrown, GiBullseye, GiUpgrade, GiSmartphone, GiCheckMark,
   GiPresent, GiBreastplate, GiCrossedSwords, GiHearts, GiPositionMarker, GiSparkles,
-  GiCardboardBox, GiLockedChest, GiSun, GiGraduateCap, GiGreekTemple,
+  GiCardboardBox, GiLockedChest, GiSun, GiGraduateCap, GiGreekTemple, GiScrollUnfurled,
 } from 'react-icons/gi'
 import { getExpProgress } from '@/lib/game/leveling'
 import { playLevelUp } from '@/lib/game/sounds/events'
@@ -255,6 +255,17 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: IconType; title: strin
         body: pinReward,
       }
     }
+    case 'pergamena_found': {
+      const n = readNum(p, 'count')
+      return {
+        icon: GiScrollUnfurled,
+        title: n > 1 ? `${n} pergamene trovate!` : 'Pergamena trovata!',
+        body: 'Aprila dallo Zaino per scoprire cosa racconta',
+      }
+    }
+    case 'pergamena_opened': {
+      return { icon: GiScrollUnfurled, title: 'Pergamena aperta', body: 'Un frammento di storia in più nella Collezione' }
+    }
     case 'place_unlocked': {
       return {
         icon: GiGreekTemple,
@@ -323,6 +334,8 @@ const EVENT_THEMES: Record<string, { color: string; dimColor: string; label: str
   daily_claimed:     { color: '#FFB36B', dimColor: 'rgba(255,179,107,0.10)', label: 'Giornaliero' },
   quiz_solved:       { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Quiz' },
   place_unlocked:    { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Luogo' },
+  pergamena_found:   { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Pergamena' },
+  pergamena_opened:  { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Pergamena' },
 }
 
 export default function GameShell({ children }: { children: React.ReactNode }) {

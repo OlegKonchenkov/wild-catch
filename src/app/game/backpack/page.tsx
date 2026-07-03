@@ -12,6 +12,7 @@ import { useGameToast } from '@/components/game/useGameToast'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
 import { AbilityGlyph, abilityAccent, buildAbilityChips } from '@/components/game/ability-visuals'
 import PackOpenModal, { type PackDrop, type OpenedPack } from '@/components/game/PackOpenModal'
+import PergamenaModal, { type PergamenaDrop } from '@/components/game/PergamenaModal'
 import ChestOpenModal, { type ChestDrop, type OpenedChest } from '@/components/game/ChestOpenModal'
 import type { Ability } from '@/lib/game/abilities'
 import ElementIcon from '@/components/ui/ElementIcon'
@@ -22,6 +23,7 @@ import {
   GiKnapsack, GiTwoCoins, GiFishingNet, GiFishingLure, GiEggClutch, GiSwordsPower,
   GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing,
   GiSparkles, GiPawPrint, GiCardboardBox, GiLockedChest, GiKeyring, GiTrophyCup,
+  GiScrollUnfurled,
 } from 'react-icons/gi'
 
 const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
@@ -354,6 +356,9 @@ export default function BackpackPage() {
   const [hatchingId, setHatchingId] = useState<string | null>(null)
   const [hatchResult, setHatchResult] = useState<HatchResult | null>(null)
   const [packs, setPacks] = useState<PackRow[]>([])
+  const [pergamene, setPergamene] = useState(0)
+  const [openingPergamena, setOpeningPergamena] = useState(false)
+  const [pergamenaResult, setPergamenaResult] = useState<PergamenaDrop[] | null>(null)
   const [openingPackId, setOpeningPackId] = useState<string | null>(null)
   const [packResult, setPackResult] = useState<{ pack: OpenedPack; drops: PackDrop[] } | null>(null)
   const [chests, setChests] = useState<ChestRow[]>([])
@@ -387,6 +392,38 @@ export default function BackpackPage() {
       .then(r => r.json())
       .then(d => { if (d.eggs) setEggs(d.eggs) })
   }, [])
+
+  const fetchPergamene = useCallback(() => {
+    const sid = sessionRef.current
+    if (!sid) return
+    fetch(`/api/game/pergamene?sessionId=${sid}`)
+      .then(r => r.json())
+      .then(d => { if (typeof d.unopened === 'number') setPergamene(d.unopened) })
+      .catch(() => {})
+  }, [])
+
+  async function handleOpenPergamena() {
+    const sessionId = localStorage.getItem('current_session_id')
+    if (!sessionId || openingPergamena) return
+    setOpeningPergamena(true)
+    try {
+      const res = await fetch('/api/game/pergamene/open', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPergamenaResult(data.drops as PergamenaDrop[])
+        setPergamene(n => Math.max(0, n - 1))
+        window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+      } else {
+        showApiError(res.status, data.error ?? 'Apertura fallita')
+      }
+    } catch {
+      showError('Errore di rete')
+    }
+    setOpeningPergamena(false)
+  }
 
   const fetchPacks = useCallback(() => {
     const sid = sessionRef.current
@@ -569,6 +606,7 @@ export default function BackpackPage() {
       fetchPacks()
       fetchChests()
       fetchPrizes()
+      fetchPergamene()
 
       // Realtime: re-fetch whenever inventory changes (shop, QR rewards, item use)
       const channel = supabase
@@ -597,6 +635,10 @@ export default function BackpackPage() {
           event: '*', schema: 'public', table: 'player_prizes',
           filter: `user_id=eq.${user.id}`,
         }, () => fetchPrizes())
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'player_pergamene',
+          filter: `user_id=eq.${user.id}`,
+        }, () => fetchPergamene())
         .subscribe()
 
       return () => { supabase.removeChannel(channel) }
@@ -641,6 +683,13 @@ export default function BackpackPage() {
             contents={chestResult.contents}
             onDone={() => setChestResult(null)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Pergamena opening overlay */}
+      <AnimatePresence>
+        {pergamenaResult && (
+          <PergamenaModal drops={pergamenaResult} onDone={() => setPergamenaResult(null)} />
         )}
       </AnimatePresence>
 
@@ -708,6 +757,31 @@ export default function BackpackPage() {
           <GameListSkeleton rows={4} />
         ) : (
           <>
+            {/* ── Pergamene section ────────────────────────────── */}
+            {pergamene > 0 && (
+              <motion.button
+                onClick={handleOpenPergamena}
+                disabled={openingPergamena}
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                whileTap={{ scale: 0.97 }}
+                className="w-full flex items-center gap-3 rounded-2xl p-3 text-left disabled:opacity-60"
+                style={{ background: 'linear-gradient(120deg, rgba(230,201,137,0.14), rgba(255,255,255,0.02))', border: '1px solid rgba(230,201,137,0.4)' }}
+              >
+                <div className="rounded-xl flex items-center justify-center shrink-0"
+                  style={{ width: 52, height: 52, background: 'radial-gradient(circle at 40% 30%, rgba(230,201,137,0.3), transparent 75%)' }}>
+                  <GiScrollUnfurled size={30} color="#E6C989" style={{ filter: 'drop-shadow(0 0 8px rgba(230,201,137,0.5))' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-bold text-sm">Pergamene <span style={{ color: '#E6C989' }}>×{pergamene}</span></p>
+                  <p className="text-[11px] text-white/45">Trovate camminando — dentro c'è un frammento di storia</p>
+                </div>
+                <span className="text-xs font-extrabold px-3 py-1.5 rounded-lg shrink-0"
+                  style={{ background: 'rgba(230,201,137,0.18)', color: '#E6C989', border: '1px solid rgba(230,201,137,0.35)' }}>
+                  {openingPergamena ? 'Apertura…' : 'Srotola'}
+                </span>
+              </motion.button>
+            )}
+
             {/* ── Bustine section ──────────────────────────────── */}
             {packs.length > 0 && (
               <div>
