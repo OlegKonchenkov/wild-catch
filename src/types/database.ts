@@ -746,6 +746,7 @@ export type Database = {
           description: string | null
           difficulty: string
           id: string
+          lock_config: Json | null
           reward_payload: Json | null
           reward_type: string | null
           session_id: string | null
@@ -757,6 +758,7 @@ export type Database = {
           description?: string | null
           difficulty?: string
           id?: string
+          lock_config?: Json | null
           reward_payload?: Json | null
           reward_type?: string | null
           session_id?: string | null
@@ -768,6 +770,7 @@ export type Database = {
           description?: string | null
           difficulty?: string
           id?: string
+          lock_config?: Json | null
           reward_payload?: Json | null
           reward_type?: string | null
           session_id?: string | null
@@ -1007,6 +1010,7 @@ export type Database = {
           description: string
           id: string
           is_required: boolean
+          recurrence: string | null
           reward_ability_id: string | null
           reward_creature_id: string | null
           reward_exp: number
@@ -1028,6 +1032,7 @@ export type Database = {
           description: string
           id?: string
           is_required?: boolean
+          recurrence?: string | null
           reward_ability_id?: string | null
           reward_creature_id?: string | null
           reward_exp?: number
@@ -1049,6 +1054,7 @@ export type Database = {
           description?: string
           id?: string
           is_required?: boolean
+          recurrence?: string | null
           reward_ability_id?: string | null
           reward_creature_id?: string | null
           reward_exp?: number
@@ -1520,6 +1526,36 @@ export type Database = {
           },
         ]
       }
+      player_daily_claims: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          claim_date: string
+          streak: number
+          reward: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          claim_date: string
+          streak?: number
+          reward?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          claim_date?: string
+          streak?: number
+          reward?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
       player_creatures: {
         Row: {
           caught_at: string | null
@@ -1813,6 +1849,7 @@ export type Database = {
           completed_at: string | null
           id: string
           mission_id: string
+          period_key: string
           progress: number
           session_id: string | null
           user_id: string
@@ -1822,6 +1859,7 @@ export type Database = {
           completed_at?: string | null
           id?: string
           mission_id: string
+          period_key?: string
           progress?: number
           session_id?: string | null
           user_id: string
@@ -1831,6 +1869,7 @@ export type Database = {
           completed_at?: string | null
           id?: string
           mission_id?: string
+          period_key?: string
           progress?: number
           session_id?: string | null
           user_id?: string
@@ -2308,11 +2347,76 @@ export type Database = {
           },
         ]
       }
+      quizzes: {
+        Row: {
+          id: string
+          session_id: string | null
+          place_id: string | null
+          unlock_anecdote_id: string | null
+          question: string
+          options: Json
+          correct_index: number
+          reward: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id?: string | null
+          place_id?: string | null
+          unlock_anecdote_id?: string | null
+          question: string
+          options?: Json
+          correct_index?: number
+          reward?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string | null
+          place_id?: string | null
+          unlock_anecdote_id?: string | null
+          question?: string
+          options?: Json
+          correct_index?: number
+          reward?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      player_quizzes: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          quiz_id: string
+          attempts: number
+          solved_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          quiz_id: string
+          attempts?: number
+          solved_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          quiz_id?: string
+          attempts?: number
+          solved_at?: string | null
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           area_bounds: Json
           auto_end: boolean
           created_at: string | null
+          daily_pack_id: string | null
+          daily_rewards_enabled: boolean
           duration_minutes: number
           end_at: string | null
           id: string
@@ -2328,6 +2432,8 @@ export type Database = {
           area_bounds?: Json
           auto_end?: boolean
           created_at?: string | null
+          daily_pack_id?: string | null
+          daily_rewards_enabled?: boolean
           duration_minutes?: number
           end_at?: string | null
           id?: string
@@ -2343,6 +2449,8 @@ export type Database = {
           area_bounds?: Json
           auto_end?: boolean
           created_at?: string | null
+          daily_pack_id?: string | null
+          daily_rewards_enabled?: boolean
           duration_minutes?: number
           end_at?: string | null
           id?: string
@@ -2354,7 +2462,15 @@ export type Database = {
           starter_kit?: Json | null
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sessions_daily_pack_id_fkey"
+            columns: ["daily_pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

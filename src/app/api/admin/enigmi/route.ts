@@ -81,6 +81,7 @@ export async function POST(request: Request) {
       difficulty,
       reward_type: body.reward_type ?? null,
       reward_payload: body.reward_payload ?? null,
+      lock_config: body.lock_config ?? null,
     })
     .select()
     .single()

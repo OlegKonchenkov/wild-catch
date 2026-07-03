@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { getMissionUnlockState, type MissionUnlockFields } from '@/lib/game/mission-unlocks'
 import { isTutorialSession } from '@/lib/game/tutorial'
+import { periodKeyFor } from '@/lib/game/recurrence'
 
 /**
  * GET /api/game/missions/next?sessionId=<uuid>
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
   // so its chain stays a clean scripted story without globals.
   const missionsBase = supabase
     .from('missions')
-    .select('id, title, type, target, target_count, reward_gold, reward_exp, unlock_level, unlock_after_mission_id, chapter_order')
+    .select('id, title, type, target, target_count, reward_gold, reward_exp, unlock_level, unlock_after_mission_id, chapter_order, recurrence')
   const missionsScoped = isTutorialSession(sessionId)
     ? missionsBase.eq('session_id', sessionId).order('chapter_order', { ascending: true })
     : missionsBase
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
     missionsScoped,
     supabase
       .from('player_missions')
-      .select('mission_id, progress, completed_at')
+      .select('mission_id, progress, completed_at, period_key')
       .eq('user_id', user.id)
       .eq('session_id', sessionId),
     supabase
@@ -68,14 +69,22 @@ export async function GET(request: Request) {
     reward_gold: number
     reward_exp: number
     chapter_order: number | null
+    recurrence?: 'daily' | 'weekly' | 'monthly' | null
   }
-  type PmRow = { mission_id: string; progress: number; completed_at: string | null }
+  type PmRow = { mission_id: string; progress: number; completed_at: string | null; period_key?: string | null }
 
   const missions = (missionsRes.data ?? []) as MissionRow[]
   const pmRows   = (pmRes.data ?? []) as PmRow[]
   const playerLevel = (psRes.data?.level as number | undefined) ?? 1
 
-  const pmByMission = new Map<string, PmRow>(pmRows.map(p => [p.mission_id, p]))
+  // Recurring missions only count the CURRENT period's row; a new period
+  // makes the mission appear fresh again.
+  const pmByMission = new Map<string, PmRow>()
+  for (const m of missions) {
+    const period = periodKeyFor(m.recurrence)
+    const row = pmRows.find(p => p.mission_id === m.id && (p.period_key ?? '') === period)
+    if (row) pmByMission.set(m.id, row)
+  }
   const completedMissionIds = pmRows.filter(p => p.completed_at).map(p => p.mission_id)
   const missionTitleById = Object.fromEntries(missions.map(m => [m.id, m.title]))
 

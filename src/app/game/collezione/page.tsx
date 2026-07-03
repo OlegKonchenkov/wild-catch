@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GiGreekTemple, GiColumnVase, GiLaurelsTrophy, GiScrollUnfurled, GiTrophyCup } from 'react-icons/gi'
+import { GiGreekTemple, GiColumnVase, GiLaurelsTrophy, GiScrollUnfurled, GiTrophyCup, GiGraduateCap, GiPadlock, GiCheckMark, GiLaurelCrown } from 'react-icons/gi'
+import { describeDrop } from '@/components/game/loot-visuals'
 import { GameListSkeleton } from '@/components/game/GameLoading'
 import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Rarity } from '@/lib/types'
@@ -9,6 +10,17 @@ import type { Rarity } from '@/lib/types'
 interface Collectible { id: string; name?: string; title?: string; description?: string; body?: string; image_url: string; rarity: string | null; owned: boolean }
 interface Place { id: string; name: string; description: string; image_url: string; artworks: Collectible[]; characters: Collectible[]; anecdotes: Collectible[] }
 interface Trophy { id: string; name: string; description: string; image_url: string; owned: boolean }
+interface Quiz {
+  id: string
+  place_id: string | null
+  question: string | null
+  options: string[]
+  locked: boolean
+  unlockAnecdoteTitle: string | null
+  solved: boolean
+  attempts: number
+}
+interface QuizDrop { type: string; ok: boolean; detail: Record<string, any> }
 
 type Kind = 'opera' | 'personaggio' | 'aneddoto'
 const KIND_META: Record<Kind, { Icon: typeof GiColumnVase; label: string; accent: string }> = {
@@ -25,10 +37,20 @@ export default function CollezionePage() {
   const [trophies, setTrophies] = useState<Trophy[]>([])
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState<{ item: Collectible; kind: Kind } | null>(null)
+  const [quizzes, setQuizzes] = useState<Quiz[]>([])
+  const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null)
+
+  const loadQuizzes = (sessionId: string) => {
+    fetch(`/api/game/quiz?sessionId=${sessionId}`)
+      .then(r => r.json())
+      .then(d => { if (d.quizzes) setQuizzes(d.quizzes) })
+      .catch(() => {})
+  }
 
   useEffect(() => {
     const sessionId = localStorage.getItem('current_session_id')
     if (!sessionId) { setLoading(false); return }
+    loadQuizzes(sessionId)
     fetch(`/api/game/collezione?sessionId=${sessionId}`)
       .then(r => r.json())
       .then(d => {
@@ -39,6 +61,15 @@ export default function CollezionePage() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  const quizzesByPlace = useMemo(() => {
+    const map: Record<string, Quiz[]> = {}
+    for (const q of quizzes) {
+      const key = q.place_id ?? '_orphan'
+      ;(map[key] ??= []).push(q)
+    }
+    return map
+  }, [quizzes])
 
   const orphanPlace: Place | null = useMemo(() => {
     const has = orphans.artworks.length || orphans.characters.length || orphans.anecdotes.length
@@ -90,7 +121,11 @@ export default function CollezionePage() {
               </div>
             )}
 
-            {allPlaces.map(place => <PlaceCard key={place.id} place={place} onOpen={(item, kind) => setDetail({ item, kind })} />)}
+            {allPlaces.map(place => (
+              <PlaceCard key={place.id} place={place} quizzes={quizzesByPlace[place.id] ?? []}
+                onOpen={(item, kind) => setDetail({ item, kind })}
+                onOpenQuiz={q => setActiveQuiz(q)} />
+            ))}
           </>
         )}
       </div>
@@ -99,11 +134,29 @@ export default function CollezionePage() {
       <AnimatePresence>
         {detail && <DetailModal item={detail.item} kind={detail.kind} onClose={() => setDetail(null)} />}
       </AnimatePresence>
+
+      {/* Quiz modal */}
+      <AnimatePresence>
+        {activeQuiz && (
+          <QuizModal quiz={activeQuiz}
+            onClose={() => setActiveQuiz(null)}
+            onSolved={() => {
+              const sid = localStorage.getItem('current_session_id')
+              if (sid) loadQuizzes(sid)
+              window.dispatchEvent(new CustomEvent('wc:refresh-stats'))
+            }} />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
-function PlaceCard({ place, onOpen }: { place: Place; onOpen: (item: Collectible, kind: Kind) => void }) {
+function PlaceCard({ place, quizzes, onOpen, onOpenQuiz }: {
+  place: Place
+  quizzes: Quiz[]
+  onOpen: (item: Collectible, kind: Kind) => void
+  onOpenQuiz: (q: Quiz) => void
+}) {
   const groups: Array<{ kind: Kind; items: Collectible[] }> = [
     { kind: 'opera', items: place.artworks },
     { kind: 'personaggio', items: place.characters },
@@ -112,7 +165,7 @@ function PlaceCard({ place, onOpen }: { place: Place; onOpen: (item: Collectible
   const total = groups.reduce((s, g) => s + g.items.length, 0)
   const owned = groups.reduce((s, g) => s + g.items.filter(i => i.owned).length, 0)
   const isGold = total > 0 && owned === total
-  if (total === 0) return null
+  if (total === 0 && quizzes.length === 0) return null
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -157,7 +210,143 @@ function PlaceCard({ place, onOpen }: { place: Place; onOpen: (item: Collectible
             </div>
           </div>
         ))}
+
+        {/* Quiz culturali del luogo */}
+        {quizzes.length > 0 && (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1" style={{ color: '#E6C989' }}>
+              <GiGraduateCap size={13} color="#E6C989" /> Quiz ({quizzes.filter(q => q.solved).length}/{quizzes.length})
+            </p>
+            <div className="space-y-1.5">
+              {quizzes.map(q => (
+                <button key={q.id} disabled={q.locked} onClick={() => onOpenQuiz(q)}
+                  className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left disabled:cursor-default"
+                  style={{
+                    background: q.solved ? 'rgba(52,211,153,0.08)' : q.locked ? 'rgba(255,255,255,0.03)' : 'rgba(230,201,137,0.08)',
+                    border: `1px solid ${q.solved ? 'rgba(52,211,153,0.3)' : q.locked ? 'rgba(255,255,255,0.07)' : 'rgba(230,201,137,0.3)'}`,
+                  }}>
+                  {q.solved
+                    ? <GiCheckMark size={16} color="#34D399" className="shrink-0" />
+                    : q.locked
+                      ? <GiPadlock size={16} color="rgba(255,255,255,0.3)" className="shrink-0" />
+                      : <GiGraduateCap size={16} color="#E6C989" className="shrink-0" />}
+                  <span className="flex-1 min-w-0 text-xs leading-snug" style={{ color: q.locked ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)' }}>
+                    {q.locked
+                      ? <>Trova l&apos;aneddoto {q.unlockAnecdoteTitle ? <strong>&ldquo;{q.unlockAnecdoteTitle}&rdquo;</strong> : 'collegato'} per sbloccare</>
+                      : (q.question ?? 'Quiz')}
+                  </span>
+                  {!q.locked && !q.solved && <span className="text-[10px] font-bold shrink-0" style={{ color: '#E6C989' }}>Rispondi →</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+    </motion.div>
+  )
+}
+
+/* ── Quiz modal — targa di marmo dello studioso ─────────────────────────── */
+function QuizModal({ quiz, onClose, onSolved }: { quiz: Quiz; onClose: () => void; onSolved: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [wrongIdx, setWrongIdx] = useState<number | null>(null)
+  const [drops, setDrops] = useState<QuizDrop[] | null>(null)
+
+  async function answer(idx: number) {
+    if (busy || drops) return
+    setBusy(true); setWrongIdx(null)
+    try {
+      const sessionId = localStorage.getItem('current_session_id')
+      const res = await fetch('/api/game/quiz/answer', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quizId: quiz.id, sessionId, answerIndex: idx }),
+      })
+      const d = await res.json()
+      if (res.ok && d.correct) {
+        setDrops((d.drops ?? []).filter((x: QuizDrop) => x.ok))
+        onSolved()
+      } else if (res.ok) {
+        setWrongIdx(idx)
+      }
+    } catch { /* rete: lascia riprovare */ }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <motion.div className="fixed inset-0 z-[1200] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.div onClick={e => e.stopPropagation()}
+        className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden"
+        style={{ background: 'linear-gradient(175deg, #1c1810 0%, #12100a 70%)', border: '1px solid rgba(230,201,137,0.35)' }}
+        initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 26 }}>
+
+        {/* Targa della domanda */}
+        <div className="relative px-5 pt-6 pb-4 text-center" style={{ background: 'linear-gradient(180deg, rgba(230,201,137,0.12), transparent)' }}>
+          <GiGraduateCap size={28} color="#E6C989" className="mx-auto mb-2" style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }} />
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] mb-2" style={{ color: 'rgba(230,201,137,0.6)' }}>Quiz culturale</p>
+          <h3 className="text-white font-bold text-base leading-snug">{quiz.question}</h3>
+        </div>
+
+        <div className="px-5 pb-6 pt-2">
+          {!drops ? (
+            <div className="space-y-2">
+              {quiz.options.map((opt, i) => (
+                <motion.button key={i} onClick={() => answer(i)} disabled={busy}
+                  className="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold disabled:opacity-60"
+                  style={{
+                    background: wrongIdx === i ? 'rgba(248,113,113,0.14)' : 'rgba(230,201,137,0.07)',
+                    border: `1px solid ${wrongIdx === i ? 'rgba(248,113,113,0.5)' : 'rgba(230,201,137,0.25)'}`,
+                    color: wrongIdx === i ? '#FCA5A5' : 'rgba(255,255,255,0.85)',
+                  }}
+                  animate={wrongIdx === i ? { x: [0, -8, 8, -5, 5, 0] } : {}}
+                  transition={{ duration: 0.4 }}
+                  whileTap={{ scale: 0.98 }}>
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-md mr-2 text-[11px] font-extrabold"
+                    style={{ background: 'rgba(230,201,137,0.15)', color: '#E6C989' }}>
+                    {String.fromCharCode(65 + i)}
+                  </span>
+                  {opt}
+                </motion.button>
+              ))}
+              {wrongIdx !== null && (
+                <p className="text-xs text-center pt-1" style={{ color: '#FCA5A5' }}>
+                  Non è questa… osserva meglio il luogo e riprova!
+                </p>
+              )}
+            </div>
+          ) : (
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <GiLaurelCrown size={20} color="#F3C233" />
+                <p className="font-extrabold text-base" style={{ color: '#F3C233' }}>Corretto!</p>
+                <GiLaurelCrown size={20} color="#F3C233" style={{ transform: 'scaleX(-1)' }} />
+              </div>
+              {drops.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {drops.map((d, i) => {
+                    const v = describeDrop(d.type, d.detail)
+                    const { Icon } = v
+                    return (
+                      <motion.div key={i} className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                        style={{ background: `${v.accent}14`, border: `1px solid ${v.accent}45` }}
+                        initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.15 + i * 0.15 }}>
+                        <Icon size={22} color={v.accent} />
+                        <p className="text-white font-bold text-sm">{v.title}</p>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              )}
+              <button onClick={onClose} className="w-full py-3 rounded-2xl font-bold text-[#12100a]"
+                style={{ background: 'linear-gradient(135deg, #E6C989, #C8A24A)' }}>
+                Ottimo! 🎓
+              </button>
+            </motion.div>
+          )}
+        </div>
+      </motion.div>
     </motion.div>
   )
 }

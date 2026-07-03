@@ -83,6 +83,8 @@ export interface Enigma {
   difficulty: EnigmaDifficulty
   reward_type: 'exp' | 'gold' | 'oggetto' | 'creatura' | null
   reward_payload: Record<string, unknown> | null
+  /** Input a lucchetto: rulli con questo alfabeto per `length` caratteri. null = campo testo. */
+  lock_config?: { alphabet: string; length: number } | null
   created_at: string
   frammenti?: EnigmaFrammento[]
   suggerimenti?: EnigmaSuggerimento[]
@@ -92,8 +94,14 @@ export interface Session {
   id: string
   name: string
   status: SessionStatus
-  /** 'event' = normal event/sagra · 'tutorial' = always-on free demo session. */
-  kind?: 'event' | 'tutorial'
+  /** 'event' = evento a tempo (escape-room) · 'tutorial' = demo always-on ·
+   *  'avventura' = sessione persistente con loop giornaliero (daily reward,
+   *  streak, missioni ricorrenti); end_at opzionale (scadenza mensile/annuale). */
+  kind?: 'event' | 'tutorial' | 'avventura'
+  /** Daily login rewards attivi (default ON per avventura, OFF per eventi). */
+  daily_rewards_enabled?: boolean
+  /** Bustina consegnata dal daily reward (null = fallback oro). */
+  daily_pack_id?: string | null
   area_bounds: { north: number; south: number; east: number; west: number }
   duration_minutes: number
   start_at: string | null
@@ -198,6 +206,8 @@ export interface Mission {
   is_required: boolean
   unlock_level: number | null
   unlock_after_mission_id: string | null
+  /** null = one-shot · daily/weekly/monthly = si rinnova a ogni periodo (Europe/Rome). */
+  recurrence?: 'daily' | 'weekly' | 'monthly' | null
 }
 
 export interface QRCode {

@@ -98,13 +98,25 @@ function Gem() {
   )
 }
 
+function StreakFlame({ lit }: { lit: boolean }) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden style={{ filter: lit ? 'drop-shadow(0 0 5px rgba(255,138,60,0.7))' : undefined }}>
+      <path d="M12 2c1 4-4 6-4 11a4 4 0 0 0 8 0c0-2.5-1.5-3.5-1-6 2 1.5 4 3.5 4 7a7 7 0 0 1-14 0C5 8 10 6.5 12 2z"
+        fill={lit ? '#FF8A3C' : 'rgba(255,255,255,0.22)'} />
+      <path d="M12 10c.5 2-1.6 3-1.6 5a1.9 1.9 0 1 0 3.8 0c0-2-2.7-3-2.2-5z" fill={lit ? '#FFD98A' : 'rgba(255,255,255,0.12)'} />
+    </svg>
+  )
+}
+
 export default function GameTopBar({
-  level, xpPct, gold, gemme, timerFormatted, timerCritical, timerWarning, statsLoading, unreadCount, onBell,
+  level, xpPct, gold, gemme, adventure, timerFormatted, timerCritical, timerWarning, statsLoading, unreadCount, onBell,
 }: {
   level: number | null
   xpPct: number
   gold: number | null
   gemme?: number | null
+  /** Sessione avventura: sostituisce il countdown con streak 🔥 + Giorno N. */
+  adventure?: { day: number; streak: number | null }
   timerFormatted: string
   timerCritical: boolean
   timerWarning: boolean
@@ -176,14 +188,30 @@ export default function GameTopBar({
       {/* gem divider */}
       <span aria-hidden className="relative shrink-0" style={{ width: 1, height: 22, background: 'linear-gradient(180deg, transparent, rgba(247,200,65,0.45), transparent)' }} />
 
-      {/* Timer + bell */}
+      {/* Timer (evento) oppure streak + giorno (avventura) + bell */}
       <div className="relative flex items-center gap-3 shrink-0">
-        <div className="flex items-center gap-1.5">
-          <Hourglass color={timerColor} />
-          <span className={`font-mono font-bold tabular-nums ${timerCritical ? 'animate-pulse' : ''}`} style={{ fontSize: 13, color: timerColor, textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
-            {timerFormatted || '--:--'}
-          </span>
-        </div>
+        {adventure ? (
+          <div className="flex items-center gap-1.5" aria-label={`Giorno ${adventure.day} dell'avventura`}>
+            {adventure.streak !== null && (
+              <span className="flex items-center gap-0.5">
+                <StreakFlame lit={adventure.streak > 0} />
+                <span className="font-bold tabular-nums" style={{ fontFamily: CINZEL, fontSize: 14, color: adventure.streak > 0 ? '#FFB36B' : 'rgba(238,245,249,0.35)', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+                  {adventure.streak}
+                </span>
+              </span>
+            )}
+            <span className="font-bold" style={{ fontSize: 10, letterSpacing: '0.08em', color: 'rgba(52,211,153,0.9)', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+              GIORNO {adventure.day}
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <Hourglass color={timerColor} />
+            <span className={`font-mono font-bold tabular-nums ${timerCritical ? 'animate-pulse' : ''}`} style={{ fontSize: 13, color: timerColor, textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+              {timerFormatted || '--:--'}
+            </span>
+          </div>
+        )}
 
         <button onClick={onBell} className="relative flex items-center justify-center p-1" aria-label="Notifiche">
           {unreadCount > 0 && (

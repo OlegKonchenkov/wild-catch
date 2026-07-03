@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import CatalogManager, { type Field } from '@/components/admin/CatalogManager'
 
-const TABS = ['Luoghi', 'Opere', 'Personaggi', 'Aneddoti', 'Trofei'] as const
+const TABS = ['Luoghi', 'Opere', 'Personaggi', 'Aneddoti', 'Quiz', 'Trofei'] as const
 type Tab = typeof TABS[number]
 
 export default function CollezioneAdminPage() {
@@ -10,11 +10,13 @@ export default function CollezioneAdminPage() {
   const [places, setPlaces] = useState<Array<{ value: string; label: string }>>([])
   const [characters, setCharacters] = useState<Array<{ value: string; label: string }>>([])
   const [abilities, setAbilities] = useState<Array<{ value: string; label: string }>>([])
+  const [anecdotes, setAnecdotes] = useState<Array<{ value: string; label: string }>>([])
 
   useEffect(() => {
     fetch('/api/admin/catalog/cultural_places').then(r => r.json()).then(d => setPlaces((d.rows ?? []).map((p: any) => ({ value: p.id, label: p.name }))))
     fetch('/api/admin/catalog/characters').then(r => r.json()).then(d => setCharacters((d.rows ?? []).map((p: any) => ({ value: p.id, label: p.name }))))
     fetch('/api/admin/abilities').then(r => r.json()).then(d => setAbilities((d.abilities ?? d.rows ?? []).map((a: any) => ({ value: a.id, label: a.name }))))
+    fetch('/api/admin/catalog/anecdotes').then(r => r.json()).then(d => setAnecdotes((d.rows ?? []).map((a: any) => ({ value: a.id, label: a.title }))))
   }, [])
 
   const placeFields: Field[] = [
@@ -43,6 +45,14 @@ export default function CollezioneAdminPage() {
     { key: 'character_id', label: 'Personaggio', type: 'select', options: characters },
     { key: 'body', label: 'Storia', type: 'textarea' },
   ]
+  const quizFields: Field[] = [
+    { key: 'question', label: 'Domanda', type: 'textarea' },
+    { key: 'options', label: 'Opzioni (JSON array di stringhe)', type: 'json', placeholder: '["Roma","Atene","Cartagine","Alessandria"]' },
+    { key: 'correct_index', label: 'Indice risposta corretta (0-based)', type: 'number', half: true },
+    { key: 'place_id', label: 'Luogo', type: 'select', options: places, half: true },
+    { key: 'unlock_anecdote_id', label: "Sbloccato dall'aneddoto (opzionale)", type: 'select', options: anecdotes },
+    { key: 'reward', label: 'Ricompensa (JSON, vuoto = 5 gemme)', type: 'json', placeholder: '[{"type":"gemme","payload":{"amount":10}}]' },
+  ]
   const trophyFields: Field[] = [
     { key: 'name', label: 'Nome', type: 'text' },
     { key: 'description', label: 'Descrizione', type: 'textarea' },
@@ -68,6 +78,7 @@ export default function CollezioneAdminPage() {
       {tab === 'Personaggi' && <CatalogManager table="characters" title="Personaggi" fields={characterFields} hasArt
         artPrompt={r => `A dignified portrait of a historical Roman/classical figure as a collectible character card. ${r.name}: ${r.description}`} />}
       {tab === 'Aneddoti' && <CatalogManager table="anecdotes" title="Aneddoti / storie" fields={anecdoteFields} />}
+      {tab === 'Quiz' && <CatalogManager table="quizzes" title="Quiz culturali" fields={quizFields} />}
       {tab === 'Trofei' && <CatalogManager table="trophies" title="Trofei" fields={trophyFields} hasArt
         artPrompt={r => `A golden trophy / laurel award icon celebrating a collection milestone. ${r.name}: ${r.description}`} />}
     </div>

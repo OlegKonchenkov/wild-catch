@@ -19,6 +19,7 @@ interface Mission {
   session_id: string | null
   unlock_level: number | null
   unlock_after_mission_id: string | null
+  recurrence?: 'daily' | 'weekly' | 'monthly' | null
 }
 
 interface Creature  { id: string; name: string; rarity: string; element: string }
@@ -181,6 +182,7 @@ const EMPTY_FORM = {
   unlock_level: '' as number | '',
   unlock_after_mission_id: '' as string,
   chapter_order: 1, is_required: false, scope_session_id: '',
+  recurrence: '' as '' | 'daily' | 'weekly' | 'monthly',
 }
 
 /* ── Page ────────────────────────────────────── */
@@ -295,6 +297,7 @@ export default function AdminMissions() {
       unlock_after_mission_id: m.unlock_after_mission_id ?? '',
       chapter_order: m.chapter_order, is_required: m.is_required,
       scope_session_id: m.session_id ?? '',
+      recurrence: (m.recurrence ?? '') as '' | 'daily' | 'weekly' | 'monthly',
     })
     setFormError(''); setPanel(m)
   }
@@ -334,6 +337,7 @@ export default function AdminMissions() {
       reward_exp: form.reward_exp,
       chapter_order: form.chapter_order,
       is_required: form.is_required,
+      recurrence: form.recurrence || null,
     }
     const sessionIdToSave = form.scope_session_id || null
     const rewardItems = form.reward_items.filter(ri => ri.item_id)
@@ -505,6 +509,16 @@ export default function AdminMissions() {
                 <select className={cls} value={form.type}
                   onChange={e => setForm(f => ({ ...f, type: e.target.value, target: '' }))}>
                   {MISSION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </Field>
+
+              <Field label="Ricorrenza 🔁" hint="Le missioni ricorrenti si rinnovano a ogni periodo (fuso Europe/Rome): progressi azzerati e ricompense di nuovo riscuotibili. Ideali per le sessioni Avventura.">
+                <select className={cls} value={form.recurrence}
+                  onChange={e => setForm(f => ({ ...f, recurrence: e.target.value as '' | 'daily' | 'weekly' | 'monthly' }))}>
+                  <option value="">Una tantum (default)</option>
+                  <option value="daily">Giornaliera — si rinnova ogni giorno</option>
+                  <option value="weekly">Settimanale — si rinnova ogni lunedì</option>
+                  <option value="monthly">Mensile — si rinnova il 1° del mese</option>
                 </select>
               </Field>
 
