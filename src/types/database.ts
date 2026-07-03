@@ -2533,6 +2533,42 @@ export type Database = {
         }
         Relationships: []
       }
+      trades: {
+        Row: {
+          id: string
+          session_id: string
+          proposer_id: string
+          recipient_id: string
+          proposer_creature_id: string
+          recipient_creature_id: string
+          status: string
+          created_at: string
+          responded_at: string | null
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          proposer_id: string
+          recipient_id: string
+          proposer_creature_id: string
+          recipient_creature_id: string
+          status?: string
+          created_at?: string
+          responded_at?: string | null
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          proposer_id?: string
+          recipient_id?: string
+          proposer_creature_id?: string
+          recipient_creature_id?: string
+          status?: string
+          created_at?: string
+          responded_at?: string | null
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           area_bounds: Json
@@ -2617,6 +2653,7 @@ export type Database = {
           old_level: number
         }[]
       }
+      execute_trade: { Args: { p_trade_id: string; p_user_id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_in_session: { Args: { p_session_id: string }; Returns: boolean }
     }

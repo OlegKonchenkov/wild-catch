@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { GameProfileSkeleton } from '@/components/game/GameLoading'
 import { GameToast } from '@/components/game/GameToast'
-import FriendsPanel, { GroupPanel } from '@/components/game/FriendsPanel'
+import FriendsPanel, { GroupPanel, TradesPanel } from '@/components/game/FriendsPanel'
 import { useGameToast } from '@/components/game/useGameToast'
 import { createClient } from '@/lib/supabase/client'
 import { TUTORIAL_SESSION_ID } from '@/lib/game/tutorial'
@@ -364,6 +364,7 @@ function ProfileContent() {
           </div>
 
           {/* Amici (globali, cross-sessione) */}
+          <TradesPanel />
           <FriendsPanel />
           <GroupPanel />
         </motion.div>
