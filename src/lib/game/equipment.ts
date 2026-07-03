@@ -63,5 +63,30 @@ export async function getEquipmentBonuses(
     // ignore — return zeroed bonuses
   }
 
+  // Variante GOLD (Wave 3): +10% delle stats BASE della specie, come fosse un
+  // equipaggiamento permanente. Un solo hook qui = vale in incontri, boss e
+  // duelli senza toccare i singoli flussi di combattimento. Stessa filosofia
+  // difensiva: se la colonna/join non c'è, il GOLD semplicemente non bonifica.
+  try {
+    type GoldRow = { id: string; is_gold: boolean | null; creatures: { hp: number; atk: number; def: number } | Array<{ hp: number; atk: number; def: number }> | null }
+    const { data: goldRows } = await supabase
+      .from('player_creatures')
+      .select('id, is_gold, creatures(hp, atk, def)')
+      .in('id', ids)
+      .eq('is_gold', true)
+
+    for (const raw of (goldRows ?? []) as unknown as GoldRow[]) {
+      const base = Array.isArray(raw.creatures) ? raw.creatures[0] : raw.creatures
+      if (!base) continue
+      const acc = result.get(raw.id) ?? { ...ZERO_BONUS }
+      acc.hp  += Math.round((base.hp  ?? 0) * 0.10)
+      acc.atk += Math.round((base.atk ?? 0) * 0.10)
+      acc.def += Math.round((base.def ?? 0) * 0.10)
+      result.set(raw.id, acc)
+    }
+  } catch {
+    // ignore — GOLD contributes nothing if unavailable
+  }
+
   return result
 }

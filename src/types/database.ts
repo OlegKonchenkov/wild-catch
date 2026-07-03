@@ -1680,6 +1680,7 @@ export type Database = {
           duplicates_count: number
           evolved: boolean
           id: string
+          is_gold: boolean
           session_id: string
           user_id: string
         }
@@ -1689,6 +1690,7 @@ export type Database = {
           duplicates_count?: number
           evolved?: boolean
           id?: string
+          is_gold?: boolean
           session_id: string
           user_id: string
         }
@@ -1698,6 +1700,7 @@ export type Database = {
           duplicates_count?: number
           evolved?: boolean
           id?: string
+          is_gold?: boolean
           session_id?: string
           user_id?: string
         }

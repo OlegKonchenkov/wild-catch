@@ -255,6 +255,13 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: IconType; title: strin
         body: pinReward,
       }
     }
+    case 'gold_forged': {
+      return {
+        icon: GiSparkles,
+        title: `🥇 ${readStr(p, 'creature_name') ?? 'Daimon'} è ora GOLD!`,
+        body: '+10% alle statistiche base, per sempre',
+      }
+    }
     case 'gym_taken': {
       const dethroned = readBool(p, 'dethroned')
       return {
@@ -343,6 +350,7 @@ const EVENT_THEMES: Record<string, { color: string; dimColor: string; label: str
   quiz_solved:       { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Quiz' },
   place_unlocked:    { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Luogo' },
   gym_taken:         { color: '#F7C841', dimColor: 'rgba(247,200,65,0.10)',  label: 'Palestra' },
+  gold_forged:       { color: '#F3C233', dimColor: 'rgba(243,194,51,0.10)',  label: 'GOLD' },
   pergamena_found:   { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Pergamena' },
   pergamena_opened:  { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Pergamena' },
 }
