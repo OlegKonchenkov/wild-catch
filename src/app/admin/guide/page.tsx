@@ -994,6 +994,13 @@ export default function AdminGuidePage() {
                 'Il giocatore compone la combinazione ruotando i rulli — la verifica resta lato server',
               ]} />
 
+              <SubHeader>Territorio Vivo (guardiani, palestre, pergamene)</SubHeader>
+              <StepList items={[
+                'Guardiano del luogo: pin boss → seleziona "Custodisce luogo"; configura il bonus di liberazione nel campo unlock_bonus del Luogo (Admin → Collezione → Luoghi)',
+                'Palestra presidiabile: nel form boss spunta "Palestra presidiabile" — sempre risfidabile, difesa che decade, rendita allo spodestato. Ricompense modeste (erogate a ogni vittoria)',
+                'Pergamene: automatiche — 1 ogni 250 passi; aprendole i giocatori ottengono aneddoti casuali + gemme (alimentano Collezione e Quiz)',
+              ]} />
+
               <SubHeader>Ritmo Avventura (daily + ricorrenti)</SubHeader>
               <StepList items={[
                 'Sessione Avventura → "Premi giornalieri": scegli la Bustina del giorno (vuota = 25 oro). Streak: gemme crescenti, bonus ogni 7 giorni',
