@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { TablesInsert } from '@/types/database'
 
 const EQUIP_TYPES = ['arma', 'corazza', 'elmo', 'accessorio'] as const
-const VALID_TYPES = ['rete', 'esca', 'uovo', 'battaglia', 'pozione', 'cura', 'custom', ...EQUIP_TYPES] as const
+const VALID_TYPES = ['rete', 'esca', 'uovo', 'battaglia', 'pozione', 'cura', 'custom', 'chiave', ...EQUIP_TYPES] as const
 const VALID_RARITIES = ['comune', 'non_comune', 'raro', 'epico', 'leggendario', 'mitologico'] as const
 
 function isEquip(type: string): boolean {

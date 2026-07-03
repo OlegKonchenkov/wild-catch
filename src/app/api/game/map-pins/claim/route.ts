@@ -468,6 +468,15 @@ export async function POST(request: Request) {
           }
           result = { ...result, rewardType, creature: enigmaCreature }
         }
+      } else if (rewardType && !['exp', 'gold', 'oggetto', 'creatura'].includes(rewardType)) {
+        // Tipi loot/collezione (bustina, forziere, gemme, premio, abilita, …):
+        // passa dal dispenser condiviso.
+        const res = await dispenseReward(admin, {
+          userId: user.id, sessionId,
+          type: rewardType as RewardType,
+          payload: rewardPayload,
+        })
+        if (res.ok) result = { ...result, rewardType, ...res.detail }
       }
       break
     }

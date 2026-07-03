@@ -80,6 +80,10 @@ const TYPE_INFO: Record<QRCodeType, { label: string; icon: string; description: 
   boss:     { label: 'Capo Palestra',     icon: '👑', description: 'Avvia uno scontro speciale 3v3 contro il Capo Palestra.', color: '#F7C841' },
   evento:   { label: 'Evento speciale',   icon: '⚡', description: 'Attiva un bonus temporaneo per il giocatore.' },
   creatura: { label: 'Creatura',          icon: '🐾', description: 'Il giocatore riceve direttamente una creatura nella sua collezione.', color: '#C084FC' },
+  bustina:  { label: 'Bustina',           icon: '🎴', description: 'Il giocatore riceve una bustina da aprire nello zaino.', color: '#F59E0B' },
+  forziere: { label: 'Forziere',          icon: '🧰', description: 'Il giocatore riceve un forziere (serviranno le chiavi giuste).', color: '#D97706' },
+  gemme:    { label: 'Gemme',             icon: '💎', description: 'Il giocatore riceve gemme.', color: '#4FD1C5' },
+  premio:   { label: 'Premio speciale',   icon: '🏆', description: 'Il giocatore vince un premio reale (voucher con codice).', color: '#FF4D6D' },
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -159,6 +163,10 @@ function defaultFields(t: QRCodeType): Fields {
     }
     case 'evento':  return { event_type: 'bonus_exp', multiplier: 2, duration_minutes: 10 }
     case 'creatura': return { creature_id: '' }
+    case 'bustina':  return { pack_id: '' }
+    case 'forziere': return { chest_id: '' }
+    case 'gemme':    return { amount: 10 }
+    case 'premio':   return { prize_id: '' }
   }
 }
 
@@ -189,6 +197,10 @@ function payloadToFields(type: QRCodeType, payload: any, qr?: any): Fields {
     }
     case 'evento':
       return { event_type: String(p.event_type ?? 'bonus_exp'), multiplier: asNumber(p.effect?.multiplier, 2), duration_minutes: asNumber(p.effect?.duration_minutes, 10) }
+    case 'bustina':  return { pack_id: String(p.pack_id ?? '') }
+    case 'forziere': return { chest_id: String(p.chest_id ?? '') }
+    case 'gemme':    return { amount: asNumber(p.amount, 10) }
+    case 'premio':   return { prize_id: String(p.prize_id ?? '') }
     case 'creatura':
       return { creature_id: String(p.creature_id ?? '') }
   }
@@ -212,6 +224,10 @@ function buildPayload(t: QRCodeType, f: Fields): any {
     }
     case 'evento':   return { event_type: f.event_type, effect: { multiplier: Number(f.multiplier), duration_minutes: Number(f.duration_minutes) } }
     case 'creatura': return { creature_id: f.creature_id }
+    case 'bustina':  return { pack_id: f.pack_id }
+    case 'forziere': return { chest_id: f.chest_id }
+    case 'gemme':    return { amount: Number(f.amount) || 0 }
+    case 'premio':   return { prize_id: f.prize_id }
   }
 }
 
@@ -406,6 +422,16 @@ export default function QRCodesPage() {
   const [type, setType]               = useState<QRCodeType>('oggetto')
   const [label, setLabel]             = useState('')
   const [fields, setFields]           = useState<Fields>(defaultFields('oggetto'))
+  const [lootPacks, setLootPacks]     = useState<{ id: string; name: string }[]>([])
+  const [lootChests, setLootChests]   = useState<{ id: string; name: string }[]>([])
+  const [lootPrizes, setLootPrizes]   = useState<{ id: string; name: string }[]>([])
+  useEffect(() => {
+    const grab = (table: string, set: (v: { id: string; name: string }[]) => void) =>
+      fetch(`/api/admin/catalog/${table}`).then(r => r.json())
+        .then(d => set(((d.rows ?? []) as { id: string; name: string }[]).map(x => ({ id: x.id, name: x.name }))))
+        .catch(() => {})
+    grab('packs', setLootPacks); grab('chests', setLootChests); grab('special_prizes', setLootPrizes)
+  }, [])
   const [usesRemaining, setUsesRemaining] = useState<number | null>(null)
   // scope: '' = current session, 'global' = all sessions
   const [scopeSessionId, setScopeSessionId] = useState<string>('')
@@ -904,6 +930,36 @@ export default function QRCodesPage() {
                       onChange={v => setField('creature_id', v)}
                       placeholder="Cerca creatura…"
                     />
+                  </Field>
+                )}
+
+                {type === 'bustina' && (
+                  <Field label="Bustina" hint="Aggiunta allo zaino, si apre con l'animazione di reveal">
+                    <select value={String(fields.pack_id ?? '')} onChange={e => setField('pack_id', e.target.value)} className={cls}>
+                      <option value="">— Seleziona bustina —</option>
+                      {lootPacks.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+                    </select>
+                  </Field>
+                )}
+                {type === 'forziere' && (
+                  <Field label="Forziere" hint="Il giocatore dovrà possedere le chiavi richieste per aprirlo">
+                    <select value={String(fields.chest_id ?? '')} onChange={e => setField('chest_id', e.target.value)} className={cls}>
+                      <option value="">— Seleziona forziere —</option>
+                      {lootChests.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+                    </select>
+                  </Field>
+                )}
+                {type === 'gemme' && (
+                  <Field label="Quantità gemme">
+                    <input type="number" min={1} value={fields.amount} onChange={e => setField('amount', Math.max(1, +e.target.value))} className={cls} />
+                  </Field>
+                )}
+                {type === 'premio' && (
+                  <Field label="Premio speciale" hint="Genera un voucher con codice, riscattabile dall'admin">
+                    <select value={String(fields.prize_id ?? '')} onChange={e => setField('prize_id', e.target.value)} className={cls}>
+                      <option value="">— Seleziona premio —</option>
+                      {lootPrizes.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+                    </select>
                   </Field>
                 )}
               </div>

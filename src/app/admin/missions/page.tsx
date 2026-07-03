@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AdminInlineSpinner, AdminListSkeleton } from '@/components/admin/AdminLoading'
+import type { Json } from '@/types/database'
 
 interface Mission {
   id: string
@@ -20,6 +21,7 @@ interface Mission {
   unlock_level: number | null
   unlock_after_mission_id: string | null
   recurrence?: 'daily' | 'weekly' | 'monthly' | null
+  reward_extra?: Array<{ type: string; payload: Record<string, unknown> }> | null
 }
 
 interface Creature  { id: string; name: string; rarity: string; element: string }
@@ -183,6 +185,7 @@ const EMPTY_FORM = {
   unlock_after_mission_id: '' as string,
   chapter_order: 1, is_required: false, scope_session_id: '',
   recurrence: '' as '' | 'daily' | 'weekly' | 'monthly',
+  reward_extra_json: '' as string,
 }
 
 /* ── Page ────────────────────────────────────── */
@@ -298,6 +301,8 @@ export default function AdminMissions() {
       chapter_order: m.chapter_order, is_required: m.is_required,
       scope_session_id: m.session_id ?? '',
       recurrence: (m.recurrence ?? '') as '' | 'daily' | 'weekly' | 'monthly',
+      reward_extra_json: Array.isArray(m.reward_extra) && m.reward_extra.length > 0
+        ? JSON.stringify(m.reward_extra, null, 2) : '',
     })
     setFormError(''); setPanel(m)
   }
@@ -313,6 +318,17 @@ export default function AdminMissions() {
       return
     }
     const unlockAfterMissionId = form.unlock_after_mission_id || null
+    let rewardExtra: Array<{ type: string; payload: Record<string, unknown> }> | null = null
+    if (form.reward_extra_json.trim()) {
+      try {
+        const parsed = JSON.parse(form.reward_extra_json)
+        if (!Array.isArray(parsed)) throw new Error('not an array')
+        rewardExtra = parsed
+      } catch {
+        setFormError('Ricompense extra: JSON non valido — deve essere un array [{"type":"...","payload":{...}}]')
+        return
+      }
+    }
     if (panel !== null && panel !== 'new' && unlockAfterMissionId === (panel as Mission).id) {
       setFormError('Una missione non può sbloccare sé stessa')
       return
@@ -338,6 +354,7 @@ export default function AdminMissions() {
       chapter_order: form.chapter_order,
       is_required: form.is_required,
       recurrence: form.recurrence || null,
+      reward_extra: rewardExtra as unknown as Json,
     }
     const sessionIdToSave = form.scope_session_id || null
     const rewardItems = form.reward_items.filter(ri => ri.item_id)
@@ -645,6 +662,22 @@ export default function AdminMissions() {
                   className="text-xs text-[#3A9DBC] font-semibold hover:text-[#5AB5D0]">
                   + Aggiungi oggetto
                 </button>
+              </div>
+
+              {/* Reward extra: qualsiasi tipo del dispenser (bustina/forziere/gemme/…) */}
+              <div className="bg-white/3 border border-white/10 rounded-xl p-3 space-y-1.5">
+                <label className="block text-xs font-semibold text-white/60">🎴 Ricompense extra <span className="font-normal text-white/30">(opzionale — JSON)</span></label>
+                <p className="text-[11px] text-white/30 leading-relaxed">
+                  Array di ricompense aggiuntive dispensate al completamento, di qualsiasi tipo (bustina, forziere,
+                  gemme, premio, personaggio, opera, aneddoto…). Es: <code className="text-white/45">{'[{"type":"bustina","payload":{"pack_id":"..."}},{"type":"gemme","payload":{"amount":10}}]'}</code>
+                </p>
+                <textarea
+                  value={form.reward_extra_json}
+                  onChange={e => setForm(f => ({ ...f, reward_extra_json: e.target.value }))}
+                  placeholder='[{"type":"bustina","payload":{"pack_id":"<id bustina>"}}]'
+                  rows={3}
+                  className="w-full bg-[#0F1F2E] border border-white/15 rounded-lg px-2 py-1.5 text-white text-xs font-mono resize-y"
+                />
               </div>
 
               <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer select-none">

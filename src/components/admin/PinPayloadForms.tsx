@@ -188,6 +188,17 @@ export function PinPayloadBoss({ allCreatures, allItems, value, onChange }: {
   const c3 = (rawCreatures[2]?.creature_id as string) ?? ''
   const l3 = (rawCreatures[2]?.level_override as number) ?? 10
   const isGym          = p.gym === true
+  const extraArr       = Array.isArray(p.extra) ? p.extra as Array<{ type: string; payload: any }>
+                        : Array.isArray((p.reward as any)?.extra) ? (p.reward as any).extra : []
+  const extraPackId    = (extraArr.find((e: any) => e.type === 'bustina')?.payload?.pack_id as string) ?? ''
+  const extraGemme     = (extraArr.find((e: any) => e.type === 'gemme')?.payload?.amount as number) ?? 0
+  const [lootPacks, setLootPacks] = useState<{ id: string; name: string }[]>([])
+  useState(() => {
+    fetch('/api/admin/catalog/packs').then(r => r.json())
+      .then(d => setLootPacks(((d.rows ?? []) as { id: string; name: string }[]).map(x => ({ id: x.id, name: x.name }))))
+      .catch(() => {})
+    return undefined
+  })
   const goldReward     = ((p.reward as any)?.gold        as number) ?? 200
   const expReward      = ((p.reward as any)?.exp         as number) ?? 100
   const itemIdReward   = ((p.reward as any)?.item_id     as string) ?? ''
@@ -198,6 +209,8 @@ export function PinPayloadBoss({ allCreatures, allItems, value, onChange }: {
     nc1: string, nl1: number, nc2: string, nl2: number, nc3: string, nl3: number,
     gold: number, exp: number, itemId: string, itemQty: number, rewardCreatureId: string,
     gym: boolean = isGym,
+    packId: string = extraPackId,
+    gemmeAmt: number = extraGemme,
   ) {
     const creatures = [
       { creature_id: nc1, level_override: nl1 },
@@ -207,6 +220,10 @@ export function PinPayloadBoss({ allCreatures, allItems, value, onChange }: {
     const reward: Record<string, unknown> = { gold, exp }
     if (itemId)          { reward.item_id = itemId; reward.item_qty = itemQty }
     if (rewardCreatureId) reward.creature_id = rewardCreatureId
+    const extra: Array<{ type: string; payload: Record<string, unknown> }> = []
+    if (packId)       extra.push({ type: 'bustina', payload: { pack_id: packId } })
+    if (gemmeAmt > 0) extra.push({ type: 'gemme', payload: { amount: gemmeAmt } })
+    if (extra.length > 0) reward.extra = extra
     onChange(encodePayload({ creatures, reward, ...(gym ? { gym: true } : {}) }))
   }
 
@@ -275,6 +292,21 @@ export function PinPayloadBoss({ allCreatures, allItems, value, onChange }: {
           <label className={LABEL}>EXP</label>
           <input type="number" min={0} value={expReward}
             onChange={e => save(c1, l1, c2, l2, c3, l3, goldReward, +e.target.value, itemIdReward, itemQtyReward, creatureReward)} className={INPUT} />
+        </div>
+        <div>
+          <label className={LABEL}>🎴 Bustina bonus (opzionale)</label>
+          <select value={extraPackId}
+            onChange={e => save(c1, l1, c2, l2, c3, l3, goldReward, expReward, itemIdReward, itemQtyReward, creatureReward, isGym, e.target.value, extraGemme)}
+            className={SELECT}>
+            <option value="">— Nessuna —</option>
+            {lootPacks.map(pk => <option key={pk.id} value={pk.id}>{pk.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={LABEL}>💎 Gemme bonus</label>
+          <input type="number" min={0} value={extraGemme}
+            onChange={e => save(c1, l1, c2, l2, c3, l3, goldReward, expReward, itemIdReward, itemQtyReward, creatureReward, isGym, extraPackId, Math.max(0, +e.target.value))}
+            className={INPUT} />
         </div>
       </div>
 
