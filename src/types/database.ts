@@ -903,6 +903,18 @@ export type Database = {
         }
         Relationships: []
       }
+      groups: {
+        Row: { id: string; name: string; code: string; created_by: string | null; created_at: string }
+        Insert: { id?: string; name: string; code: string; created_by?: string | null; created_at?: string }
+        Update: { id?: string; name?: string; code?: string; created_by?: string | null; created_at?: string }
+        Relationships: []
+      }
+      group_members: {
+        Row: { id: string; group_id: string; user_id: string; joined_at: string }
+        Insert: { id?: string; group_id: string; user_id: string; joined_at?: string }
+        Update: { id?: string; group_id?: string; user_id?: string; joined_at?: string }
+        Relationships: []
+      }
       gym_holds: {
         Row: {
           id: string

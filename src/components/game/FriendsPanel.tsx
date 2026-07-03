@@ -151,3 +151,82 @@ export default function FriendsPanel() {
     </div>
   )
 }
+
+/**
+ * Pannello Gruppo (classe/istituto): entra con il codice dell'organizzatore,
+ * poi la classifica offre il filtro "Gruppo".
+ */
+export function GroupPanel() {
+  const [group, setGroup] = useState<{ id: string; name: string; members: number } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  const load = useCallback(() => {
+    fetch('/api/game/groups').then(r => r.json())
+      .then(d => setGroup(d.group ?? null))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+  useEffect(load, [load])
+
+  async function join() {
+    if (!code.trim() || busy) return
+    setBusy(true); setMsg(null)
+    try {
+      const res = await fetch('/api/game/groups', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.trim() }),
+      })
+      const d = await res.json()
+      if (res.ok) { setMsg({ ok: true, text: `Sei entrato in ${d.name}!` }); setCode(''); load() }
+      else setMsg({ ok: false, text: d.error ?? 'Errore' })
+    } catch { setMsg({ ok: false, text: 'Errore di rete' }) }
+    finally { setBusy(false) }
+  }
+
+  async function leave() {
+    if (busy || !confirm('Uscire dal gruppo?')) return
+    setBusy(true)
+    await fetch('/api/game/groups', { method: 'DELETE' }).catch(() => {})
+    setBusy(false); setMsg(null); load()
+  }
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+      <p className="text-[10px] text-white/25 uppercase tracking-widest font-bold mb-2.5">
+        🏫 Gruppo (classe / squadra)
+      </p>
+      {loading ? (
+        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
+      ) : group ? (
+        <div className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+          style={{ background: 'rgba(58,157,188,0.1)', border: '1px solid rgba(58,157,188,0.3)' }}>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white truncate">{group.name}</p>
+            <p className="text-[11px] text-white/40">{group.members} membri — filtra la classifica su "Gruppo"</p>
+          </div>
+          <button onClick={leave} disabled={busy} className="text-[11px] text-red-300/70 font-semibold shrink-0">esci</button>
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <input value={code} onChange={e => setCode(e.target.value.toUpperCase())}
+              onKeyDown={e => { if (e.key === 'Enter') join() }}
+              placeholder="CODICE"
+              maxLength={6}
+              className="flex-1 min-w-0 rounded-lg bg-[#0A1520] border border-white/15 px-3 py-2 text-sm font-mono tracking-widest text-white placeholder-white/25 focus:outline-none focus:border-[#3A9DBC] uppercase"
+            />
+            <button onClick={join} disabled={busy || !code.trim()}
+              className="shrink-0 rounded-lg bg-[#3A9DBC] disabled:bg-white/10 px-3 py-2 text-sm font-bold text-white disabled:text-white/30">
+              Entra
+            </button>
+          </div>
+          <p className="text-[11px] text-white/30 mt-1.5">Chiedi il codice all&apos;organizzatore (classe, scuola, squadra).</p>
+        </>
+      )}
+      {msg && <p className={`text-xs mt-2 ${msg.ok ? 'text-emerald-300' : 'text-red-300'}`}>{msg.text}</p>}
+    </div>
+  )
+}

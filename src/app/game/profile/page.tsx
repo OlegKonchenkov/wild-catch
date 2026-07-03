@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { GameProfileSkeleton } from '@/components/game/GameLoading'
 import { GameToast } from '@/components/game/GameToast'
-import FriendsPanel from '@/components/game/FriendsPanel'
+import FriendsPanel, { GroupPanel } from '@/components/game/FriendsPanel'
 import { useGameToast } from '@/components/game/useGameToast'
 import { createClient } from '@/lib/supabase/client'
 import { TUTORIAL_SESSION_ID } from '@/lib/game/tutorial'
@@ -68,6 +68,8 @@ function ProfileContent() {
   const [avatarUrl, setAvatarUrl]       = useState<string | null>(null)
   const [loading, setLoading]           = useState(true)
   const [loadingBoard, setLoadingBoard] = useState(false)
+  const [boardFilter, setBoardFilter]   = useState<'all' | 'friends' | 'group'>('all')
+  const [boardNoGroup, setBoardNoGroup] = useState(false)
   const [tutorialCompleted, setTutorialCompleted] = useState(false)
   const { toast, showError, dismiss }   = useGameToast()
   const supabase = useMemo(() => createClient(), [])
@@ -99,11 +101,16 @@ function ProfileContent() {
   const searchParams = useSearchParams()
   const sessionEnded = searchParams.get('ended') === '1'
 
-  const fetchBoard = useCallback(async (sid: string) => {
+  const fetchBoard = useCallback(async (sid: string, filter: 'all' | 'friends' | 'group' = 'all') => {
     setLoadingBoard(true)
     try {
-      const r = await fetch(`/api/game/leaderboard?sessionId=${sid}`)
-      if (r.ok) setLeaderboard((await r.json()).leaderboard ?? [])
+      const qs = filter === 'all' ? '' : `&filter=${filter}`
+      const r = await fetch(`/api/game/leaderboard?sessionId=${sid}${qs}`)
+      if (r.ok) {
+        const d = await r.json()
+        setLeaderboard(d.leaderboard ?? [])
+        setBoardNoGroup(!!d.noGroup)
+      }
     } finally {
       setLoadingBoard(false)
     }
@@ -280,16 +287,34 @@ function ProfileContent() {
 
           {/* Leaderboard */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] text-white/25 uppercase tracking-widest font-bold">
                 Classifica — {session.name}
               </p>
               <button
-                onClick={() => fetchBoard(session.id)}
+                onClick={() => fetchBoard(session.id, boardFilter)}
                 className="text-xs text-[#3A9DBC] hover:text-white transition-colors"
               >
                 ↻
               </button>
+            </div>
+
+            {/* Filtri sociali */}
+            <div className="flex gap-1.5 mb-3">
+              {([
+                { key: 'all' as const, label: 'Tutti' },
+                { key: 'friends' as const, label: '🤝 Amici' },
+                { key: 'group' as const, label: '🏫 Gruppo' },
+              ]).map(f => (
+                <button key={f.key}
+                  onClick={() => { setBoardFilter(f.key); fetchBoard(session.id, f.key) }}
+                  className="text-xs px-2.5 py-1 rounded-full font-semibold transition-all"
+                  style={boardFilter === f.key
+                    ? { background: 'rgba(58,157,188,0.25)', color: '#7FD6F2', border: '1px solid rgba(58,157,188,0.5)' }
+                    : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {f.label}
+                </button>
+              ))}
             </div>
 
             {loadingBoard ? (
@@ -299,7 +324,13 @@ function ProfileContent() {
                 ))}
               </div>
             ) : leaderboard.length === 0 ? (
-              <p className="text-center text-white/25 py-5 text-sm">Nessun giocatore ancora</p>
+              <p className="text-center text-white/25 py-5 text-sm">
+                {boardFilter === 'group' && boardNoGroup
+                  ? 'Non sei in nessun gruppo — entra con un codice qui sotto!'
+                  : boardFilter === 'friends'
+                    ? 'Nessun amico in questa sessione'
+                    : 'Nessun giocatore ancora'}
+              </p>
             ) : (
               <div className="space-y-1.5">
                 {leaderboard.map(entry => (
@@ -334,6 +365,7 @@ function ProfileContent() {
 
           {/* Amici (globali, cross-sessione) */}
           <FriendsPanel />
+          <GroupPanel />
         </motion.div>
       )}
     </div>
