@@ -52,7 +52,7 @@ async function collectJobs(): Promise<Job[]> {
     for (const r of rows ?? []) if (!r.image_url) jobs.push({ table, id: r.id, label: r.name ?? r.title, prompt: prompt(r) })
   }
 
-  const [packs, chests, keys, prizes, places, artworks, characters] = await Promise.all([
+  const [packs, chests, keys, prizes, places, artworks, characters, trophies] = await Promise.all([
     db.from('packs').select('id, name, description, image_url, rarity'),
     db.from('chests').select('id, name, description, image_url, rarity'),
     db.from('items').select('id, name, description, image_url').eq('type', 'chiave'),
@@ -60,6 +60,7 @@ async function collectJobs(): Promise<Job[]> {
     db.from('cultural_places').select('id, name, description, image_url'),
     db.from('artworks').select('id, name, description, image_url'),
     db.from('characters').select('id, name, description, image_url'),
+    db.from('trophies').select('id, name, description, image_url'),
   ])
 
   push('packs', packs.data, r => `A sealed collectible card pack / booster envelope, ${r.rarity ?? 'common'} tier, foil accents, Roman motifs. ${r.name}: ${r.description}`)
@@ -69,6 +70,7 @@ async function collectJobs(): Promise<Job[]> {
   push('cultural_places', places.data, r => `An evocative wide illustration of an Italian archaeological/cultural site. ${r.name}: ${r.description}`)
   push('artworks', artworks.data, r => `A museum artwork / ancient Roman artefact photographed as a collectible card. ${r.name}: ${r.description}`)
   push('characters', characters.data, r => `A dignified portrait of a historical Roman/classical figure as a collectible character card. ${r.name}: ${r.description}`)
+  push('trophies', trophies.data, r => `A golden laurel-wreath trophy / medal icon celebrating a collection milestone, heraldic and celebratory. ${r.name}: ${r.description}`)
 
   return jobs
 }

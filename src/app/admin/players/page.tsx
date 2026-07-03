@@ -38,6 +38,12 @@ export default function PlayersPage() {
   const [notifyLoading, setNotifyLoading] = useState(false)
   const [feedback, setFeedback]         = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Riscatta premio (voucher per codice)
+  const [redeemPrizeOpen, setRedeemPrizeOpen] = useState(false)
+  const [redeemPrizeCode, setRedeemPrizeCode] = useState('')
+  const [redeemPrizeBusy, setRedeemPrizeBusy] = useState(false)
+  const [redeemPrizeResult, setRedeemPrizeResult] = useState<{ ok: boolean; text: string } | null>(null)
+
   // Inventory
   const [inventoryTarget, setInventoryTarget] = useState<{ userId: string; label: string } | null>(null)
   const [inventory, setInventory] = useState<any[]>([])
@@ -210,6 +216,28 @@ export default function PlayersPage() {
     }
   }
 
+  async function handleRedeemPrize() {
+    if (!redeemPrizeCode.trim() || redeemPrizeBusy) return
+    setRedeemPrizeBusy(true); setRedeemPrizeResult(null)
+    try {
+      const res = await fetch('/api/admin/players/redeem-prize', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: redeemPrizeCode.trim().toUpperCase() }),
+      })
+      const d = await res.json()
+      if (res.ok) {
+        setRedeemPrizeResult({ ok: true, text: `✅ Riscattato: ${d.prizeName ?? 'premio'}` })
+        setRedeemPrizeCode('')
+      } else {
+        setRedeemPrizeResult({ ok: false, text: d.error ?? 'Errore' })
+      }
+    } catch {
+      setRedeemPrizeResult({ ok: false, text: 'Errore di rete' })
+    } finally {
+      setRedeemPrizeBusy(false)
+    }
+  }
+
   async function handleRedeemItem(inventoryId: string, itemName: string) {
     if (!inventoryTarget) return
     if (!confirm(`Validare e consumare "${itemName}" per ${inventoryTarget.label}?`)) return
@@ -351,13 +379,19 @@ export default function PlayersPage() {
             </div>
           )}
         </div>
-        <div className="flex items-end">
+        <div className="flex items-end gap-2">
           <button
             onClick={openNotifyAll}
             disabled={!selectedId || players.length === 0}
             className="bg-[#3A9DBC] text-white font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-40"
           >
             📢 Notifica tutti
+          </button>
+          <button
+            onClick={() => { setRedeemPrizeOpen(true); setRedeemPrizeResult(null); setRedeemPrizeCode('') }}
+            className="bg-[#F7C841] text-[#1a1405] font-bold px-4 py-2 rounded-lg text-sm"
+          >
+            🏆 Riscatta premio
           </button>
         </div>
       </div>
@@ -648,6 +682,47 @@ export default function PlayersPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Riscatta premio modal (voucher per codice, non richiede prima cercare il giocatore) */}
+      {redeemPrizeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) setRedeemPrizeOpen(false) }}>
+          <div className="bg-[#0d1e2e] border border-white/20 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-white">🏆 Riscatta premio</h2>
+              <button onClick={() => setRedeemPrizeOpen(false)} className="text-white/40 hover:text-white text-xl leading-none">✕</button>
+            </div>
+            <p className="text-xs text-white/40 mb-3">
+              Chiedi al giocatore il codice del voucher mostrato nello Zaino (sezione Premi) e inseriscilo qui per validarlo.
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={redeemPrizeCode}
+                onChange={e => setRedeemPrizeCode(e.target.value.toUpperCase())}
+                onKeyDown={e => { if (e.key === 'Enter') handleRedeemPrize() }}
+                placeholder="es. A1B2C3D4"
+                className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm font-mono tracking-widest uppercase placeholder-white/25 focus:outline-none focus:border-[#F7C841]"
+              />
+              <button
+                onClick={handleRedeemPrize}
+                disabled={redeemPrizeBusy || !redeemPrizeCode.trim()}
+                className="bg-[#F7C841] text-[#1a1405] font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-40"
+              >
+                {redeemPrizeBusy ? '…' : 'Valida'}
+              </button>
+            </div>
+            {redeemPrizeResult && (
+              <p className={`text-sm font-medium px-3 py-2 rounded-lg mt-3 ${
+                redeemPrizeResult.ok
+                  ? 'bg-[#34d399]/10 text-[#34d399] border border-[#34d399]/20'
+                  : 'bg-red-400/10 text-red-400 border border-red-400/20'
+              }`}>
+                {redeemPrizeResult.text}
+              </p>
+            )}
           </div>
         </div>
       )}
