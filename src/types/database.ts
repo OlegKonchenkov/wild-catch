@@ -1333,9 +1333,9 @@ export type Database = {
         ]
       }
       cultural_places: {
-        Row: { id: string; name: string; description: string; image_url: string; lat: number | null; lng: number | null; session_id: string | null; created_at: string }
-        Insert: { id?: string; name: string; description?: string; image_url?: string; lat?: number | null; lng?: number | null; session_id?: string | null; created_at?: string }
-        Update: { id?: string; name?: string; description?: string; image_url?: string; lat?: number | null; lng?: number | null; session_id?: string | null; created_at?: string }
+        Row: { id: string; name: string; description: string; image_url: string; lat: number | null; lng: number | null; session_id: string | null; unlock_bonus: Json | null; created_at: string }
+        Insert: { id?: string; name: string; description?: string; image_url?: string; lat?: number | null; lng?: number | null; session_id?: string | null; unlock_bonus?: Json | null; created_at?: string }
+        Update: { id?: string; name?: string; description?: string; image_url?: string; lat?: number | null; lng?: number | null; session_id?: string | null; unlock_bonus?: Json | null; created_at?: string }
         Relationships: []
       }
       artworks: {
@@ -1401,6 +1401,30 @@ export type Database = {
           image_url?: string
           redemption_note?: string
           created_at?: string
+        }
+        Relationships: []
+      }
+      player_place_unlocks: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          place_id: string
+          unlocked_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          place_id: string
+          unlocked_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          place_id?: string
+          unlocked_at?: string
         }
         Relationships: []
       }
@@ -2251,6 +2275,7 @@ export type Database = {
           lng: number
           name: string
           reward_payload: Json | null
+          place_id: string | null
           reward_radius_m: number | null
           reward_type: string | null
           session_id: string
@@ -2266,6 +2291,7 @@ export type Database = {
           lng: number
           name?: string
           reward_payload?: Json | null
+          place_id?: string | null
           reward_radius_m?: number | null
           reward_type?: string | null
           session_id: string
@@ -2281,6 +2307,7 @@ export type Database = {
           lng?: number
           name?: string
           reward_payload?: Json | null
+          place_id?: string | null
           reward_radius_m?: number | null
           reward_type?: string | null
           session_id?: string
