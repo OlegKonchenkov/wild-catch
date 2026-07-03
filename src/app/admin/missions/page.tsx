@@ -479,6 +479,15 @@ export default function AdminMissions() {
                     {m.unlock_after_mission_id && (
                       <span className="text-xs text-[#C084FC]/70">🔒 Dopo missione</span>
                     )}
+                    {m.recurrence && (
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md"
+                        style={{
+                          background: m.recurrence === 'daily' ? 'rgba(255,179,107,0.15)' : m.recurrence === 'weekly' ? 'rgba(56,189,248,0.15)' : 'rgba(192,132,252,0.15)',
+                          color: m.recurrence === 'daily' ? '#FFB36B' : m.recurrence === 'weekly' ? '#38BDF8' : '#C084FC',
+                        }}>
+                        🔁 {m.recurrence === 'daily' ? 'Giornaliera' : m.recurrence === 'weekly' ? 'Settimanale' : 'Mensile'}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
