@@ -7,6 +7,7 @@ import { loadMissionUnlockContext } from '@/lib/game/missions'
 import { getMissionUnlockState } from '@/lib/game/mission-unlocks'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { evaluateStep, shouldRollEncounter, STEP_FILTER } from '@/lib/game/step-counter'
+import { pergameneEarned } from '@/lib/game/pergamene'
 import { isTutorialSession } from '@/lib/game/tutorial'
 
 type SupabaseLike = ReturnType<typeof createAdminClient>
@@ -152,6 +153,7 @@ export async function POST(request: Request) {
   // tiny; we still want the egg to hatch / mission to complete now.
   let eggsHatched: Array<{ name: string; rarity: string; element: string; image_url?: string | null; sprite_cutout_url?: string | null; sprite_url?: string | null }> = []
   let completedMissions: Array<{ title: string; rewardGold: number; rewardExp: number }> = []
+  let pergamene = 0
   if (stepsAdvanced && session.status === 'active') {
     const [missions, hatched] = await Promise.all([
       updateWalkMissions(sessionId, user.id, effectiveSteps, supabase),
@@ -159,6 +161,23 @@ export async function POST(request: Request) {
     ])
     completedMissions = missions
     eggsHatched = hatched
+
+    // Pergamene: crossing di soglie-passi (best-effort, mai bloccante sul hot path)
+    pergamene = pergameneEarned(prevSteps, effectiveSteps)
+    if (pergamene > 0) {
+      const rows = Array.from({ length: pergamene }, () => ({
+        user_id: user.id, session_id: sessionId, steps_at: effectiveSteps,
+      }))
+      const { error: pergErr } = await supabase.from('player_pergamene').insert(rows)
+      if (pergErr) {
+        pergamene = 0
+      } else {
+        supabase.from('player_game_events').insert({
+          user_id: user.id, session_id: sessionId, type: 'pergamena_found',
+          payload: { count: pergamene, steps: effectiveSteps },
+        }).then(undefined, () => {})
+      }
+    }
   }
 
   // Encounter trigger: piggy-backs on the same anti-noise filter as steps.
@@ -169,7 +188,7 @@ export async function POST(request: Request) {
   // encounter accumulator (cumDistRef), which must not grow on rejected fixes.
   const reportedDistance = validStep ? distanceMoved : 0
 
-  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status, stepsWalked: effectiveSteps, distanceMoved: reportedDistance, eggsHatched, completedMissions })
+  return NextResponse.json({ valid: true, inBounds, triggerEncounter, sessionStatus: session.status, stepsWalked: effectiveSteps, distanceMoved: reportedDistance, eggsHatched, completedMissions, pergamene })
 }
 
 async function updateWalkMissions(

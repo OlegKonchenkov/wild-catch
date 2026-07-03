@@ -1404,6 +1404,33 @@ export type Database = {
         }
         Relationships: []
       }
+      player_pergamene: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          steps_at: number
+          earned_at: string
+          opened_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          steps_at?: number
+          earned_at?: string
+          opened_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          steps_at?: number
+          earned_at?: string
+          opened_at?: string | null
+        }
+        Relationships: []
+      }
       player_place_unlocks: {
         Row: {
           id: string
