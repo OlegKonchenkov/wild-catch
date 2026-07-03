@@ -12,7 +12,7 @@ const TABLES: Record<string, { cols: string[]; order?: string }> = {
   pack_pool:       { cols: ['pack_id', 'reward_type', 'reward_payload', 'weight', 'rarity_tier', 'min_qty', 'max_qty'], order: 'created_at' },
   chests:          { cols: ['name', 'description', 'rarity', 'image_url', 'place_id', 'key_requirements', 'contents'], order: 'created_at' },
   special_prizes:  { cols: ['name', 'description', 'rarity', 'image_url', 'redemption_note'], order: 'created_at' },
-  cultural_places: { cols: ['name', 'description', 'image_url', 'lat', 'lng', 'session_id'], order: 'created_at' },
+  cultural_places: { cols: ['name', 'description', 'image_url', 'lat', 'lng', 'session_id', 'unlock_bonus'], order: 'created_at' },
   artworks:        { cols: ['name', 'description', 'image_url', 'place_id', 'rarity'], order: 'created_at' },
   characters:      { cols: ['name', 'description', 'image_url', 'place_id', 'rarity', 'unlocks_ability_id'], order: 'created_at' },
   anecdotes:       { cols: ['title', 'body', 'image_url', 'place_id', 'character_id', 'rarity'], order: 'created_at' },

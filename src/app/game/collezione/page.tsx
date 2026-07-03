@@ -8,7 +8,7 @@ import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import type { Rarity } from '@/lib/types'
 
 interface Collectible { id: string; name?: string; title?: string; description?: string; body?: string; image_url: string; rarity: string | null; owned: boolean }
-interface Place { id: string; name: string; description: string; image_url: string; artworks: Collectible[]; characters: Collectible[]; anecdotes: Collectible[] }
+interface Place { id: string; name: string; description: string; image_url: string; artworks: Collectible[]; characters: Collectible[]; anecdotes: Collectible[]; guardian?: { unlocked: boolean } | null }
 interface Trophy { id: string; name: string; description: string; image_url: string; owned: boolean }
 interface Quiz {
   id: string
@@ -74,7 +74,7 @@ export default function CollezionePage() {
   const orphanPlace: Place | null = useMemo(() => {
     const has = orphans.artworks.length || orphans.characters.length || orphans.anecdotes.length
     if (!has) return null
-    return { id: '_orphan', name: 'Altre scoperte', description: 'Reperti non ancora legati a un luogo', image_url: '', artworks: orphans.artworks, characters: orphans.characters, anecdotes: orphans.anecdotes }
+    return { id: '_orphan', name: 'Altre scoperte', description: 'Reperti non ancora legati a un luogo', image_url: '', artworks: orphans.artworks, characters: orphans.characters, anecdotes: orphans.anecdotes, guardian: null }
   }, [orphans])
 
   const allPlaces = orphanPlace ? [...places, orphanPlace] : places
@@ -179,6 +179,11 @@ function PlaceCard({ place, quizzes, onOpen, onOpenQuiz }: {
             <div className="flex items-center gap-2">
               <p className="text-white font-bold text-sm truncate">{place.name}</p>
               {isGold && <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full" style={{ background: '#F3C233', color: '#1a1405' }}>GOLD</span>}
+              {place.guardian && (
+                place.guardian.unlocked
+                  ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399', border: '1px solid rgba(52,211,153,0.35)' }}>✓ Liberato</span>
+                  : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: 'rgba(232,93,47,0.15)', color: '#FB923C', border: '1px solid rgba(232,93,47,0.35)' }}>🛡️ Guardiano</span>
+              )}
             </div>
             <div className="mt-1.5 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
               <div className="h-full rounded-full" style={{ width: `${(owned / total) * 100}%`, background: isGold ? '#F3C233' : 'linear-gradient(90deg, #E6C989, #C8A24A)' }} />

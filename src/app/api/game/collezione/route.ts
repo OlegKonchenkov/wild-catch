@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const sessionId = new URL(request.url).searchParams.get('sessionId')
   if (!sessionId) return NextResponse.json({ error: 'sessionId richiesto' }, { status: 400 })
 
-  const [placesRes, artRes, charRes, anecRes, ownedRes, trophyRes, ownedTrophyRes] = await Promise.all([
+  const [placesRes, artRes, charRes, anecRes, ownedRes, trophyRes, ownedTrophyRes, guardianPinsRes, unlocksRes] = await Promise.all([
     supabase.from('cultural_places').select('id, name, description, image_url'),
     supabase.from('artworks').select('id, name, description, image_url, place_id, rarity'),
     supabase.from('characters').select('id, name, description, image_url, place_id, rarity'),
@@ -19,13 +19,22 @@ export async function GET(request: Request) {
     supabase.from('player_collection').select('kind, ref_id, copies').eq('user_id', user.id).eq('session_id', sessionId),
     supabase.from('trophies').select('id, name, description, image_url'),
     supabase.from('player_trophies').select('trophy_id').eq('user_id', user.id).eq('session_id', sessionId),
+    // Guardiani: pin boss di QUESTA sessione che custodiscono un luogo
+    supabase.from('session_map_pins').select('place_id').eq('session_id', sessionId).not('place_id', 'is', null),
+    supabase.from('player_place_unlocks').select('place_id').eq('user_id', user.id).eq('session_id', sessionId),
   ])
 
   const ownedIds = new Set((ownedRes.data ?? []).map((r: any) => `${r.kind}:${r.ref_id}`))
   const owns = (kind: string, id: string) => ownedIds.has(`${kind}:${id}`)
+  const guardedPlaceIds = new Set((guardianPinsRes.data ?? []).map((r: any) => r.place_id))
+  const unlockedPlaceIds = new Set((unlocksRes.data ?? []).map((r: any) => r.place_id))
 
   const places = (placesRes.data ?? []).map((p: any) => ({
     ...p,
+    // Stato guardiano nella sessione corrente: null = nessun guardiano
+    guardian: guardedPlaceIds.has(p.id)
+      ? { unlocked: unlockedPlaceIds.has(p.id) }
+      : null,
     artworks: (artRes.data ?? []).filter((a: any) => a.place_id === p.id).map((a: any) => ({ ...a, owned: owns('opera', a.id) })),
     characters: (charRes.data ?? []).filter((c: any) => c.place_id === p.id).map((c: any) => ({ ...c, owned: owns('personaggio', c.id) })),
     anecdotes: (anecRes.data ?? []).filter((a: any) => a.place_id === p.id).map((a: any) => ({ ...a, owned: owns('aneddoto', a.id) })),

@@ -531,6 +531,32 @@ function buildSections(): Section[] {
       ),
     },
     {
+      id: 'territorio',
+      Icon: GiGreekTemple,
+      title: 'Territorio Vivo',
+      accent: '#E6C989',
+      content: (
+        <div>
+          <p className="text-white/80 text-sm leading-relaxed">
+            Il territorio reagisce a come lo esplori: guardiani da sconfiggere, pergamene da
+            raccogliere camminando e palestre da presidiare.
+          </p>
+          <div className="mt-3 space-y-1.5 text-xs">
+            {([
+              { Icon: GiGreekTemple,    color: '#E6C989', label: 'Guardiani del luogo', desc: 'Alcuni luoghi culturali sono custoditi da un boss: sconfiggilo per liberare il luogo e ottenere il suo bonus (vedi la Collezione)' },
+              { Icon: GiScrollUnfurled, color: '#E6C989', label: 'Pergamene',            desc: 'Ogni ~250 passi trovi una pergamena: srotolala dallo Zaino per scoprire un aneddoto + gemme' },
+              { Icon: GiTrophyCup,      color: '#F7C841', label: 'Palestre presidiabili', desc: 'Vinci per presidiare: la difesa è fortissima appena conquistata e si indebolisce col tempo. Se ti spodestano incassi la rendita maturata (10 oro/h)' },
+            ] as const).map(row => (
+              <div key={row.label} className="flex items-start gap-3 rounded-lg border px-3 py-2" style={{ background: row.color + '0a', borderColor: row.color + '28' }}>
+                <row.Icon size={17} color={row.color} className="flex-shrink-0 mt-0.5" />
+                <div><span className="font-bold text-white/90">{row.label}</span><span className="text-white/45"> — {row.desc}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
       id: 'mappa',
       Icon: GiTreasureMap,
       title: 'La Mappa',

@@ -34,6 +34,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       ...(reward_type !== undefined ? { reward_type: reward_type ?? null } : {}),
       ...(reward_payload !== undefined ? { reward_payload: reward_payload ?? null } : {}),
       ...(reward_radius_m !== undefined ? { reward_radius_m: reward_radius_m ?? 50 } : {}),
+      ...(body.place_id !== undefined ? { place_id: body.place_id || null } : {}),
       ...(reward_type !== undefined && reward_type === 'enigma' && reward_payload?.enigma_id ? { enigma_id: reward_payload.enigma_id } :
          reward_type !== undefined && reward_type !== 'enigma' ? { enigma_id: null } : {}),
     })

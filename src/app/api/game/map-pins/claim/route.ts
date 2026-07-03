@@ -7,6 +7,7 @@ import { scaleCombatStats } from '@/lib/game/combat'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import type { CompletedMission } from '@/lib/game/missions'
 import { grantAbility } from '@/lib/game/grant-ability'
+import { gymDefenseMultiplier, heldHours } from '@/lib/game/gym'
 import { dispenseReward, type RewardType } from '@/lib/game/rewards/dispense'
 
 // Haversine distance in metres
@@ -247,6 +248,27 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Boss non configurato correttamente' }, { status: 422 })
       }
 
+      // ── Palestra presidiabile (payload.gym) ─────────────────────────────
+      // Sfidabile sempre; il titolare non sfida la propria palestra; la difesa
+      // della lineup scala col tempo di presidio (fresca forte, stantia debole).
+      const isGym = payload.gym === true
+      let gymHold: { holder_id: string; held_since: string } | null = null
+      if (isGym) {
+        const { data: hold } = await admin
+          .from('gym_holds')
+          .select('holder_id, held_since')
+          .eq('pin_id', pinId).eq('session_id', sessionId)
+          .maybeSingle()
+        gymHold = (hold as { holder_id: string; held_since: string } | null) ?? null
+        if (gymHold?.holder_id === user.id) {
+          return NextResponse.json({
+            error: 'Presidi già questa palestra — difendila dagli sfidanti!',
+            alreadyHolder: true,
+          }, { status: 409 })
+        }
+      }
+      const gymMult = isGym ? gymDefenseMultiplier(gymHold?.held_since ?? null) : 1
+
       const creatureIds = bossCreatureEntries.map(e => e.creature_id)
       const { data: creaturesData } = await admin
         .from('creatures')
@@ -260,10 +282,16 @@ export async function POST(request: Request) {
       const bossLineup = bossCreatureEntries.map((entry, i) => {
         const cr = crMap[entry.creature_id]
         if (!cr) return null
-        const scaled = scaleCombatStats(
+        const base = scaleCombatStats(
           { hp: cr.hp, atk: cr.atk, def: cr.def ?? 0 },
           entry.level_override ?? 1,
         )
+        const scaled = gymMult === 1 ? base : {
+          ...base,
+          hp: Math.max(1, Math.round(base.hp * gymMult)),
+          atk: Math.max(1, Math.round(base.atk * gymMult)),
+          def: Math.max(0, Math.round(base.def * gymMult)),
+        }
         return {
           slot: i, creature_id: cr.id, name: cr.name, element: cr.element,
           level: scaled.level, atk: scaled.atk, def: scaled.def,
@@ -294,7 +322,9 @@ export async function POST(request: Request) {
       const inProgress = fights.find(
         (f: any) => f.status === 'selecting' || f.status === 'active',
       ) as any | undefined
-      const wonFight   = fights.find((f: any) => f.status === 'won')  as any | undefined
+      // Le palestre sono ri-sfidabili anche dopo una vittoria (il presidio può
+      // essere perso e riconquistato); i boss normali restano one-shot.
+      const wonFight = isGym ? undefined : fights.find((f: any) => f.status === 'won') as any | undefined
 
       let bossFightId: string
 
@@ -325,6 +355,15 @@ export async function POST(request: Request) {
       }
 
       result = { ...result, bossFightId, bossName: (bossLineup[0] as any)?.name ?? 'Capo' }
+      if (isGym) {
+        let holderName: string | null = null
+        if (gymHold) {
+          const { data: prof } = await admin
+            .from('profiles').select('nickname').eq('user_id', gymHold.holder_id).maybeSingle()
+          holderName = (prof as { nickname?: string } | null)?.nickname ?? 'Un rivale'
+        }
+        result = { ...result, gym: { holderName, heldHours: gymHold ? Math.floor(heldHours(gymHold.held_since)) : 0 } }
+      }
       break
     }
 

@@ -83,6 +83,29 @@ export default function BossApproachModal({
             <p className="text-red-300/70 text-sm mt-1">Un boss ti sfida in battaglia!</p>
             <p className="text-white/35 text-xs mt-2">Sei pronto ad affrontarlo?</p>
           </div>
+
+          {/* Palestra presidiabile: stato del presidio */}
+          {(pin as { gym?: { holderName: string | null; isHolder: boolean; heldSince: string | null } }).gym && (() => {
+            const gym = (pin as { gym?: { holderName: string | null; isHolder: boolean; heldSince: string | null } }).gym!
+            const hours = gym.heldSince ? Math.floor((Date.now() - new Date(gym.heldSince).getTime()) / 3_600_000) : 0
+            return (
+              <div className="rounded-2xl px-4 py-3 text-center"
+                style={{ background: 'rgba(230,201,137,0.08)', border: '1px solid rgba(230,201,137,0.3)' }}>
+                {gym.isHolder ? (
+                  <p className="text-sm font-bold" style={{ color: '#E6C989' }}>🏰 Presidi tu questa palestra — difendila!</p>
+                ) : gym.holderName ? (
+                  <>
+                    <p className="text-sm font-bold" style={{ color: '#E6C989' }}>🏰 Presidiata da {gym.holderName}</p>
+                    <p className="text-[11px] text-white/40 mt-0.5">
+                      da {hours < 1 ? 'meno di un’ora' : `${hours} h`} — {hours < 3 ? 'difesa ancora fresca e forte' : 'la difesa si sta indebolendo'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm font-bold" style={{ color: '#E6C989' }}>🏰 Palestra libera — conquistala per primo!</p>
+                )}
+              </div>
+            )
+          })()}
           {claimError && (
             <p className="text-xs text-red-400 bg-red-400/10 border border-red-400/25 rounded-xl px-3 py-2 text-center">
               ⚠ {claimError}

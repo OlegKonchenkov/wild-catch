@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   const auth = await requireAdmin(supabase)
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: (auth as any).status })
 
-  const { sessionId, lat, lng, name, description, image_url, reward_type, reward_payload, reward_radius_m } = await request.json().catch(() => ({}))
+  const { sessionId, lat, lng, name, description, image_url, reward_type, reward_payload, reward_radius_m, place_id } = await request.json().catch(() => ({}))
   if (!sessionId || lat == null || lng == null) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 })
   }
@@ -53,6 +53,7 @@ export async function POST(request: Request) {
       ...(reward_type != null ? { reward_type: reward_type ?? null } : {}),
       ...(reward_payload != null ? { reward_payload: reward_payload ?? null } : {}),
       ...(reward_radius_m != null ? { reward_radius_m: reward_radius_m ?? 50 } : {}),
+      ...(place_id !== undefined ? { place_id: place_id || null } : {}),
       ...(reward_type === 'enigma' && reward_payload?.enigma_id ? { enigma_id: reward_payload.enigma_id } : {}),
     })
     .select()

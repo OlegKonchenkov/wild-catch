@@ -187,6 +187,7 @@ export function PinPayloadBoss({ allCreatures, allItems, value, onChange }: {
   const l2 = (rawCreatures[1]?.level_override as number) ?? 10
   const c3 = (rawCreatures[2]?.creature_id as string) ?? ''
   const l3 = (rawCreatures[2]?.level_override as number) ?? 10
+  const isGym          = p.gym === true
   const goldReward     = ((p.reward as any)?.gold        as number) ?? 200
   const expReward      = ((p.reward as any)?.exp         as number) ?? 100
   const itemIdReward   = ((p.reward as any)?.item_id     as string) ?? ''
@@ -196,6 +197,7 @@ export function PinPayloadBoss({ allCreatures, allItems, value, onChange }: {
   function save(
     nc1: string, nl1: number, nc2: string, nl2: number, nc3: string, nl3: number,
     gold: number, exp: number, itemId: string, itemQty: number, rewardCreatureId: string,
+    gym: boolean = isGym,
   ) {
     const creatures = [
       { creature_id: nc1, level_override: nl1 },
@@ -205,7 +207,7 @@ export function PinPayloadBoss({ allCreatures, allItems, value, onChange }: {
     const reward: Record<string, unknown> = { gold, exp }
     if (itemId)          { reward.item_id = itemId; reward.item_qty = itemQty }
     if (rewardCreatureId) reward.creature_id = rewardCreatureId
-    onChange(encodePayload({ creatures, reward }))
+    onChange(encodePayload({ creatures, reward, ...(gym ? { gym: true } : {}) }))
   }
 
   const slots = [
@@ -247,6 +249,19 @@ export function PinPayloadBoss({ allCreatures, allItems, value, onChange }: {
           </div>
         )
       })}
+
+      <label className="flex items-start gap-2.5 cursor-pointer rounded-xl border border-[#E6C989]/25 bg-[#E6C989]/5 p-3">
+        <input type="checkbox" checked={isGym}
+          onChange={e => save(c1, l1, c2, l2, c3, l3, goldReward, expReward, itemIdReward, itemQtyReward, creatureReward, e.target.checked)}
+          className="w-4 h-4 accent-[#E6C989] mt-0.5" />
+        <span className="text-sm text-white/80">
+          🏰 Palestra presidiabile
+          <span className="block text-[11px] text-white/40 mt-0.5">
+            Sempre risfidabile: chi vince la presidia, la difesa decade col tempo e lo spodestato incassa la rendita.
+            Tieni le ricompense modeste — vengono erogate a ogni vittoria.
+          </span>
+        </span>
+      </label>
 
       <p className="text-xs font-semibold text-white/40 uppercase tracking-wider pt-1">Ricompense vittoria</p>
 
