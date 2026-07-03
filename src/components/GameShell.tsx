@@ -255,6 +255,14 @@ function formatGameEvent(ev: PlayerGameEventRow): { icon: IconType; title: strin
         body: pinReward,
       }
     }
+    case 'gym_taken': {
+      const dethroned = readBool(p, 'dethroned')
+      return {
+        icon: GiCrown,
+        title: `Palestra conquistata${readStr(p, 'pin_name') ? `: ${readStr(p, 'pin_name')}` : '!'}`,
+        body: dethroned ? 'Hai spodestato il titolare — ora presidi tu!' : 'Sei il primo a presidiarla!',
+      }
+    }
     case 'pergamena_found': {
       const n = readNum(p, 'count')
       return {
@@ -334,6 +342,7 @@ const EVENT_THEMES: Record<string, { color: string; dimColor: string; label: str
   daily_claimed:     { color: '#FFB36B', dimColor: 'rgba(255,179,107,0.10)', label: 'Giornaliero' },
   quiz_solved:       { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Quiz' },
   place_unlocked:    { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Luogo' },
+  gym_taken:         { color: '#F7C841', dimColor: 'rgba(247,200,65,0.10)',  label: 'Palestra' },
   pergamena_found:   { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Pergamena' },
   pergamena_opened:  { color: '#E6C989', dimColor: 'rgba(230,201,137,0.10)', label: 'Pergamena' },
 }

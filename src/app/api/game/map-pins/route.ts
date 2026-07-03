@@ -62,6 +62,26 @@ export async function GET(request: Request) {
   for (const c of (claimsRes.data ?? []) as Array<{ pin_id: string }>) claimedSet.add(c.pin_id)
   for (const f of (wonFightsRes.data ?? []) as Array<{ pin_id: string }>) claimedSet.add(f.pin_id)
 
+  // Palestre presidiabili: chi presidia ogni pin gym (visibile a tutti).
+  const gymPinIds = pins
+    .filter((p: any) => p.reward_type === 'boss' && p.reward_payload?.gym === true)
+    .map((p: any) => p.id)
+  const gymByPin = new Map<string, { holderId: string; holderName: string | null; heldSince: string }>()
+  if (gymPinIds.length > 0) {
+    const { data: holds } = await supabase
+      .from('gym_holds')
+      .select('pin_id, holder_id, held_since')
+      .in('pin_id', gymPinIds)
+    const holderIds = [...new Set((holds ?? []).map((h: any) => h.holder_id))]
+    const { data: profs } = holderIds.length > 0
+      ? await supabase.from('profiles').select('user_id, nickname').in('user_id', holderIds)
+      : { data: [] as any[] }
+    const nameById = new Map((profs ?? []).map((pr: any) => [pr.user_id, pr.nickname]))
+    for (const h of (holds ?? []) as any[]) {
+      gymByPin.set(h.pin_id, { holderId: h.holder_id, holderName: nameById.get(h.holder_id) ?? null, heldSince: h.held_since })
+    }
+  }
+
   // Index enigmi by id, and collect every frammento / suggerimento id we need
   // to resolve "player_has" for, across ALL enigma pins in one go.
   const enigmasById = new Map<string, any>()
@@ -149,9 +169,19 @@ export async function GET(request: Request) {
     // Strip reward_payload from the response (contains admin secrets); replace
     // with safe enigma data above where applicable.
     const { reward_payload: _rp, enigma_id: _eid, ...rest } = p
+    const isGym = p.reward_type === 'boss' && p.reward_payload?.gym === true
+    const hold = isGym ? gymByPin.get(p.id) : undefined
     return {
       ...rest,
-      claimed: claimedSet.has(p.id),
+      // Le palestre restano sempre sfidabili: mai marcate come "claimed".
+      claimed: isGym ? (hold?.holderId === user.id) : claimedSet.has(p.id),
+      ...(isGym ? {
+        gym: {
+          holderName: hold?.holderName ?? null,
+          isHolder: hold?.holderId === user.id,
+          heldSince: hold?.heldSince ?? null,
+        },
+      } : {}),
       ...(enigmaPublic ? { reward_payload: enigmaPublic } : {}),
     }
   })

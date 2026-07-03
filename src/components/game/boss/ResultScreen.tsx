@@ -35,6 +35,8 @@ interface BossReward {
     placeName: string
     drops: Array<{ type: string; ok: boolean; detail: Record<string, unknown> }>
   }
+  /** Palestra presidiabile conquistata (Wave 2). */
+  gymTaken?: boolean
 }
 
 export default function ResultScreen({
@@ -180,6 +182,14 @@ export default function ResultScreen({
               </div>
             )}
           </div>
+
+          {reward.gymTaken && (
+            <div className="rounded-xl px-3 py-2.5"
+              style={{ background: 'linear-gradient(120deg, rgba(247,200,65,0.14), rgba(255,255,255,0.03))', border: '1px solid rgba(247,200,65,0.45)' }}>
+              <p className="font-extrabold text-sm" style={{ color: '#F7C841' }}>🏰 Palestra conquistata — ora la presidi tu!</p>
+              <p className="text-white/45 text-xs mt-0.5">Difendila: più resisti, più rendita maturi.</p>
+            </div>
+          )}
 
           {reward.placeUnlocked && (
             <div

@@ -876,6 +876,33 @@ export type Database = {
           },
         ]
       }
+      gym_holds: {
+        Row: {
+          id: string
+          pin_id: string
+          session_id: string
+          holder_id: string
+          held_since: string
+          times_defended: number
+        }
+        Insert: {
+          id?: string
+          pin_id: string
+          session_id: string
+          holder_id: string
+          held_since?: string
+          times_defended?: number
+        }
+        Update: {
+          id?: string
+          pin_id?: string
+          session_id?: string
+          holder_id?: string
+          held_since?: string
+          times_defended?: number
+        }
+        Relationships: []
+      }
       items: {
         Row: {
           bonus_atk: number
