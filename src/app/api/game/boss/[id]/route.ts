@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { unlockPlaceIfGuardian } from '@/lib/game/place-unlock'
 import { handleGymVictory } from '@/lib/game/gym-victory'
+import { dispenseReward, type RewardType } from '@/lib/game/rewards/dispense'
 import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
@@ -185,6 +186,8 @@ async function grantBossFightRewards({
     item_id?: string
     item_qty?: number
     creature_id?: string
+    /** Ricompense loot aggiuntive (bustina/gemme/forziere/…) via dispenser. */
+    extra?: Array<{ type: string; payload: Record<string, unknown> }>
   } | null
   const admin = createAdminClient()
 
@@ -281,6 +284,22 @@ async function grantBossFightRewards({
 
       enrichedReward.creature = rewardCreature
     }
+  }
+
+  // Ricompense extra (bustine, gemme, forzieri, …): qualsiasi tipo del
+  // dispenser condiviso, configurate dall'admin nel form boss.
+  if (Array.isArray(reward?.extra) && reward.extra.length > 0) {
+    const extraDrops = []
+    for (const entry of reward.extra) {
+      if (!entry?.type) continue
+      const res = await dispenseReward(admin, {
+        userId, sessionId: fight.session_id,
+        type: entry.type as RewardType,
+        payload: (entry.payload ?? {}) as Record<string, any>,
+      }).catch(() => null)
+      if (res?.ok) extraDrops.push(res)
+    }
+    if (extraDrops.length > 0) enrichedReward.extraDrops = extraDrops
   }
 
   // Guardiano del luogo: la prima vittoria su un pin che custodisce un luogo

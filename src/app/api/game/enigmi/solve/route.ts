@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { incrementMissionProgress } from '@/lib/game/missions'
 import { grantAbility } from '@/lib/game/grant-ability'
+import { dispenseReward, type RewardType } from '@/lib/game/rewards/dispense'
 import { logSessionError } from '@/lib/logSessionError'
 import { isTutorialSession } from '@/lib/game/tutorial'
 
@@ -154,6 +155,18 @@ export async function POST(request: Request) {
       const r = await grantAbility(admin, user.id, sessionId, abilityId, qty)
       if (r.granted) reward.abilityId = abilityId
     }
+  }
+
+  // Tutti gli altri tipi (oggetto/creatura/bustina/forziere/gemme/premio/
+  // collezionabili/missione) passano dal dispenser condiviso: un enigma può
+  // premiare con qualsiasi ricompensa del gioco.
+  if (enigma.reward_type && !['gold', 'exp', 'abilita'].includes(enigma.reward_type)) {
+    const res = await dispenseReward(admin, {
+      userId: user.id, sessionId,
+      type: enigma.reward_type as RewardType,
+      payload,
+    })
+    if (res.ok) (reward as Record<string, unknown>).extra = res
   }
 
   // Bell notification

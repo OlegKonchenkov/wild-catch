@@ -3,7 +3,9 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AdminListSkeleton } from '@/components/admin/AdminLoading'
 
-type ItemType = 'rete' | 'esca' | 'uovo' | 'battaglia' | 'pozione' | 'cura' | 'custom'
+type ItemType = 'rete' | 'esca' | 'uovo' | 'battaglia' | 'pozione' | 'cura' | 'custom' | 'chiave'
+/** Slot equipaggiamento: righe di items con questi type sono gestite in /admin/equipaggiamento, non qui. */
+const EQUIP_TYPES = ['arma', 'corazza', 'elmo', 'accessorio'] as const
 type EggRarity = 'comune' | 'non_comune' | 'raro' | 'epico' | 'leggendario' | 'mitologico'
 
 interface Item {
@@ -79,6 +81,13 @@ const TYPE_META: Record<ItemType, TypeMeta> = {
   custom: {
     icon: '🎁', label: 'Oggetto custom',
     hint: 'Oggetto speciale creato dall\'admin. Può essere riscattato tramite QR code. Sempre is_redeemable = true.',
+    effectLabel: '—',
+    effectHint: '',
+    effectStep: '1', effectMin: 0, effectMax: 0,
+  },
+  chiave: {
+    icon: '🔑', label: 'Chiave (forziere)',
+    hint: 'Serve ad aprire i forzieri (Admin → Tesori). Un forziere può richiedere più chiavi, anche di tipi diversi.',
     effectLabel: '—',
     effectHint: '',
     effectStep: '1', effectMin: 0, effectMax: 0,
@@ -198,7 +207,11 @@ export default function ItemsPage() {
     setLoading(true)
     const res = await fetch('/api/admin/items')
     const d = await res.json()
-    setItems(d.items ?? [])
+    // Gli item equipaggiamento (arma/corazza/elmo/accessorio) si gestiscono
+    // in /admin/equipaggiamento — escluderli qui evita di renderli con una
+    // TYPE_META che non li conosce (crash storico su TYPE_META[item.type]).
+    const all: Item[] = d.items ?? []
+    setItems(all.filter(it => !(EQUIP_TYPES as readonly string[]).includes(it.type)))
     setLoading(false)
   }
 
