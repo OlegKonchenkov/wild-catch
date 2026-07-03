@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { unlockPlaceIfGuardian } from '@/lib/game/place-unlock'
 import { calculateCombatDamage, resolveTurnStartStatus, rollCombatFortune, rollCrit, rollStatusEffect, scaleCombatStats, STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import { getElementMultiplier } from '@/lib/game/elements'
@@ -279,6 +280,14 @@ async function grantBossFightRewards({
 
       enrichedReward.creature = rewardCreature
     }
+  }
+
+  // Guardiano del luogo: la prima vittoria su un pin che custodisce un luogo
+  // culturale lo libera (bonus una-tantum via dispenser, idempotente).
+  if (fight.pin_id) {
+    const placeUnlocked = await unlockPlaceIfGuardian(admin, userId, fight.session_id, fight.pin_id)
+      .catch(() => null)
+    if (placeUnlocked) enrichedReward.placeUnlocked = placeUnlocked
   }
 
   const bossName = (fight.boss_lineup as any[])?.[0]?.name ?? 'Boss'

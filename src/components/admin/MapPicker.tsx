@@ -12,6 +12,7 @@ export interface MapPin {
   description: string
   image_url?: string | null
   reward_type?: string | null
+  place_id?: string | null
   reward_radius_m?: number | null
 }
 
@@ -25,6 +26,7 @@ interface Props {
     reward_type?: string | null
     reward_payload?: string | null
     reward_radius_m?: number | null
+    place_id?: string | null
   }) => Promise<void> | void
   onDeletePin?: (id: string) => Promise<void> | void
   onEditPin?: (id: string) => void
@@ -67,6 +69,14 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
   const [pinImageFile, setPinImageFile] = useState<File | null>(null)
   const [pinImagePreview, setPinImagePreview] = useState<string | null>(null)
   const [pinRewardType, setPinRewardType]     = useState('none')
+  const [pinPlaceId, setPinPlaceId]           = useState('')
+  const [allPlaces, setAllPlaces]             = useState<{ id: string; name: string }[]>([])
+  const loadPlaces = () => {
+    if (allPlaces.length > 0) return
+    fetch('/api/admin/catalog/cultural_places').then(r => r.json())
+      .then(d => setAllPlaces(((d.rows ?? []) as { id: string; name: string }[]).map(x => ({ id: x.id, name: x.name }))))
+      .catch(() => {})
+  }
   const [pinRewardPayload, setPinRewardPayload] = useState('')
   const [pinRewardRadius, setPinRewardRadius]   = useState(50)
   const [savingPin, setSavingPin]     = useState(false)
@@ -379,6 +389,7 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
       reward_type: pinRewardType === 'none' ? null : pinRewardType,
       reward_payload: (pinRewardType !== 'none' && pinRewardPayload) ? pinRewardPayload : null,
       reward_radius_m: pinRewardType !== 'none' ? pinRewardRadius : null,
+      place_id: pinRewardType === 'boss' && pinPlaceId ? pinPlaceId : null,
     })
     setSavingPin(false)
     setPendingPin(null)
@@ -387,6 +398,7 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
     setPinRewardType('none')
     setPinRewardPayload('')
     setPinRewardRadius(50)
+    setPinPlaceId('')
   }
 
   const showPinTools = !!onAddPin
@@ -525,7 +537,7 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
           <div>
             <label className="text-xs text-white/50 font-medium">Tipo ricompensa (opzionale)</label>
             <select value={pinRewardType}
-              onChange={e => { setPinRewardType(e.target.value); setPinRewardPayload('') }}
+              onChange={e => { setPinRewardType(e.target.value); setPinRewardPayload(''); if (e.target.value === 'boss') loadPlaces() }}
               className="mt-1 w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#F7C841]/60">
               <option value="none">— Nessuna —</option>
               <option value="oggetto">🎁 Oggetto</option>
@@ -541,6 +553,17 @@ export default function MapPicker({ onBoundsChange, initialBounds, pins, onAddPi
               <option value="gemme">💎 Gemme</option>
             </select>
           </div>
+
+          {pinRewardType === 'boss' && (
+            <div>
+              <label className="block text-xs text-white/50 mb-1 font-semibold">🏛️ Custodisce luogo <span className="text-white/25">(opzionale — la vittoria libera il luogo)</span></label>
+              <select value={pinPlaceId} onChange={e => setPinPlaceId(e.target.value)}
+                className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E6C989]/60">
+                <option value="">— Nessuno —</option>
+                {allPlaces.map(pl => <option key={pl.id} value={pl.id}>{pl.name}</option>)}
+              </select>
+            </div>
+          )}
           {pinRewardType !== 'none' && (
             <>
               <PinPayloadFields

@@ -24,6 +24,7 @@ export default function CollezioneAdminPage() {
     { key: 'description', label: 'Descrizione', type: 'textarea' },
     { key: 'lat', label: 'Lat', type: 'number', half: true },
     { key: 'lng', label: 'Lng', type: 'number', half: true },
+    { key: 'unlock_bonus', label: 'Bonus liberazione guardiano (JSON, opzionale)', type: 'json', placeholder: '[{"type":"gemme","payload":{"amount":25}},{"type":"opera","payload":{"artwork_id":"..."}}]' },
   ]
   const artworkFields: Field[] = [
     { key: 'name', label: 'Nome', type: 'text' },

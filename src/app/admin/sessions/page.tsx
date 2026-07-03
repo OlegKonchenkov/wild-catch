@@ -157,6 +157,14 @@ export default function SessionsPage() {
   const [pinEditImageUploading, setPinEditImageUploading] = useState(false)
   const [pinEditRadius, setPinEditRadius] = useState(50)
   const [pinEditRewardType, setPinEditRewardType] = useState<string>('none')
+  const [pinEditPlaceId, setPinEditPlaceId] = useState('')
+  const [allPlaces, setAllPlaces] = useState<Array<{ id: string; name: string }>>([])
+  const loadPlaces = () => {
+    if (allPlaces.length > 0) return
+    fetch('/api/admin/catalog/cultural_places').then(r => r.json())
+      .then(d => setAllPlaces(((d.rows ?? []) as Array<{ id: string; name: string }>).map(x => ({ id: x.id, name: x.name }))))
+      .catch(() => {})
+  }
   const [pinEditPayload, setPinEditPayload]   = useState('')  // JSON string
   const [pinEditSaving, setPinEditSaving]     = useState(false)
   const [pinEditError, setPinEditError]       = useState<string | null>(null)
@@ -286,6 +294,8 @@ export default function SessionsPage() {
     setPinEditImageUrl((pin as any).image_url ?? '')
     setPinEditRadius(pin.reward_radius_m ?? 50)
     setPinEditRewardType(pin.reward_type ?? 'none')
+    setPinEditPlaceId((pin as { place_id?: string | null }).place_id ?? '')
+    if (pin.reward_type === 'boss') loadPlaces()
     setPinEditPayload((pin as any).reward_payload ? JSON.stringify((pin as any).reward_payload) : '')
     setPinEditError(null)
     // Lazy-load items + creatures for payload pickers
@@ -329,6 +339,7 @@ export default function SessionsPage() {
         description: pinEditDesc,
         image_url: pinEditImageUrl || null,
         reward_type: pinEditRewardType === 'none' ? null : pinEditRewardType,
+        place_id: pinEditRewardType === 'boss' && pinEditPlaceId ? pinEditPlaceId : null,
         reward_payload: payload,
         reward_radius_m: pinEditRadius,
       }),
@@ -851,7 +862,17 @@ export default function SessionsPage() {
               <PinPayloadIndizio value={pinEditPayload} onChange={setPinEditPayload} />
             )}
             {pinEditRewardType === 'boss' && (
-              <PinPayloadBoss allCreatures={allCreatures} allItems={allItems} value={pinEditPayload} onChange={setPinEditPayload} />
+              <>
+                <PinPayloadBoss allCreatures={allCreatures} allItems={allItems} value={pinEditPayload} onChange={setPinEditPayload} />
+                <div>
+                  <label className="block text-xs text-white/50 mb-1 font-semibold">🏛️ Custodisce luogo <span className="text-white/25">(la vittoria libera il luogo)</span></label>
+                  <select value={pinEditPlaceId} onChange={e => setPinEditPlaceId(e.target.value)}
+                    className="w-full bg-[#0F1F2E] border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E6C989]/60">
+                    <option value="">— Nessuno —</option>
+                    {allPlaces.map(pl => <option key={pl.id} value={pl.id}>{pl.name}</option>)}
+                  </select>
+                </div>
+              </>
             )}
             {pinEditRewardType === 'evento' && (
               <PinPayloadEvento value={pinEditPayload} onChange={setPinEditPayload} />
