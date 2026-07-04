@@ -123,6 +123,18 @@ export default function PackOpenModal({
               <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
                 {drops.map((d, i) => <DropCard key={i} drop={d} index={i} />)}
               </div>
+
+              {drops.map((d, i) => {
+                const rarity = describeDrop(d.type, d.detail).rarity
+                return rarity === 'mitologico' ? (
+                  <motion.div key={`mito-${i}`} aria-hidden data-testid="mitologico-flash"
+                    className="fixed inset-0 pointer-events-none z-[1210]"
+                    style={{ background: 'radial-gradient(circle at 50% 45%, #FFD76699 0%, transparent 70%)' }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 0.9, 0] }}
+                    transition={{ delay: 0.26 + i * 0.14, duration: 0.35, ease: 'easeOut' }} />
+                ) : null
+              })}
             </div>
 
             <div className="px-5 pb-8 pt-2" style={{ background: 'linear-gradient(180deg, transparent, #05070E 40%)' }}>
@@ -166,14 +178,6 @@ function DropCard({ drop, index }: { drop: PackDrop; index: number }) {
             style={{ background: `radial-gradient(circle, ${v.accent}66 0%, transparent 70%)` }}
             initial={{ scale: 0.4, opacity: 0.9 }}
             animate={{ scale: 1.8, opacity: 0 }}
-            transition={{ delay: 0.26 + index * 0.14, duration: 0.35, ease: 'easeOut' }} />
-        )}
-        {v.rarity === 'mitologico' && (
-          <motion.div aria-hidden data-testid="mitologico-flash"
-            className="fixed inset-0 pointer-events-none z-[1210]"
-            style={{ background: 'radial-gradient(circle at 50% 45%, #FFD76699 0%, transparent 70%)' }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 0.9, 0] }}
             transition={{ delay: 0.26 + index * 0.14, duration: 0.35, ease: 'easeOut' }} />
         )}
         <div className="relative mb-2 rounded-xl flex items-center justify-center"
