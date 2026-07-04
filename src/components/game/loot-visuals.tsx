@@ -13,16 +13,22 @@ export interface LootView {
   title: string
   subtitle?: string
   imageUrl?: string | null
+  rarity?: Rarity
 }
 
 /**
  * Presentation metadata for a single reward drop returned by the reward
  * dispenser. Shared by the pack- and chest-opening reveals so both surfaces
- * describe rewards identically.
+ * describe rewards identically. `rarity` (when present) is also the single
+ * source used to scale the reveal sound/visual boost — see pack-open.ts.
  */
 export function describeDrop(type: string, detail: Record<string, any> = {}): LootView {
-  const rarityAccent = (r?: string) =>
-    r && r in RARITY_COLORS ? RARITY_COLORS[r as Rarity] : undefined
+  const asRarity = (r?: string): Rarity | undefined =>
+    r && r in RARITY_COLORS ? (r as Rarity) : undefined
+  const rarityAccent = (r?: string) => {
+    const rarity = asRarity(r)
+    return rarity ? RARITY_COLORS[rarity] : undefined
+  }
 
   switch (type) {
     case 'gold':
@@ -37,11 +43,18 @@ export function describeDrop(type: string, detail: Record<string, any> = {}): Lo
         accent: rarityAccent(detail.rarity) ?? '#9CA3AF',
         title: detail.itemName ?? 'Oggetto',
         subtitle: detail.quantity && detail.quantity > 1 ? `×${detail.quantity}` : undefined,
+        rarity: asRarity(detail.rarity),
       }
     case 'abilita':
       return { Icon: GiSpellBook, accent: '#C084FC', title: detail.abilityName ?? 'Abilità', subtitle: 'Abilità speciale' }
     case 'uovo':
-      return { Icon: GiEggClutch, accent: rarityAccent(detail.eggRarity) ?? '#C084FC', title: 'Uovo', subtitle: detail.eggRarity }
+      return {
+        Icon: GiEggClutch,
+        accent: rarityAccent(detail.eggRarity) ?? '#C084FC',
+        title: 'Uovo',
+        subtitle: detail.eggRarity,
+        rarity: asRarity(detail.eggRarity),
+      }
     case 'creatura':
       return {
         Icon: GiPawPrint,
@@ -49,6 +62,7 @@ export function describeDrop(type: string, detail: Record<string, any> = {}): Lo
         title: detail.creature?.name ?? 'Creatura',
         subtitle: detail.creature?.rarity,
         imageUrl: detail.creature?.image_url ?? detail.creature?.sprite_url ?? null,
+        rarity: asRarity(detail.creature?.rarity),
       }
     case 'bustina':
       return { Icon: GiCardboardBox, accent: '#F59E0B', title: detail.packName ?? 'Bustina', subtitle: 'Bustina bonus' }
@@ -57,9 +71,23 @@ export function describeDrop(type: string, detail: Record<string, any> = {}): Lo
     case 'premio':
       return { Icon: GiTrophyCup, accent: '#FF4D6D', title: detail.prizeName ?? 'Premio speciale', subtitle: detail.code ? `Codice ${detail.code}` : 'Premio' }
     case 'personaggio':
-      return { Icon: GiLaurelsTrophy, accent: rarityAccent(detail.rarity) ?? '#F59E0B', title: detail.name ?? 'Personaggio', subtitle: 'Personaggio culturale', imageUrl: detail.image_url }
+      return {
+        Icon: GiLaurelsTrophy,
+        accent: rarityAccent(detail.rarity) ?? '#F59E0B',
+        title: detail.name ?? 'Personaggio',
+        subtitle: 'Personaggio culturale',
+        imageUrl: detail.image_url,
+        rarity: asRarity(detail.rarity),
+      }
     case 'opera':
-      return { Icon: GiColumnVase, accent: rarityAccent(detail.rarity) ?? '#38BDF8', title: detail.name ?? 'Opera', subtitle: 'Opera d’arte', imageUrl: detail.image_url }
+      return {
+        Icon: GiColumnVase,
+        accent: rarityAccent(detail.rarity) ?? '#38BDF8',
+        title: detail.name ?? 'Opera',
+        subtitle: 'Opera d’arte',
+        imageUrl: detail.image_url,
+        rarity: asRarity(detail.rarity),
+      }
     case 'aneddoto':
       return { Icon: GiScrollUnfurled, accent: '#A3E635', title: detail.title ?? 'Aneddoto', subtitle: 'Storia' }
     case 'indizio':
