@@ -95,4 +95,14 @@ describe('<PackOpenModal> rarity visual boosts', () => {
     await screen.findByText('Erba', {}, { timeout: 3000 })
     expect(screen.queryByTestId('drop-rarity-burst')).toBeNull()
   })
+
+  it('flashes gold across the screen when a mitologico drop is revealed', async () => {
+    render(<PackOpenModal
+      pack={{ name: 'Bustina', rarity: 'comune' }}
+      drops={[{ type: 'creatura', ok: true, detail: { creature: { name: 'Fenice', rarity: 'mitologico' } } }]}
+      onDone={() => {}}
+    />)
+    fireEvent.click(screen.getByRole('button'))
+    await screen.findByTestId('mitologico-flash', {}, { timeout: 3000 })
+  })
 })

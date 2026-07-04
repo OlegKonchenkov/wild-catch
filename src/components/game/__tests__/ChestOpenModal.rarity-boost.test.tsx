@@ -94,4 +94,14 @@ describe('<ChestOpenModal> rarity visual boosts', () => {
     await screen.findByText('Volpe', {}, { timeout: 3000 })
     expect(screen.queryByTestId('drop-rarity-burst')).toBeNull()
   })
+
+  it('flashes gold across the screen when a mitologico content item is revealed', async () => {
+    render(<ChestOpenModal
+      chest={{ name: 'Forziere', rarity: 'comune' }}
+      contents={[{ type: 'creatura', ok: true, detail: { creature: { name: 'Fenice', rarity: 'mitologico' } } }]}
+      onDone={() => {}}
+    />)
+    fireEvent.click(screen.getByRole('button'))
+    await screen.findByTestId('mitologico-flash', {}, { timeout: 3000 })
+  })
 })

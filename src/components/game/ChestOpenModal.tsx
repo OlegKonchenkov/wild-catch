@@ -108,6 +108,14 @@ export default function ChestOpenModal({
                           animate={{ scale: 1.8, opacity: 0 }}
                           transition={{ delay: 0.15 + i * 0.14, duration: 0.35, ease: 'easeOut' }} />
                       )}
+                      {v.rarity === 'mitologico' && (
+                        <motion.div aria-hidden data-testid="mitologico-flash"
+                          className="fixed inset-0 pointer-events-none z-[1210]"
+                          style={{ background: 'radial-gradient(circle at 50% 45%, #FFD76699 0%, transparent 70%)' }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: [0, 0.9, 0] }}
+                          transition={{ delay: 0.15 + i * 0.14, duration: 0.35, ease: 'easeOut' }} />
+                      )}
                       <div className="mb-2 rounded-xl flex items-center justify-center"
                         style={{ width: 62, height: 62, background: `radial-gradient(circle at 40% 30%, ${v.accent}44, transparent 70%)` }}>
                         {v.imageUrl
