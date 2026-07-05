@@ -3,8 +3,10 @@ import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GiCardboardBox } from 'react-icons/gi'
 import { describeDrop } from './loot-visuals'
-import { RARITY_COLORS } from '@/lib/types'
+import { RARITY_COLORS, RARITY_RANK } from '@/lib/types'
 import type { Rarity } from '@/lib/types'
+import { playPackTear, playPackBurst, playDropReveal } from '@/lib/game/sounds/pack-open'
+import { playUiTap } from '@/lib/game/sounds/ui'
 
 export interface PackDrop { type: string; ok: boolean; detail: Record<string, any> }
 export interface OpenedPack { id?: string; name: string; image_url?: string | null; rarity?: string | null }
@@ -24,9 +26,14 @@ export default function PackOpenModal({
 
   const tear = useCallback(() => {
     if (phase !== 'sealed') return
+    playPackTear(pack.rarity)
     setPhase('burst')
+    playPackBurst(pack.rarity)
     setTimeout(() => setPhase('reveal'), 620)
-  }, [phase])
+  }, [phase, pack.rarity])
+
+  const isPackEpicPlus = !!pack.rarity && pack.rarity in RARITY_RANK
+    && RARITY_RANK[pack.rarity as Rarity] >= RARITY_RANK.epico
 
   return (
     <div className="fixed inset-0 z-[1200] flex flex-col items-center justify-center overflow-hidden"
@@ -87,8 +94,15 @@ export default function PackOpenModal({
               initial={{ width: 40, height: 40, opacity: 0.9 }}
               animate={{ width: 900, height: 900, opacity: 0 }}
               transition={{ duration: 0.6, ease: 'easeOut' }} />
+            {isPackEpicPlus && (
+              <motion.div className="absolute rounded-full" data-testid="pack-burst-boost"
+                style={{ background: `radial-gradient(circle, #fff 0%, ${packAccent} 55%, transparent 78%)` }}
+                initial={{ width: 20, height: 20, opacity: 1 }}
+                animate={{ width: 1200, height: 1200, opacity: 0 }}
+                transition={{ duration: 0.85, delay: 0.1, ease: 'easeOut' }} />
+            )}
             <motion.div className="absolute inset-0 bg-white"
-              initial={{ opacity: 0 }} animate={{ opacity: [0, 0.85, 0] }} transition={{ duration: 0.5 }} />
+              initial={{ opacity: 0 }} animate={{ opacity: isPackEpicPlus ? [0, 1, 0] : [0, 0.85, 0] }} transition={{ duration: 0.5 }} />
           </motion.div>
         )}
 
@@ -109,10 +123,22 @@ export default function PackOpenModal({
               <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
                 {drops.map((d, i) => <DropCard key={i} drop={d} index={i} />)}
               </div>
+
+              {drops.map((d, i) => {
+                const rarity = describeDrop(d.type, d.detail).rarity
+                return rarity === 'mitologico' ? (
+                  <motion.div key={`mito-${i}`} aria-hidden data-testid="mitologico-flash"
+                    className="fixed inset-0 pointer-events-none z-[1210]"
+                    style={{ background: 'radial-gradient(circle at 50% 45%, #FFD76699 0%, transparent 70%)' }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 0.9, 0] }}
+                    transition={{ delay: 0.26 + i * 0.14, duration: 0.35, ease: 'easeOut' }} />
+                ) : null
+              })}
             </div>
 
             <div className="px-5 pb-8 pt-2" style={{ background: 'linear-gradient(180deg, transparent, #05070E 40%)' }}>
-              <motion.button onClick={onDone}
+              <motion.button onClick={() => { playUiTap(); onDone() }}
                 className="w-full max-w-md mx-auto block py-4 rounded-2xl font-extrabold text-[#05070E] text-base"
                 style={{ background: `linear-gradient(135deg, ${packAccent}, ${packAccent}bb)`, boxShadow: `0 6px 24px ${packAccent}55` }}
                 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -131,6 +157,7 @@ export default function PackOpenModal({
 function DropCard({ drop, index }: { drop: PackDrop; index: number }) {
   const v = describeDrop(drop.type, drop.detail)
   const { Icon } = v
+  const isEpicPlus = !!v.rarity && RARITY_RANK[v.rarity] >= RARITY_RANK.epico
   return (
     <motion.div style={{ perspective: 800 }}
       initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
@@ -143,7 +170,16 @@ function DropCard({ drop, index }: { drop: PackDrop; index: number }) {
           boxShadow: `0 8px 26px ${v.accent}22, inset 0 0 20px ${v.accent}12`,
         }}
         initial={{ rotateY: 180 }} animate={{ rotateY: 0 }}
+        onAnimationStart={() => playDropReveal(v.rarity)}
         transition={{ delay: 0.26 + index * 0.14, duration: 0.5, ease: 'easeOut' }}>
+        {isEpicPlus && (
+          <motion.div aria-hidden data-testid="drop-rarity-burst"
+            className="absolute inset-0 rounded-2xl pointer-events-none"
+            style={{ background: `radial-gradient(circle, ${v.accent}66 0%, transparent 70%)` }}
+            initial={{ scale: 0.4, opacity: 0.9 }}
+            animate={{ scale: 1.8, opacity: 0 }}
+            transition={{ delay: 0.26 + index * 0.14, duration: 0.35, ease: 'easeOut' }} />
+        )}
         <div className="relative mb-2 rounded-xl flex items-center justify-center"
           style={{ width: 62, height: 62, background: `radial-gradient(circle at 40% 30%, ${v.accent}44, transparent 70%)` }}>
           {v.imageUrl

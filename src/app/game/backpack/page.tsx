@@ -17,6 +17,7 @@ import ChestOpenModal, { type ChestDrop, type OpenedChest } from '@/components/g
 import type { Ability } from '@/lib/game/abilities'
 import ElementIcon from '@/components/ui/ElementIcon'
 import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
+import { playUiTap } from '@/lib/game/sounds/ui'
 import { type IconType } from 'react-icons'
 import { GiSpellBook } from 'react-icons/gi'
 import {
@@ -797,7 +798,7 @@ export default function BackpackPage() {
                     return (
                       <motion.button
                         key={row.id}
-                        onClick={() => handleOpenPack(row)}
+                        onClick={() => { playUiTap(); handleOpenPack(row) }}
                         disabled={busy}
                         layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                         whileTap={{ scale: 0.96 }}
@@ -872,7 +873,7 @@ export default function BackpackPage() {
                           </div>
                         </div>
                         <button
-                          onClick={() => handleOpenChest(row)}
+                          onClick={() => { playUiTap(); handleOpenChest(row) }}
                           disabled={!canOpen || busy}
                           className="shrink-0 text-xs font-extrabold px-3.5 py-2 rounded-xl disabled:opacity-40"
                           style={{ background: canOpen ? `linear-gradient(135deg, ${accent}, ${accent}bb)` : 'rgba(255,255,255,0.06)', color: canOpen ? '#05070E' : 'rgba(255,255,255,0.5)' }}>
