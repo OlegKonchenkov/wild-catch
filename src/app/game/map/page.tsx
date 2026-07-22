@@ -69,7 +69,7 @@ const GameMap = dynamic(() => import('@/components/map/GameMap'), { ssr: false }
 const COACHMARK_STORAGE_KEY = 'wc:coachmarks:map-seen:v2'
 const MAP_COACHMARK_STEPS: CoachmarkStep[] = [
   { key: 'map-area',      title: 'La tua mappa', body: 'Questo è il tuo territorio di caccia. Cammina con il cellulare e le creature appariranno vicino a te.' },
-  { key: 'step-counter',  title: 'Contapassi',   body: 'I metri percorsi si accumulano qui. Molte missioni si completano camminando.', preferredSide: 'bottom' },
+  { key: 'step-counter',  title: 'Contapassi',   body: 'I metri percorsi si accumulano qui, nel contatore in alto a destra. Molte missioni si completano camminando.', preferredSide: 'bottom' },
   { key: 'nav-bestiary',  title: 'DaimonDex',    body: 'Tutte le creature che hai scoperto e catturato. Più completi la collezione, più sale la tua fama.', preferredSide: 'top' },
   { key: 'nav-duelli',    title: 'Duelli',       body: 'Sfida altri giocatori della sessione 1v1 con la tua squadra.', preferredSide: 'top' },
   { key: 'nav-missioni',  title: 'Missioni',     body: 'I tuoi obiettivi attuali — la stessa missione che vedi sempre in alto a sinistra sulla mappa.', preferredSide: 'top' },
@@ -1013,12 +1013,23 @@ function MapPageInner() {
     try {
       const sid = sessionIdRef.current
       if (!sid) return false
-      const res = await fetch('/api/game/encounter/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: sid, trigger }),
-      })
-      const data = await res.json()
+      // Fetch can throw outright (offline, DNS blip) — this fires from a
+      // background GPS/timer tick, not a direct tap, so there's nothing
+      // useful to show the player. Swallow rather than let it surface as
+      // an unhandled rejection (Sentry noise); the next tick retries.
+      let res: Response
+      try {
+        res = await fetch('/api/game/encounter/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid, trigger }),
+        })
+      } catch {
+        return false
+      }
+      if (!res.ok) return false
+      const data = await res.json().catch(() => null)
+      if (!data) return false
       if (data.encounterId && data.creature) {
         sessionStorage.setItem(`encounter_${data.encounterId}`, JSON.stringify({
           encounterId: data.encounterId,

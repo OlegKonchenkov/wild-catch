@@ -319,6 +319,7 @@ function SquadGuide() {
       {/* How to set up */}
       <div className="space-y-1.5 text-xs">
         {([
+          { Icon: GiPawPrint,      text: 'I primi Daimon che catturi entrano da soli negli slot liberi: la squadra si forma da sé finché non arrivi a 3. Te lo diciamo nella schermata di cattura.' },
           { Icon: GiSpellBook,     text: 'Apri il DaimonDex → tocca una creatura → sezione "Squadra da battaglia"' },
           { Icon: GiCrossedSwords, text: 'Slot 1 = Capitano — combatte per primo in ogni battaglia' },
           { Icon: GiCycle,         text: 'Slots 2 e 3 = Riserve — entrano in automatico quando la precedente sviene' },
@@ -371,7 +372,7 @@ function BossGuide() {
       {/* Rules */}
       <div className="space-y-2 text-xs">
         {([
-          { Icon: GiPawPrint,       text: 'Seleziona la tua squadra dal DaimonDex prima di iniziare (fino a 3 creature). Con meno di 3 comparirà un avviso di conferma.' },
+          { Icon: GiPawPrint,       text: 'La squadra si pre-compila da sola (fino a 3 creature): puoi togliere o sostituire chiunque prima di iniziare. Con meno di 3 vieni avvisato, ma puoi combattere lo stesso.' },
           { Icon: GiCrossedSwords,  text: 'Il boss schiera fino a 3 creature. Il combattimento è a turni: tu attacchi, poi il boss risponde immediatamente.' },
           { Icon: GiSandsOfTime,    text: 'Hai 30 secondi per attaccare ogni turno — allo scadere parte un attacco automatico.' },
           { Icon: GiCycle,          text: 'Quando una creatura è KO entra automaticamente la prossima della squadra.' },
@@ -625,7 +626,7 @@ function buildSections(): Section[] {
           <div className="mt-3 rounded-xl border border-white/10 bg-white/4 px-3 py-2 text-xs text-white/55">
             <strong className="text-white/80">Probabilità base di cattura per rarità:</strong>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {[['Terrestre','#7AB87A','70%'], ['Arcaico','#4A9FD4','45%'], ['Eroico','#E8A820','25%'], ['Mostruoso','#7B4DB8','12%'], ['Leggendario','#C8352A','5%'], ['Mitologico','#F0A0FF','2%']].map(([r, c, p]) => (
+              {[['Terrestre','#7AB87A','70%'], ['Arcaico','#4A9FD4','45%'], ['Eroico','#E8A820','25%'], ['Mostruoso','#7B4DB8','12%'], ['Leggendario','#C8352A','5%'], ['Mitologico','#F0A0FF','1.25%']].map(([r, c, p]) => (
                 <span key={r} className="px-2 py-0.5 rounded-full text-[10px] font-bold"
                   style={{ background: (c as string) + '22', color: c as string, border: `1px solid ${c}44` }}>
                   {r}: {p}

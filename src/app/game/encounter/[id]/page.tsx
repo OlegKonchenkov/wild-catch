@@ -406,6 +406,8 @@ export default function EncounterPage() {
   const [caughtCreatureData, setCaughtCreatureData] = useState<any>(null)
   const [caughtExpGain, setCaughtExpGain]           = useState(0)
   const [caughtGoldGain, setCaughtGoldGain]         = useState(0)
+  // 1-based slot when the server auto-added the catch to a free squad slot.
+  const [caughtSquadSlot, setCaughtSquadSlot]       = useState<number | null>(null)
   const [completedMissions, setCompletedMissions]   = useState<Array<{ title: string; rewardGold: number; rewardExp: number; levelUp?: { newLevel: number; goldReward: number } | null }>>([])
   const [missionRewardIdx, setMissionRewardIdx]     = useState(-1)
   const [playerCreature, setPlayerCreature] = useState<{
@@ -1304,6 +1306,7 @@ export default function EncounterPage() {
         .then(({ data: cr }) => { if (cr) setCaughtCreatureData(cr) })
       setCaughtExpGain(data.expGain ?? 0)
       setCaughtGoldGain(data.goldGain ?? 0)
+      setCaughtSquadSlot(data.addedToSquadSlot ?? null)
       if (data.completedMissions?.length) setCompletedMissions(data.completedMissions)
       if (data.evolved) {
         // Dramatic evolution beat (charge → flash) before the evolved reveal.
@@ -2410,6 +2413,27 @@ export default function EncounterPage() {
                         </motion.div>
                       ))}
                     </div>
+                  )}
+
+                  {/* Auto-added to the squad — never rearrange the player's
+                      squad silently; say it happened and where to change it. */}
+                  {caughtSquadSlot !== null && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                      className="rounded-xl px-4 py-3 mb-4 flex items-center gap-3"
+                      style={{ background: 'rgba(58,188,168,0.10)', border: '1px solid rgba(58,188,168,0.35)' }}
+                    >
+                      <span className="text-xl shrink-0">⚔️</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-extrabold text-[#3ABCA8]">
+                          Aggiunto alla squadra · slot {caughtSquadSlot}/3
+                        </p>
+                        <p className="text-[11px] text-white/45 mt-0.5 leading-snug">
+                          Avevi uno slot libero. Puoi modificare la squadra dalla DaimonDex.
+                        </p>
+                      </div>
+                    </motion.div>
                   )}
 
                   {/* Status effect ability */}

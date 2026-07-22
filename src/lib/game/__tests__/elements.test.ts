@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getElementMultiplier } from '@/lib/game/elements'
+import { getElementMultiplier, strongAgainst, weakAgainst } from '@/lib/game/elements'
 import type { Element } from '@/lib/types'
 
 // Full 5×5 type-chart derived from ELEMENT_MULTIPLIERS in types.ts.
@@ -53,5 +53,40 @@ describe('getElementMultiplier', () => {
   // Pre-existing balance assertion (currently failing — do not change)
   it('armonia gets +15% base bonus', () => {
     expect(getElementMultiplier('armonia', 'fiamma')).toBe(1.15)
+  })
+})
+
+// Guards for the strong/weak display tables (guide, bestiary, tutorial modals).
+// These derive from ELEMENT_MULTIPLIERS so the UI can never drift again — the
+// tutorial modal previously hard-coded a table where Terra was blank and
+// Adriatico/Bosco were wrong.
+describe('strongAgainst', () => {
+  const CASES: Array<[Element, Element[]]> = [
+    ['fiamma',    ['bosco']],
+    ['adriatico', ['fiamma']],
+    ['bosco',     ['terra']],
+    ['terra',     ['adriatico']],
+    ['armonia',   ['fiamma', 'adriatico', 'bosco', 'terra']],
+  ]
+  it.each(CASES)('%s is strong against %s', (element, expected) => {
+    expect(strongAgainst(element)).toEqual(expected)
+  })
+})
+
+describe('weakAgainst', () => {
+  const CASES: Array<[Element, Element[]]> = [
+    ['fiamma',    ['adriatico']],
+    ['adriatico', ['terra']],
+    ['bosco',     ['fiamma']],
+    ['terra',     ['bosco']],
+    ['armonia',   []],
+  ]
+  it.each(CASES)('%s is weak against %s', (element, expected) => {
+    expect(weakAgainst(element)).toEqual(expected)
+  })
+
+  it('Terra has both a strength and a weakness (was blank in the tutorial modal)', () => {
+    expect(strongAgainst('terra')).not.toHaveLength(0)
+    expect(weakAgainst('terra')).not.toHaveLength(0)
   })
 })

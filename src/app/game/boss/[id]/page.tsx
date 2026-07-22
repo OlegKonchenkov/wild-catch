@@ -612,12 +612,13 @@ export default function BossFightPage() {
               .gt("quantity", 0),
             supabase
               .from("player_sessions")
-              .select("level")
+              .select("level, squad_ids")
               .eq("user_id", user.id)
               .eq("session_id", sessionId)
               .single(),
           ]);
           if (lvRes.data) setPlayerLevel((lvRes.data as any).level ?? 1);
+          const squadIds: string[] = ((lvRes.data as any)?.squad_ids ?? []) as string[];
 
           const RARITY_ORDER = [
             "comune",
@@ -646,6 +647,26 @@ export default function BossFightPage() {
                 RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity),
             );
           setAllCreatures(mapped);
+
+          // Pre-fill the squad selector for a not-yet-started fight with the
+          // player's configured squad (DaimonDex order), padded with their
+          // strongest remaining creatures up to 3 slots. Prevents walking into
+          // the boss understaffed just because the player didn't know to tap
+          // each empty slot — every slot stays fully editable before start.
+          if (f.status !== "active") {
+            const byId = new Map(mapped.map((c) => [c.playerCreatureId, c]));
+            const fromSquad = squadIds
+              .map((id) => byId.get(id))
+              .filter((c): c is SquadCreature => Boolean(c));
+            const rest = mapped
+              .filter((c) => !squadIds.includes(c.playerCreatureId))
+              .sort(
+                (a, b) =>
+                  RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity),
+              );
+            const chosen = [...fromSquad, ...rest].slice(0, 3);
+            setLineup([chosen[0] ?? null, chosen[1] ?? null, chosen[2] ?? null]);
+          }
 
           // Patch player lineup with current art from creature data (fixes resumed
           // fights whose JSONB was saved before image_url/sprite_cutout_url/sprite_url existed).

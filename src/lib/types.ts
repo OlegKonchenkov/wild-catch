@@ -312,3 +312,15 @@ export const ELEMENT_EMOJI: Record<Element, string> = {
   terra: '⛰️',
   armonia: '🎵',
 }
+
+// Display names for the five elements. Keep in sync with `Element`.
+export const ELEMENT_LABELS: Record<Element, string> = {
+  fiamma: 'Fiamma',
+  adriatico: 'Adriatico',
+  bosco: 'Bosco',
+  terra: 'Terra',
+  armonia: 'Armonia',
+}
+
+// Iteration order used wherever the full roster of elements is displayed.
+export const ALL_ELEMENTS: Element[] = ['fiamma', 'adriatico', 'bosco', 'terra', 'armonia']

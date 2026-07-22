@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }))
+vi.mock('next/server', async (orig) => {
+  const actual = await orig() as Record<string, unknown>
+  return { ...actual, after: vi.fn() }
+})
 
 import { PATCH } from '../route'
 import { createClient } from '@/lib/supabase/server'

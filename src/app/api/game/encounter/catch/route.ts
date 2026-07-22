@@ -89,11 +89,12 @@ export async function POST(request: Request) {
 
   // Player level (per-user) + global catch config (cached, ~zero-cost re-reads).
   const [psResult, cfg] = await Promise.all([
-    supabase.from('player_sessions').select('level, gold').eq('user_id', user.id).eq('session_id', encounter.session_id).single(),
+    supabase.from('player_sessions').select('level, gold, squad_ids').eq('user_id', user.id).eq('session_id', encounter.session_id).single(),
     getGlobalCatchConfig(),
   ])
   const playerLevel  = (psResult.data as any)?.level ?? 1
   const currentGold  = (psResult.data as any)?.gold  ?? 0
+  const squadIds: string[] = ((psResult.data as any)?.squad_ids ?? []) as string[]
 
   // Base catch rate: DB config overrides hardcoded defaults if present
   const rarity = creature.rarity as string
@@ -268,6 +269,36 @@ export async function POST(request: Request) {
     }
   }
 
+  // Auto-fill a free squad slot with a newly-caught creature (up to 3). Early
+  // players build a full squad without opening the DaimonDex — we only ever
+  // fill EMPTY slots, never replace an existing pick. Plain new catches only
+  // (evolutions stay a manual squad choice).
+  // 1-based squad slot the catch landed in, or null when nothing was auto-added.
+  // Returned to the client so the catch screen can TELL the player it happened
+  // instead of silently rearranging their squad behind their back.
+  let addedToSquadSlot: number | null = null
+  if (!existing && squadIds.length < 3) {
+    const { data: caughtPc } = await supabase
+      .from('player_creatures')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('session_id', encounter.session_id)
+      .eq('creature_id', creature.id)
+      .maybeSingle()
+    if (caughtPc?.id && !squadIds.includes(caughtPc.id)) {
+      const nextSquad = [...squadIds, caughtPc.id]
+      const squadUpdate: Record<string, unknown> = { squad_ids: nextSquad }
+      // Slot 0 is the primary fighter — mirror the squad route's behaviour.
+      if (nextSquad.length === 1) squadUpdate.selected_creature_id = caughtPc.id
+      const { error: squadErr } = await supabase
+        .from('player_sessions')
+        .update(squadUpdate)
+        .eq('user_id', user.id)
+        .eq('session_id', encounter.session_id)
+      if (!squadErr) addedToSquadSlot = nextSquad.length
+    }
+  }
+
   // Award EXP, gold and score — new catch=15, duplicate=5
   const rarityMultiplier = { comune: 1, non_comune: 2, raro: 3, epico: 4, leggendario: 5, mitologico: 6 }
   const rarityMult = rarityMultiplier[creature.rarity as keyof typeof rarityMultiplier] ?? 1
@@ -354,6 +385,6 @@ export async function POST(request: Request) {
     },
   }).then(undefined, () => {})
 
-  return NextResponse.json({ caught: true, evolved: evolvedTriggered, isNew, newCreatureId, expGain, goldGain, scoreGain, levelUp, completedMissions })
+  return NextResponse.json({ caught: true, evolved: evolvedTriggered, isNew, newCreatureId, expGain, goldGain, scoreGain, levelUp, completedMissions, addedToSquadSlot })
 }
 

@@ -112,6 +112,63 @@ describe('POST /api/game/encounter/catch', () => {
     expect(body.expGain).toBeGreaterThan(0)
   })
 
+  it('auto-fills an empty squad slot with a newly-caught creature', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.001) // guarantee the catch
+
+    const psUpdateSpy = vi.fn()
+    let pcSelectCall = 0
+    const mock = {
+      auth: { getUser: mockGetUser },
+      rpc: vi.fn(async () => ({ data: [{ leveled_up: false }], error: null })),
+      from: vi.fn((table: string) => {
+        if (table === 'encounters') return {
+          select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({
+            single: vi.fn(async () => ({ data: ENCOUNTER })),
+          })) })) })) })),
+          update: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
+        }
+        if (table === 'sessions') return {
+          select: vi.fn(() => ({ eq: vi.fn(() => ({ single: vi.fn(async () => ({ data: { status: 'active' } })) })) })),
+        }
+        if (table === 'player_sessions') return {
+          select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({
+            single: vi.fn(async () => ({ data: { level: 5, gold: 100, squad_ids: [] } })),
+          })) })) })),
+          update: vi.fn((payload: any) => { psUpdateSpy(payload); return { eq: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })) } }),
+        }
+        if (table === 'player_creatures') return {
+          // 1st read = pre-catch "existing?" lookup → null (new catch).
+          // 2nd read = the auto-fill lookup for the freshly-granted row.
+          select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({
+            maybeSingle: vi.fn(async () => ({ data: ++pcSelectCall === 1 ? null : { id: 'pc-new' } })),
+          })) })) })) })),
+          upsert: vi.fn(async () => ({ error: null })),
+        }
+        if (table === 'player_inventory') return {
+          select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({ single: vi.fn(async () => ({ data: null })) })) })) })),
+          update: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
+        }
+        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: null })) })) })), insert: vi.fn(async () => ({})) }
+      }),
+    }
+    vi.mocked(createClient).mockResolvedValue(mock as any)
+
+    const res = await POST(new Request('http://x', {
+      method: 'POST', body: JSON.stringify({ encounterId: 'enc-1' }),
+    }))
+    vi.restoreAllMocks()
+
+    expect(res.status).toBe(200)
+    const squadCall = psUpdateSpy.mock.calls.find(c => Array.isArray(c[0]?.squad_ids))
+    expect(squadCall).toBeTruthy()
+    expect(squadCall![0].squad_ids).toContain('pc-new')
+    expect(squadCall![0].selected_creature_id).toBe('pc-new')
+    // The client must be told it happened, so the catch screen can surface it
+    // instead of the squad changing silently.
+    const body = await res.json()
+    expect(body.addedToSquadSlot).toBe(1)
+  })
+
   it('404 when encounter is not found', async () => {
     const mock = buildMock()
     // Override encounters to return null

@@ -86,6 +86,15 @@ export default function SquadSelector({
             )
           })}
         </div>
+        {/* Understaffed warning — mirrors the duel's pre-fight notice so the
+            player never walks into the boss short-handed without noticing. */}
+        {filledCount > 0 && (
+          <p className={`text-[10px] text-center mt-1.5 font-semibold ${filledCount === 3 ? 'text-[#34D399]' : 'text-[#FBBF24]'}`}>
+            {filledCount === 3
+              ? 'Squadra completa! Tocca uno slot per sostituire.'
+              : `${filledCount}/3 creature — puoi combattere lo stesso`}
+          </p>
+        )}
       </div>
 
       {/* Creature list */}

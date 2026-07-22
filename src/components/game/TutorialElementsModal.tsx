@@ -2,6 +2,8 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { GiCrossedSwords, GiBroadsword, GiHealthPotion, GiCycle } from 'react-icons/gi'
 import ElementIcon from '@/components/ui/ElementIcon'
+import { strongAgainst, weakAgainst } from '@/lib/game/elements'
+import { ALL_ELEMENTS, ELEMENT_LABELS } from '@/lib/types'
 
 /**
  * One-time tooltip the first time the player enters a boss combat in
@@ -16,13 +18,24 @@ interface Props {
   onClose: () => void
 }
 
-const ELEMENTS = [
-  { element: 'fiamma',    name: 'Fiamma',    strong: 'Bosco',    weak: 'Adriatico' },
-  { element: 'adriatico', name: 'Adriatico', strong: 'Fiamma',   weak: 'Bosco' },
-  { element: 'bosco',     name: 'Bosco',     strong: 'Adriatico',weak: 'Fiamma' },
-  { element: 'terra',     name: 'Terra',     strong: '—',        weak: '—' },
-  { element: 'armonia',   name: 'Armonia',   strong: 'Tutti',    weak: 'Nessuno' },
-]
+// Derived from ELEMENT_MULTIPLIERS (via strongAgainst/weakAgainst) so this
+// table can never drift from the actual combat maths. Armonia — strong vs
+// every other element, weak vs none — collapses to the "Tutti"/"Nessuno"
+// shorthands the layout expects.
+const ELEMENTS = ALL_ELEMENTS.map(element => {
+  const strong = strongAgainst(element)
+  const weak = weakAgainst(element)
+  return {
+    element,
+    name: ELEMENT_LABELS[element],
+    strong: strong.length >= ALL_ELEMENTS.length - 1
+      ? 'Tutti'
+      : strong.map(e => ELEMENT_LABELS[e]).join(', ') || '—',
+    weak: weak.length === 0
+      ? 'Nessuno'
+      : weak.map(e => ELEMENT_LABELS[e]).join(', '),
+  }
+})
 
 export default function TutorialElementsModal({ open, onClose }: Props) {
   return (
@@ -55,8 +68,8 @@ export default function TutorialElementsModal({ open, onClose }: Props) {
             </div>
 
             <p className="text-sm text-white/70 leading-relaxed mb-4">
-              Ogni Daimon ha un elemento. Alcuni elementi sono <span className="text-[#34D399] font-bold">forti</span> contro
-              altri (+20% danno), altri <span className="text-[#F87171] font-bold">deboli</span> (−20%).
+              Ogni Daimon ha un elemento. Se attacchi il tipo a cui sei <span className="text-[#34D399] font-bold">forte</span> infliggi
+              +50% danni (×1.5); contro il tipo a cui sei <span className="text-[#F87171] font-bold">debole</span> sei tu a subirli.
               Sceglilo strategicamente.
             </p>
 

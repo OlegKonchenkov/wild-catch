@@ -117,7 +117,7 @@ const SLIDES: { title: string; Icon: IconType; body: React.ReactNode }[] = [
               <ElementIcon key={e} element={e} size={13} />
             ))}
           </span>
-          Ogni Daimon ha un <b className="text-white">elemento</b>. Fiamma è forte contro Bosco, Bosco contro Adriatico, Adriatico contro Fiamma. Armonia è neutra.
+          Ogni Daimon ha un <b className="text-white">elemento</b>. Fiamma è forte contro Bosco, Bosco contro Terra, Terra contro Adriatico, Adriatico contro Fiamma. Armonia è forte contro tutti.
         </div>
       </div>
     ),

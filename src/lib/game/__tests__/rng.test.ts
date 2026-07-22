@@ -42,16 +42,25 @@ describe('rollCatch', () => {
 })
 
 describe('getCatchHealthMultiplier', () => {
-  it('returns no bonus above half hp', () => {
-    expect(getCatchHealthMultiplier(80, 100)).toBe(1)
+  // Continuous model: 1 + (1 - hpRatio) * 2.0 — every 10% HP removed adds +0.2,
+  // from ×1.0 at full HP to ×3.0 at 0 HP. Matches the Guide ("Gli Incontri").
+  it('gives no bonus at full HP', () => {
+    expect(getCatchHealthMultiplier(100, 100)).toBe(1)
   })
 
-  it('returns weakened bonus at or below half hp', () => {
-    expect(getCatchHealthMultiplier(50, 100)).toBe(1.5)
+  it('scales proportionally with missing HP', () => {
+    expect(getCatchHealthMultiplier(90, 100)).toBeCloseTo(1.2)
+    expect(getCatchHealthMultiplier(50, 100)).toBe(2.0)
+    expect(getCatchHealthMultiplier(10, 100)).toBeCloseTo(2.8)
   })
 
-  it('returns critical bonus at or below 30% hp', () => {
-    expect(getCatchHealthMultiplier(30, 100)).toBe(2.25)
+  it('caps at ×3.0 at 0 HP', () => {
+    expect(getCatchHealthMultiplier(0, 100)).toBe(3.0)
+  })
+
+  it('clamps out-of-range HP (over-full and negative)', () => {
+    expect(getCatchHealthMultiplier(120, 100)).toBe(1)
+    expect(getCatchHealthMultiplier(-10, 100)).toBe(3.0)
   })
 })
 
