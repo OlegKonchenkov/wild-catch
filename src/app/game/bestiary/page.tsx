@@ -5,8 +5,10 @@ import { getCurrentUser } from '@/lib/supabase/client-user'
 import { swr } from '@/lib/cache'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
-import { RARITY_COLORS, RARITY_LABELS, RARITY_CATCH_RATES, ELEMENT_MULTIPLIERS } from '@/lib/types'
+import { RARITY_COLORS, RARITY_LABELS, RARITY_CATCH_RATES, ALL_ELEMENTS } from '@/lib/types'
 import type { Creature, PlayerCreature, Element } from '@/lib/types'
+import { strongAgainst, weakAgainst } from '@/lib/game/elements'
+import { useBackDismiss } from '@/hooks/useBackDismiss'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import CreatureSprite from '@/components/creature/CreatureSprite'
@@ -75,6 +77,20 @@ export default function BestiaryPage() {
   const supabase   = useMemo(() => createClient(), [])
   const userIdRef  = useRef<string | null>(null)
   const sessionRef = useRef<string | null>(null)
+
+  // Auto-dismiss the inline toast — previously it stayed on screen until the
+  // next action overwrote it, so "creatura selezionata" / "forgiato in GOLD"
+  // messages lingered indefinitely.
+  useEffect(() => {
+    if (!message) return
+    const t = setTimeout(() => setMessage(''), 3200)
+    return () => clearTimeout(t)
+  }, [message])
+
+  // Native-app Back: the hardware / swipe Back closes the open detail sheet or
+  // the weakness modal instead of navigating away from the DaimonDex.
+  useBackDismiss(!!selected, () => setSelected(null))
+  useBackDismiss(showWeakness, () => setShowWeakness(false))
 
   function fetchPlayerCreatures() {
     const uid = userIdRef.current
@@ -352,14 +368,6 @@ export default function BestiaryPage() {
     armonia:   { label: 'Armonia',   emoji: '✨' },
   }
 
-  const ELEM_TABLE: Record<string, { strong: string[]; weak: string[] }> = {
-    fiamma:    { strong: ['bosco'],                              weak: ['adriatico'] },
-    adriatico: { strong: ['fiamma'],                             weak: ['terra'] },
-    bosco:     { strong: ['terra'],                              weak: ['fiamma'] },
-    terra:     { strong: ['adriatico'],                          weak: ['bosco'] },
-    armonia:   { strong: ['fiamma', 'adriatico', 'bosco', 'terra'], weak: [] },
-  }
-
   return (
     <div className="h-full overflow-y-auto" style={{ background: 'radial-gradient(120% 65% at 50% 0%, #122c3e 0%, #0a1a26 45%, #060f17 100%)' }}>
       {/* Modale debolezze elementali */}
@@ -379,7 +387,13 @@ export default function BestiaryPage() {
                 <h2 className="text-lg font-bold text-white mb-1">Forze & Debolezze</h2>
                 <p className="text-xs text-white/40 mb-4">+50% danno quando attacchi un tipo debole</p>
                 <div className="space-y-2">
-                  {Object.entries(ELEM_TABLE).map(([el, { strong, weak }]) => (
+                  {ALL_ELEMENTS.map(el => {
+                    // Forze/debolezze derivate dalle math di combattimento
+                    // (strongAgainst/weakAgainst) invece di una tabella locale,
+                    // così questo pannello non può mai divergere dal chart reale.
+                    const strong = strongAgainst(el)
+                    const weak = weakAgainst(el)
+                    return (
                     <div key={el} className="bg-white/5 rounded-xl px-3 py-2.5 flex items-center gap-3">
                       <span className="w-8 flex justify-center"><ElementIcon element={el} size={20} /></span>
                       <div className="flex-1">
@@ -398,7 +412,7 @@ export default function BestiaryPage() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ) })}
                 </div>
                 <p className="text-[10px] text-white/20 mt-3 text-center">
                   ✨ Armonia: forte su tutti, nessuna debolezza
@@ -458,7 +472,7 @@ export default function BestiaryPage() {
             <button
               onClick={() => setShowWeakness(true)}
               aria-label="Forze e debolezze"
-              className="w-5 h-5 rounded-full bg-white/8 border border-white/10 text-white/35 text-[10px] font-bold flex items-center justify-center active:bg-white/15"
+              className="relative w-5 h-5 rounded-full bg-white/8 border border-white/10 text-white/35 text-[10px] font-bold flex items-center justify-center active:bg-white/15 before:absolute before:content-[''] before:-inset-2.5"
             >
               ?
             </button>

@@ -37,6 +37,18 @@ function gpsDistance(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+// Pin name/description/image_url come from admin-authored rows and are
+// injected into a Leaflet popup via innerHTML — so they must be escaped.
+// escapeHtml guards element/attribute contexts; escapeJs guards the string
+// literal inside the inline onclick handler.
+function escapeHtml(s: string): string {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+}
+function escapeJs(s: string): string {
+  return String(s).replace(/[\\'"]/g, '\\$&').replace(/</g, '\\x3c').replace(/[\r\n]/g, '')
+}
+
 // Bearing 0–360° (0 = north) from point 1 → point 2
 function computeBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const dLon = (lon2 - lon1) * Math.PI / 180
@@ -453,8 +465,8 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
           </div>`
         : ''
       const imgHtml = pin.image_url
-        ? `<img src="${pin.image_url}"
-            onclick="window.dispatchEvent(new CustomEvent('wc:zoom-image',{detail:'${pin.image_url}'}))"
+        ? `<img src="${escapeHtml(pin.image_url)}"
+            onclick="window.dispatchEvent(new CustomEvent('wc:zoom-image',{detail:'${escapeJs(pin.image_url)}'}))"
             style="width:100%;border-radius:8px;margin-top:6px;cursor:zoom-in;max-height:130px;object-fit:cover"
             title="Tocca per ingrandire" />`
         : ''
@@ -462,14 +474,16 @@ export default function GameMap({ session, playerPosition, sessionId, creatureIm
       // popup, it stays open until they explicitly close it. Default
       // Leaflet behaviour dismisses popups on the next map interaction or
       // marker re-render, which is annoying when reading the pin text.
+      // Text colours are light: the popup wrapper is retheme'd dark in
+      // globals.css, so dark-on-white text would be invisible.
       const popup = Leaflet.popup({
         maxWidth: 230,
         autoClose: false,
         closeOnClick: false,
       }).setContent(`
         <div style="font-family:sans-serif;padding:2px 0">
-          <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#0F1F2E">${pin.name || 'Punto di interesse'}</div>
-          ${pin.description ? `<div style="font-size:12px;color:#4B5563;line-height:1.4">${pin.description}</div>` : ''}
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#FFE9A6">${escapeHtml(pin.name || 'Punto di interesse')}</div>
+          ${pin.description ? `<div style="font-size:12px;color:rgba(238,245,249,0.72);line-height:1.4">${escapeHtml(pin.description)}</div>` : ''}
           ${rewardBadge}
           ${imgHtml}
         </div>

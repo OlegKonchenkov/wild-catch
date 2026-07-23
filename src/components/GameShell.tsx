@@ -14,6 +14,7 @@ import NotifPopupComponent, { type NotifPopupData } from '@/components/game/Noti
 import PushOptIn from '@/components/game/PushOptIn'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import { useBackDismiss } from '@/hooks/useBackDismiss'
 import GameTopBar from '@/components/ui/GameTopBar'
 import { NAV_ICON } from '@/components/ui/NavIcons'
 import ElementIcon from '@/components/ui/ElementIcon'
@@ -757,6 +758,9 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
     return () => { supabase.removeChannel(channel) }
   }, [supabase])
 
+  // Native-app Back: closes the notification drawer instead of navigating away.
+  useBackDismiss(showNotifPanel, () => setShowNotifPanel(false))
+
   const xpPct = exp !== null && level !== null ? xpProgress(exp, level) : 0
   const inEncounter = pathname.startsWith('/game/encounter/')
   const inDuelFight = pathname.startsWith('/game/duel/') && pathname !== '/game/duel'
@@ -764,7 +768,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const inAnyBattle = inEncounter || inDuelFight || inBossFight
 
   return (
-    <div ref={rootRef} className="flex flex-col bg-[#0F1F2E] text-white overflow-hidden" style={{ height: '100dvh' }}>
+    <div ref={rootRef} className="wc-app-shell flex flex-col bg-[#0F1F2E] text-white overflow-hidden" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top)' }}>
       <ImageLightbox />
       {/* Session status banner */}
       {!sessionEnded && sessionStatus === 'ready' && (
@@ -822,6 +826,11 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
             borderTop: '1px solid rgba(247,200,65,0.42)',
             boxShadow: 'inset 0 1px 0 rgba(255,236,150,0.14), inset 0 10px 24px -12px rgba(0,0,0,0.6)',
             overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 'env(safe-area-inset-bottom)',
+            // iOS momentum scroll + soft edge fade so the off-screen tabs read
+            // as "there's more, swipe" instead of a hard clip.
+            WebkitOverflowScrolling: 'touch',
+            maskImage: 'linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%)',
           } as React.CSSProperties}
         >
           {NAV_ITEMS.map(({ href, key, label, coachmark }) => {

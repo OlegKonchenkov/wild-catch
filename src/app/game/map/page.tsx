@@ -76,6 +76,7 @@ const MAP_COACHMARK_STEPS: CoachmarkStep[] = [
   { key: 'nav-enigmi',    title: 'Enigmi',       body: 'Indizi e rompicapi narrativi che si sbloccano scansionando QR code in giro.', preferredSide: 'top' },
   { key: 'nav-shop',      title: 'Shop',         body: 'Spendi oro per reti, esche, pozioni e oggetti che ti aiutano in cattura e battaglia.', preferredSide: 'top' },
   { key: 'nav-zaino',     title: 'Zaino',        body: 'La tua squadra di creature, gli oggetti raccolti e le uova in incubazione.', preferredSide: 'top' },
+  { key: 'nav-collezione', title: 'Collezione',  body: 'Frammenti di storia, pergamene e ricompense che sblocchi esplorando il territorio.', preferredSide: 'top' },
   { key: 'nav-classifica', title: 'Classifica',  body: 'Il tuo posizionamento nella sessione corrente e le statistiche personali.', preferredSide: 'top' },
   { key: 'nav-guida',     title: 'Guida',        body: 'Ogni meccanica spiegata con esempi animati. Da qui puoi rivedere anche questo tutorial.', preferredSide: 'top' },
 ]
@@ -1701,25 +1702,25 @@ function MapPageInner() {
         </div>
       )}
 
-      {/* Top-left alerts column — stops before the right-side HUD (right-20 = 80px) */}
-      <div className="absolute top-2 left-2 right-20 z-[1500] flex flex-col gap-1.5" style={{ pointerEvents: gpsError ? 'auto' : 'none' }}>
+      {/* Top-left column — GPS/bounds alerts stacked ABOVE the "next
+          objective" widget and the "closest egg" chip. Previously these
+          were two separate absolute columns both anchored at top-2/left-2,
+          so a GPS error banner overlapped the objective widget. Merging
+          them into one flex-col makes them stack cleanly. The container
+          ignores pointer events (so the map stays draggable in the empty
+          space); each child re-enables them. Everything self-hides when
+          empty, collapsing the column to zero footprint. */}
+      <div className="absolute top-2 left-2 right-20 z-[1000] flex flex-col gap-1.5 items-start pointer-events-none">
         {gpsError && (
-          <GPSErrorBanner message={gpsError} />
+          <div className="w-full pointer-events-auto"><GPSErrorBanner message={gpsError} /></div>
         )}
         {!inBounds && (
-          <div className="bg-red-900/90 text-red-200 text-xs px-3 py-2 rounded-xl backdrop-blur-sm font-semibold">
-            🚫 Sei fuori dall'area di gioco
+          <div className="pointer-events-auto bg-red-900/90 text-red-200 text-xs px-3 py-2 rounded-xl backdrop-blur-sm font-semibold">
+            🚫 Sei fuori dall&apos;area di gioco
           </div>
         )}
-      </div>
-
-      {/* Top-left HUD — "next objective" widget + a compact "closest egg
-          to hatching" chip stacked under it. Both self-hide when there's
-          nothing to show, so the column collapses to zero footprint when
-          idle. */}
-      <div className="absolute top-2 left-2 z-[900] flex flex-col gap-1.5 items-start">
-        <NextObjectiveWidget sessionId={sessionId} />
-        <EggHatchWidget sessionId={sessionId} />
+        <div className="pointer-events-auto"><NextObjectiveWidget sessionId={sessionId} /></div>
+        <div className="pointer-events-auto"><EggHatchWidget sessionId={sessionId} /></div>
       </div>
 
       {/* Top-right HUD column — step counter + GPS accuracy + esca */}

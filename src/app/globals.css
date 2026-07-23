@@ -61,6 +61,14 @@
   }
 }
 
+html,
+body {
+  /* Kill the browser's pull-to-refresh and rubber-band overscroll glow —
+     the app is a fixed-viewport shell, so page-level bounce reads as "web
+     page", not "native app". Inner scroll areas keep their own scrolling. */
+  overscroll-behavior: none;
+}
+
 body {
   background: #0a1520;
   color: var(--foreground);
@@ -68,6 +76,39 @@ body {
   font-family: var(--font-dm-sans), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* No grey/blue flash on tap anywhere — native controls don't do this. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Native-app feel inside the game shell ───────────────────────────────
+   Long-pressing chrome (buttons, labels, sprites) must NOT pop the text-
+   selection handles or the iOS callout menu. Scoped to the game so admin
+   (a desktop web surface) keeps normal text selection. Inputs / anything
+   explicitly marked selectable opt back in. */
+.wc-app-shell {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.wc-app-shell input,
+.wc-app-shell textarea,
+.wc-app-shell [contenteditable],
+.wc-app-shell [data-selectable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Snappy taps — kill the ~300ms click delay and double-tap-to-zoom on
+   interactive controls (panning/scrolling still works). Makes buttons feel
+   like native controls rather than web links. */
+button,
+a,
+[role="button"],
+label,
+input,
+select,
+textarea {
+  touch-action: manipulation;
 }
 
 /* ── Premium UI primitives (opt-in via className) ────────────────── */
@@ -125,6 +166,28 @@ body {
 /* Reusable: hide scrollbar but keep scrolling (e.g. filter pill rows). */
 .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* Leaflet pin popup — retheme the default light-mode bubble to the app's
+   dark "Gilded Relic" palette so tapping a map pin doesn't flash a white
+   Google-Maps-style card in an otherwise fully dark UI. */
+.leaflet-popup-content-wrapper {
+  background: #0d1e2e !important;
+  color: var(--wc-ink) !important;
+  border: 1px solid rgba(247, 200, 65, 0.28) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 34px -10px rgba(0, 0, 0, 0.8) !important;
+}
+.leaflet-popup-tip {
+  background: #0d1e2e !important;
+  border: 1px solid rgba(247, 200, 65, 0.28) !important;
+  box-shadow: none !important;
+}
+.leaflet-popup-close-button {
+  color: rgba(238, 245, 249, 0.5) !important;
+}
+.leaflet-popup-close-button:hover {
+  color: #fff !important;
+}
 
 /* Leaflet attribution — required by license, styled to be unobtrusive */
 .leaflet-control-attribution {

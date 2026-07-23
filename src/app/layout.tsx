@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Cinzel, DM_Sans } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -40,6 +40,17 @@ export const metadata: Metadata = {
   formatDetection: { telephone: false },
 };
 
+// Next 16-sanctioned viewport export (replaces the manual <meta viewport> /
+// <meta theme-color> tags). `viewportFit: 'cover'` is what activates the
+// `env(safe-area-inset-*)` values the shell relies on to clear the notch.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0F1F2E",
+  colorScheme: "dark",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -47,7 +58,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="it"
       // Browser extensions (e.g. Bitdefender's TrafficLight/Wallet) inject
       // attributes like `bis_skin_checked`, `bis_register` and
       // `__processed_<uuid>__` onto <html>/<body> BEFORE React hydrates,
@@ -57,16 +68,15 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${dmSans.variable} h-full antialiased`}
     >
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#0F1F2E" />
-        {/* iOS PWA */}
+        {/* viewport + theme-color come from the `viewport` export above;
+            apple-mobile-web-app-* come from metadata.appleWebApp. Only the
+            bits the Metadata API doesn't emit are declared by hand here. */}
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        {/* Next auto-emits the modern `mobile-web-app-capable` from
+            metadata.appleWebApp, but NOT the legacy `apple-mobile-web-app-capable`
+            that older iOS (< 16.4) still needs for standalone launch. */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Daimon" />
-        {/* Android */}
-        <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         {children}
