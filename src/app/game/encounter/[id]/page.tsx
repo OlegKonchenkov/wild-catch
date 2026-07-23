@@ -13,6 +13,7 @@ import type { BattleAction } from '@/components/battle/ActionBar'
 import type { SquadMember } from '@/components/battle/SquadBar'
 import { IconCapture, IconFlee, IconFlask, IconSwords } from '@/components/battle/icons'
 import TutorialEncounterLesson from '@/components/game/TutorialEncounterLesson'
+import FirstTimeHint from '@/components/game/FirstTimeHint'
 import { TUTORIAL_SESSION_ID } from '@/lib/game/tutorial'
 import { playEncounterSound } from '@/lib/game/battle-sounds'
 import { startEncounterLoop } from '@/lib/game/sounds/battle-loop'
@@ -31,7 +32,7 @@ import { haptics } from '@/lib/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
 import ElementIcon from '@/components/ui/ElementIcon'
-import { GiRoundStar, GiTwoCoins, GiTrophyCup, GiDeathSkull } from 'react-icons/gi'
+import { GiRoundStar, GiTwoCoins, GiTrophyCup, GiDeathSkull, GiFishingNet } from 'react-icons/gi'
 import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
@@ -381,6 +382,21 @@ export default function EncounterPage() {
     try {
       if (!localStorage.getItem('wc:tutorial-encounter-lesson-seen')) {
         setShowEncounterLesson(true)
+      }
+    } catch { /* noop */ }
+  }, [])
+  // First REAL (non-tutorial) wild encounter: a concise catch-loop hint for
+  // players who never saw the tutorial's richer TutorialEncounterLesson.
+  // Suppressed for tutorial graduates (lesson-seen flag) and in the tutorial
+  // itself (which shows the full lesson above).
+  const [catchHintEligible, setCatchHintEligible] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const sid = localStorage.getItem('current_session_id')
+    if (sid === TUTORIAL_SESSION_ID) return
+    try {
+      if (!localStorage.getItem('wc:tutorial-encounter-lesson-seen')) {
+        setCatchHintEligible(true)
       }
     } catch { /* noop */ }
   }, [])
@@ -2797,6 +2813,17 @@ export default function EncounterPage() {
           setShowEncounterLesson(false)
           try { localStorage.setItem('wc:tutorial-encounter-lesson-seen', '1') } catch { /* noop */ }
         }}
+      />
+
+      {/* Real-session first-encounter catch-loop hint (see catchHintEligible) */}
+      <FirstTimeHint
+        id="encounter-catch-v1"
+        active={catchHintEligible && !showIntro && !result}
+        accent="#F0703A"
+        icon={<GiFishingNet />}
+        eyebrow="Incontro selvatico"
+        title="Come si cattura un Daimon"
+        body={<>Prima <b className="text-white/90">indeboliscilo</b> con gli attacchi per far scendere gli HP, poi lancia una <b className="text-white/90">Rete</b> per catturarlo: più è debole, più è alta la probabilità. E occhio alle forze elementali!</>}
       />
     </div>
   )

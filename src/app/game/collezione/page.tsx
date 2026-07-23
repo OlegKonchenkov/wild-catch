@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GiGreekTemple, GiColumnVase, GiLaurelsTrophy, GiScrollUnfurled, GiTrophyCup, GiGraduateCap, GiPadlock, GiCheckMark, GiLaurelCrown } from 'react-icons/gi'
+import FirstTimeHint from '@/components/game/FirstTimeHint'
 import { describeDrop } from '@/components/game/loot-visuals'
 import { GameListSkeleton } from '@/components/game/GameLoading'
 import { RARITY_COLORS, RARITY_LABELS } from '@/lib/types'
@@ -82,6 +83,15 @@ export default function CollezionePage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden" style={{ background: 'radial-gradient(120% 80% at 50% 0%, #2a2410 0%, #14130a 45%, #0a0a06 100%)' }}>
+      <FirstTimeHint
+        id="collezione-intro-v1"
+        active={!loading}
+        accent="#F7C841"
+        icon={<GiScrollUnfurled />}
+        eyebrow="La Collezione"
+        title="La storia della città, pezzo per pezzo"
+        body={<>Ogni <b className="text-white/90">reperto</b> e <b className="text-white/90">pergamena</b> che raccogli aggiunge un frammento al racconto. Aprili da bustine, forzieri e luoghi liberati per svelare la storia.</>}
+      />
       {/* Header */}
       <div className="relative px-4 pt-4 pb-3">
         <span aria-hidden className="absolute inset-x-0 bottom-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(230,201,137,0.45), transparent)' }} />
