@@ -9,6 +9,7 @@ import { RARITY_COLORS, RARITY_LABELS, RARITY_CATCH_RATES, ALL_ELEMENTS } from '
 import type { Creature, PlayerCreature, Element } from '@/lib/types'
 import { strongAgainst, weakAgainst } from '@/lib/game/elements'
 import { useBackDismiss } from '@/hooks/useBackDismiss'
+import FirstTimeHint from '@/components/game/FirstTimeHint'
 import { STATUS_EFFECT_META } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
 import CreatureSprite from '@/components/creature/CreatureSprite'
@@ -1488,6 +1489,25 @@ export default function BestiaryPage() {
           )
         })()}
       </AnimatePresence>
+
+      {/* First-time explainer for the Daimon detail sheet (caught creatures
+          only — that's when the tabs + squad controls are present). */}
+      <FirstTimeHint
+        id="bestiary-detail-v1"
+        active={!!selected && !!selected.pc}
+        accent="#3ABCA8"
+        icon={<GiOpenBook />}
+        eyebrow="Scheda Daimon"
+        title="Tutto sul tuo Daimon"
+        body={
+          <>
+            Le schede <b className="text-white/90">Info · Abilità · Equip · Enigma</b> raccolgono
+            statistiche, mosse ed equipaggiamento. Più in basso, tocca uno slot{' '}
+            <b className="text-white/90">Squadra</b> per schierare il Daimon: il 1º slot è il tuo
+            Capitano.
+          </>
+        }
+      />
 
       {/* ── Evolution animation + reveal card ────────────────────────── */}
       {evolveReveal && (() => {
