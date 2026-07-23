@@ -29,11 +29,12 @@ const TABLE: Array<[Element, Element, number]> = [
   ['terra', 'bosco',     1.0],
   ['terra', 'terra',     1.0],
   ['terra', 'armonia',   1.0],
-  // armonia attacks (×1.5 vs all except self)
-  ['armonia', 'fiamma',    1.5],
-  ['armonia', 'adriatico', 1.5],
-  ['armonia', 'bosco',     1.5],
-  ['armonia', 'terra',     1.5],
+  // armonia attacks (×1.15 vs all except self — special reduced bonus,
+  // offset by having no weaknesses)
+  ['armonia', 'fiamma',    1.15],
+  ['armonia', 'adriatico', 1.15],
+  ['armonia', 'bosco',     1.15],
+  ['armonia', 'terra',     1.15],
   ['armonia', 'armonia',   1.0],
 ]
 
@@ -50,7 +51,7 @@ describe('getElementMultiplier', () => {
     expect(getElementMultiplier('fiamma', 'unknown' as Element)).toBe(1.0)
   })
 
-  // Pre-existing balance assertion (currently failing — do not change)
+  // Armonia's special reduced advantage: strong vs all, but +15% not +50%.
   it('armonia gets +15% base bonus', () => {
     expect(getElementMultiplier('armonia', 'fiamma')).toBe(1.15)
   })

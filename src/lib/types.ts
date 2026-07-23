@@ -248,13 +248,16 @@ export interface PlayerMission {
 // 💧 Adriatico → forte su 🔥 Fiamma
 // 🌳 Bosco    → forte su 🪨 Terra
 // 🪨 Terra    → forte su 💧 Adriatico
-// ✨ Armonia   → forte su tutti, nessuna debolezza
+// ✨ Armonia   → forte su tutti (+15%), nessuna debolezza
+// Nota: il vantaggio standard è +50% (1.5). Armonia è il caso speciale:
+// è forte contro OGNI elemento ma con un bonus ridotto del +15% (1.15),
+// bilanciato dal fatto che non ha alcuna debolezza.
 export const ELEMENT_MULTIPLIERS: Record<Element, Partial<Record<Element, number>>> = {
   fiamma:    { bosco: 1.5 },
   adriatico: { fiamma: 1.5 },
   bosco:     { terra: 1.5 },
   terra:     { adriatico: 1.5 },
-  armonia:   { fiamma: 1.5, adriatico: 1.5, bosco: 1.5, terra: 1.5 },
+  armonia:   { fiamma: 1.15, adriatico: 1.15, bosco: 1.15, terra: 1.15 },
 }
 
 export const RARITY_CATCH_RATES: Record<Rarity, number> = {
