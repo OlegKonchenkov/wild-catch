@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
 import { swr } from '@/lib/cache'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useDragControls, type PanInfo } from 'framer-motion'
 import Image from 'next/image'
 import { RARITY_COLORS, RARITY_LABELS, RARITY_CATCH_RATES, ALL_ELEMENTS } from '@/lib/types'
 import type { Creature, PlayerCreature, Element } from '@/lib/types'
@@ -91,6 +91,14 @@ export default function BestiaryPage() {
   // the weakness modal instead of navigating away from the DaimonDex.
   useBackDismiss(!!selected, () => setSelected(null))
   useBackDismiss(showWeakness, () => setShowWeakness(false))
+
+  // Swipe-down-to-dismiss for the detail bottom sheet. Drag is started only
+  // from the grab handle (dragListener=false) so the sheet's inner scroll is
+  // never hijacked. A firm downward flick or drag past ~130px closes it.
+  const detailDragControls = useDragControls()
+  const onSheetDragEnd = (_e: unknown, info: PanInfo) => {
+    if (info.offset.y > 130 || info.velocity.y > 700) setSelected(null)
+  }
 
   function fetchPlayerCreatures() {
     const uid = userIdRef.current
@@ -379,8 +387,12 @@ export default function BestiaryPage() {
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
               className="bg-[#0F1F2E] border-t border-white/10 rounded-t-3xl w-full max-w-lg pb-10"
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.6 }}
+              onDragEnd={(_e, info) => { if (info.offset.y > 130 || info.velocity.y > 700) setShowWeakness(false) }}
               onClick={e => e.stopPropagation()}>
-              <div className="flex justify-center pt-3 pb-2">
+              <div className="flex justify-center pt-3 pb-2" style={{ cursor: 'grab' }}>
                 <div className="w-10 h-1 bg-white/20 rounded-full" />
               </div>
               <div className="px-5">
@@ -912,9 +924,19 @@ export default function BestiaryPage() {
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
               className="fixed inset-x-0 bottom-0 bg-[#0F1F2E] border-t border-white/10 rounded-t-3xl z-50 overflow-y-auto"
               style={{ maxHeight: '88vh' }}
+              drag="y"
+              dragListener={false}
+              dragControls={detailDragControls}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.6 }}
+              onDragEnd={onSheetDragEnd}
             >
-              {/* Drag handle */}
-              <div className="flex justify-center pt-3 pb-1 sticky top-0 bg-[#0F1F2E] z-10">
+              {/* Drag handle — grab here to swipe the sheet down and dismiss */}
+              <div
+                className="flex justify-center pt-3 pb-2 sticky top-0 bg-[#0F1F2E] z-10"
+                style={{ touchAction: 'none', cursor: 'grab' }}
+                onPointerDown={e => detailDragControls.start(e)}
+              >
                 <div className="w-10 h-1 bg-white/20 rounded-full" />
               </div>
               <button onClick={() => setSelected(null)}

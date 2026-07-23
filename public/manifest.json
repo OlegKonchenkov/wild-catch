@@ -16,5 +16,10 @@
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Mappa", "short_name": "Mappa", "url": "/game/map" },
+    { "name": "DaimonDex", "short_name": "DaimonDex", "url": "/game/bestiary" },
+    { "name": "Missioni", "short_name": "Missioni", "url": "/game/missions" }
   ]
 }

@@ -225,6 +225,10 @@ function MapPageInner() {
   const declinedEnigmaPinIdsRef = useRef<Set<string>>(new Set())
   const [stepsWalked, setStepsWalked] = useState(0)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
+  // Transient "you're too far to interact with this pin" notice — shown when a
+  // boss/enigma pin is tapped from outside its claim radius. Previously such a
+  // tap did nothing, leaving the player unsure why. Auto-dismisses.
+  const [farPinNotice, setFarPinNotice] = useState<string | null>(null)
   const [hatchQueue, setHatchQueue] = useState<{
     name: string
     rarity: string
@@ -993,7 +997,12 @@ function MapPageInner() {
         Math.cos(pos.lat * Math.PI / 180) * Math.cos(pin.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
       const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
       const threshold = (pin.reward_radius_m ?? 50) + 20
-      if (dist > threshold) return
+      if (dist > threshold) {
+        const away = Math.max(1, Math.round(dist - (pin.reward_radius_m ?? 50)))
+        haptics.tap()
+        setFarPinNotice(`Sei troppo lontano — avvicinati di ~${away} m per interagire con "${pin.name || 'questo punto'}".`)
+        return
+      }
     }
 
     if (pin.reward_type === 'boss') setPendingBossPin(pin)
@@ -1003,6 +1012,13 @@ function MapPageInner() {
       setPendingEnigmaPin(pin)
     }
   }, [tryClaimTutorialBonus])
+
+  // Auto-dismiss the "too far from pin" notice.
+  useEffect(() => {
+    if (!farPinNotice) return
+    const t = setTimeout(() => setFarPinNotice(null), 3400)
+    return () => clearTimeout(t)
+  }, [farPinNotice])
 
   const triggerEncounter = useCallback(async (trigger: 'gps' | 'timer' = 'gps'): Promise<boolean> => {
     // Mutex: skip if another trigger is in-flight or popup already showing
@@ -1920,6 +1936,29 @@ function MapPageInner() {
           </button>
         </motion.div>
       )}
+
+      {/* "Too far from pin" transient notice */}
+      <AnimatePresence>
+        {farPinNotice && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ duration: 0.28 }}
+            className="absolute bottom-32 left-1/2 -translate-x-1/2 z-[860] flex items-start gap-2.5 px-4 py-2.5 rounded-2xl max-w-[320px] w-[86%]"
+            style={{
+              background: 'rgba(120,53,15,0.94)',
+              border: '1px solid rgba(251,191,36,0.4)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 4px 18px rgba(0,0,0,0.45)',
+            }}
+            onClick={() => setFarPinNotice(null)}
+          >
+            <span className="leading-none shrink-0 mt-0.5">📍</span>
+            <p className="text-[12px] leading-snug text-yellow-100 flex-1">{farPinNotice}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* QR scan button — glowing cyan glass (matches the reference mockup) */}
       <button
