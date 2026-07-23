@@ -169,6 +169,11 @@ export const TUTORIAL_USER_SESSION_TABLES = [
   'player_enigma_frammenti',
   'player_enigmi',
   'duel_lineups',
+  // Bell feeds: the notification panel reads both of these scoped by
+  // (user_id, session_id). Without wiping them, a tutorial "do-over" kept
+  // showing game events / messages from the previous run.
+  'player_game_events',
+  'player_notifications',
 ] as const
 
 /** Derive a deterministic bearing 0–359° from a user UUID. Same user
