@@ -909,6 +909,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
               exit={{ x: '100%' }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="absolute right-0 top-0 bottom-0 w-[min(100%,360px)] bg-[#0D1E2E] border-l border-white/10 flex flex-col"
+              style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
               onClick={e => e.stopPropagation()}
             >
               {/* Header */}

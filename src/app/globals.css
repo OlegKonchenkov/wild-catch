@@ -111,6 +111,15 @@ textarea {
   touch-action: manipulation;
 }
 
+/* Prevent the jarring iOS auto-zoom-and-reflow when focusing a field: Safari
+   zooms into any input whose font-size is < 16px. Force 16px on the game's
+   text fields (admin — a desktop surface — keeps its own sizing). */
+.wc-app-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.wc-app-shell textarea,
+.wc-app-shell select {
+  font-size: 16px;
+}
+
 /* ── Premium UI primitives (opt-in via className) ────────────────── */
 
 /* Engraved display face for epic titles, wordmarks, big numbers. */

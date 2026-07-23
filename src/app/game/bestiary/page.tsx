@@ -387,7 +387,8 @@ export default function BestiaryPage() {
             onClick={() => setShowWeakness(false)}>
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="bg-[#0F1F2E] border-t border-white/10 rounded-t-3xl w-full max-w-lg pb-10"
+              className="bg-[#0F1F2E] border-t border-white/10 rounded-t-3xl w-full max-w-lg"
+              style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom))' }}
               drag="y"
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={{ top: 0, bottom: 0.6 }}
@@ -924,7 +925,7 @@ export default function BestiaryPage() {
               initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
               className="fixed inset-x-0 bottom-0 bg-[#0F1F2E] border-t border-white/10 rounded-t-3xl z-50 overflow-y-auto"
-              style={{ maxHeight: '88vh' }}
+              style={{ maxHeight: '88vh', paddingBottom: 'env(safe-area-inset-bottom)' }}
               drag="y"
               dragListener={false}
               dragControls={detailDragControls}

@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { EnigmaDifficulty } from '@/lib/types'
+import { GameListSkeleton } from '@/components/game/GameLoading'
+import FirstTimeHint from '@/components/game/FirstTimeHint'
 import EnigmaSolvedModal from '@/components/game/EnigmaSolvedModal'
 import EnigmaLock from '@/components/game/EnigmaLock'
 import MissionRewardModal, { type CompletedMissionInfo } from '@/components/game/MissionRewardModal'
@@ -622,6 +624,15 @@ export default function EnigmiPage() {
 
   return (
     <div className="h-full overflow-y-auto" style={{ background: 'radial-gradient(120% 70% at 50% 0%, #1c2545 0%, #0e1626 45%, #070d17 100%)' }}>
+      <FirstTimeHint
+        id="enigmi-intro-v1"
+        active={!loading}
+        accent="#B06CF0"
+        icon={<GiPuzzle />}
+        eyebrow="Enigmi"
+        title="Rompicapi da svelare"
+        body={<>Raccogli <b className="text-white/90">frammenti</b> e <b className="text-white/90">suggerimenti</b> esplorando e catturando Daimon, poi combinali per risolvere l&apos;enigma e sbloccare la ricompensa.</>}
+      />
       <div className="max-w-lg mx-auto px-4 py-4 pb-6">
         {/* Header */}
         <div className="relative mb-5 pb-3">
@@ -638,11 +649,7 @@ export default function EnigmiPage() {
         </div>
 
         {loading ? (
-          <div className="space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-24 rounded-2xl bg-white/5 animate-pulse" />
-            ))}
-          </div>
+          <GameListSkeleton rows={3} className="space-y-3" itemClassName="h-24" />
         ) : enigmi.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 mt-14 text-white/30">
             {/* Friendly Daimon (same launcher/splash art) instead of a

@@ -26,6 +26,7 @@ import {
   GiSparkles, GiPawPrint, GiCardboardBox, GiLockedChest, GiKeyring, GiTrophyCup,
   GiScrollUnfurled,
 } from 'react-icons/gi'
+import FirstTimeHint from '@/components/game/FirstTimeHint'
 
 const USABLE_FROM_BACKPACK: ItemType[] = ['esca', 'uovo']
 
@@ -655,6 +656,15 @@ export default function BackpackPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden relative" style={{ background: 'radial-gradient(120% 80% at 50% 0%, #122c3e 0%, #0a1a26 45%, #060f17 100%)' }}>
+      <FirstTimeHint
+        id="backpack-intro-v1"
+        active={!loading}
+        accent="#3ABCA8"
+        icon={<GiKnapsack />}
+        eyebrow="Zaino"
+        title="Squadra, oggetti e uova"
+        body={<>Qui gestisci la <b className="text-white/90">squadra</b>, usi gli oggetti raccolti e tieni d&apos;occhio le <b className="text-white/90">uova</b>: si schiudono man mano che cammini.</>}
+      />
       {/* Hatching overlay */}
       <AnimatePresence>
         {hatchResult && (

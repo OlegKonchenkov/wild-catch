@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser } from '@/lib/supabase/client-user'
 import { swr } from '@/lib/cache'
 import type { Mission } from '@/lib/types'
+import { GameListSkeleton } from '@/components/game/GameLoading'
 import { getMissionUnlockState, type MissionUnlockState } from '@/lib/game/mission-unlocks'
 import { isTutorialSession } from '@/lib/game/tutorial'
 import { periodKeyFor, RECURRENCE_LABELS } from '@/lib/game/recurrence'
@@ -674,7 +675,7 @@ export default function MissionsPage() {
       {/* List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
         {loading ? (
-          [1,2,3].map(i => <div key={i} className="bg-white/5 rounded-2xl h-24 animate-pulse" />)
+          <GameListSkeleton rows={3} className="space-y-2.5" itemClassName="h-24" />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <span className="text-5xl opacity-20">🎯</span>

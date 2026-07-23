@@ -8,6 +8,7 @@ import CreatureLineupSlot from '@/components/game/CreatureLineupSlot'
 import CreatureRosterRow from '@/components/game/CreatureRosterRow'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GiCrossedSwords, GiCrown, GiScrollUnfurled } from 'react-icons/gi'
+import FirstTimeHint from '@/components/game/FirstTimeHint'
 import { scaleCombatStats } from '@/lib/game/combat'
 import { GameToast } from '@/components/game/GameToast'
 import { useGameToast } from '@/components/game/useGameToast'
@@ -303,6 +304,15 @@ export default function DuelLobbyPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative" style={{ background: 'radial-gradient(120% 70% at 50% 0%, #2a1410 0%, #150a12 45%, #0a0710 100%)' }}>
+      <FirstTimeHint
+        id="duel-intro-v1"
+        active={!loading}
+        accent="#B06CF0"
+        icon={<GiCrossedSwords />}
+        eyebrow="Duelli"
+        title="Sfida gli altri giocatori"
+        body={<>Scegli la tua <b className="text-white/90">squadra da 3</b> e sfida un altro giocatore della sessione in un <b className="text-white/90">1 contro 1</b> a turni. Le forze elementali contano: porta i Daimon giusti.</>}
+      />
       {/* Toast — fixed above everything */}
       <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
         <div className="pointer-events-auto">

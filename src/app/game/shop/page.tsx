@@ -32,6 +32,7 @@ import {
   GiStandingPotion, GiHealthPotion, GiBroadsword, GiBreastplate, GiHelmet, GiRing, GiKeyring,
   GiCutDiamond, GiCardboardBox,
 } from 'react-icons/gi'
+import FirstTimeHint from '@/components/game/FirstTimeHint'
 
 const TYPE_META: Record<ItemType, { icon: string; Icon: IconType; label: string; hint: string; color: string }> = {
   rete:      { icon: '🎯', Icon: GiFishingNet,    label: 'Rete',       hint: 'Aumenta la probabilità di cattura',    color: '#3A9DBC' },
@@ -180,6 +181,15 @@ export default function ShopPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden relative" style={{ background: 'radial-gradient(120% 80% at 50% 0%, #122c3e 0%, #0a1a26 45%, #060f17 100%)' }}>
+      <FirstTimeHint
+        id="shop-intro-v1"
+        active={!loading}
+        accent="#F7C841"
+        icon={<GiCardboardBox />}
+        eyebrow="Bazar"
+        title="Potenzia la tua avventura"
+        body={<>Spendi <b className="text-white/90">oro e gemme</b> in reti, esche e pozioni, oppure tenta la fortuna con <b className="text-white/90">bustine e forzieri</b> per Daimon e oggetti rari.</>}
+      />
       {missionQueue.length > 0 && (
         <MissionRewardModal
           missions={missionQueue}
