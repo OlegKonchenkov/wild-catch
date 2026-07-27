@@ -169,6 +169,16 @@ textarea {
   animation: wc-sheen 5.5s ease-in-out infinite;
 }
 
+/* One-shot entrance for the install banner. Transform-only (never opacity):
+   the element's base state is fully visible, so even if the animation is
+   throttled/paused (background tab) the banner is never stuck invisible —
+   worst case it sits a few px lower, still clear of the nav. */
+@keyframes wc-rise-in {
+  from { transform: translateY(10px); }
+  to   { transform: none; }
+}
+.wc-rise-in { animation: wc-rise-in 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+
 /* Hide scrollbar on nav overflow while keeping scrollability */
 .nav-scrollable::-webkit-scrollbar { display: none; }
 

@@ -12,6 +12,7 @@ import DailyRewardModal, { type DailyDrop } from '@/components/game/DailyRewardM
 import { romeDateKey } from '@/lib/game/daily'
 import NotifPopupComponent, { type NotifPopupData } from '@/components/game/NotifPopup'
 import PushOptIn from '@/components/game/PushOptIn'
+import InstallPrompt from '@/components/game/InstallPrompt'
 import { useSessionTimer } from '@/hooks/useSessionTimer'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import { useBackDismiss } from '@/hooks/useBackDismiss'
@@ -365,6 +366,9 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const router   = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const navRef   = useRef<HTMLElement>(null)
+  // Live bottom-nav height so the install banner can float just above it
+  // (the nav is in-flow, not fixed — see the ResizeObserver effect below).
+  const [navHeight, setNavHeight] = useState(0)
 
   const [gold, setGold]             = useState<number | null>(null)
   const [gemme, setGemme]           = useState<number | null>(null)
@@ -499,6 +503,22 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const active = navRef.current?.querySelector('[data-active="true"]') as HTMLElement | null
     active?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+  }, [pathname])
+
+  // Track the in-flow bottom-nav height (0 while it's hidden during battles)
+  // so the install banner can float just above it without overlapping.
+  useEffect(() => {
+    const el = navRef.current
+    if (!el) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when the nav unmounts (battle screens)
+      setNavHeight(0)
+      return
+    }
+    // ResizeObserver delivers an initial callback on observe(), so the height
+    // is measured without a synchronous setState in the effect body.
+    const ro = new ResizeObserver(() => setNavHeight(el.offsetHeight))
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [pathname])
 
   useEffect(() => {
@@ -863,6 +883,8 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
       )}
+
+      <InstallPrompt bottomOffset={navHeight} />
 
       <LevelUpModal info={levelUpInfo} onDismiss={() => setLevelUpInfo(null)} />
 

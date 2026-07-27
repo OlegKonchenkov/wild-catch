@@ -198,7 +198,7 @@ function ElementChart() {
       <div className="flex items-start gap-1.5 rounded-xl border border-[#C084FC]/25 bg-[#C084FC]/5 px-3 py-2 text-xs text-[#C084FC]/80">
         <GiLightningArc size={14} color="#C084FC" className="flex-shrink-0 mt-0.5" /> <span>Il danno con vantaggio elementale vale <strong className="text-[#C084FC]">×1.5</strong>.
         Lo svantaggio infligge solo <strong className="text-[#C084FC]">×0.5</strong> (neutro = ×1.0).
-        Armonia è forte su <em>tutti</em> gli elementi (×1.5) e non ha debolezze.</span>
+        Armonia è forte su <em>tutti</em> gli elementi (×1.15) e non ha debolezze.</span>
       </div>
     </div>
   )
@@ -673,7 +673,7 @@ function buildSections(): Section[] {
             </div>
             {[
               { label: 'ATK', color: '#E85D2F', desc: 'Statistica d\'attacco della creatura, scalata in base al livello (+10% per livello sopra 1).' },
-              { label: 'Moltiplicatore elemento', color: '#3A9DBC', desc: '×1.5 vantaggio · ×0.5 svantaggio · ×1.0 neutro. Armonia è forte su tutti (×1.5), nessuna debolezza.' },
+              { label: 'Moltiplicatore elemento', color: '#3A9DBC', desc: '×1.5 vantaggio · ×0.5 svantaggio · ×1.0 neutro. Armonia è forte su tutti (×1.15), nessuna debolezza.' },
               { label: 'Varianza fortuna', color: '#C084FC', desc: '±6% casuale ogni attacco. I combattenti più deboli ricevono un leggero bonus underdog fino a +6%.' },
               { label: 'DEF difensore', color: '#34D399', desc: 'La difesa riduce i danni: formula 120/(120+DEF). Con DEF=120 la riduzione è del 50%, con DEF=0 nessuna riduzione.' },
             ].map(row => (
