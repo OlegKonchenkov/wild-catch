@@ -1,3 +1,10 @@
+// Per-row stagger for the list/grid skeletons. The delay has to sit on the
+// elements that actually carry `animate-pulse` — it used to be set on the row
+// wrapper, which animates nothing, so every row pulsed in unison and the
+// stagger was silently inert. Custom properties inherit, so the row sets
+// `--wc-stagger` once and each pulsing child reads it.
+const STAGGER: React.CSSProperties = { animationDelay: 'var(--wc-stagger, 0ms)' }
+
 interface GameScreenLoadingProps {
   label?: string
 }
@@ -232,16 +239,16 @@ export function GameListSkeleton({
         <div
           key={i}
           className={`rounded-2xl border border-white/8 bg-white/5 ${itemClassName}`}
-          style={{ animationDelay: `${i * 60}ms` }}
+          style={{ '--wc-stagger': `${i * 60}ms` } as React.CSSProperties}
         >
           <div className="flex h-full items-center gap-3 px-3">
-            <div className="h-12 w-12 shrink-0 rounded-xl bg-white/10 animate-pulse" />
+            <div className="h-12 w-12 shrink-0 rounded-xl bg-white/10 animate-pulse" style={STAGGER} />
             <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-3 w-1/2 rounded bg-white/10 animate-pulse" />
-              <div className="h-2.5 w-4/5 rounded bg-white/5 animate-pulse" />
-              <div className="h-2.5 w-1/3 rounded bg-white/5 animate-pulse" />
+              <div className="h-3 w-1/2 rounded bg-white/10 animate-pulse" style={STAGGER} />
+              <div className="h-2.5 w-4/5 rounded bg-white/5 animate-pulse" style={STAGGER} />
+              <div className="h-2.5 w-1/3 rounded bg-white/5 animate-pulse" style={STAGGER} />
             </div>
-            <div className="h-10 w-16 shrink-0 rounded-xl bg-white/10 animate-pulse" />
+            <div className="h-10 w-16 shrink-0 rounded-xl bg-white/10 animate-pulse" style={STAGGER} />
           </div>
         </div>
       ))}
@@ -259,12 +266,12 @@ export function GameGridSkeleton({
         <div
           key={i}
           className="rounded-xl border border-white/8 bg-white/5 p-2"
-          style={{ animationDelay: `${i * 60}ms` }}
+          style={{ '--wc-stagger': `${i * 60}ms` } as React.CSSProperties}
         >
           <div className="flex flex-col items-center gap-1.5">
-            <div className="h-14 w-14 rounded-lg bg-white/10 animate-pulse" />
-            <div className="h-2.5 w-12 rounded bg-white/10 animate-pulse" />
-            <div className="h-2 w-8 rounded bg-white/5 animate-pulse" />
+            <div className="h-14 w-14 rounded-lg bg-white/10 animate-pulse" style={STAGGER} />
+            <div className="h-2.5 w-12 rounded bg-white/10 animate-pulse" style={STAGGER} />
+            <div className="h-2 w-8 rounded bg-white/5 animate-pulse" style={STAGGER} />
           </div>
         </div>
       ))}

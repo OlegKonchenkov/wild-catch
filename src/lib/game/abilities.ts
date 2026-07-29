@@ -32,7 +32,16 @@ export interface Ability {
   power: number
   accuracy: number
   target: AbilityTarget
-  priority: number
+  // NOTE: the `abilities.priority` column still exists in the database but is
+  // deliberately not modelled here. Nothing ever read it — not encounter/fight,
+  // not duel/action, not boss/[id] — yet the player was shown an "⚡ Priorità"
+  // chip and the admin form offered a "> 0 va prima" field, so both audiences
+  // were told about a mechanic that does not exist. Turn order isn't a contest
+  // in any resolver (the player always acts first, then the opponent answers),
+  // so honouring priority would mean restructuring the turn loop rather than
+  // reading a number. Removed from the domain type so it can't be mistaken for
+  // wired-up behaviour; the column is left in place for a future turn-order
+  // rework to adopt.
   charge_turns: number
   recharge_turns: number
   cooldown: number

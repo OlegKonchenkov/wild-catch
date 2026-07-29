@@ -55,11 +55,16 @@ function StatCell({ val, label, color }: { val: number | string; label: string; 
   )
 }
 
+// `draft` is reachable by players: /api/auth/join accepts a code for a session
+// that hasn't been made ready yet and answers `pendingStart`. Without a case
+// here the fallback rendered the raw English DB value ("draft") to an
+// Italian-speaking user.
 function statusMeta(status: string) {
   if (status === 'active') return { label: 'In corso', color: '#34D399' }
   if (status === 'ready')  return { label: 'In attesa', color: '#F7C841' }
+  if (status === 'draft')  return { label: 'In programma', color: '#8FA8BC' }
   if (status === 'ended')  return { label: 'Terminata', color: 'rgba(255,255,255,0.25)' }
-  return { label: status, color: 'rgba(255,255,255,0.25)' }
+  return { label: 'Non disponibile', color: 'rgba(255,255,255,0.25)' }
 }
 
 /* ─── main ─────────────────────────────────────── */
@@ -701,9 +706,13 @@ function HomeLobby() {
                     </div>
                   </div>
 
-                  {/* Enter session CTA */}
-                  {isPlayable && (
-                    <div style={{ padding: '0 12px 14px' }}>
+                  {/* Enter session CTA. A non-playable session (i.e. `draft` —
+                      joined with a code before the organiser opened the event)
+                      used to render nothing at all: the card expanded, showed
+                      six zeroed stats and simply had no button, with no reason
+                      given. Say why instead of leaving a hole. */}
+                  <div style={{ padding: '0 12px 14px' }}>
+                    {isPlayable ? (
                       <button
                         className="btn btn-teal"
                         style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.03em', padding: '14px 16px', boxShadow: '0 4px 20px rgba(58,188,168,0.35)' }}
@@ -714,8 +723,24 @@ function HomeLobby() {
                           <><span className="spinner" /> Apertura...</>
                         ) : selected.status === 'ended' ? '🏁 Visualizza sessione' : selected.status === 'active' ? '▶ Entra nella sessione' : '▶ Rientra nella sessione'}
                       </button>
-                    </div>
-                  )}
+                    ) : (
+                      <div
+                        style={{
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: 14,
+                          padding: '12px 14px',
+                          fontSize: 12.5,
+                          lineHeight: 1.5,
+                          color: 'rgba(255,255,255,0.55)',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <strong style={{ color: '#8FA8BC', fontWeight: 700 }}>Sei iscritto a questo evento.</strong><br />
+                        L&apos;organizzatore non l&apos;ha ancora aperto — potrai entrare appena viene avviato.
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </>

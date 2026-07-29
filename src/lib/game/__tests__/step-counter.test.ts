@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
+  encounterChance,
+  ENCOUNTER_BASE_CHANCE,
+  ENCOUNTER_ESCA_CHANCE,
+  FLEE_COOLDOWN_SECONDS,
+  isEncounterBlocked,
   evaluateStep,
   shouldRollEncounter,
   STEP_FILTER,
@@ -365,5 +370,69 @@ describe('pushRecentFix', () => {
   it('treats windowSize < 1 as 1', () => {
     const next = pushRecentFix([1, 2, 3], 4, 0)
     expect(next).toEqual([4])
+  })
+})
+
+// The Esca writes `player_sessions.esca_active_until` and the map renders a
+// countdown for it, but nothing read the column — the encounter roll was a
+// hard-coded 0.30, so the item was a placebo sold in the shop.
+describe('encounterChance', () => {
+  const NOW = Date.parse('2026-07-28T12:00:00Z')
+  const inFuture = new Date(NOW + 5 * 60 * 1000).toISOString()
+  const inPast = new Date(NOW - 60 * 1000).toISOString()
+
+  it('is the base chance with no esca', () => {
+    expect(encounterChance(null, NOW)).toBe(ENCOUNTER_BASE_CHANCE)
+    expect(encounterChance(undefined, NOW)).toBe(ENCOUNTER_BASE_CHANCE)
+  })
+
+  it('is raised while an esca is active', () => {
+    expect(encounterChance(inFuture, NOW)).toBe(ENCOUNTER_ESCA_CHANCE)
+    expect(ENCOUNTER_ESCA_CHANCE).toBeGreaterThan(ENCOUNTER_BASE_CHANCE)
+  })
+
+  it('falls back to base once the esca has expired', () => {
+    expect(encounterChance(inPast, NOW)).toBe(ENCOUNTER_BASE_CHANCE)
+  })
+
+  it('treats the exact expiry instant as expired', () => {
+    expect(encounterChance(new Date(NOW).toISOString(), NOW)).toBe(ENCOUNTER_BASE_CHANCE)
+  })
+
+  it('ignores an unparseable timestamp instead of throwing', () => {
+    expect(encounterChance('not-a-date', NOW)).toBe(ENCOUNTER_BASE_CHANCE)
+  })
+})
+
+// Fleeing used to be entirely free: the route marked the encounter 'fled' and
+// returned ok. With HP restored at the start of every encounter, that made
+// running away the optimal reroll — the fastest route to farm rare spawns.
+describe('isEncounterBlocked', () => {
+  const NOW = Date.parse('2026-07-29T12:00:00Z')
+
+  it('is not blocked with no cooldown recorded', () => {
+    expect(isEncounterBlocked(null, NOW)).toBe(false)
+    expect(isEncounterBlocked(undefined, NOW)).toBe(false)
+  })
+
+  it('is blocked while the cooldown is in the future', () => {
+    expect(isEncounterBlocked(new Date(NOW + 5000).toISOString(), NOW)).toBe(true)
+  })
+
+  it('is not blocked once the cooldown has passed', () => {
+    expect(isEncounterBlocked(new Date(NOW - 1).toISOString(), NOW)).toBe(false)
+  })
+
+  it('treats the exact expiry instant as expired', () => {
+    expect(isEncounterBlocked(new Date(NOW).toISOString(), NOW)).toBe(false)
+  })
+
+  it('ignores an unparseable timestamp instead of blocking forever', () => {
+    expect(isEncounterBlocked('not-a-date', NOW)).toBe(false)
+  })
+
+  it('uses a cooldown short enough to stay a nudge, not a punishment', () => {
+    expect(FLEE_COOLDOWN_SECONDS).toBeGreaterThan(0)
+    expect(FLEE_COOLDOWN_SECONDS).toBeLessThanOrEqual(60)
   })
 })

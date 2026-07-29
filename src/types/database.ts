@@ -592,6 +592,7 @@ export type Database = {
           id: string
           player_creature_id: string | null
           player_hp: number | null
+          player_level: number | null
           player_status: string | null
           player_status_turns: number
           resolved_at: string | null
@@ -610,6 +611,7 @@ export type Database = {
           id?: string
           player_creature_id?: string | null
           player_hp?: number | null
+          player_level?: number | null
           player_status?: string | null
           player_status_turns?: number
           resolved_at?: string | null
@@ -628,6 +630,7 @@ export type Database = {
           id?: string
           player_creature_id?: string | null
           player_hp?: number | null
+          player_level?: number | null
           player_status?: string | null
           player_status_turns?: number
           resolved_at?: string | null
@@ -2051,7 +2054,9 @@ export type Database = {
       }
       player_sessions: {
         Row: {
+          encounter_block_until: string | null
           esca_active_until: string | null
+          event_bonuses: Json
           exp: number
           gemme: number
           gold: number
@@ -2071,7 +2076,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          encounter_block_until?: string | null
           esca_active_until?: string | null
+          event_bonuses?: Json
           exp?: number
           gemme?: number
           gold?: number
@@ -2091,7 +2098,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          encounter_block_until?: string | null
           esca_active_until?: string | null
+          event_bonuses?: Json
           exp?: number
           gemme?: number
           gold?: number

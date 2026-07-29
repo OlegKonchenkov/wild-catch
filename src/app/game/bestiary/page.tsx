@@ -154,10 +154,17 @@ export default function BestiaryPage() {
       setEvolvableIds(ids)
     }
 
-    const creaturesSWR = swr<Creature[]>('creatures:v1', 10 * 60 * 1000, async () => {
+    // Scoped to this session: the event's own creatures plus the global
+    // catalogue (session_id IS NULL). Without the filter the DaimonDex listed
+    // every creature ever authored for any event as "not yet caught", so the
+    // completion counter was unreachable by construction and event-exclusive
+    // Daimon were spoiled to players who could never encounter them.
+    // Cache key carries the session id for the same reason.
+    const creaturesSWR = swr<Creature[]>(`creatures:v2:${sessionId}`, 10 * 60 * 1000, async () => {
       const { data } = await supabase
         .from('creatures')
         .select('*, enigma_frammento:enigma_frammenti(id, enigma_id, title, description, image_url, video_url, order_index, enigma:enigmi(id, title))')
+        .or(`session_id.eq.${sessionId},session_id.is.null`)
         .order('rarity')
       return (data ?? []) as unknown as Creature[]
     })

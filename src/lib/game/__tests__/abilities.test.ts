@@ -17,7 +17,7 @@ import {
 function makeAbility(over: Partial<Ability> = {}): Ability {
   return {
     id: 'ab-1', name: 'Test', description: '', element: null, category: 'attacco', rarity: null,
-    power: 1, accuracy: 1, target: 'enemy', priority: 0,
+    power: 1, accuracy: 1, target: 'enemy',
     charge_turns: 0, recharge_turns: 0, cooldown: 0, max_uses: null,
     hits_min: 1, hits_max: 1,
     status_effect: null, status_chance: 0, self_status: null,

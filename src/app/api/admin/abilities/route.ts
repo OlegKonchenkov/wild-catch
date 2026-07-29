@@ -49,7 +49,8 @@ function sanitizeAbility(body: Record<string, unknown>): { data: Record<string, 
       power: Math.max(0, num(body.power, 0)),
       accuracy: clamp(num(body.accuracy, 1), 0, 1),
       target: oneOf(TARGETS, body.target) ? body.target : 'enemy',
-      priority: Math.round(num(body.priority, 0)),
+      // `priority` is intentionally not written: no resolver reads it. The
+      // column keeps its NOT NULL DEFAULT 0, so omitting it here is safe.
       charge_turns: Math.max(0, Math.round(num(body.charge_turns, 0))),
       recharge_turns: Math.max(0, Math.round(num(body.recharge_turns, 0))),
       cooldown: Math.max(0, Math.round(num(body.cooldown, 0))),

@@ -45,8 +45,9 @@ export async function GET(request: Request) {
     })
   }
 
-  // Return all comune spawnable creatures (cached — read-only config table).
-  const creatures = await getStarterCreatures()
+  // Comune spawnable creatures for THIS session (cached per session): the
+  // event's own starters plus the global ones.
+  const creatures = await getStarterCreatures(sessionId)
 
   return NextResponse.json({
     alreadyHasCreatures: false,

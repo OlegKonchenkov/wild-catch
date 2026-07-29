@@ -3,8 +3,14 @@ import { createClient } from '@/lib/supabase/server'
 import Login from './_components/Login'
 
 // Server-side gate: if the user already has a Supabase session cookie, redirect
-// to /game/map (for an active/ready/ended player_session) or /home.
+// to /game/map (for an active/ready player_session) or /home.
 // Returning users never see the client-side splash that used to validate auth.
+//
+// 'ended' is deliberately NOT an auto-resume target. It used to be, which meant
+// the day after an event the player opened the app and landed on the dead map
+// of a finished session — the one moment where showing them their session list
+// (and whatever comes next) matters most. Ended sessions stay reachable from
+// /home in view-only mode, which is where they belong.
 export default async function LandingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -14,7 +20,7 @@ export default async function LandingPage() {
       .from('player_sessions')
       .select('session_id, sessions!inner(status)')
       .eq('user_id', user.id)
-      .in('sessions.status', ['active', 'ready', 'ended'])
+      .in('sessions.status', ['active', 'ready'])
       // player_sessions has `joined_at`, not `created_at` — wrong column errored
       // and broke the landing-page auto-resume into the user's active session.
       .order('joined_at', { ascending: false })

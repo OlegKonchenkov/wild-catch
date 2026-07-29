@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { grantAbility } from '@/lib/game/grant-ability'
 import { dispenseReward } from '@/lib/game/rewards/dispense'
+import { grantLevelRewards } from '@/lib/game/level-rewards'
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -67,7 +68,14 @@ export async function POST(request: Request) {
     const row = Array.isArray(rpcData) ? rpcData[0] : null
     return NextResponse.json({
       granted: true, type, amount: expAmount,
-      levelUp: row?.leveled_up ? { newLevel: row.new_level } : null,
+      // An organiser topping someone up mid-event can push them over a level;
+      // the configured level_rewards have to follow, same as any other source.
+      levelUp: row?.leveled_up
+        ? {
+            newLevel: row.new_level,
+            rewards: await grantLevelRewards(admin, userId, sessionId, row.new_level),
+          }
+        : null,
     })
   }
 

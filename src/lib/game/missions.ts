@@ -5,6 +5,7 @@ import { getMissionUnlockState, type MissionUnlockContext, type MissionUnlockFie
 import { TUTORIAL_MISSION_FRAMMENTO_GRANTS, isTutorialSession } from '@/lib/game/tutorial'
 import { grantAbility } from '@/lib/game/grant-ability'
 import { dispenseReward, type RewardType } from '@/lib/game/rewards/dispense'
+import { grantLevelRewards, type LevelUpResult } from '@/lib/game/level-rewards'
 import { periodKeyFor, type MissionRecurrence } from '@/lib/game/recurrence'
 
 interface MissionRow {
@@ -43,7 +44,7 @@ export interface CompletedMission {
   title: string
   rewardGold: number
   rewardExp: number
-  levelUp?: { newLevel: number; goldReward: number } | null
+  levelUp?: LevelUpResult | null
   /** Present when this mission completion granted a tutorial enigma
    *  frammento. The client uses it to surface a "🧩 nuovo frammento"
    *  toast alongside the mission reward. */
@@ -312,8 +313,8 @@ async function grantMissionReward(
   userId: string,
   sessionId: string,
   admin: ReturnType<typeof createAdminClient>,
-): Promise<{ newLevel: number; goldReward: number } | null> {
-  let levelUp: { newLevel: number; goldReward: number } | null = null
+): Promise<LevelUpResult | null> {
+  let levelUp: LevelUpResult | null = null
 
   if (mission.reward_exp > 0) {
     const { data: rpcData } = await admin.rpc('increment_player_stats', {
@@ -324,7 +325,11 @@ async function grantMissionReward(
     })
     const rpcRow = Array.isArray(rpcData) ? rpcData[0] : null
     if (rpcRow?.leveled_up) {
-      levelUp = { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
+      levelUp = {
+        newLevel: rpcRow.new_level,
+        goldReward: rpcRow.gold_reward ?? 0,
+        rewards: await grantLevelRewards(admin, userId, sessionId, rpcRow.new_level),
+      }
     }
   }
 

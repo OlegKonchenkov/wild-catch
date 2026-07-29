@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
+import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import {
+  calculateCombatDamage,
   resolveTurnStartStatus,
   rollStatusEffect,
+  scaleCombatStats,
   STATUS_EFFECT_META,
 } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
@@ -75,7 +77,15 @@ export async function POST(request: Request) {
 
   const equipBonus = (await getEquipmentBonuses(supabase, [newActivePcId])).get(newActivePcId)
     ?? { hp: 0, atk: 0, def: 0 }
-  const newPlayerMaxHp = newPlayerCr.hp + equipBonus.hp
+  // Level-scaled like /start and /fight — all three must agree or the incoming
+  // creature's max HP won't match the player_hp this route persists.
+  const encounterLevel = encounter.player_level ?? 1
+  const scaledIncoming = scaleCombatStats(
+    { hp: newPlayerCr.hp, atk: newPlayerCr.atk, def: newPlayerCr.def ?? 0 },
+    encounterLevel,
+    equipBonus,
+  )
+  const newPlayerMaxHp = scaledIncoming.hp
 
   // Sanity: never switch to a fainted creature (defensive — UI prevents it)
   const incomingHp = Math.max(0, Math.min(
@@ -125,7 +135,13 @@ export async function POST(request: Request) {
   let wildDamage = 0
   let playerTookDamage = false
   if (wildHpRemaining > 0 && !skipWildAttack && playerHpRemaining > 0) {
-    wildDamage = calculateFightDamage(wildCreature.atk)
+    // Mitigated by the incoming creature's DEF, same formula as /fight and as
+    // abilities. Switching used to take a defence-blind hit, so sending in a
+    // tanky creature was no safer than sending in a glass cannon.
+    wildDamage = calculateCombatDamage({
+      attackerAtk: wildCreature.atk,
+      defenderDef: (newPlayerCr.def ?? 0) + equipBonus.def,
+    })
     playerTookDamage = true
     playerHpRemaining = Math.max(0, playerHpRemaining - wildDamage)
   }

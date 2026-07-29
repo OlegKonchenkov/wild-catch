@@ -20,6 +20,13 @@ interface Props {
    *  1 = full dramatic glow (battle/bestiary); lower = crisper, less haze
    *  when the creature already sits on a real scene (pickers). */
   glow?: number
+  /** Preload the sprite instead of lazy-loading it. Defaults to true only for
+   *  large sprites (battle / bestiary detail), where the creature IS the
+   *  screen. It used to be unconditional, which meant a roster or squad list
+   *  rendering dozens of 30–68px thumbnails preloaded all of them at once —
+   *  they compete for bandwidth with the sprite the player is actually
+   *  looking at. Pass explicitly to override. */
+  priority?: boolean
 }
 
 // Vivid accent color per element (used for drop-shadow + aura)
@@ -116,8 +123,14 @@ function idleVariant(size: number): TargetAndTransition {
   }
 }
 
+// Above this size the sprite is the focal point of the screen (battle ~200,
+// bestiary detail 180–210) and is worth preloading; below it we're in a list of
+// thumbnails and lazy-loading is what keeps the focal sprite fast.
+const PRIORITY_SIZE_PX = 140
+
 export default function CreatureSprite({
   imageUrl, name, animState = 'idle', size = 200, element, rarity, showAura, glow = 1,
+  priority = size >= PRIORITY_SIZE_PX,
 }: Props) {
   const glowColor = element ? (ELEMENT_GLOW[element] ?? '#3A9DBC') : null
   const auraAlpha = rarity ? (RARITY_ALPHA[rarity] ?? 0.25) : 0.25
@@ -146,7 +159,7 @@ export default function CreatureSprite({
       height={size}
       className="object-contain"
       style={{ filter: dropShadow }}
-      priority
+      priority={priority}
     />
   ) : (
     <div

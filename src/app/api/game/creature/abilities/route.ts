@@ -4,8 +4,11 @@ import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { canLearnAbility, type Ability } from '@/lib/game/abilities'
 import type { Element, Rarity } from '@/lib/types'
 
+// `priority` is not selected: no resolver reads it (see Ability in
+// lib/game/abilities.ts), and shipping it to the client is what let the
+// ability card render an "⚡ Priorità" badge for a mechanic that doesn't exist.
 const ABILITY_COLS =
-  'id, name, description, element, category, rarity, power, accuracy, target, priority, ' +
+  'id, name, description, element, category, rarity, power, accuracy, target, ' +
   'charge_turns, recharge_turns, cooldown, max_uses, hits_min, hits_max, status_effect, ' +
   'status_chance, self_status, heal_percent, lifesteal_percent, buff_atk, buff_def, ' +
   'debuff_atk, debuff_def, min_level, min_rarity, allowed_elements, icon_url, animation_key, sound_url, color'

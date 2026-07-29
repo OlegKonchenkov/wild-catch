@@ -17,6 +17,9 @@
   --wc-ink: #eef5f9;
   --wc-ink-dim: rgba(238, 245, 249, 0.58);
   --wc-ink-faint: rgba(238, 245, 249, 0.34);
+  /* Hairline separator *colour* — consumed as `1px solid var(--wc-line)`, so
+     unlike --wc-rim below this is a bare colour, not a border shorthand. */
+  --wc-line: rgba(238, 245, 249, 0.12);
 
   /* accents */
   --wc-gold: #f7c841;

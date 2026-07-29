@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { grantAbility } from '@/lib/game/grant-ability'
+import { stackInventory } from '@/lib/game/rewards/inventory'
+import { isEventBonusKind, withEventBonus, EVENT_BONUS_LABELS } from '@/lib/game/event-bonuses'
 import { grantCollectible, checkTrophies, type CollectibleKind } from '@/lib/game/collection'
 
 /**
@@ -62,7 +64,17 @@ export async function dispenseReward(
         ok: true,
         detail: {
           amount,
-          levelUp: row?.leveled_up ? { newLevel: row.new_level } : null,
+          levelUp: row?.leveled_up
+            ? {
+                newLevel: row.new_level,
+                // Pins/QR that award exp can push the player over a level, so
+                // configured level rewards have to be paid out here too — not
+                // only on the catch/duel/boss paths. Imported lazily to keep
+                // this module free of a static dependency on level-rewards.ts.
+                rewards: await (await import('@/lib/game/level-rewards'))
+                  .grantLevelRewards(client, userId, sessionId, row.new_level),
+              }
+            : null,
         },
       }
     }
@@ -143,9 +155,47 @@ export async function dispenseReward(
       return { type, ok: true, detail: { text: payload.text, imageUrl: payload.image_url, chapterOrder: payload.chapter_order } }
     }
 
-    // ── Passthrough event (client-side effect described by payload) ───────────
+    // ── Timed session bonus (double EXP, gold rain, spawn boost) ──────────────
+    // This used to be a pure passthrough: it echoed the payload back and no
+    // multiplier was ever applied anywhere, so every configured event bonus was
+    // cosmetic. Now it writes a real, expiring entry onto the player's session.
     case 'evento': {
-      return { type, ok: true, detail: { eventType: payload.event_type, effect: payload.effect } }
+      const kind = (payload.event_type ?? payload.eventType) as string
+      if (!isEventBonusKind(kind)) {
+        // Unknown/legacy free-text event type: keep the old behaviour so an
+        // already-authored pin still shows its message instead of erroring.
+        return { type, ok: true, detail: { eventType: kind, effect: payload.effect, applied: false } }
+      }
+
+      const multiplier = Number(payload.multiplier ?? payload.mult ?? 2)
+      const minutes = Number(payload.duration_minutes ?? payload.minutes ?? 15)
+
+      const { data: ps } = await client
+        .from('player_sessions')
+        .select('event_bonuses')
+        .eq('user_id', userId).eq('session_id', sessionId)
+        .maybeSingle()
+
+      const next = withEventBonus((ps as any)?.event_bonuses, kind, multiplier, minutes)
+      const { error } = await client
+        .from('player_sessions')
+        .update({ event_bonuses: next })
+        .eq('user_id', userId).eq('session_id', sessionId)
+      if (error) return { type, ok: false, detail: { error: error.message } }
+
+      const granted = next[kind]!
+      return {
+        type,
+        ok: true,
+        detail: {
+          eventType: kind,
+          effect: payload.effect,
+          applied: true,
+          label: EVENT_BONUS_LABELS[kind],
+          multiplier: granted.mult,
+          until: granted.until,
+        },
+      }
     }
 
     // ── Bustina (card pack) — adds an unopened pack to the player's stash ─────
@@ -263,22 +313,6 @@ export async function dispenseReward(
   }
 }
 
-/** Upsert-style stack of an item into player_inventory (insert or add quantity). */
-async function stackInventory(
-  client: SupabaseClient, userId: string, sessionId: string, itemId: string, quantity: number,
-): Promise<void> {
-  const { data: existing } = await client
-    .from('player_inventory')
-    .select('id, quantity')
-    .eq('user_id', userId).eq('session_id', sessionId).eq('item_id', itemId)
-    .maybeSingle()
-  if (existing) {
-    await client.from('player_inventory')
-      .update({ quantity: (existing as any).quantity + quantity })
-      .eq('id', (existing as any).id)
-  } else {
-    await client.from('player_inventory').insert({
-      user_id: userId, session_id: sessionId, item_id: itemId, quantity,
-    })
-  }
-}
+// stackInventory now lives in ./inventory so level-rewards.ts can grant items
+// without importing this module (which would close an import cycle, since
+// level rewards are triggered from the exp path below).

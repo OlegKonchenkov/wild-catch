@@ -249,9 +249,17 @@ export interface PlayerMission {
 // 🌳 Bosco    → forte su 🪨 Terra
 // 🪨 Terra    → forte su 💧 Adriatico
 // ✨ Armonia   → forte su tutti (+15%), nessuna debolezza
-// Nota: il vantaggio standard è +50% (1.5). Armonia è il caso speciale:
-// è forte contro OGNI elemento ma con un bonus ridotto del +15% (1.15),
-// bilanciato dal fatto che non ha alcuna debolezza.
+//
+// Nota: il vantaggio standard è +50% (1.5). Armonia è il caso speciale: è forte
+// contro OGNI elemento ma con un bonus ridotto del +15% (1.15), e non ha alcuna
+// debolezza.
+//
+// Scelta di design deliberata, NON una svista. Contro un pool uniforme dei 5
+// elementi Armonia ha un netto di ~1.12 (1.12 inflitto / 1.00 subìto) ed è
+// immune al counterpick: è cioè il tipo più forte del gioco, ed è così che deve
+// essere: è l'elemento raro/speciale, non uno dei quattro del ciclo. Se in
+// futuro il roster si sbilancia, la leva da toccare è la disponibilità delle
+// creature armonia (spawn_weight / rarità), non il moltiplicatore.
 export const ELEMENT_MULTIPLIERS: Record<Element, Partial<Record<Element, number>>> = {
   fiamma:    { bosco: 1.5 },
   adriatico: { fiamma: 1.5 },

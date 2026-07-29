@@ -35,6 +35,16 @@ interface LeaderboardEntry {
   isMe: boolean
 }
 
+/** Frozen top-10 snapshot written when the event closed (hall_of_fame). */
+interface HallOfFameEntry {
+  rank: number
+  userId: string
+  nickname: string
+  score: number
+  creaturesCaught: number
+  isMe: boolean
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SESSION_STATUS: Record<string, { label: string; color: string }> = {
@@ -70,6 +80,8 @@ function ProfileContent() {
   const [loadingBoard, setLoadingBoard] = useState(false)
   const [boardFilter, setBoardFilter]   = useState<'all' | 'friends' | 'group'>('all')
   const [boardNoGroup, setBoardNoGroup] = useState(false)
+  const [hallOfFame, setHallOfFame]     = useState<HallOfFameEntry[]>([])
+  const [hofSeason, setHofSeason]       = useState<string | null>(null)
   const [tutorialCompleted, setTutorialCompleted] = useState(false)
   const { toast, showError, dismiss }   = useGameToast()
   const supabase = useMemo(() => createClient(), [])
@@ -100,6 +112,29 @@ function ProfileContent() {
 
   const searchParams = useSearchParams()
   const sessionEnded = searchParams.get('ended') === '1'
+
+  // ── Hall of Fame ──────────────────────────────────────────────────────────
+  // /api/admin/session/close has always frozen a top-10 into `hall_of_fame`,
+  // and until now nothing read it — an event ended with no closing moment at
+  // all. Load it once the session is over: unlike the live leaderboard above,
+  // this is the final result and it doesn't move any more.
+  useEffect(() => {
+    if (!session || session.status !== 'ended') { setHallOfFame([]); return }
+    let cancelled = false
+    void (async () => {
+      try {
+        const r = await fetch(`/api/game/hall-of-fame?sessionId=${session.id}`)
+        if (!r.ok || cancelled) return
+        const d = await r.json()
+        if (cancelled) return
+        setHallOfFame(d.hallOfFame ?? [])
+        setHofSeason(d.seasonLabel ?? null)
+      } catch {
+        // A missing podium must never break the profile screen.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [session])
 
   const fetchBoard = useCallback(async (sid: string, filter: 'all' | 'friends' | 'group' = 'all') => {
     setLoadingBoard(true)
@@ -284,6 +319,57 @@ function ProfileContent() {
               />
             </div>
           </div>
+
+          {/* Hall of Fame — the frozen result of a finished event. */}
+          {hallOfFame.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl p-3 mb-3"
+              style={{
+                background: 'linear-gradient(165deg, rgba(247,200,65,0.10), rgba(123,77,184,0.08))',
+                border: '1px solid rgba(247,200,65,0.28)',
+              }}
+            >
+              <div className="flex items-center gap-2 mb-0.5">
+                <GiTrophyCup size={18} color="#F7C841" />
+                <p className="wc-display text-[11px] text-[#F7C841] uppercase tracking-widest font-bold">
+                  Albo d&apos;oro
+                </p>
+              </div>
+              <p className="text-[11px] text-white/40 mb-3">
+                {hofSeason ?? session.name} — risultato finale
+              </p>
+
+              <div className="space-y-1.5">
+                {hallOfFame.map((entry, i) => (
+                  <motion.div
+                    key={entry.userId}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.04 * i }}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2"
+                    style={entry.isMe
+                      ? { background: 'rgba(247,200,65,0.14)', border: '1px solid rgba(247,200,65,0.35)' }
+                      : { background: 'rgba(0,0,0,0.22)', border: '1px solid transparent' }}
+                  >
+                    <span className="w-7 text-center wc-display font-extrabold text-sm" style={{ color: entry.rank <= 3 ? '#F7C841' : 'rgba(255,255,255,0.35)' }}>
+                      {MEDAL[entry.rank] ?? `#${entry.rank}`}
+                    </span>
+                    <span className="flex-1 min-w-0 truncate text-sm font-semibold text-white/90">
+                      {entry.nickname}{entry.isMe && <span className="text-[#F7C841]/70 font-normal"> — tu</span>}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] text-white/45">
+                      <GiPawPrint size={12} color="rgba(255,255,255,0.45)" />{entry.creaturesCaught}
+                    </span>
+                    <span className="wc-display font-bold text-sm text-[#F7C841] tabular-nums">
+                      {entry.score}
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
           {/* Leaderboard */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">

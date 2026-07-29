@@ -369,3 +369,47 @@ describe('new status effects (abilities)', () => {
     expect(r.nextEffect).toBe('marchio')
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Base attack vs abilities — the two used to run on DIFFERENT formulas:
+// the base attack was `atk × variance` with no defence term, while abilities
+// went through calculateCombatDamage's `120/(120+def)` mitigation. An ability
+// therefore had to reach power ≈ 1.33 (at DEF 40) just to match the free
+// ATTACCA button, and 13 of the 29 attack abilities in the catalogue sat below
+// that line — the whole special-move system punished the player for using it.
+//
+// Every resolver now goes through calculateCombatDamage, so the break-even is
+// exactly power = 1.00 and, crucially, it does NOT move with the defender's
+// DEF. These tests pin that down: if someone reintroduces a defence-blind base
+// attack, the seeded ability powers silently become wrong again.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('base attack / ability break-even', () => {
+  const FIXED_VARIANCE = 1 // strip the dice so the comparison is exact
+  const baseAttack = (atk: number, def: number) =>
+    calculateCombatDamage({ attackerAtk: atk, defenderDef: def, varianceMultiplier: FIXED_VARIANCE })
+  const ability = (atk: number, def: number, power: number) =>
+    calculateCombatDamage({ attackerAtk: atk, defenderDef: def, attackMultiplier: power, varianceMultiplier: FIXED_VARIANCE })
+
+  it.each([0, 5, 20, 40, 60, 120, 300])('power 1.0 exactly matches a base attack at DEF %i', def => {
+    expect(ability(60, def, 1.0)).toBe(baseAttack(60, def))
+  })
+
+  it.each([0, 20, 40, 60, 120])('power above 1 always beats a base attack at DEF %i', def => {
+    expect(ability(60, def, 1.15)).toBeGreaterThan(baseAttack(60, def))
+  })
+
+  it.each([20, 40, 60, 120])('power below 1 always loses to a base attack at DEF %i', def => {
+    expect(ability(60, def, 0.7)).toBeLessThan(baseAttack(60, def))
+  })
+
+  // The old bug in one assertion: break-even must not depend on the defender.
+  it('break-even does not drift with the defender DEF', () => {
+    for (const def of [0, 10, 40, 90, 200]) {
+      expect(ability(80, def, 1.0) / baseAttack(80, def)).toBeCloseTo(1, 5)
+    }
+  })
+
+  it('DEF actually reduces incoming damage (it was inert in encounters)', () => {
+    expect(baseAttack(60, 120)).toBeLessThan(baseAttack(60, 0))
+  })
+})

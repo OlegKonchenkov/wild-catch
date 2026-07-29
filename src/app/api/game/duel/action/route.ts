@@ -12,6 +12,7 @@ import {
 import type { Json } from '@/types/database'
 import { sendPushToUser, pickOne } from '@/lib/push'
 import { incrementMissionProgress } from '@/lib/game/missions'
+import { grantLevelRewards, type LevelRewardGrant } from '@/lib/game/level-rewards'
 import type { CompletedMission } from '@/lib/game/missions'
 import type { Element } from '@/lib/types'
 
@@ -912,7 +913,7 @@ async function awardDuelResults(
   sessionId: string,
   winnerId: string,
   _loserId: string,
-): Promise<{ winnerLevelUp: { newLevel: number; goldReward: number } | null }> {
+): Promise<{ winnerLevelUp: { newLevel: number; goldReward: number; rewards: LevelRewardGrant[] } | null }> {
   // Winner gets EXP + score + gold atomically via the RPC (p_gold added in migration 015).
   // Loser gets nothing (REQ-XP-03) — no separate call needed.
   const { data } = await supabase.rpc('increment_player_stats', {
@@ -926,7 +927,11 @@ async function awardDuelResults(
   const winRow = Array.isArray(data) ? data[0] : null
   return {
     winnerLevelUp: winRow?.leveled_up
-      ? { newLevel: winRow.new_level, goldReward: winRow.gold_reward ?? 0 }
+      ? {
+          newLevel: winRow.new_level,
+          goldReward: winRow.gold_reward ?? 0,
+          rewards: await grantLevelRewards(supabase, winnerId, sessionId, winRow.new_level),
+        }
       : null,
   }
 }

@@ -16,7 +16,7 @@ type Form = Partial<Ability> & { name: string }
 
 const BLANK: Form = {
   name: '', description: '', element: null, category: 'attacco', rarity: null,
-  power: 1, accuracy: 1, target: 'enemy', priority: 0,
+  power: 1, accuracy: 1, target: 'enemy',
   charge_turns: 0, recharge_turns: 0, cooldown: 0, max_uses: null, hits_min: 1, hits_max: 1,
   status_effect: null, status_chance: 0, self_status: null, heal_percent: 0, lifesteal_percent: 0,
   buff_atk: 0, buff_def: 0, debuff_atk: 0, debuff_def: 0,
@@ -134,7 +134,8 @@ export default function AdminAbilitiesPage() {
               <option value="enemy">Nemico</option><option value="self">Sé stesso</option>
             </select>
           </Field>
-          <Field label="Priorità" hint="&gt;0 va prima"><input type="number" className={inputCls} value={form.priority ?? 0} onChange={e => set('priority', num(e.target.value))} /></Field>
+          {/* "Priorità" field removed: nothing in the combat engine reads it,
+              so it let an organiser tune a knob with no effect. */}
           <Field label="Colpi min"><input type="number" className={inputCls} value={form.hits_min ?? 1} onChange={e => set('hits_min', num(e.target.value))} /></Field>
           <Field label="Colpi max"><input type="number" className={inputCls} value={form.hits_max ?? 1} onChange={e => set('hits_max', num(e.target.value))} /></Field>
         </div>

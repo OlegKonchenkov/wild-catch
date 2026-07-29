@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Cinzel, DM_Sans } from "next/font/google";
 import Script from "next/script";
+import AnalyticsPageviews from "@/components/AnalyticsPageviews";
+import MotionProvider from "@/components/MotionProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -79,7 +81,9 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col">
-        {children}
+        {/* No-op unless NEXT_PUBLIC_POSTHOG_KEY is set. */}
+        <AnalyticsPageviews />
+        <MotionProvider>{children}</MotionProvider>
         <Script
           id="sw-registration"
           strategy="afterInteractive"

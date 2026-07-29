@@ -5,7 +5,7 @@ import type { Ability } from '@/lib/game/abilities'
 function ab(over: Partial<Ability> & { id: string }): Ability {
   return {
     name: over.id, description: '', element: null, category: 'attacco', rarity: null,
-    power: 1, accuracy: 1, target: 'enemy', priority: 0, charge_turns: 0, recharge_turns: 0, cooldown: 0, max_uses: null,
+    power: 1, accuracy: 1, target: 'enemy', charge_turns: 0, recharge_turns: 0, cooldown: 0, max_uses: null,
     hits_min: 1, hits_max: 1, status_effect: null, status_chance: 0, self_status: null, heal_percent: 0, lifesteal_percent: 0,
     buff_atk: 0, buff_def: 0, debuff_atk: 0, debuff_def: 0, min_level: 1, min_rarity: null, allowed_elements: null,
     icon_url: null, animation_key: 'basic_strike', sound_url: null, color: null, ...over,

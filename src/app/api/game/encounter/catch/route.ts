@@ -3,11 +3,15 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { getGlobalCatchConfig } from '@/lib/game/config-cache'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
+import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import { RARITY_CATCH_RATES, CATCH_DIFFICULTY_MULT } from '@/lib/types'
 import { incrementMissionProgress } from '@/lib/game/missions'
+import { grantLevelRewards } from '@/lib/game/level-rewards'
 import { sendPushToUser, getDisplayName, pickOne } from '@/lib/push'
 import { logSessionError } from '@/lib/logSessionError'
+import { calculateCombatDamage } from '@/lib/game/combat'
+import { eventBonusMultiplier } from '@/lib/game/event-bonuses'
+import { getEquipmentBonuses } from '@/lib/game/equipment'
 import type { StatusEffect } from '@/lib/game/combat'
 
 export async function POST(request: Request) {
@@ -89,7 +93,7 @@ export async function POST(request: Request) {
 
   // Player level (per-user) + global catch config (cached, ~zero-cost re-reads).
   const [psResult, cfg] = await Promise.all([
-    supabase.from('player_sessions').select('level, gold, squad_ids').eq('user_id', user.id).eq('session_id', encounter.session_id).single(),
+    supabase.from('player_sessions').select('level, gold, squad_ids, event_bonuses').eq('user_id', user.id).eq('session_id', encounter.session_id).single(),
     getGlobalCatchConfig(),
   ])
   const playerLevel  = (psResult.data as any)?.level ?? 1
@@ -120,6 +124,32 @@ export async function POST(request: Request) {
 
   const statusPayload = { wildStatus: newWildStatus, wildStatusTurns: newWildStatusTurns }
 
+  // The wild's counter-attack is mitigated by the active creature's DEF, the
+  // same way /fight and /switch now do it — otherwise a failed catch attempt
+  // would hit harder than a lost fight round against the same creature, and
+  // defensive gear would go on being a dead stat.
+  //
+  // Loaded lazily: a successful catch never counter-attacks, so the common
+  // path doesn't pay for these two lookups.
+  let cachedPlayerDef: number | null = null
+  const resolvePlayerDef = async (): Promise<number> => {
+    if (cachedPlayerDef !== null) return cachedPlayerDef
+    cachedPlayerDef = 0
+    const pcId = encounter.player_creature_id
+    if (!pcId) return cachedPlayerDef
+    const [{ data: pc }, equipMap] = await Promise.all([
+      supabase.from('player_creatures').select('creatures(def)').eq('id', pcId).maybeSingle(),
+      getEquipmentBonuses(supabase, [pcId]),
+    ])
+    const baseDef = (pc as { creatures?: { def?: number } } | null)?.creatures?.def ?? 0
+    cachedPlayerDef = baseDef + (equipMap.get(pcId)?.def ?? 0)
+    return cachedPlayerDef
+  }
+  const counterAttack = async () => calculateCombatDamage({
+    attackerAtk: creature.atk,
+    defenderDef: await resolvePlayerDef(),
+  })
+
   if (!caught) {
     // Sleeping: can't flee or counter-attack
     if (wildStatus === 'sonno') {
@@ -133,7 +163,7 @@ export async function POST(request: Request) {
         await persistTickedStatus()
         return NextResponse.json({ caught: false, fled: false, wildDamage: 0, ...statusPayload })
       }
-      const counterDamage = calculateFightDamage(creature.atk)
+      const counterDamage = await counterAttack()
       await persistTickedStatus()
       return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage, ...statusPayload })
     }
@@ -154,7 +184,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ caught: false, fled: false, wildDamage: 0, ...statusPayload })
     }
 
-    const counterDamage = calculateFightDamage(creature.atk)
+    const counterDamage = await counterAttack()
     await persistTickedStatus()
     return NextResponse.json({ caught: false, fled: false, wildDamage: counterDamage, ...statusPayload })
   }
@@ -299,11 +329,26 @@ export async function POST(request: Request) {
     }
   }
 
-  // Award EXP, gold and score — new catch=15, duplicate=5
+  // Award EXP, gold and score. Base is 15 for a new catch, 5 for a duplicate,
+  // scaled by rarity on all three axes.
+  //
+  // EXP/gold used to be flat (15 / 5 regardless of rarity) while only `score`
+  // scaled with rarity. That inverted the incentive of the whole loop: a
+  // mitologico at a 1.25% base catch rate paid the same 15 exp as a comune at
+  // 70%, making comune farming ~56× more efficient per attempt. Chasing rare
+  // Daimon has to pay for the hunt to mean anything.
   const rarityMultiplier = { comune: 1, non_comune: 2, raro: 3, epico: 4, leggendario: 5, mitologico: 6 }
   const rarityMult = rarityMultiplier[creature.rarity as keyof typeof rarityMultiplier] ?? 1
-  const expGain   = existing ? 5  : 15
-  const goldGain  = expGain   // gold mirrors EXP
+  const baseGain  = existing ? 5 : 15
+  // Timed `evento` bonuses (double EXP / gold rain) granted by a pin or QR.
+  // These were authorable but never applied to anything — see migration 081.
+  const eventBonuses = psResult.data?.event_bonuses
+  const expBonusMult  = eventBonusMultiplier(eventBonuses, 'exp_boost')
+  const goldBonusMult = eventBonusMultiplier(eventBonuses, 'gold_rain')
+  const expGain   = Math.round(baseGain * rarityMult * expBonusMult)
+  const goldGain  = Math.round(baseGain * rarityMult * goldBonusMult)
+  // Score keeps its original shape on purpose: duplicates stay worth a flat 5
+  // so the leaderboard rewards breadth of collection, not repeat farming.
   const scoreGain = existing ? 5  : 15 * rarityMult
 
   const [{ data: rpcData }, { error: goldErr }] = await Promise.all([
@@ -329,7 +374,11 @@ export async function POST(request: Request) {
 
   const rpcRow    = Array.isArray(rpcData) ? rpcData[0] : null
   const levelUp   = rpcRow?.leveled_up
-    ? { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
+    ? {
+        newLevel: rpcRow.new_level,
+        goldReward: rpcRow.gold_reward ?? 0,
+        rewards: await grantLevelRewards(supabase, user.id, encounter.session_id, rpcRow.new_level),
+      }
     : null
 
   // Track cattura missions — await so we can return completion data to client

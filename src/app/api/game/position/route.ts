@@ -6,7 +6,8 @@ import { isWithinBounds, haversineDistance, parsePoint } from '@/lib/game/anti-c
 import { loadMissionUnlockContext } from '@/lib/game/missions'
 import { getMissionUnlockState } from '@/lib/game/mission-unlocks'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { evaluateStep, shouldRollEncounter, STEP_FILTER } from '@/lib/game/step-counter'
+import { encounterChance, evaluateStep, isEncounterBlocked, shouldRollEncounter, STEP_FILTER } from '@/lib/game/step-counter'
+import { eventBonusMultiplier } from '@/lib/game/event-bonuses'
 import { pergameneEarned } from '@/lib/game/pergamene'
 import { isTutorialSession } from '@/lib/game/tutorial'
 
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
   const [{ data: playerSession }, { data: session }] = await Promise.all([
     supabase
       .from('player_sessions')
-      .select('id, last_position, last_position_at, steps_walked')
+      .select('id, last_position, last_position_at, steps_walked, esca_active_until, encounter_block_until, event_bonuses')
       .eq('user_id', user.id)
       .eq('session_id', sessionId)
       .single(),
@@ -182,7 +183,18 @@ export async function POST(request: Request) {
 
   // Encounter trigger: piggy-backs on the same anti-noise filter as steps.
   // A "move" we wouldn't count as walking shouldn't spawn an encounter either.
-  const triggerEncounter = shouldRollEncounter(step, distanceMoved) && Math.random() < 0.30
+  // An active Esca raises the roll (encounterChance) — that lookup is what was
+  // missing, which is why the item had no effect at all.
+  // A recent flee suppresses the roll entirely for a few seconds, so running
+  // away isn't a free reroll (see FLEE_COOLDOWN_SECONDS).
+  const triggerEncounter =
+    !isEncounterBlocked(playerSession.encounter_block_until) &&
+    shouldRollEncounter(step, distanceMoved) &&
+    Math.random() < encounterChance(
+      playerSession.esca_active_until,
+      Date.now(),
+      eventBonusMultiplier(playerSession.event_bonuses, 'spawn_boost'),
+    )
 
   // Return validated distance only — the client uses this for its fallback
   // encounter accumulator (cumDistRef), which must not grow on rejected fixes.

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getElementMultiplier, strongAgainst, weakAgainst } from '@/lib/game/elements'
+import { ALL_ELEMENTS } from '@/lib/types'
 import type { Element } from '@/lib/types'
 
 // Full 5×5 type-chart derived from ELEMENT_MULTIPLIERS in types.ts.
@@ -30,7 +31,7 @@ const TABLE: Array<[Element, Element, number]> = [
   ['terra', 'terra',     1.0],
   ['terra', 'armonia',   1.0],
   // armonia attacks (×1.15 vs all except self — special reduced bonus,
-  // offset by having no weaknesses)
+  // with no weakness in return: deliberate, see ELEMENT_MULTIPLIERS)
   ['armonia', 'fiamma',    1.15],
   ['armonia', 'adriatico', 1.15],
   ['armonia', 'bosco',     1.15],
@@ -89,5 +90,36 @@ describe('weakAgainst', () => {
   it('Terra has both a strength and a weakness (was blank in the tutorial modal)', () => {
     expect(strongAgainst('terra')).not.toHaveLength(0)
     expect(weakAgainst('terra')).not.toHaveLength(0)
+  })
+})
+
+// Armonia's dominance is INTENDED, and this pins it down so nobody "fixes" it
+// by accident. It is the special element, not the fifth corner of the cycle:
+// strong against everything at a reduced +15%, and counterable by nothing.
+// Its balancing lever is creature availability (spawn_weight / rarity), not
+// this chart. The numbers below are what that choice costs, stated explicitly.
+describe('armonia is deliberately the strongest type', () => {
+  const meanDealt = (attacker: Element) =>
+    ALL_ELEMENTS.reduce((sum, d) => sum + getElementMultiplier(attacker, d), 0) / ALL_ELEMENTS.length
+  const meanTaken = (defender: Element) =>
+    ALL_ELEMENTS.reduce((sum, a) => sum + getElementMultiplier(a, defender), 0) / ALL_ELEMENTS.length
+
+  it('has no weakness at all', () => {
+    expect(weakAgainst('armonia')).toEqual([])
+  })
+
+  it('is strong against every other element', () => {
+    expect(strongAgainst('armonia')).toHaveLength(ALL_ELEMENTS.length - 1)
+  })
+
+  it('takes no bonus damage from anyone', () => {
+    expect(meanTaken('armonia')).toBeCloseTo(1.0, 10)
+  })
+
+  it('nets ~+12% against a uniform pool, where the cycle four sit slightly under 1', () => {
+    expect(meanDealt('armonia') / meanTaken('armonia')).toBeCloseTo(1.12, 2)
+    for (const element of ['fiamma', 'adriatico', 'bosco', 'terra'] as Element[]) {
+      expect(meanDealt(element) / meanTaken(element)).toBeCloseTo(0.97, 2)
+    }
   })
 })

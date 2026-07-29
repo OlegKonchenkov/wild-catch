@@ -5,8 +5,10 @@ vi.mock('@/lib/rate-limit', () => ({
   rateLimit: vi.fn(async () => ({ success: true })),
   rateLimitResponse: vi.fn(),
 }))
+// rollDice is needed because the wild's attack now goes through
+// calculateCombatDamage (DEF-mitigated), which pulls its variance from rng.
 vi.mock('@/lib/game/rng', () => ({
-  calculateFightDamage: vi.fn(() => 10),
+  rollDice: vi.fn(() => 1),
   getCatchHealthMultiplier: vi.fn(() => 1),
 }))
 

@@ -4,8 +4,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { selectCreatureForEncounter } from '@/lib/game/rng'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getEquipmentBonuses } from '@/lib/game/equipment'
+import { scaleCombatStats } from '@/lib/game/combat'
 import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { getSpawnableCreatures } from '@/lib/game/config-cache'
+import { isEncounterBlocked } from '@/lib/game/step-counter'
 
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthUser()
@@ -31,7 +33,7 @@ export async function POST(request: Request) {
   const [psRes, sessRes, creatures] = await Promise.all([
     supabase
       .from('player_sessions')
-      .select('id, level, selected_creature_id, squad_ids, last_position')
+      .select('id, level, selected_creature_id, squad_ids, last_position, encounter_block_until')
       .eq('user_id', user.id)
       .eq('session_id', sessionId)
       .single(),
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
       .select('status, area_bounds')
       .eq('id', sessionId)
       .single(),
-    getSpawnableCreatures(),
+    getSpawnableCreatures(sessionId),
   ])
 
   const playerSession = psRes.data
@@ -49,6 +51,17 @@ export async function POST(request: Request) {
   const session = sessRes.data
   if (!session || session.status !== 'active') {
     return NextResponse.json({ error: 'Sessione non attiva' }, { status: 403 })
+  }
+
+  // Post-flee blackout. /position already skips the trigger while this is set,
+  // but the client has its own fallback spawners (distance accumulator + idle
+  // timer) that call this route directly — without the check here, fleeing
+  // would still be a free reroll through those paths.
+  if (isEncounterBlocked(playerSession.encounter_block_until)) {
+    return NextResponse.json(
+      { error: 'Ti stai ancora allontanando…', fleeCooldown: true },
+      { status: 429 },
+    )
   }
 
   // Out-of-bounds check (CPU only) using the last position we already loaded.
@@ -168,12 +181,20 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .map((pc: any) => {
         const b = equipBonusesMap.get(pc.id) ?? { hp: 0, atk: 0, def: 0 }
+        // Level-scaled, like duels and boss fights already do. Encounters used
+        // to send raw base+equipment stats, so the player's creatures never got
+        // stronger while the wild pool did (see migration 078).
+        const scaled = scaleCombatStats(
+          { hp: pc.creatures.hp, atk: pc.creatures.atk, def: pc.creatures.def ?? 0 },
+          playerSession.level,
+          b,
+        )
         return {
           pcId: pc.id,
           id: pc.creatures.id,
           name: pc.creatures.name,
-          hp: pc.creatures.hp + b.hp,
-          atk: pc.creatures.atk + b.atk,
+          hp: scaled.hp,
+          atk: scaled.atk,
           element: pc.creatures.element,
           rarity: pc.creatures.rarity,
           image_url: pc.creatures.image_url ?? null,
@@ -193,10 +214,16 @@ export async function POST(request: Request) {
   if (squadIds.length > 0 && squadCreatures.length > 0) {
     primaryCreatureMaxHp = squadCreatures[0].hp
   } else if (needsPrimaryLookup && primaryPcRes.data) {
-    const baseHp = (primaryPcRes.data as any)?.creatures?.hp ?? null
-    if (baseHp !== null) {
+    const cr = (primaryPcRes.data as any)?.creatures
+    if (cr?.hp != null) {
       const b = (primaryEquipMap?.get(primaryCreatureId)) ?? { hp: 0, atk: 0, def: 0 }
-      primaryCreatureMaxHp = baseHp + b.hp
+      // Same level scaling as the squad path above — these two must agree or
+      // player_hp is written against a different max than /fight computes.
+      primaryCreatureMaxHp = scaleCombatStats(
+        { hp: cr.hp, atk: cr.atk ?? 0, def: cr.def ?? 0 },
+        playerSession.level,
+        b,
+      ).hp
     }
   }
 
@@ -211,6 +238,9 @@ export async function POST(request: Request) {
       wild_creature_hp: creature.hp,
       player_creature_id: primaryCreatureId,
       player_hp: primaryCreatureMaxHp,
+      // Frozen for the encounter's lifetime so /fight and /switch scale against
+      // the same level that produced player_hp above (migration 078).
+      player_level: playerSession.level ?? 1,
     })
     .select()
     .single()

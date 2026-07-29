@@ -21,6 +21,11 @@ export function strongAgainst(element: Element): Element[] {
  * teaches such an element as a separate special case ("forte su tutti, nessuna
  * debolezza") rather than repeating it as a weakness on every other row, so
  * `weakAgainst` filters it out to match how guide/bestiary present the chart.
+ *
+ * Note this only affects *presentation*: `getElementMultiplier` still applies
+ * Armonia's ×1.15 in combat against every element. Without the filter, each of
+ * the other four rows would read "debole contro <suo counter>, Armonia", which
+ * buries the actual 4-element cycle the player has to learn.
  */
 function isUniversalAttacker(element: Element): boolean {
   return strongAgainst(element).length >= ALL_ELEMENTS.length - 1

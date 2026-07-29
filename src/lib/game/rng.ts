@@ -130,6 +130,18 @@ export function selectCreatureForEncounter(
   return pool[pool.length - 1]
 }
 
+/**
+ * @deprecated Defence-blind damage: `atk × variance`, with no mitigation term.
+ *
+ * No resolver uses this any more. Wild encounters were the last holdout —
+ * /fight, /switch and /catch all went through it while abilities, duels and
+ * boss fights used `calculateCombatDamage` (which applies `120/(120+def)`).
+ * The two formulas disagreeing is what made 13 of the 29 attack abilities weaker
+ * than the free ATTACCA button and left DEF/equipment inert in encounters.
+ *
+ * Kept only so the existing unit tests still document the old behaviour. Use
+ * `calculateCombatDamage` from lib/game/combat.ts for anything new.
+ */
 export function calculateFightDamage(atk: number): number {
   return Math.round(atk * rollDice())
 }

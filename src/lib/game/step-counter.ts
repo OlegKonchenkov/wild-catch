@@ -101,6 +101,56 @@ export function shouldRollEncounter(result: StepFilterResult, distanceMoved: num
   return result.validStep && distanceMoved >= STEP_FILTER.ENCOUNTER_MIN_M
 }
 
+/** Probability that a qualifying fix actually spawns an encounter. */
+export const ENCOUNTER_BASE_CHANCE = 0.30
+/** Same, while an Esca is active — roughly +80% encounters. */
+export const ENCOUNTER_ESCA_CHANCE = 0.55
+
+/**
+ * Seconds of encounter blackout after fleeing.
+ *
+ * Long enough that bailing out is no longer a free reroll (the flee → respawn
+ * loop was the fastest way to farm rare spawns), short enough that running from
+ * a fight you can't win stays a reasonable move rather than a punishment.
+ */
+export const FLEE_COOLDOWN_SECONDS = 20
+
+/** True while a post-flee blackout is still in effect. */
+export function isEncounterBlocked(
+  blockedUntil: string | null | undefined,
+  now: number = Date.now(),
+): boolean {
+  if (!blockedUntil) return false
+  const until = new Date(blockedUntil).getTime()
+  return Number.isFinite(until) && until > now
+}
+
+/**
+ * Encounter probability for this fix, accounting for an active Esca.
+ *
+ * `player_sessions.esca_active_until` was written by /api/game/item/use and
+ * displayed as a countdown on the map, but no endpoint ever read it: the roll
+ * was hard-coded to ENCOUNTER_BASE_CHANCE, so the Esca — sold in the shop and
+ * handed out by the tutorial — did literally nothing. This is the read side.
+ */
+export function encounterChance(
+  escaActiveUntil: string | null | undefined,
+  now: number = Date.now(),
+  /** Multiplier from an active `spawn_boost` event bonus (1 = none). */
+  spawnBoost = 1,
+): number {
+  let chance = ENCOUNTER_BASE_CHANCE
+  if (escaActiveUntil) {
+    const until = new Date(escaActiveUntil).getTime()
+    if (Number.isFinite(until) && until > now) chance = ENCOUNTER_ESCA_CHANCE
+  }
+  // A spawn_boost event stacks on top of the Esca, capped at 1 — the roll is a
+  // probability, and letting it exceed 1 would make every qualifying GPS fix
+  // spawn an encounter, which reads as broken rather than generous.
+  const boost = Number.isFinite(spawnBoost) && spawnBoost > 1 ? spawnBoost : 1
+  return Math.min(1, chance * boost)
+}
+
 /**
  * Fraction of the SNR threshold the optimistic "pending" display is allowed
  * to climb to before plateauing. Set just under 1 so the visible counter

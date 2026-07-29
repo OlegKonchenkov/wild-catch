@@ -61,7 +61,9 @@ describe('dispenseReward — currencies', () => {
     const c = makeClient({ rpc: () => ({ data: [{ new_level: 3, leveled_up: true }], error: null }) })
     const r = await dispenseReward(c, { ...BASE, type: 'gold', payload: { amount: 100 } })
     expect(c.rpc).toHaveBeenCalledWith('increment_player_stats', expect.objectContaining({ p_gold: 100, p_gemme: 0 }))
-    expect(r.detail.levelUp).toEqual({ newLevel: 3 })
+    // `rewards` carries whatever `level_rewards` had configured for the levels
+    // crossed — empty here because this stub client returns no rows for it.
+    expect(r.detail.levelUp).toEqual({ newLevel: 3, rewards: [] })
   })
 
   it('grants exp with a score fraction', async () => {

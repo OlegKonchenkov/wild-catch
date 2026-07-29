@@ -29,7 +29,8 @@ const mockGetUser = vi.fn()
 const CREATURE = { id: 'cr-1', name: 'Fiammare', hp: 80, atk: 15, def: 5, element: 'fiamma', rarity: 'comune', catch_difficulty: 3, image_url: null, sprite_url: null }
 const ENCOUNTER = { id: 'enc-1', user_id: 'user-1', session_id: 'sess-1', wild_creature_hp: 40, wild_status: null, wild_status_turns: 0, player_creature_id: 'pc-1', creatures: CREATURE, sessions: { status: 'active' } }
 
-function buildMock() {
+function buildMock(rarity: string = 'comune') {
+  const encounter = { ...ENCOUNTER, creatures: { ...CREATURE, rarity } }
   const rpcFn = vi.fn(async () => ({ data: [{ leveled_up: false }], error: null }))
   return {
     auth: { getUser: mockGetUser },
@@ -38,7 +39,7 @@ function buildMock() {
       if (table === 'encounters') return {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({
-            single: vi.fn(async () => ({ data: ENCOUNTER })),
+            single: vi.fn(async () => ({ data: encounter })),
           })) })) })),
         })),
         update: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
@@ -167,6 +168,34 @@ describe('POST /api/game/encounter/catch', () => {
     // instead of the squad changing silently.
     const body = await res.json()
     expect(body.addedToSquadSlot).toBe(1)
+  })
+
+  // Balance guard. EXP and gold used to be flat (15 for any new catch) while
+  // only `score` scaled with rarity — so a comune at a 70% catch rate paid the
+  // same as a mitologico at 1.25%, and farming comuni was ~56× more efficient
+  // per attempt. If these ever go flat again the whole hunt loses its point.
+  it.each([
+    ['comune',      1],
+    ['non_comune',  2],
+    ['raro',        3],
+    ['epico',       4],
+    ['leggendario', 5],
+    ['mitologico',  6],
+  ] as const)('scales a new %s catch by ×%i on exp, gold and score', async (rarity, mult) => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.001) // guarantee the catch
+    vi.mocked(createClient).mockResolvedValue(buildMock(rarity) as any)
+
+    const res = await POST(new Request('http://x', {
+      method: 'POST', body: JSON.stringify({ encounterId: 'enc-1' }),
+    }))
+    vi.restoreAllMocks()
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.caught).toBe(true)
+    expect(body.expGain).toBe(15 * mult)
+    expect(body.goldGain).toBe(15 * mult)
+    expect(body.scoreGain).toBe(15 * mult)
   })
 
   it('404 when encounter is not found', async () => {

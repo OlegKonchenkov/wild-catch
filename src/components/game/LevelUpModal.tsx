@@ -1,10 +1,15 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GiRoundStar, GiTwoCoins } from 'react-icons/gi'
+import { GiRoundStar, GiTwoCoins, GiCardboardBox } from 'react-icons/gi'
+import type { LevelRewardGrant } from '@/lib/game/level-rewards'
 
 export interface LevelUpInfo {
   newLevel: number
   goldReward: number
+  /** Rewards the organiser configured in `level_rewards` for the levels just
+   *  crossed. Previously these were never granted at all, so there was nothing
+   *  to show; now they have to be visible or the player gets items in silence. */
+  rewards?: LevelRewardGrant[] | null
 }
 
 export default function LevelUpModal({
@@ -80,6 +85,51 @@ export default function LevelUpModal({
                 <span className="text-[#D4A96A] font-bold text-lg">+{info.goldReward}</span>
               </motion.div>
             )}
+
+            {(() => {
+              const grants = (info.rewards ?? []).filter(
+                r => r.gold > 0 || r.items.length > 0 || r.description,
+              )
+              if (grants.length === 0) return null
+              const bonusGold = grants.reduce((sum, r) => sum + r.gold, 0)
+              const items = grants.flatMap(r => r.items)
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.55 }}
+                  className="mt-4 pt-4 border-t border-white/10 text-left"
+                >
+                  <p className="wc-display text-[#F7C841]/70 text-[10px] font-bold tracking-[0.2em] uppercase mb-2 text-center">
+                    Ricompensa di livello
+                  </p>
+                  {grants.map(r => r.description && (
+                    <p key={`d-${r.level}`} className="text-white/60 text-xs text-center mb-2 leading-relaxed">
+                      {r.description}
+                    </p>
+                  ))}
+                  <div className="flex flex-wrap justify-center gap-1.5">
+                    {bonusGold > 0 && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#D4A96A]/15 border border-[#D4A96A]/30">
+                        <GiTwoCoins size={15} color="#D4A96A" />
+                        <span className="text-[#D4A96A] font-bold text-sm">+{bonusGold}</span>
+                      </span>
+                    )}
+                    {items.map((it, i) => (
+                      <span
+                        key={`${it.itemId}-${i}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/8 border border-white/15"
+                      >
+                        <GiCardboardBox size={15} color="#E6C989" />
+                        <span className="text-white/85 font-semibold text-sm">
+                          {it.itemName ?? 'Oggetto'}{it.quantity > 1 ? ` ×${it.quantity}` : ''}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                </motion.div>
+              )
+            })()}
 
             <motion.p
               initial={{ opacity: 0 }}

@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/auth-fast'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { calculateFightDamage, getCatchHealthMultiplier } from '@/lib/game/rng'
+import { getCatchHealthMultiplier } from '@/lib/game/rng'
 import {
+  calculateCombatDamage,
   resolveTurnStartStatus,
+  rollCrit,
   rollStatusEffect,
+  scaleCombatStats,
   STATUS_EFFECT_META,
 } from '@/lib/game/combat'
 import type { StatusEffect } from '@/lib/game/combat'
@@ -90,11 +93,25 @@ export async function POST(request: Request) {
 
   const playerCr = (playerCreature as any).creatures
 
-  // Equipped gear adds flat bonuses to the player creature's base stats.
+  // Equipped gear adds flat bonuses on top of the LEVEL-SCALED base stats —
+  // the same scaleCombatStats duel/connect and boss/[id] have always used.
+  //
+  // Encounters used to skip the level term entirely (`base + equip`), while
+  // selectCreatureForEncounter weights rarity up with player level. Levelling
+  // therefore made the main loop harder: tougher wild creatures, identical
+  // player creature. The level is read off the encounter row (migration 078)
+  // rather than re-queried, so it stays frozen for this fight and matches the
+  // max HP that /start used to write player_hp.
   const equipBonus = equipBonusesMap.get(lookupId) ?? { hp: 0, atk: 0, def: 0 }
-  const playerMaxHp = playerCr.hp + equipBonus.hp
-  const playerAtk = playerCr.atk + equipBonus.atk
-  const playerDef = (playerCr.def ?? 0) + equipBonus.def
+  const encounterLevel = encounter.player_level ?? 1
+  const scaledPlayer = scaleCombatStats(
+    { hp: playerCr.hp, atk: playerCr.atk, def: playerCr.def ?? 0 },
+    encounterLevel,
+    equipBonus,
+  )
+  const playerMaxHp = scaledPlayer.hp
+  const playerAtk = scaledPlayer.atk
+  const playerDef = scaledPlayer.def
 
   // ── Special abilities ──────────────────────────────────────────────────────
   // The player's active creature owns an AbilityBattleState (cooldowns / charge /
@@ -280,10 +297,30 @@ export async function POST(request: Request) {
       abilityMissed = true
     }
   } else if (!skipPlayerAttack && wildHpRemaining > 0) {
-    // ── Base attack (unchanged behaviour) ──
-    playerCrit = Math.random() < 0.10
-    const critMult = playerCrit ? 1.75 : 1
-    playerDamage = Math.round(calculateFightDamage(playerAtk) * elementMult * atkMultiplier * critMult)
+    // ── Base attack ──
+    // Same damage formula as abilities (calculateCombatDamage), so the wild
+    // creature's DEF actually mitigates it.
+    //
+    // This used to call calculateFightDamage, which is just `atk × variance`
+    // with NO defence term. The two paths therefore disagreed: an ability had
+    // to get through `120/(120+def)` (≈0.75 at DEF 40) while the free ATTACCA
+    // button ignored defence entirely. The consequence was that 13 of the 29
+    // attack abilities in the catalogue dealt LESS damage than pressing attack,
+    // and DEF/equipment barely mattered in the most-played resolver.
+    //
+    // Also switches to the buffed stats: a self-ATK buff used to apply to
+    // abilities only, so buffing and then attacking normally silently wasted
+    // the buff.
+    const { isCrit, critMultiplier: critMult } = rollCrit()
+    playerCrit = isCrit
+    const effPlayerBase = applyStatMods(playerAtk, playerDef, encState.player)
+    const effWildDefBase = Math.max(0, Math.round((wildCreature.def ?? 0) * (1 + encState.enemyDefMod)))
+    playerDamage = calculateCombatDamage({
+      attackerAtk: effPlayerBase.atk,
+      defenderDef: effWildDefBase,
+      attackMultiplier: atkMultiplier * critMult,
+      elementMultiplier: elementMult,
+    })
     wildHpRemaining = Math.max(0, wildHpRemaining - playerDamage)
 
     // Innate on-hit status effect (base attacks only — abilities carry their own).
@@ -321,7 +358,14 @@ export async function POST(request: Request) {
   if (wildHpRemaining > 0 && !skipWildAttack && playerHpRemaining > 0) {
     // enemyAtkMod is 0 unless the player debuffed the wild — identical to before otherwise.
     const effWildAtk = Math.max(1, Math.round(wildCreature.atk * (1 + encState.enemyAtkMod)))
-    wildDamage = calculateFightDamage(effWildAtk)
+    // Mitigated by the player creature's DEF, symmetrically with the player's
+    // own attack above. Before, the wild's counterattack ignored defence too,
+    // which is why DEF gear read as a dead stat in encounters.
+    const effPlayerDef = applyStatMods(playerAtk, playerDef, encState.player).def
+    wildDamage = calculateCombatDamage({
+      attackerAtk: effWildAtk,
+      defenderDef: effPlayerDef,
+    })
     playerTookDamage = true
     playerHpRemaining = Math.max(0, playerHpRemaining - wildDamage)
   }

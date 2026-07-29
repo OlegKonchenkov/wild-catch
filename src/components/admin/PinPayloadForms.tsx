@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { EVENT_BONUS_KINDS, EVENT_BONUS_LABELS, EVENT_BONUS_LIMITS } from '@/lib/game/event-bonuses'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -385,22 +386,59 @@ export function PinPayloadEnigma({ allEnigmi, value, onChange }: {
 
 // ── Evento ────────────────────────────────────────────────────────────────────
 
+// The type used to be a free-text box (placeholder: "es. spawn_boost,
+// gold_rain…") and the server ignored whatever was typed. Now it's a closed
+// list backed by EVENT_BONUS_KINDS, with the multiplier and duration that
+// actually get applied — so what an organiser configures is what the player
+// gets. `effect` stays as the player-facing flavour text.
 export function PinPayloadEvento({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const p         = parsePayload(value)
-  const eventType = (p.event_type as string) ?? ''
+  const eventType = (p.event_type as string) ?? EVENT_BONUS_KINDS[0]
   const effect    = (p.effect as string) ?? ''
+  const multiplier = Number(p.multiplier ?? 2)
+  const minutes    = Number(p.duration_minutes ?? 15)
+
+  const emit = (patch: Record<string, unknown>) => onChange(encodePayload({
+    event_type: eventType, effect, multiplier, duration_minutes: minutes, ...patch,
+  }))
+
+  const { minMultiplier, maxMultiplier, minMinutes, maxMinutes } = EVENT_BONUS_LIMITS
+
   return (
     <div className="space-y-2">
       <div>
         <label className={LABEL}>Tipo evento</label>
-        <input value={eventType} placeholder="es. spawn_boost, gold_rain…"
-          onChange={e => onChange(encodePayload({ event_type: e.target.value, effect }))}
-          className={INPUT} />
+        <select value={eventType} onChange={e => emit({ event_type: e.target.value })} className={INPUT}>
+          {EVENT_BONUS_KINDS.map(k => (
+            <option key={k} value={k}>{EVENT_BONUS_LABELS[k]}</option>
+          ))}
+        </select>
       </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={LABEL}>Moltiplicatore</label>
+          <input type="number" step="0.5" min={minMultiplier} max={maxMultiplier} value={multiplier}
+            onChange={e => emit({ multiplier: Number(e.target.value) })}
+            className={INPUT} />
+        </div>
+        <div>
+          <label className={LABEL}>Durata (minuti)</label>
+          <input type="number" min={minMinutes} max={maxMinutes} value={minutes}
+            onChange={e => emit({ duration_minutes: Number(e.target.value) })}
+            className={INPUT} />
+        </div>
+      </div>
+      <p className="text-[11px] text-white/40 leading-snug">
+        {eventType === 'spawn_boost'
+          ? `Incontri ×${multiplier} per ${minutes} min (il tasso resta comunque ≤ 100%).`
+          : eventType === 'gold_rain'
+            ? `Oro dalle catture ×${multiplier} per ${minutes} min.`
+            : `EXP dalle catture ×${multiplier} per ${minutes} min.`}
+      </p>
       <div>
         <label className={LABEL}>Descrizione effetto</label>
         <textarea value={effect} rows={2} placeholder="Testo mostrato al giocatore…"
-          onChange={e => onChange(encodePayload({ event_type: eventType, effect: e.target.value }))}
+          onChange={e => emit({ effect: e.target.value })}
           className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#3A9DBC]/60" />
       </div>
     </div>

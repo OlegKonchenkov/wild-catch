@@ -14,6 +14,7 @@ import {
   normalizeAbilityState, type Ability, type AbilityBattleState,
 } from '@/lib/game/abilities'
 import { normalizeEncounterAbilityState, clampMod } from '@/lib/game/ability-turn'
+import { grantLevelRewards, type LevelUpResult } from '@/lib/game/level-rewards'
 import { sendPushToUser, getDisplayName, pickOne } from '@/lib/push'
 import { RARITY_RANK, type Element, type Rarity } from '@/lib/types'
 import type { Json } from '@/types/database'
@@ -135,10 +136,10 @@ async function grantBossFightRewards({
   supabase: Awaited<ReturnType<typeof createClient>>
   userId: string
 }): Promise<{
-  levelUp: { newLevel: number; goldReward: number } | null
+  levelUp: LevelUpResult | null
   reward: Record<string, unknown> | null
 }> {
-  let levelUp: { newLevel: number; goldReward: number } | null = null
+  let levelUp: LevelUpResult | null = null
   let rewardGranted = false
 
   // Dedup reward per (user, QR, session). A global boss QR earns a reward
@@ -199,7 +200,11 @@ async function grantBossFightRewards({
   })
   const rpcRow = Array.isArray(rpcData) ? rpcData[0] : null
   if (rpcRow?.leveled_up) {
-    levelUp = { newLevel: rpcRow.new_level, goldReward: rpcRow.gold_reward ?? 0 }
+    levelUp = {
+      newLevel: rpcRow.new_level,
+      goldReward: rpcRow.gold_reward ?? 0,
+      rewards: await grantLevelRewards(admin, userId, fight.session_id, rpcRow.new_level),
+    }
   }
 
   const goldReward = (reward?.gold ?? 0) + (levelUp?.goldReward ?? 0)
@@ -737,7 +742,7 @@ export async function POST(request: Request, { params }: Params) {
 
     await Promise.all(updates)
 
-    let levelUp: { newLevel: number; goldReward: number } | null = null
+    let levelUp: LevelUpResult | null = null
     let reward: Record<string, unknown> | null = null
 
     if (won) {
@@ -1324,7 +1329,7 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     // ── Grant reward on win ──────────────────────────────────────────────
-    let levelUp: { newLevel: number; goldReward: number } | null = null
+    let levelUp: LevelUpResult | null = null
     let enrichedReward: Record<string, unknown> | null = null
     if (won) {
       const rewardResult = await grantBossFightRewards({

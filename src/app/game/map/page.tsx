@@ -18,6 +18,7 @@ import { haversineDistance } from '@/lib/game/anti-cheat'
 import useTweenedInteger from '@/hooks/useTweenedInteger'
 import { logSessionErrorClient } from '@/lib/logSessionErrorClient'
 import CreatureDiorama from '@/components/creature/CreatureDiorama'
+import EventBonusBadges from '@/components/game/EventBonusBadges'
 import ElementIcon from '@/components/ui/ElementIcon'
 import EggHatchModal from '@/components/game/EggHatchModal'
 import Coachmark, { type CoachmarkStep } from '@/components/game/Coachmark'
@@ -205,6 +206,7 @@ function MapPageInner() {
   const [sessionEnded, setSessionEnded] = useState(false)
   const [sessionRestarted, setSessionRestarted] = useState(false)
   const [escaActiveUntil, setEscaActiveUntil] = useState<Date | null>(null)
+  const [eventBonuses, setEventBonuses] = useState<unknown>(null)
   const [creatureImageUrl, setCreatureImageUrl] = useState<string | null>(null)
   const [creatureElement, setCreatureElement] = useState<string | null>(null)
   const [creatureRarity, setCreatureRarity] = useState<string | null>(null)
@@ -827,7 +829,7 @@ function MapPageInner() {
       getCurrentUser(supabase).then(user => {
         if (!user) { setAmbienceReady(true); return }
         supabase.from('player_sessions')
-          .select('esca_active_until, selected_creature_id, steps_walked, onboarding_seen')
+          .select('esca_active_until, selected_creature_id, steps_walked, onboarding_seen, event_bonuses')
           .eq('user_id', user.id)
           .eq('session_id', sid)
           .single()
@@ -847,6 +849,9 @@ function MapPageInner() {
               const d = new Date(data.esca_active_until)
               if (d > new Date()) setEscaActiveUntil(d)
             }
+            // Timed `evento` bonuses (EXP ×N, gold rain, spawn boost) — the
+            // HUD badge is the only way the player can tell one is running.
+            setEventBonuses(data?.event_bonuses ?? null)
             if (typeof data?.steps_walked === 'number') {
               // Compare server's count to any locally-cached optimistic
               // total from a previous mount (now includes the pending
@@ -1841,6 +1846,7 @@ function MapPageInner() {
             </div>
           </div>
         )}
+        <EventBonusBadges bonuses={eventBonuses} />
       </div>
 
       {/* Starter selection — shown when player has no creatures in this session */}

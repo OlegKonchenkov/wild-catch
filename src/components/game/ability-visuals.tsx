@@ -30,7 +30,9 @@ export function buildAbilityChips(a: Ability): AbilityChip[] {
 
   if (a.power > 0) chips.push({ key: 'pow', label: `⚔ ×${a.power}`, color: '#FB923C' })
   if (a.hits_max > 1) chips.push({ key: 'hits', label: `${a.hits_min}–${a.hits_max} colpi`, color: '#F59E0B' })
-  if (a.priority > 0) chips.push({ key: 'prio', label: '⚡ Priorità', color: '#FBBF24' })
+  // No "⚡ Priorità" chip: turn priority was never implemented in any resolver
+  // (see the note on Ability.priority), so the badge advertised a mechanic the
+  // combat engine doesn't have.
   if (a.status_effect) {
     const m = STATUS_EFFECT_META[a.status_effect as StatusEffect]
     chips.push({ key: 'st', label: `${m.emoji} ${m.label} ${pct(a.status_chance)}`, color: m.color })

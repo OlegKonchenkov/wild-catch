@@ -19,27 +19,51 @@ async function memo<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   return value
 }
 
-/** Spawnable creatures pool used by encounter/start for RNG selection. */
-export async function getSpawnableCreatures() {
-  return memo('creatures-spawnable', async () => {
+/** PostgREST filter for "belongs to this event, or is part of the global
+ *  catalogue". `creatures.session_id IS NULL` means the creature spawns
+ *  everywhere; a non-null one is exclusive to that event.
+ *
+ *  Note this deliberately does NOT use `scopedSessionOrFilter` from
+ *  lib/game/tutorial.ts. That helper isolates the tutorial completely
+ *  (session-scoped rows only), which is right for missions/items/QR/enigmi
+ *  because those have tutorial-specific rows seeded — but there are no
+ *  tutorial-scoped creatures, so isolating here would leave the tutorial with
+ *  an empty spawn pool. */
+function sessionScope(sessionId: string): string {
+  return `session_id.eq.${sessionId},session_id.is.null`
+}
+
+/** Spawnable creatures pool used by encounter/start for RNG selection.
+ *
+ *  Scoped to the session. This used to fetch the entire `spawnable` catalogue
+ *  under a single global cache key, so creatures authored as exclusive to one
+ *  event spawned at every other event too — which both breaks the "Daimon
+ *  dedicated to your territory" promise the per-event catalogue exists for,
+ *  and dilutes completion for the player. */
+export async function getSpawnableCreatures(sessionId: string) {
+  return memo(`creatures-spawnable:${sessionId}`, async () => {
     const admin = createAdminClient()
     const { data } = await admin
       .from('creatures')
       .select('id, spawn_weight, rarity, min_level, hp, element')
       .eq('spawnable', true)
+      .or(sessionScope(sessionId))
     return (data ?? []) as Array<{ id: string; spawn_weight: number; rarity: Rarity; min_level: number; hp: number; element: string }>
   })
 }
 
-/** Starter creatures (comune spawnable) shown to new players. */
-export async function getStarterCreatures() {
-  return memo('creatures-starters', async () => {
+/** Starter creatures (comune spawnable) shown to new players. Same scoping as
+ *  the spawn pool — an event with its own starters shouldn't offer another
+ *  event's. */
+export async function getStarterCreatures(sessionId: string) {
+  return memo(`creatures-starters:${sessionId}`, async () => {
     const admin = createAdminClient()
     const { data } = await admin
       .from('creatures')
       .select('id, name, rarity, element, image_url, sprite_cutout_url, sprite_url, hp, atk, def, description')
       .eq('rarity', 'comune')
       .eq('spawnable', true)
+      .or(sessionScope(sessionId))
       .order('name')
     return data ?? []
   })
@@ -63,8 +87,12 @@ export async function getGlobalCatchConfig() {
 export function invalidateConfigCache(key?: 'creatures' | 'catch-config' | 'all') {
   if (!key || key === 'all') { store.clear(); return }
   if (key === 'creatures') {
-    store.delete('creatures-spawnable')
-    store.delete('creatures-starters')
+    // Creature entries are keyed per session (`creatures-spawnable:<id>`), so
+    // drop every entry with that prefix rather than a single fixed key — an
+    // admin editing the catalogue has no idea which sessions are warm.
+    for (const k of store.keys()) {
+      if (k.startsWith('creatures-spawnable:') || k.startsWith('creatures-starters:')) store.delete(k)
+    }
   }
   if (key === 'catch-config') store.delete('global-catch-config')
 }
