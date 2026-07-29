@@ -57,6 +57,9 @@ export const LIMITS = {
   enigma_solve:    makeLimiter(10, '60s'),
   tutorial_claim_pin: makeLimiter(6, '60s'),
   friend_request:  makeLimiter(10, '300s'),
+  // GDPR export fans out across ~30 tables; nobody needs it more than a few
+  // times an hour, and a tight budget keeps it from being a cheap amplifier.
+  profile_export:  makeLimiter(3,  '3600s'),
 } as const
 
 export type LimitKey = keyof typeof LIMITS

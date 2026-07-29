@@ -597,6 +597,25 @@ function HomeLobby() {
                     </svg>
                     Disconnetti
                   </button>
+
+                  {/* GDPR art. 20 — portabilità. Prima non esisteva alcun modo
+                      di ottenere una copia dei propri dati. */}
+                  <a
+                    href="/api/profile/export"
+                    download
+                    className="btn btn-logout"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, textDecoration: 'none' }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Scarica i miei dati
+                  </a>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 8, lineHeight: 1.5, textAlign: 'center' }}>
+                    Un file JSON con profilo, sessioni, creature e progressi.
+                  </p>
                 </div>
               </Card>
 

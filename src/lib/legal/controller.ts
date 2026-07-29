@@ -38,3 +38,13 @@ export const LEGAL_LAST_UPDATED = '2026-07-29'
  * art. 2-quinquies), which is the floor the age gate enforces.
  */
 export const MIN_AGE_WITHOUT_PARENT = 14
+
+/**
+ * How long game data survives after an event closes, in months.
+ *
+ * Enforced by `purge_expired_sessions()` (migration 083, daily pg_cron job) and
+ * stated in the privacy notice. The two must agree — a retention period you
+ * publish but don't enforce is worse than not publishing one, so this constant
+ * is the single place the number appears on the app side.
+ */
+export const RETENTION_MONTHS = 12

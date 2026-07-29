@@ -1,4 +1,4 @@
-import { LEGAL, MIN_AGE_WITHOUT_PARENT, resolveController } from '@/lib/legal/controller'
+import { LEGAL, MIN_AGE_WITHOUT_PARENT, RETENTION_MONTHS, resolveController } from '@/lib/legal/controller'
 
 /**
  * The privacy policy as data, so the in-app modal and the public /privacy page
@@ -93,14 +93,21 @@ export function buildPrivacySections(
     },
     {
       title: 'Conservazione',
-      blocks: [{
-        kind: 'list',
-        items: [
-          "i dati di profilo restano associati all'account finché l'account non viene eliminato",
-          "i dati di gioco e di sessione restano disponibili per la gestione dell'evento, delle classifiche e dello storico finché non vengono rimossi dall'organizzatore o cancelli l'account",
-          'i log tecnici e operativi sono mantenuti per il tempo strettamente necessario a diagnosi, sicurezza e gestione del servizio',
-        ],
-      }],
+      blocks: [
+        {
+          kind: 'list',
+          items: [
+            "i dati di profilo restano associati all'account finché l'account non viene eliminato",
+            `i dati di gioco e di sessione vengono cancellati automaticamente ${RETENTION_MONTHS} mesi dopo la chiusura dell'evento a cui si riferiscono, o prima se l'organizzatore rimuove la sessione o se cancelli l'account`,
+            "l'albo d'oro di un evento (nome e punteggio finale dei primi classificati) viene conservato anche dopo la cancellazione dei dati di gioco, perché è il risultato pubblico della manifestazione; puoi chiederne la rimozione scrivendoci",
+            'i log tecnici e operativi sono mantenuti per il tempo strettamente necessario a diagnosi, sicurezza e gestione del servizio',
+          ],
+        },
+        {
+          kind: 'text',
+          text: `La cancellazione a ${RETENTION_MONTHS} mesi è automatica: non serve chiederla. Se vuoi eliminare i tuoi dati prima, puoi cancellare l'account in qualsiasi momento dal tuo profilo.`,
+        },
+      ],
     },
     {
       title: 'Chi può ricevere i dati',

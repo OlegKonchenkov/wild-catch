@@ -57,11 +57,15 @@ Migrazioni 073–082 applicate al progetto Supabase linkato.
 | C3 nessuna pagina legale pubblica | ✅ `/privacy` e `/termini` pubbliche, linkate dal login. Testo unico condiviso con il modale in-app |
 | C4 analytics senza consenso | ✅ PostHog non si inizializza finché il consenso non è dato; toggle revocabile nelle Preferenze; **email rimossa** da `identify()` |
 
-**Restano aperti**: export dati (art. 20) e retention policy documentata;
-revisione legale dei Termini (bozza, mai passata da un avvocato); login
-alternativo a Google (OTP/magic link) — senza il quale i minori di 13 anni
-restano tecnicamente esclusi da Google stesso; B6 `isValidGPSSpeed`, B7 tipi
-missione, D (sblocco giocatore), F2/F3, e le sezioni G–J.
+| C5 export dati (art. 20) | ✅ `GET /api/profile/export` → JSON scaricabile, bottone in Gestione account. Gira sul client service-role per non perdere righe a causa delle RLS, quindi ogni query è filtrata sull'id del chiamante — invariante coperta da test |
+| C6 retention | ✅ 12 mesi dalla chiusura evento, `purge_expired_sessions()` via pg_cron giornaliero (migrazione 083). L'albo d'oro sopravvive con `session_id` nullo. Periodo dichiarato nell'informativa e definito in un solo punto (`RETENTION_MONTHS`) |
+
+**Restano aperti**: revisione legale dei Termini (bozza, mai passata da un
+avvocato); login alternativo a Google (OTP/magic link) — rimandato per scelta
+dell'owner il 29/07, senza il quale i minori di 13 anni restano esclusi da
+Google stesso nonostante l'age gate li ammetta con consenso genitoriale;
+B6 `isValidGPSSpeed`, B7 tipi missione, D (sblocco giocatore), F2/F3, e le
+sezioni G–J.
 
 ---
 

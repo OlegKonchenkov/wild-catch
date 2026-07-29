@@ -1190,7 +1190,7 @@ export type Database = {
           rank: number
           score: number
           season_label: string
-          session_id: string
+          session_id: string | null
           user_id: string
         }
         Insert: {
@@ -1200,7 +1200,7 @@ export type Database = {
           rank: number
           score: number
           season_label: string
-          session_id: string
+          session_id?: string | null
           user_id: string
         }
         Update: {
@@ -1210,7 +1210,7 @@ export type Database = {
           rank?: number
           score?: number
           season_label?: string
-          session_id?: string
+          session_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -3122,6 +3122,8 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_in_session: { Args: { p_session_id: string }; Returns: boolean }
+      purge_expired_sessions: { Args: never; Returns: number }
+      retention_months: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never
