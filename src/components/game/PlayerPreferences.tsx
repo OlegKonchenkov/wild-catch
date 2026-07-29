@@ -1,12 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { type IconType } from 'react-icons'
-import { GiMusicalNotes, GiSpeaker, GiVibratingSmartphone } from 'react-icons/gi'
+import { GiMusicalNotes, GiProgression, GiSpeaker, GiVibratingSmartphone } from 'react-icons/gi'
 import {
   isMusicMuted, isSfxMuted, isHapticsOff,
   setMusicMuted, setSfxMuted, setHapticsOff,
   onPrefsChange,
 } from '@/lib/audioPrefs'
+import { hasAnalyticsConsent, setAnalyticsConsent } from '@/lib/analytics'
 import PushOptIn from '@/components/game/PushOptIn'
 
 function Switch({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
@@ -69,6 +70,7 @@ export default function PlayerPreferences() {
   const [sfx, setSfx] = useState(true)
   const [haptics, setHaptics] = useState(true)
   const [hapticsSupported, setHapticsSupported] = useState(false)
+  const [analytics, setAnalytics] = useState(false)
 
   useEffect(() => {
     const sync = () => {
@@ -79,8 +81,18 @@ export default function PlayerPreferences() {
     sync()
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only capability check
     setHapticsSupported(typeof navigator !== 'undefined' && !!navigator.vibrate)
+    setAnalytics(hasAnalyticsConsent())
     return onPrefsChange(sync)
   }, [])
+
+  // Consent must be as easy to withdraw as it was to give (GDPR art. 7(3)):
+  // toggling off calls opt_out_capturing() and reset(), so collection actually
+  // stops rather than the switch merely looking off.
+  const toggleAnalytics = () => {
+    const next = !analytics
+    setAnalyticsConsent(next)
+    setAnalytics(next)
+  }
 
   return (
     <div>
@@ -99,6 +111,11 @@ export default function PlayerPreferences() {
         />
       )}
       <PushOptIn />
+      <Row
+        Icon={GiProgression} title="Statistiche di utilizzo"
+        desc="Facoltative. Ci aiutano a capire cosa funziona nel gioco. Nessun dato pubblicitario."
+        on={analytics} onToggle={toggleAnalytics}
+      />
     </div>
   )
 }

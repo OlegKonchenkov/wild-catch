@@ -7,6 +7,8 @@ import { identify, resetIdentity, track } from '@/lib/analytics'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import PrivacyPolicyModal from '@/components/legal/PrivacyPolicyModal'
+import { ABSOLUTE_MIN_AGE, AGE_ERROR_MESSAGES, ageFromBirthYear, checkAge } from '@/lib/legal/age'
+import { MIN_AGE_WITHOUT_PARENT } from '@/lib/legal/controller'
 import PlayerPreferences from '@/components/game/PlayerPreferences'
 import DaimonSplash from '@/components/DaimonSplash'
 
@@ -94,6 +96,8 @@ function HomeLobby() {
   // Invite code form
   const [code, setCode]           = useState(searchParams.get('code') ?? '')
   const [gdpr, setGdpr]           = useState(false)
+  const [birthYear, setBirthYear] = useState('')
+  const [parentalConsent, setParentalConsent] = useState(false)
   const [showJoin, setShowJoin]   = useState(!!searchParams.get('code'))
   const [joining, setJoining]     = useState(false)
   const [joinError, setJoinError] = useState('')
@@ -151,7 +155,8 @@ function HomeLobby() {
     getCurrentUser(supabase).then(user => {
       if (!user) { router.replace('/'); return }
       setUser(user)
-      identify(user.id, { email: user.email })
+      // Pseudonymous id only — the email used to be sent here.
+      identify(user.id)
       loadData()
     })
   }, [supabase, router])
@@ -175,12 +180,18 @@ function HomeLobby() {
   async function handleJoin() {
     if (!code || code.length < 4 || !gdpr || joining) return
     if (!nickname) { setJoinError('Imposta prima il tuo nickname (vedi sopra)'); return }
+
+    // Age gate — the server re-checks this, but failing fast here gives a
+    // usable message instead of a rejected join.
+    const localAge = checkAge(birthYear, parentalConsent)
+    if (!localAge.ok) { setJoinError(AGE_ERROR_MESSAGES[localAge.reason]); return }
+
     setJoining(true); setJoinError(''); setJoinNotice(null)
 
     const consentRes = await fetch('/api/profile', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ acceptGdpr: true }),
+      body: JSON.stringify({ acceptGdpr: true, birthYear: Number(birthYear), parentalConsent }),
     })
     if (!consentRes.ok) {
       const consentData = await consentRes.json().catch(() => ({}))
@@ -303,6 +314,13 @@ function HomeLobby() {
   const needsNickname  = nickname === null || nickname === ''
   const privacyController = process.env.NEXT_PUBLIC_PRIVACY_CONTROLLER
   const privacyEmail = process.env.NEXT_PUBLIC_PRIVACY_EMAIL
+
+  // Only ask for parental consent once a year has been entered that needs it —
+  // showing the checkbox to everyone would invite people to tick it blindly.
+  const declaredAge = Number(birthYear) >= 1900 ? ageFromBirthYear(Number(birthYear)) : null
+  const needsParentalConsent =
+    declaredAge !== null && declaredAge >= ABSOLUTE_MIN_AGE && declaredAge < MIN_AGE_WITHOUT_PARENT
+  const ageOk = checkAge(birthYear, parentalConsent).ok
 
   const selected = sessions.find(s => s.id === selectedId) ?? null
   const isPlayable = selected && (selected.status === 'active' || selected.status === 'ready' || selected.status === 'ended')
@@ -821,6 +839,44 @@ function HomeLobby() {
                   style={{ marginTop: 14 }}
                 />
 
+                {/* Age gate. In Italy the digital-consent age is 14 (GDPR art. 8
+                    + Codice Privacy art. 2-quinquies); below it a parent or
+                    guardian must consent, and at these events they are present.
+                    Only the outcome is stored — never the year itself. */}
+                <div style={{ marginTop: 14 }}>
+                  <label
+                    htmlFor="birth-year"
+                    style={{ display: 'block', fontSize: 11.5, color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}
+                  >
+                    Anno di nascita
+                  </label>
+                  <input
+                    id="birth-year"
+                    className="input"
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="es. 2010"
+                    min={1900}
+                    max={new Date().getFullYear()}
+                    value={birthYear}
+                    onChange={e => setBirthYear(e.target.value)}
+                  />
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 6, lineHeight: 1.5 }}>
+                    Serve solo a verificare l&apos;età minima. Non lo conserviamo.
+                  </p>
+                </div>
+
+                {needsParentalConsent && (
+                  <label className="gdpr-wrap" onClick={() => setParentalConsent(v => !v)}>
+                    <div className={`gdpr-box ${parentalConsent ? 'on' : ''}`}>
+                      {parentalConsent && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    </div>
+                    <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+                      Ho meno di {MIN_AGE_WITHOUT_PARENT} anni: un <strong style={{ color: 'rgba(255,255,255,0.7)' }}>genitore o tutore è presente</strong> e acconsente alla mia partecipazione e al trattamento dei dati.
+                    </span>
+                  </label>
+                )}
+
                 <label className="gdpr-wrap" onClick={() => setGdpr(v => !v)}>
                   <div className={`gdpr-box ${gdpr ? 'on' : ''}`}>
                     {gdpr && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
@@ -862,7 +918,7 @@ function HomeLobby() {
                 <button
                   className="btn btn-gold"
                   style={{ marginTop: 14 }}
-                  disabled={!code || code.length < 4 || !gdpr || joining || needsNickname}
+                  disabled={!code || code.length < 4 || !gdpr || joining || needsNickname || !ageOk}
                   onClick={handleJoin}
                 >
                   {joining ? <><span className="spinner dark" /> Accesso...</> : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><GiJoystick size={16} /> PARTECIPA ALL&apos;EVENTO</span>}

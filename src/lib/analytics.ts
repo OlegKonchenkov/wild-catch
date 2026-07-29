@@ -8,9 +8,51 @@ import posthog from 'posthog-js'
 
 let initialized = false
 
+// ── Consent ─────────────────────────────────────────────────────────────────
+// Analytics are opt-in and OFF until the user says yes. Previously PostHog was
+// initialised on the first tracked event with no gate at all, and `identify()`
+// was called with the user's email address — i.e. tracking tied to a personal
+// identifier with no consent collected for it. Nothing is sent now until
+// setAnalyticsConsent(true) has been called at least once.
+
+const CONSENT_KEY = 'wc:analytics-consent'
+export type AnalyticsConsent = 'granted' | 'denied' | 'unset'
+
+export function getAnalyticsConsent(): AnalyticsConsent {
+  if (typeof window === 'undefined') return 'unset'
+  try {
+    const stored = window.localStorage.getItem(CONSENT_KEY)
+    return stored === 'granted' || stored === 'denied' ? stored : 'unset'
+  } catch {
+    // Private mode / storage blocked: treat as not consented.
+    return 'unset'
+  }
+}
+
+export function hasAnalyticsConsent(): boolean {
+  return getAnalyticsConsent() === 'granted'
+}
+
+/**
+ * Record the user's choice. Revoking takes effect immediately: PostHog is told
+ * to stop capturing and the local identity is cleared, so "I changed my mind"
+ * actually stops collection rather than only hiding the toggle.
+ */
+export function setAnalyticsConsent(granted: boolean): void {
+  try { window.localStorage.setItem(CONSENT_KEY, granted ? 'granted' : 'denied') } catch {}
+  if (granted) return
+  try {
+    if (initialized) {
+      posthog.opt_out_capturing()
+      posthog.reset()
+    }
+  } catch {}
+}
+
 function ensureInit() {
   if (initialized) return
   if (typeof window === 'undefined') return
+  if (!hasAnalyticsConsent()) return
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY
   if (!key) return
   posthog.init(key, {
@@ -24,23 +66,35 @@ function ensureInit() {
   initialized = true
 }
 
-/** Track a typed game event. Safe to call from anywhere; becomes a no-op without a key. */
+/** Every public entry point funnels through this. */
+function ready(): boolean {
+  if (!hasAnalyticsConsent()) return false
+  ensureInit()
+  return initialized
+}
+
+/** Track a typed game event. No-op without a key or without consent. */
 export function track<K extends keyof GameEvents>(event: K, props?: GameEvents[K]): void {
   try {
-    ensureInit()
-    if (!initialized) return
+    if (!ready()) return
     posthog.capture(event, props as Record<string, unknown> | undefined)
   } catch {
     // analytics must never break the app
   }
 }
 
-/** Associate the current browser with a user id (call once after auth). */
-export function identify(userId: string, traits?: Record<string, unknown>): void {
+/**
+ * Associate the current browser with a user id (call once after auth).
+ *
+ * `traits` deliberately does NOT accept free-form personal data any more. The
+ * call site used to pass `{ email: user.email }`, which shipped a direct
+ * personal identifier to PostHog. The Supabase user id is a pseudonymous key
+ * and is all the funnels need.
+ */
+export function identify(userId: string): void {
   try {
-    ensureInit()
-    if (!initialized) return
-    posthog.identify(userId, traits)
+    if (!ready()) return
+    posthog.identify(userId)
   } catch {}
 }
 
@@ -50,8 +104,7 @@ export function resetIdentity(): void {
 
 export function capturePageview(path: string): void {
   try {
-    ensureInit()
-    if (!initialized) return
+    if (!ready()) return
     posthog.capture('$pageview', { $current_url: path })
   } catch {}
 }

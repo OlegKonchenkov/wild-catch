@@ -43,8 +43,25 @@ Suite dopo l'intervento: **894/894 verdi (120 file)**, typecheck pulito.
 | A5 bonus `evento` | ✅ tre effetti reali (exp_boost, gold_rain, spawn_boost) con moltiplicatore + durata, form admin strutturato e badge HUD |
 | **H1b HP persistenti** | ⏸️ **escluso su richiesta** — da valutare più avanti |
 
-**Restano aperti**: B6 `isValidGPSSpeed`, B7 tipi missione, tutta la sezione C
-(compliance), D, F2/F3, e le sezioni G–J.
+---
+
+## STATO — Compliance (sezione C) applicata
+
+Suite dopo l'intervento: **913/913 verdi (122 file)**, typecheck pulito.
+Migrazioni 073–082 applicate al progetto Supabase linkato.
+
+| Voce | Stato |
+|---|---|
+| C1 cancellazione account rotta | ✅ migrazione 082 riscrive dinamicamente ogni FK verso `auth.users` (NOT NULL → CASCADE, nullable → SET NULL). 20 vincoli corretti in produzione; un guard in coda alla migrazione fallisce se ne resta anche uno bloccante |
+| C2 nessun age gate | ✅ anno di nascita richiesto all'adesione, soglia 14 anni (art. 8 GDPR + art. 2-quinquies), consenso genitoriale sotto soglia, `gdpr_consent_minor` finalmente scritta. L'anno **non** viene conservato |
+| C3 nessuna pagina legale pubblica | ✅ `/privacy` e `/termini` pubbliche, linkate dal login. Testo unico condiviso con il modale in-app |
+| C4 analytics senza consenso | ✅ PostHog non si inizializza finché il consenso non è dato; toggle revocabile nelle Preferenze; **email rimossa** da `identify()` |
+
+**Restano aperti**: export dati (art. 20) e retention policy documentata;
+revisione legale dei Termini (bozza, mai passata da un avvocato); login
+alternativo a Google (OTP/magic link) — senza il quale i minori di 13 anni
+restano tecnicamente esclusi da Google stesso; B6 `isValidGPSSpeed`, B7 tipi
+missione, D (sblocco giocatore), F2/F3, e le sezioni G–J.
 
 ---
 

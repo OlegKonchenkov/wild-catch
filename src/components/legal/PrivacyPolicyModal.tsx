@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
+import Link from 'next/link'
+import { LEGAL, LEGAL_LAST_UPDATED, resolveController } from '@/lib/legal/controller'
+import { buildPrivacySections } from '@/lib/legal/privacy'
 
 interface PrivacyPolicyModalProps {
   open: boolean
@@ -9,19 +12,36 @@ interface PrivacyPolicyModalProps {
   contactEmail?: string | null
 }
 
-function PolicySection({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
+/**
+ * In-app privacy notice, shown in the join flow.
+ *
+ * The text is NOT written here any more: it comes from lib/legal/privacy.ts,
+ * the same definition the public /privacy page renders. Previously this modal
+ * was the only copy of the policy in existence, which also meant it lived
+ * behind Google login — unreadable by anyone deciding whether to sign up.
+ */
+
+function Contact({ email, controllerName }: { email: string; controllerName: string }) {
+  const line = { margin: '6px 0 0' }
+  const strong = { color: '#fff' }
   return (
-    <section
-      style={{
-        padding: '14px 14px 0',
-      }}
-    >
+    <>
+      <p style={{ margin: 0 }}><strong style={strong}>{LEGAL.businessName}</strong></p>
+      <p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.55)' }}>{LEGAL.address}</p>
+      <p style={line}><strong style={strong}>P.IVA:</strong>{' '}
+        <span style={{ color: 'rgba(255,255,255,0.72)' }}>{LEGAL.vatNumber}</span></p>
+      <p style={line}><strong style={strong}>Titolare / referente privacy:</strong> {controllerName}</p>
+      <p style={line}><strong style={strong}>Email:</strong>{' '}
+        <a href={`mailto:${email}`} style={{ color: '#3ABCA8', textDecoration: 'none' }}>{email}</a></p>
+      <p style={line}><strong style={strong}>Tel:</strong>{' '}
+        <a href={`tel:${LEGAL.phone.replace(/\s/g, '')}`} style={{ color: '#3ABCA8', textDecoration: 'none' }}>{LEGAL.phone}</a></p>
+    </>
+  )
+}
+
+function PolicySection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section style={{ padding: '14px 14px 0' }}>
       <div
         style={{
           fontSize: 11,
@@ -51,18 +71,6 @@ function PolicySection({
   )
 }
 
-function PolicyList({ items }: { items: string[] }) {
-  return (
-    <ul style={{ paddingLeft: 18, margin: 0 }}>
-      {items.map(item => (
-        <li key={item} style={{ marginBottom: 6 }}>
-          {item}
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 export default function PrivacyPolicyModal({
   open,
   onClose,
@@ -78,7 +86,6 @@ export default function PrivacyPolicyModal({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
-
     window.addEventListener('keydown', onKeyDown)
 
     return () => {
@@ -89,13 +96,11 @@ export default function PrivacyPolicyModal({
 
   if (!open) return null
 
-  // Dati fissi del titolare — Adventura Escape Room Pesaro
-  const businessName   = 'Adventura Escape Room Pesaro di Marco Tomasucci'
-  const controllerLabel = controllerName?.trim() || 'Marco Tomasucci'
-  const address        = 'Via XXIV Maggio 17, 61121 Pesaro (PU) — Italia'
-  const vatNumber      = '02812540413'
-  const contactLabel   = contactEmail?.trim() || 'adventuraescaperoom@gmail.com'
-  const phone          = '+39 339 7136398'
+  const controller = resolveController(controllerName, contactEmail)
+  const sections = buildPrivacySections(controllerName, contactEmail)
+  const updated = new Date(LEGAL_LAST_UPDATED).toLocaleDateString('it-IT', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  })
 
   return (
     <div
@@ -123,8 +128,7 @@ export default function PrivacyPolicyModal({
           maxHeight: '84svh',
           overflowY: 'auto',
           borderRadius: 24,
-          background:
-            'linear-gradient(160deg, rgba(13,30,46,0.98) 0%, rgba(10,21,32,0.99) 100%)',
+          background: 'linear-gradient(160deg, rgba(13,30,46,0.98) 0%, rgba(10,21,32,0.99) 100%)',
           border: '1px solid rgba(58,188,168,0.2)',
           boxShadow: '0 24px 80px rgba(0,0,0,0.4)',
         }}
@@ -136,19 +140,11 @@ export default function PrivacyPolicyModal({
             zIndex: 1,
             padding: '18px 18px 14px',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
-            background:
-              'linear-gradient(180deg, rgba(13,30,46,0.98) 0%, rgba(13,30,46,0.94) 100%)',
+            background: 'linear-gradient(180deg, rgba(13,30,46,0.98) 0%, rgba(13,30,46,0.94) 100%)',
             backdropFilter: 'blur(12px)',
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: 12,
-            }}
-          >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div>
               <div
                 style={{
@@ -162,26 +158,19 @@ export default function PrivacyPolicyModal({
               >
                 Privacy
               </div>
-              <h2
-                style={{
-                  fontSize: 22,
-                  lineHeight: 1.15,
-                  color: '#fff',
-                  margin: 0,
-                }}
-              >
+              <h2 style={{ fontSize: 22, lineHeight: 1.15, color: '#fff', margin: 0 }}>
                 Informativa Privacy
               </h2>
-              <p
-                style={{
-                  marginTop: 8,
-                  fontSize: 12,
-                  color: 'rgba(255,255,255,0.42)',
-                  lineHeight: 1.5,
-                }}
-              >
-                Versione sintetica mostrata al momento di accesso all&apos;evento. Ultimo
-                aggiornamento: 15 aprile 2026.
+              <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5 }}>
+                Ultimo aggiornamento: {updated}. Consultabile in ogni momento su{' '}
+                <Link href="/privacy" style={{ color: '#3ABCA8', textDecoration: 'none' }}>
+                  /privacy
+                </Link>
+                , insieme ai{' '}
+                <Link href="/termini" style={{ color: '#3ABCA8', textDecoration: 'none' }}>
+                  Termini di Servizio
+                </Link>
+                .
               </p>
             </div>
 
@@ -202,127 +191,31 @@ export default function PrivacyPolicyModal({
               }}
               aria-label="Chiudi informativa privacy"
             >
-              x
+              ×
             </button>
           </div>
         </div>
 
         <div style={{ paddingBottom: 18 }}>
-          <PolicySection title="Titolare del trattamento">
-            <p style={{ margin: 0 }}>
-              <strong style={{ color: '#fff' }}>{businessName}</strong>
-            </p>
-            <p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.55)' }}>
-              {address}
-            </p>
-            <p style={{ margin: '6px 0 0' }}>
-              <strong style={{ color: '#fff' }}>P.IVA:</strong>{' '}
-              <span style={{ color: 'rgba(255,255,255,0.72)' }}>{vatNumber}</span>
-            </p>
-            <p style={{ margin: '6px 0 0' }}>
-              <strong style={{ color: '#fff' }}>Titolare / referente privacy:</strong>{' '}
-              {controllerLabel}
-            </p>
-            <p style={{ margin: '6px 0 0' }}>
-              <strong style={{ color: '#fff' }}>Email:</strong>{' '}
-              <a href={`mailto:${contactLabel}`} style={{ color: '#3ABCA8', textDecoration: 'none' }}>
-                {contactLabel}
-              </a>
-            </p>
-            <p style={{ margin: '6px 0 0' }}>
-              <strong style={{ color: '#fff' }}>Tel:</strong>{' '}
-              <a href={`tel:${phone}`} style={{ color: '#3ABCA8', textDecoration: 'none' }}>
-                {phone}
-              </a>
-            </p>
-          </PolicySection>
-
-          <PolicySection title="Quali dati trattiamo">
-            <PolicyList
-              items={[
-                "dati di accesso e profilo provenienti dall'autenticazione (es. email, nome profilo, avatar Google se disponibile)",
-                'nickname scelto nel gioco',
-                'partecipazione alla sessione, progressi, inventario, creature, missioni, duelli, QR riscattati e ricompense',
-                'posizione GPS e accuratezza durante il gioco, necessarie alle funzioni basate sulla mappa e sugli incontri',
-                "dati tecnici essenziali per tenere aperta la sessione sul dispositivo, come l'identificativo sessione salvato in locale",
-                "se attivi le notifiche push: l'identificativo della sottoscrizione push del browser/dispositivo (endpoint e chiavi) necessario a recapitare gli avvisi",
-              ]}
-            />
-          </PolicySection>
-
-          <PolicySection title="Perche usiamo questi dati">
-            <PolicyList
-              items={[
-                "consentirti l'accesso e la partecipazione all'evento di gioco",
-                'abilitare mappa, incontri, missioni, QR code, duelli, classifiche e progressi',
-                'gestire sicurezza operativa minima, assistenza e prevenzione di abusi o errori di sessione',
-                'tenere traccia dell accettazione dell informativa privacy mostrata nel flusso di adesione',
-              ]}
-            />
-          </PolicySection>
-
-          <PolicySection title="Base giuridica e geolocalizzazione">
-            <p style={{ margin: 0 }}>
-              L&apos;app richiede una tua azione positiva per accettare questa informativa e
-              usa i permessi del browser/dispositivo per la geolocalizzazione. Senza GPS
-              alcune funzioni basate sulla mappa potrebbero non essere disponibili o
-              risultare limitate durante la sessione.
-            </p>
-          </PolicySection>
-
-          <PolicySection title="Notifiche push">
-            <p style={{ margin: 0 }}>
-              Le notifiche push sono <strong style={{ color: '#fff' }}>facoltative</strong> e
-              vengono attivate solo con una tua azione esplicita e con il permesso del
-              browser/dispositivo. Le usiamo unicamente per avvisarti di eventi di gioco
-              rilevanti (es. esito duelli, missioni completate, salita di livello, boss
-              sconfitti) e di comunicazioni degli organizzatori. Puoi revocarle in
-              qualsiasi momento dal pannello Notifiche o dalle impostazioni del browser:
-              la sottoscrizione viene eliminata e quelle non più valide sono rimosse
-              automaticamente.
-            </p>
-          </PolicySection>
-
-          <PolicySection title="Conservazione">
-            <PolicyList
-              items={[
-                "i dati di profilo restano associati all'account finche l'account non viene eliminato",
-                "i dati di gioco e di sessione restano disponibili per la gestione dell'evento, delle classifiche e dello storico finche non vengono rimossi dall'organizzatore o cancelli l'account",
-                'i log tecnici e operativi sono mantenuti per il tempo strettamente necessario a diagnosi, sicurezza e gestione del servizio',
-              ]}
-            />
-          </PolicySection>
-
-          <PolicySection title="Chi puo ricevere i dati">
-            <PolicyList
-              items={[
-                "fornitori tecnici indispensabili per autenticazione, database, hosting e mappe",
-                "organizzatori o amministratori dell'evento per funzioni operative strettamente collegate alla sessione",
-              ]}
-            />
-          </PolicySection>
-
-          <PolicySection title="I tuoi diritti">
-            <PolicyList
-              items={[
-                'accesso, rettifica, cancellazione, limitazione, opposizione e portabilita dei dati nei limiti previsti dalla legge',
-                "revoca del consenso gia prestato, senza pregiudicare i trattamenti gia effettuati",
-                "reclamo all'autorita di controllo competente",
-              ]}
-            />
-          </PolicySection>
-
-          <PolicySection title="Autorità di controllo">
-            <p style={{ margin: 0 }}>
-              Hai il diritto di proporre reclamo al{' '}
-              <strong style={{ color: '#fff' }}>Garante per la Protezione dei Dati Personali</strong>{' '}
-              (
-              <a href="https://www.garanteprivacy.it" target="_blank" rel="noopener noreferrer" style={{ color: '#3ABCA8', textDecoration: 'none' }}>
-                www.garanteprivacy.it
-              </a>
-              ) se ritieni che il trattamento dei tuoi dati violi il Regolamento UE 2016/679 (GDPR).
-            </p>
-          </PolicySection>
+          {sections.map(section => (
+            <PolicySection key={section.title} title={section.title}>
+              {section.blocks.map((block, i) => {
+                if (block.kind === 'contact') {
+                  return <Contact key={i} email={controller.email} controllerName={controller.controllerName} />
+                }
+                if (block.kind === 'list') {
+                  return (
+                    <ul key={i} style={{ paddingLeft: 18, margin: i === 0 ? 0 : '10px 0 0' }}>
+                      {block.items.map(item => (
+                        <li key={item} style={{ marginBottom: 6 }}>{item}</li>
+                      ))}
+                    </ul>
+                  )
+                }
+                return <p key={i} style={{ margin: i === 0 ? 0 : '10px 0 0' }}>{block.text}</p>
+              })}
+            </PolicySection>
+          ))}
         </div>
       </div>
     </div>

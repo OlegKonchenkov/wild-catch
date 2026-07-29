@@ -247,6 +247,17 @@ function LoginInner() {
           transition: color 0.2s;
         }
         .admin-link a:hover { color: rgba(255,255,255,0.55); }
+
+        .legal-links {
+          margin-top: 10px; font-size: 11.5px; text-align: center;
+          display: flex; justify-content: center; gap: 8px;
+          color: rgba(255,255,255,0.18);
+        }
+        .legal-links a {
+          color: rgba(255,255,255,0.32); text-decoration: none;
+          transition: color 0.2s; padding: 4px 2px;
+        }
+        .legal-links a:hover { color: rgba(255,255,255,0.55); }
       `}</style>
 
       <div className="login-root">
@@ -350,6 +361,15 @@ function LoginInner() {
 
           <div className="admin-link">
             Sei un organizzatore? <a href="/admin-login">Accesso admin →</a>
+          </div>
+
+          {/* Legal links have to be reachable BEFORE signing in: this is the
+              screen where someone decides whether to hand over their data, and
+              both app stores require a publicly linkable policy. */}
+          <div className="legal-links">
+            <a href="/privacy">Privacy</a>
+            <span aria-hidden="true">·</span>
+            <a href="/termini">Termini</a>
           </div>
         </div>
       </div>
