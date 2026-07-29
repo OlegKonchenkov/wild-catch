@@ -122,6 +122,92 @@ export type Database = {
         }
         Relationships: []
       }
+      anecdotes: {
+        Row: {
+          body: string
+          character_id: string | null
+          created_at: string
+          id: string
+          image_url: string
+          place_id: string | null
+          rarity: string | null
+          title: string
+        }
+        Insert: {
+          body?: string
+          character_id?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string
+          place_id?: string | null
+          rarity?: string | null
+          title: string
+        }
+        Update: {
+          body?: string
+          character_id?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string
+          place_id?: string | null
+          rarity?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anecdotes_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anecdotes_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "cultural_places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artworks: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          name: string
+          place_id: string | null
+          rarity: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          name: string
+          place_id?: string | null
+          rarity?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          name?: string
+          place_id?: string | null
+          rarity?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artworks_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "cultural_places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audio_overrides: {
         Row: {
           created_at: string
@@ -232,6 +318,98 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      characters: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          name: string
+          place_id: string | null
+          rarity: string | null
+          unlocks_ability_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          name: string
+          place_id?: string | null
+          rarity?: string | null
+          unlocks_ability_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          name?: string
+          place_id?: string | null
+          rarity?: string | null
+          unlocks_ability_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "characters_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "cultural_places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "characters_unlocks_ability_id_fkey"
+            columns: ["unlocks_ability_id"]
+            isOneToOne: false
+            referencedRelation: "abilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chests: {
+        Row: {
+          contents: Json
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          key_requirements: Json
+          name: string
+          place_id: string | null
+          rarity: string | null
+        }
+        Insert: {
+          contents?: Json
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          key_requirements?: Json
+          name: string
+          place_id?: string | null
+          rarity?: string | null
+        }
+        Update: {
+          contents?: Json
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          key_requirements?: Json
+          name?: string
+          place_id?: string | null
+          rarity?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chests_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "cultural_places"
             referencedColumns: ["id"]
           },
         ]
@@ -448,6 +626,50 @@ export type Database = {
           },
           {
             foreignKeyName: "creatures_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cultural_places: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          lat: number | null
+          lng: number | null
+          name: string
+          session_id: string | null
+          unlock_bonus: Json | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          lat?: number | null
+          lng?: number | null
+          name: string
+          session_id?: string | null
+          unlock_bonus?: Json | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          session_id?: string | null
+          unlock_bonus?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cultural_places_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
@@ -790,6 +1012,33 @@ export type Database = {
           },
         ]
       }
+      friendships: {
+        Row: {
+          addressee_id: string
+          created_at: string
+          id: string
+          requester_id: string
+          responded_at: string | null
+          status: string
+        }
+        Insert: {
+          addressee_id: string
+          created_at?: string
+          id?: string
+          requester_id: string
+          responded_at?: string | null
+          status?: string
+        }
+        Update: {
+          addressee_id?: string
+          created_at?: string
+          id?: string
+          requester_id?: string
+          responded_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       global_catch_config: {
         Row: {
           comune_rate: number
@@ -838,6 +1087,101 @@ export type Database = {
         }
         Relationships: []
       }
+      group_members: {
+        Row: {
+          group_id: string
+          id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      gym_holds: {
+        Row: {
+          held_since: string
+          holder_id: string
+          id: string
+          pin_id: string
+          session_id: string
+          times_defended: number
+        }
+        Insert: {
+          held_since?: string
+          holder_id: string
+          id?: string
+          pin_id: string
+          session_id: string
+          times_defended?: number
+        }
+        Update: {
+          held_since?: string
+          holder_id?: string
+          id?: string
+          pin_id?: string
+          session_id?: string
+          times_defended?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gym_holds_pin_id_fkey"
+            columns: ["pin_id"]
+            isOneToOne: false
+            referencedRelation: "session_map_pins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gym_holds_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hall_of_fame: {
         Row: {
           awarded_at: string | null
@@ -878,72 +1222,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      friendships: {
-        Row: {
-          id: string
-          requester_id: string
-          addressee_id: string
-          status: string
-          created_at: string
-          responded_at: string | null
-        }
-        Insert: {
-          id?: string
-          requester_id: string
-          addressee_id: string
-          status?: string
-          created_at?: string
-          responded_at?: string | null
-        }
-        Update: {
-          id?: string
-          requester_id?: string
-          addressee_id?: string
-          status?: string
-          created_at?: string
-          responded_at?: string | null
-        }
-        Relationships: []
-      }
-      groups: {
-        Row: { id: string; name: string; code: string; created_by: string | null; created_at: string }
-        Insert: { id?: string; name: string; code: string; created_by?: string | null; created_at?: string }
-        Update: { id?: string; name?: string; code?: string; created_by?: string | null; created_at?: string }
-        Relationships: []
-      }
-      group_members: {
-        Row: { id: string; group_id: string; user_id: string; joined_at: string }
-        Insert: { id?: string; group_id: string; user_id: string; joined_at?: string }
-        Update: { id?: string; group_id?: string; user_id?: string; joined_at?: string }
-        Relationships: []
-      }
-      gym_holds: {
-        Row: {
-          id: string
-          pin_id: string
-          session_id: string
-          holder_id: string
-          held_since: string
-          times_defended: number
-        }
-        Insert: {
-          id?: string
-          pin_id: string
-          session_id: string
-          holder_id: string
-          held_since?: string
-          times_defended?: number
-        }
-        Update: {
-          id?: string
-          pin_id?: string
-          session_id?: string
-          holder_id?: string
-          held_since?: string
-          times_defended?: number
-        }
-        Relationships: []
       }
       items: {
         Row: {
@@ -1083,10 +1361,10 @@ export type Database = {
           reward_ability_id: string | null
           reward_creature_id: string | null
           reward_exp: number
+          reward_extra: Json | null
           reward_gold: number
           reward_item_id: string | null
           reward_items: Json
-          reward_extra: Json | null
           session_id: string | null
           target: string
           target_count: number
@@ -1105,10 +1383,10 @@ export type Database = {
           reward_ability_id?: string | null
           reward_creature_id?: string | null
           reward_exp?: number
+          reward_extra?: Json | null
           reward_gold?: number
           reward_item_id?: string | null
           reward_items?: Json
-          reward_extra?: Json | null
           session_id?: string | null
           target: string
           target_count?: number
@@ -1127,10 +1405,10 @@ export type Database = {
           reward_ability_id?: string | null
           reward_creature_id?: string | null
           reward_exp?: number
+          reward_extra?: Json | null
           reward_gold?: number
           reward_item_id?: string | null
           reward_items?: Json
-          reward_extra?: Json | null
           session_id?: string | null
           target?: string
           target_count?: number
@@ -1212,149 +1490,39 @@ export type Database = {
           },
         ]
       }
-      chests: {
-        Row: {
-          id: string
-          name: string
-          description: string
-          rarity: string | null
-          image_url: string
-          place_id: string | null
-          key_requirements: Json
-          contents: Json
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          description?: string
-          rarity?: string | null
-          image_url?: string
-          place_id?: string | null
-          key_requirements?: Json
-          contents?: Json
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string
-          rarity?: string | null
-          image_url?: string
-          place_id?: string | null
-          key_requirements?: Json
-          contents?: Json
-          created_at?: string
-        }
-        Relationships: []
-      }
-      player_chests: {
-        Row: {
-          id: string
-          user_id: string
-          session_id: string
-          chest_id: string
-          quantity: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          session_id: string
-          chest_id: string
-          quantity?: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          session_id?: string
-          chest_id?: string
-          quantity?: number
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "player_chests_chest_id_fkey"
-            columns: ["chest_id"]
-            isOneToOne: false
-            referencedRelation: "chests"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      packs: {
-        Row: {
-          id: string
-          name: string
-          description: string
-          rarity: string | null
-          image_url: string
-          min_drops: number
-          max_drops: number
-          price_gold: number | null
-          price_gemme: number | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          description?: string
-          rarity?: string | null
-          image_url?: string
-          min_drops?: number
-          max_drops?: number
-          price_gold?: number | null
-          price_gemme?: number | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string
-          rarity?: string | null
-          image_url?: string
-          min_drops?: number
-          max_drops?: number
-          price_gold?: number | null
-          price_gemme?: number | null
-          created_at?: string
-        }
-        Relationships: []
-      }
       pack_pool: {
         Row: {
-          id: string
-          pack_id: string
-          reward_type: string
-          reward_payload: Json
-          weight: number
-          rarity_tier: string | null
-          min_qty: number
-          max_qty: number
           created_at: string
+          id: string
+          max_qty: number
+          min_qty: number
+          pack_id: string
+          rarity_tier: string | null
+          reward_payload: Json
+          reward_type: string
+          weight: number
         }
         Insert: {
-          id?: string
-          pack_id: string
-          reward_type: string
-          reward_payload?: Json
-          weight?: number
-          rarity_tier?: string | null
-          min_qty?: number
-          max_qty?: number
           created_at?: string
+          id?: string
+          max_qty?: number
+          min_qty?: number
+          pack_id: string
+          rarity_tier?: string | null
+          reward_payload?: Json
+          reward_type: string
+          weight?: number
         }
         Update: {
-          id?: string
-          pack_id?: string
-          reward_type?: string
-          reward_payload?: Json
-          weight?: number
-          rarity_tier?: string | null
-          min_qty?: number
-          max_qty?: number
           created_at?: string
+          id?: string
+          max_qty?: number
+          min_qty?: number
+          pack_id?: string
+          rarity_tier?: string | null
+          reward_payload?: Json
+          reward_type?: string
+          weight?: number
         }
         Relationships: [
           {
@@ -1366,204 +1534,44 @@ export type Database = {
           },
         ]
       }
-      player_packs: {
+      packs: {
         Row: {
-          id: string
-          user_id: string
-          session_id: string
-          pack_id: string
-          quantity: number
           created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          session_id: string
-          pack_id: string
-          quantity?: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          session_id?: string
-          pack_id?: string
-          quantity?: number
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "player_packs_pack_id_fkey"
-            columns: ["pack_id"]
-            isOneToOne: false
-            referencedRelation: "packs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      cultural_places: {
-        Row: { id: string; name: string; description: string; image_url: string; lat: number | null; lng: number | null; session_id: string | null; unlock_bonus: Json | null; created_at: string }
-        Insert: { id?: string; name: string; description?: string; image_url?: string; lat?: number | null; lng?: number | null; session_id?: string | null; unlock_bonus?: Json | null; created_at?: string }
-        Update: { id?: string; name?: string; description?: string; image_url?: string; lat?: number | null; lng?: number | null; session_id?: string | null; unlock_bonus?: Json | null; created_at?: string }
-        Relationships: []
-      }
-      artworks: {
-        Row: { id: string; name: string; description: string; image_url: string; place_id: string | null; rarity: string | null; created_at: string }
-        Insert: { id?: string; name: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; created_at?: string }
-        Update: { id?: string; name?: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; created_at?: string }
-        Relationships: [{ foreignKeyName: "artworks_place_id_fkey"; columns: ["place_id"]; isOneToOne: false; referencedRelation: "cultural_places"; referencedColumns: ["id"] }]
-      }
-      characters: {
-        Row: { id: string; name: string; description: string; image_url: string; place_id: string | null; rarity: string | null; unlocks_ability_id: string | null; created_at: string }
-        Insert: { id?: string; name: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; unlocks_ability_id?: string | null; created_at?: string }
-        Update: { id?: string; name?: string; description?: string; image_url?: string; place_id?: string | null; rarity?: string | null; unlocks_ability_id?: string | null; created_at?: string }
-        Relationships: [{ foreignKeyName: "characters_place_id_fkey"; columns: ["place_id"]; isOneToOne: false; referencedRelation: "cultural_places"; referencedColumns: ["id"] }]
-      }
-      anecdotes: {
-        Row: { id: string; title: string; body: string; image_url: string; place_id: string | null; character_id: string | null; rarity: string | null; created_at: string }
-        Insert: { id?: string; title: string; body?: string; image_url?: string; place_id?: string | null; character_id?: string | null; rarity?: string | null; created_at?: string }
-        Update: { id?: string; title?: string; body?: string; image_url?: string; place_id?: string | null; character_id?: string | null; rarity?: string | null; created_at?: string }
-        Relationships: []
-      }
-      player_collection: {
-        Row: { id: string; user_id: string; session_id: string; kind: string; ref_id: string; copies: number; obtained_at: string }
-        Insert: { id?: string; user_id: string; session_id: string; kind: string; ref_id: string; copies?: number; obtained_at?: string }
-        Update: { id?: string; user_id?: string; session_id?: string; kind?: string; ref_id?: string; copies?: number; obtained_at?: string }
-        Relationships: []
-      }
-      trophies: {
-        Row: { id: string; name: string; description: string; image_url: string; criteria: Json; created_at: string }
-        Insert: { id?: string; name: string; description?: string; image_url?: string; criteria?: Json; created_at?: string }
-        Update: { id?: string; name?: string; description?: string; image_url?: string; criteria?: Json; created_at?: string }
-        Relationships: []
-      }
-      player_trophies: {
-        Row: { id: string; user_id: string; session_id: string; trophy_id: string; awarded_at: string }
-        Insert: { id?: string; user_id: string; session_id: string; trophy_id: string; awarded_at?: string }
-        Update: { id?: string; user_id?: string; session_id?: string; trophy_id?: string; awarded_at?: string }
-        Relationships: [{ foreignKeyName: "player_trophies_trophy_id_fkey"; columns: ["trophy_id"]; isOneToOne: false; referencedRelation: "trophies"; referencedColumns: ["id"] }]
-      }
-      special_prizes: {
-        Row: {
-          id: string
-          name: string
           description: string
-          rarity: string | null
+          id: string
           image_url: string
-          redemption_note: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
+          max_drops: number
+          min_drops: number
           name: string
-          description?: string
-          rarity?: string | null
-          image_url?: string
-          redemption_note?: string
+          price_gemme: number | null
+          price_gold: number | null
+          rarity: string | null
+        }
+        Insert: {
           created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          max_drops?: number
+          min_drops?: number
+          name: string
+          price_gemme?: number | null
+          price_gold?: number | null
+          rarity?: string | null
         }
         Update: {
+          created_at?: string
+          description?: string
           id?: string
+          image_url?: string
+          max_drops?: number
+          min_drops?: number
           name?: string
-          description?: string
+          price_gemme?: number | null
+          price_gold?: number | null
           rarity?: string | null
-          image_url?: string
-          redemption_note?: string
-          created_at?: string
         }
         Relationships: []
-      }
-      player_pergamene: {
-        Row: {
-          id: string
-          user_id: string
-          session_id: string
-          steps_at: number
-          earned_at: string
-          opened_at: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          session_id: string
-          steps_at?: number
-          earned_at?: string
-          opened_at?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          session_id?: string
-          steps_at?: number
-          earned_at?: string
-          opened_at?: string | null
-        }
-        Relationships: []
-      }
-      player_place_unlocks: {
-        Row: {
-          id: string
-          user_id: string
-          session_id: string
-          place_id: string
-          unlocked_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          session_id: string
-          place_id: string
-          unlocked_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          session_id?: string
-          place_id?: string
-          unlocked_at?: string
-        }
-        Relationships: []
-      }
-      player_prizes: {
-        Row: {
-          id: string
-          user_id: string
-          session_id: string
-          prize_id: string
-          code: string
-          won_at: string
-          redeemed_at: string | null
-          redeemed_by_admin_id: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          session_id: string
-          prize_id: string
-          code: string
-          won_at?: string
-          redeemed_at?: string | null
-          redeemed_by_admin_id?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          session_id?: string
-          prize_id?: string
-          code?: string
-          won_at?: string
-          redeemed_at?: string | null
-          redeemed_by_admin_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "player_prizes_prize_id_fkey"
-            columns: ["prize_id"]
-            isOneToOne: false
-            referencedRelation: "special_prizes"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       pin_claims: {
         Row: {
@@ -1646,35 +1654,85 @@ export type Database = {
           },
         ]
       }
-      player_daily_claims: {
+      player_chests: {
         Row: {
-          id: string
-          user_id: string
-          session_id: string
-          claim_date: string
-          streak: number
-          reward: Json
+          chest_id: string
           created_at: string
+          id: string
+          quantity: number
+          session_id: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          session_id: string
-          claim_date: string
-          streak?: number
-          reward?: Json
+          chest_id: string
           created_at?: string
+          id?: string
+          quantity?: number
+          session_id: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          session_id?: string
-          claim_date?: string
-          streak?: number
-          reward?: Json
+          chest_id?: string
           created_at?: string
+          id?: string
+          quantity?: number
+          session_id?: string
+          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "player_chests_chest_id_fkey"
+            columns: ["chest_id"]
+            isOneToOne: false
+            referencedRelation: "chests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_chests_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_collection: {
+        Row: {
+          copies: number
+          id: string
+          kind: string
+          obtained_at: string
+          ref_id: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          copies?: number
+          id?: string
+          kind: string
+          obtained_at?: string
+          ref_id: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          copies?: number
+          id?: string
+          kind?: string
+          obtained_at?: string
+          ref_id?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_collection_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       player_creatures: {
         Row: {
@@ -1717,6 +1775,44 @@ export type Database = {
           },
           {
             foreignKeyName: "player_creatures_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_daily_claims: {
+        Row: {
+          claim_date: string
+          created_at: string
+          id: string
+          reward: Json
+          session_id: string
+          streak: number
+          user_id: string
+        }
+        Insert: {
+          claim_date: string
+          created_at?: string
+          id?: string
+          reward?: Json
+          session_id: string
+          streak?: number
+          user_id: string
+        }
+        Update: {
+          claim_date?: string
+          created_at?: string
+          id?: string
+          reward?: Json
+          session_id?: string
+          streak?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_daily_claims_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
@@ -1966,6 +2062,38 @@ export type Database = {
           },
         ]
       }
+      player_level_rewards: {
+        Row: {
+          granted_at: string
+          id: string
+          level: number
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          id?: string
+          level: number
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          id?: string
+          level?: number
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_level_rewards_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_missions: {
         Row: {
           baseline_steps: number | null
@@ -2045,6 +2173,212 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "player_notifications_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_packs: {
+        Row: {
+          created_at: string
+          id: string
+          pack_id: string
+          quantity: number
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pack_id: string
+          quantity?: number
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pack_id?: string
+          quantity?: number
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_packs_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_packs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_pergamene: {
+        Row: {
+          earned_at: string
+          id: string
+          opened_at: string | null
+          session_id: string
+          steps_at: number
+          user_id: string
+        }
+        Insert: {
+          earned_at?: string
+          id?: string
+          opened_at?: string | null
+          session_id: string
+          steps_at?: number
+          user_id: string
+        }
+        Update: {
+          earned_at?: string
+          id?: string
+          opened_at?: string | null
+          session_id?: string
+          steps_at?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_pergamene_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_place_unlocks: {
+        Row: {
+          id: string
+          place_id: string
+          session_id: string
+          unlocked_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          place_id: string
+          session_id: string
+          unlocked_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          place_id?: string
+          session_id?: string
+          unlocked_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_place_unlocks_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "cultural_places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_place_unlocks_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_prizes: {
+        Row: {
+          code: string
+          id: string
+          prize_id: string
+          redeemed_at: string | null
+          redeemed_by_admin_id: string | null
+          session_id: string
+          user_id: string
+          won_at: string
+        }
+        Insert: {
+          code: string
+          id?: string
+          prize_id: string
+          redeemed_at?: string | null
+          redeemed_by_admin_id?: string | null
+          session_id: string
+          user_id: string
+          won_at?: string
+        }
+        Update: {
+          code?: string
+          id?: string
+          prize_id?: string
+          redeemed_at?: string | null
+          redeemed_by_admin_id?: string | null
+          session_id?: string
+          user_id?: string
+          won_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_prizes_prize_id_fkey"
+            columns: ["prize_id"]
+            isOneToOne: false
+            referencedRelation: "special_prizes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_prizes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_quizzes: {
+        Row: {
+          attempts: number
+          id: string
+          quiz_id: string
+          session_id: string
+          solved_at: string | null
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          id?: string
+          quiz_id: string
+          session_id: string
+          solved_at?: string | null
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          id?: string
+          quiz_id?: string
+          session_id?: string
+          solved_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_quizzes_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_quizzes_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
@@ -2132,6 +2466,45 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_trophies: {
+        Row: {
+          awarded_at: string
+          id: string
+          session_id: string
+          trophy_id: string
+          user_id: string
+        }
+        Insert: {
+          awarded_at?: string
+          id?: string
+          session_id: string
+          trophy_id: string
+          user_id: string
+        }
+        Update: {
+          awarded_at?: string
+          id?: string
+          session_id?: string
+          trophy_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_trophies_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_trophies_trophy_id_fkey"
+            columns: ["trophy_id"]
+            isOneToOne: false
+            referencedRelation: "trophies"
             referencedColumns: ["id"]
           },
         ]
@@ -2289,6 +2662,64 @@ export type Database = {
           },
         ]
       }
+      quizzes: {
+        Row: {
+          correct_index: number
+          created_at: string
+          id: string
+          options: Json
+          place_id: string | null
+          question: string
+          reward: Json | null
+          session_id: string | null
+          unlock_anecdote_id: string | null
+        }
+        Insert: {
+          correct_index?: number
+          created_at?: string
+          id?: string
+          options?: Json
+          place_id?: string | null
+          question: string
+          reward?: Json | null
+          session_id?: string | null
+          unlock_anecdote_id?: string | null
+        }
+        Update: {
+          correct_index?: number
+          created_at?: string
+          id?: string
+          options?: Json
+          place_id?: string | null
+          question?: string
+          reward?: Json | null
+          session_id?: string | null
+          unlock_anecdote_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "cultural_places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quizzes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quizzes_unlock_anecdote_id_fkey"
+            columns: ["unlock_anecdote_id"]
+            isOneToOne: false
+            referencedRelation: "anecdotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_errors: {
         Row: {
           context: Json
@@ -2379,8 +2810,8 @@ export type Database = {
           lat: number
           lng: number
           name: string
-          reward_payload: Json | null
           place_id: string | null
+          reward_payload: Json | null
           reward_radius_m: number | null
           reward_type: string | null
           session_id: string
@@ -2395,8 +2826,8 @@ export type Database = {
           lat: number
           lng: number
           name?: string
-          reward_payload?: Json | null
           place_id?: string | null
+          reward_payload?: Json | null
           reward_radius_m?: number | null
           reward_type?: string | null
           session_id: string
@@ -2411,8 +2842,8 @@ export type Database = {
           lat?: number
           lng?: number
           name?: string
-          reward_payload?: Json | null
           place_id?: string | null
+          reward_payload?: Json | null
           reward_radius_m?: number | null
           reward_type?: string | null
           session_id?: string
@@ -2430,6 +2861,13 @@ export type Database = {
             columns: ["enigma_suggerimento_id"]
             isOneToOne: false
             referencedRelation: "enigma_suggerimenti"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_map_pins_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "cultural_places"
             referencedColumns: ["id"]
           },
           {
@@ -2478,105 +2916,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      quizzes: {
-        Row: {
-          id: string
-          session_id: string | null
-          place_id: string | null
-          unlock_anecdote_id: string | null
-          question: string
-          options: Json
-          correct_index: number
-          reward: Json | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          session_id?: string | null
-          place_id?: string | null
-          unlock_anecdote_id?: string | null
-          question: string
-          options?: Json
-          correct_index?: number
-          reward?: Json | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          session_id?: string | null
-          place_id?: string | null
-          unlock_anecdote_id?: string | null
-          question?: string
-          options?: Json
-          correct_index?: number
-          reward?: Json | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      player_quizzes: {
-        Row: {
-          id: string
-          user_id: string
-          session_id: string
-          quiz_id: string
-          attempts: number
-          solved_at: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          session_id: string
-          quiz_id: string
-          attempts?: number
-          solved_at?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          session_id?: string
-          quiz_id?: string
-          attempts?: number
-          solved_at?: string | null
-        }
-        Relationships: []
-      }
-      trades: {
-        Row: {
-          id: string
-          session_id: string
-          proposer_id: string
-          recipient_id: string
-          proposer_creature_id: string
-          recipient_creature_id: string
-          status: string
-          created_at: string
-          responded_at: string | null
-        }
-        Insert: {
-          id?: string
-          session_id: string
-          proposer_id: string
-          recipient_id: string
-          proposer_creature_id: string
-          recipient_creature_id: string
-          status?: string
-          created_at?: string
-          responded_at?: string | null
-        }
-        Update: {
-          id?: string
-          session_id?: string
-          proposer_id?: string
-          recipient_id?: string
-          proposer_creature_id?: string
-          recipient_creature_id?: string
-          status?: string
-          created_at?: string
-          responded_at?: string | null
-        }
-        Relationships: []
       }
       sessions: {
         Row: {
@@ -2640,12 +2979,131 @@ export type Database = {
           },
         ]
       }
+      special_prizes: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          name: string
+          rarity: string | null
+          redemption_note: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          name: string
+          rarity?: string | null
+          redemption_note?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          name?: string
+          rarity?: string | null
+          redemption_note?: string
+        }
+        Relationships: []
+      }
+      trades: {
+        Row: {
+          created_at: string
+          id: string
+          proposer_creature_id: string
+          proposer_id: string
+          recipient_creature_id: string
+          recipient_id: string
+          responded_at: string | null
+          session_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          proposer_creature_id: string
+          proposer_id: string
+          recipient_creature_id: string
+          recipient_id: string
+          responded_at?: string | null
+          session_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          proposer_creature_id?: string
+          proposer_id?: string
+          recipient_creature_id?: string
+          recipient_id?: string
+          responded_at?: string | null
+          session_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trades_proposer_creature_id_fkey"
+            columns: ["proposer_creature_id"]
+            isOneToOne: false
+            referencedRelation: "creatures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_recipient_creature_id_fkey"
+            columns: ["recipient_creature_id"]
+            isOneToOne: false
+            referencedRelation: "creatures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trophies: {
+        Row: {
+          created_at: string
+          criteria: Json
+          description: string
+          id: string
+          image_url: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          criteria?: Json
+          description?: string
+          id?: string
+          image_url?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          criteria?: Json
+          description?: string
+          id?: string
+          image_url?: string
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       close_expired_sessions: { Args: never; Returns: undefined }
+      execute_trade: {
+        Args: { p_trade_id: string; p_user_id: string }
+        Returns: undefined
+      }
       increment_player_stats: {
         Args: {
           p_exp: number
@@ -2662,7 +3120,6 @@ export type Database = {
           old_level: number
         }[]
       }
-      execute_trade: { Args: { p_trade_id: string; p_user_id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_in_session: { Args: { p_session_id: string }; Returns: boolean }
     }
